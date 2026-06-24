@@ -1,0 +1,13 @@
+Salve aqui os logos dos clientes com os nomes exatos:
+
+  duh-lanches.png
+  md-moveis.png
+  los-caldos.png
+  my-sorvetes.png
+  pedreirar.png
+  odonto-lura.png
+  sandubao.png
+  banca-jean.png
+
+Os logos aparecem com filter: grayscale + invert (brancos no fundo escuro).
+Para mudar o visual, edite o style.filter em src/app/page.tsx na seção "Cases / Clientes".

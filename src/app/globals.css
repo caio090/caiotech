@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ── Design tokens ──────────────────────────────────────────── */
+:root {
+  --lk-bg:      #0a0a0c;
+  --lk-card:    #13131a;
+  --lk-border:  #222230;
+  --lk-text:    #e8e8e8;
+  --lk-muted:   #555566;
+  --lk-accent:  #7b6ef6;
+  --lk-accent2: #e0635a;
+
+  --background: var(--lk-bg);
+  --foreground: var(--lk-text);
+}
+
+body {
+  background: var(--lk-bg);
+  color: var(--lk-text);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #333345; border-radius: 2px; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes lokat-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(1.07); }
+}
+@keyframes lokat-orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes lokat-orbit-rev {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+@keyframes lokat-fade-up {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes lokat-eye-blink {
+  0%, 88%, 100% { opacity: 1; }
+  92%           { opacity: 0.15; }
+}
+@keyframes lk-ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes lk-scroll-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.hero-fade-up    { animation: lokat-fade-up 0.75s cubic-bezier(0.16,1,0.3,1) both; }
+.hero-fade-up-d1 { animation: lokat-fade-up 0.75s 0.10s cubic-bezier(0.16,1,0.3,1) both; }
+.hero-fade-up-d2 { animation: lokat-fade-up 0.75s 0.20s cubic-bezier(0.16,1,0.3,1) both; }
+.hero-fade-up-d3 { animation: lokat-fade-up 0.75s 0.30s cubic-bezier(0.16,1,0.3,1) both; }
+.hero-robot-in   { animation: lokat-fade-up 1s 0.25s cubic-bezier(0.16,1,0.3,1) both; }
+.glow-pulse      { animation: lokat-glow 5s ease-in-out infinite; }
+.orbit-slow      { animation: lokat-orbit 22s linear infinite; transform-origin: center; }
+.orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; }
+.eye-blink       { animation: lokat-eye-blink 5s 2.5s ease-in-out infinite; }
+
+@keyframes lk-drop-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+.lk-drop-float { animation: lk-drop-float 4s ease-in-out infinite; }
+
+@keyframes robot-blink {
+  0%, 91%, 100% { transform: scaleY(0); opacity: 0; }
+  94%           { transform: scaleY(1); opacity: 1; }
+  97%           { transform: scaleY(0); opacity: 0; }
+}
+.robot-eye-l {
+  animation: robot-blink 4.5s 1.2s ease-in-out infinite;
+  transform: scaleY(0);
+}
+.robot-eye-r {
+  animation: robot-blink 4.5s 1.27s ease-in-out infinite;
+  transform: scaleY(0);
+}
+
+.lk-ticker-track {
+  display: inline-flex;
+  animation: lk-ticker 28s linear infinite;
+  white-space: nowrap;
+}
+.lk-ticker-track:hover { animation-play-state: paused; }
+
+.lk-logo-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5rem;
+  animation: lk-scroll-x 40s linear infinite;
+  will-change: transform;
+}
+
+/* ── Dark panel overrides ───────────────────────────────────── */
+/* Applied via .lk-dark class on admin/operacional layout wrappers */
+.lk-dark {
+  background: var(--lk-bg) !important;
+  color: var(--lk-text);
+}
+.lk-dark .bg-white    { background-color: var(--lk-card)   !important; }
+.lk-dark .bg-gray-50  { background-color: #0f0f18          !important; }
+.lk-dark .bg-gray-100 { background-color: #1a1a26          !important; }
+.lk-dark .bg-gray-200 { background-color: #252535          !important; }
+.lk-dark .border-gray-50  { border-color: #1a1a24 !important; }
+.lk-dark .border-gray-100 { border-color: var(--lk-border) !important; }
+.lk-dark .border-gray-200 { border-color: #2e2e40          !important; }
+.lk-dark .text-gray-900 { color: #eeeef0 !important; }
+.lk-dark .text-gray-800 { color: #d0d0dc !important; }
+.lk-dark .text-gray-700 { color: #b0b0c0 !important; }
+.lk-dark .text-gray-600 { color: #8888a0 !important; }
+.lk-dark .text-gray-500 { color: #66667a !important; }
+.lk-dark .text-gray-400 { color: #555568 !important; }
+.lk-dark input,
+.lk-dark textarea,
+.lk-dark select {
+  background: #1a1a28 !important;
+  color: #e8e8e8 !important;
+  border-color: #333348 !important;
+}
+.lk-dark input::placeholder,
+.lk-dark textarea::placeholder { color: #555568 !important; }
+.lk-dark .shadow-sm  { box-shadow: 0 1px 3px rgba(0,0,0,0.6) !important; }
+.lk-dark .shadow-md  { box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important; }
+.lk-dark .shadow-lg  { box-shadow: 0 8px 24px rgba(0,0,0,0.8) !important; }
+/* Scrollable tables */
+.lk-dark table { color: #d0d0dc; }
+.lk-dark thead { background: #0f0f18 !important; }
+.lk-dark tbody tr:hover { background: #161624 !important; }
+.lk-dark .divide-gray-50  > * + * { border-color: #1a1a24 !important; }
+.lk-dark .divide-gray-100 > * + * { border-color: var(--lk-border) !important; }
+.lk-dark .divide-y > * + * { border-color: var(--lk-border) !important; }
+
+/* ── Public page base ───────────────────────────────────────── */
+.lk-public {
+  background: var(--lk-bg);
+  color: var(--lk-text);
+  font-family: 'Space Grotesk', sans-serif;
+}
