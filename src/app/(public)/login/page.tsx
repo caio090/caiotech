@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { getRoleHome } from "@/lib/access-control";
-import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, GraduationCap, KeyRound } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, GraduationCap, KeyRound, Link2, ArrowRight } from "lucide-react";
 
 const DEMO_ROLES = [
   { label: "Admin",        desc: "Dashboard completo da agência",   href: "/admin/dashboard",        icon: ShieldCheck,   color: "bg-indigo-600 hover:bg-indigo-700" },
@@ -19,11 +19,28 @@ const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm o
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPwd, setShowPwd]       = useState(false);
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteErr, setInviteErr]   = useState("");
+
+  const handleInviteRedirect = () => {
+    setInviteErr("");
+    const raw = inviteCode.trim();
+    if (!raw) { setInviteErr("Cole o link ou código do convite."); return; }
+    // Extrair token de link ou usar direto como token
+    let token = raw;
+    try {
+      const url = new URL(raw);
+      const parts = url.pathname.split("/");
+      token = parts[parts.length - 1] || raw;
+    } catch {}
+    router.push(`/convite/${token}`);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +150,47 @@ export default function LoginPage() {
               Não tem conta?{" "}
               <Link href="/criar-conta" className="text-indigo-600 font-medium hover:underline">Criar conta grátis</Link>
             </p>
+
+            {/* ── Recebi um convite ── */}
+            <div className="mt-4 pt-4 border-t border-gray-50">
+              {!showInvite ? (
+                <button
+                  type="button"
+                  onClick={() => setShowInvite(true)}
+                  className="w-full flex items-center justify-center gap-2 text-xs text-gray-400 hover:text-indigo-600 transition-colors py-1"
+                >
+                  <Link2 className="w-3.5 h-3.5" /> Recebi um convite
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700">Link ou código do convite</label>
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="Cole o link ou o código aqui…"
+                    className="w-full border border-indigo-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors"
+                  />
+                  {inviteErr && <p className="text-xs text-red-500">{inviteErr}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowInvite(false); setInviteCode(""); setInviteErr(""); }}
+                      className="flex-1 text-xs text-gray-400 border border-gray-200 py-2 rounded-xl hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleInviteRedirect}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-indigo-600 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" /> Acessar convite
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           /* ── Modo demonstração ──────────────────────────── */

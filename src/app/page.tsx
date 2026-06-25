@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2 } from "lucide-react";
+import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, X, Check, Zap, ArrowRight } from "lucide-react";
 import type { ElementType } from "react";
 
 // ── Modules ──────────────────────────────────────────────────
@@ -39,14 +39,14 @@ const clients = [
 
 // ── Ticker content ───────────────────────────────────────────
 const tickerItems = [
-  "■ Marketing, conteúdo e operação em um único OS",
-  "✦ ContentOS · RecOS · GrowthOS · FinanceOS",
-  "■ Para empresas, agências e profissionais",
-  "✦ Automação com inteligência estratégica",
-  "■ Marketing, conteúdo e operação em um único OS",
-  "✦ ContentOS · RecOS · GrowthOS · FinanceOS",
-  "■ Para empresas, agências e profissionais",
-  "✦ Automação com inteligência estratégica",
+  "■ DO CONTEÚDO À VENDA EM UM ÚNICO OS",
+  "✦ CONTEÚDO · LEADS · FINANÇAS · APROVAÇÕES",
+  "■ PARA EMPRESAS, AGÊNCIAS E AUTÔNOMOS",
+  "✦ COM IA E AUTOMAÇÃO DO INÍCIO AO FIM",
+  "■ DO CONTEÚDO À VENDA EM UM ÚNICO OS",
+  "✦ CONTEÚDO · LEADS · FINANÇAS · APROVAÇÕES",
+  "■ PARA EMPRESAS, AGÊNCIAS E AUTÔNOMOS",
+  "✦ COM IA E AUTOMAÇÃO DO INÍCIO AO FIM",
 ];
 
 const S = {
@@ -90,8 +90,8 @@ export default function HomePage() {
           </div>
         ))}
 
-        <div className="hero-fade-up" style={{ fontSize: ".65rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".25rem .8rem", marginBottom: "2rem", display: "inline-block", ...S.mono }}>
-          [Sistema Operacional para Agências]
+        <div className="hero-fade-up" style={{ fontSize: ".65rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, border: `1px solid ${S.accent}30`, background: `${S.accent}10`, padding: ".25rem .8rem", marginBottom: "2rem", display: "inline-block", ...S.mono }}>
+          [OS do Marketing que Vende]
         </div>
 
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 w-full">
@@ -101,27 +101,27 @@ export default function HomePage() {
               className="hero-fade-up-d1"
               style={{ ...S.grotesk, fontSize: "clamp(2.8rem, 8vw, 6.5rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-.03em", color: S.text, marginBottom: "1.5rem" }}
             >
-              Marketing,<br />
-              <em style={{ fontStyle: "italic", color: S.accent }}>organizado</em><br />
-              e escalável.
+              Marketing que<br />
+              <em style={{ fontStyle: "italic", color: S.accent }}>funciona</em><br />
+              e gera resultado.
             </h1>
 
-            <p className="hero-fade-up-d2" style={{ ...S.grotesk, maxWidth: "480px", fontSize: "1rem", lineHeight: 1.7, color: S.muted, marginBottom: "2.5rem" }}>
-              Para empresas que querem autonomia e agências que precisam escalar. Conteúdo, aprovações, produção e resultados — em um único OS com IA.
+            <p className="hero-fade-up-d2" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "1rem", lineHeight: 1.7, color: S.muted, marginBottom: "2.5rem" }}>
+              Gerencie conteúdo, aprovações, leads e finanças em um único lugar — sem planilha, sem WhatsApp perdido, sem retrabalho. Com IA do início ao fim.
             </p>
 
             <div className="hero-fade-up-d3 flex flex-wrap gap-3">
               <Link
                 href="/diagnostico"
-                style={{ background: S.accent, color: "#fff", padding: ".75rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+                style={{ background: S.accent, color: "#fff", padding: ".85rem 2.2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
               >
-                ■ Fazer diagnóstico →
+                ■ Quero ver na prática →
               </Link>
               <a
                 href="#modulos"
-                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
               >
-                Ver como funciona
+                Ver a plataforma
               </a>
             </div>
 
@@ -240,21 +240,114 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
           {[
-            { emoji: "🏢", title: "Sou empresa ou autônomo", desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.", cta: "Começar →", href: "/criar-conta", accent: "#7b6ef6" },
-            { emoji: "🚀", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.", cta: "Ver plataforma →", href: "/plataforma", accent: "#a855f7" },
-            { emoji: "✅", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e relatórios da sua marca atendida.", cta: "Entrar →", href: "/login", accent: "#10b981" },
-            { emoji: "🔍", title: "Quero só um diagnóstico", desc: "Receba uma análise da sua presença digital antes de criar conta. Grátis e sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico", accent: "#f59e0b" },
+            { Icon: Building2, iconColor: "#7b6ef6", title: "Sou empresa ou autônomo", desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.", cta: "Começar →", href: "/criar-conta", accent: "#7b6ef6" },
+            { Icon: Rocket,    iconColor: "#a855f7", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.", cta: "Ver plataforma →", href: "/plataforma", accent: "#a855f7" },
+            { Icon: UserCheck, iconColor: "#10b981", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e relatórios da sua marca atendida.", cta: "Entrar →", href: "/login", accent: "#10b981" },
+            { Icon: ClipboardList, iconColor: "#f59e0b", title: "Quero só um diagnóstico", desc: "Receba uma análise da sua presença digital antes de criar conta. Grátis e sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico", accent: "#f59e0b" },
           ].map((item) => (
             <div key={item.title} className="p-6 md:p-8 flex flex-col" style={{ background: S.card, transition: "background .2s" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = S.card; }}
             >
-              <span style={{ fontSize: "1.6rem", marginBottom: ".8rem" }}>{item.emoji}</span>
+              <div style={{ width: "36px", height: "36px", background: `${item.iconColor}18`, border: `1px solid ${item.iconColor}30`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".85rem" }}>
+                <item.Icon style={{ width: "17px", height: "17px", color: item.iconColor }} strokeWidth={1.5} />
+              </div>
               <h3 style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".5rem", lineHeight: 1.3 }}>{item.title}</h3>
               <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted, flexGrow: 1, marginBottom: "1.2rem" }}>{item.desc}</p>
               <a href={item.href} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent, textDecoration: "none" }}>{item.cta}</a>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Do diagnóstico à execução ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
+        <div className="mb-10 text-center">
+          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[O processo]</p>
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Do diagnóstico à execução</h2>
+          <p style={{ ...S.grotesk, fontSize: ".85rem", color: S.muted, marginTop: ".6rem" }}>Cada módulo conectado ao próximo.</p>
+        </div>
+        <div style={{ position: "relative" }}>
+          {/* Linha conectora desktop */}
+          <div className="hidden lg:block" style={{ position: "absolute", top: "28px", left: "10%", right: "10%", height: "1px", background: `linear-gradient(to right, transparent, ${S.border}, ${S.accent}50, ${S.border}, transparent)` }} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              { num: "01", Icon: ClipboardList, color: "#7b6ef6", title: "Diagnóstico",   desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
+              { num: "02", Icon: Sparkles,      color: "#a855f7", title: "ContentOS",      desc: "Estratégia, campanhas, briefings, legendas e aprovações com IA." },
+              { num: "03", Icon: Video,          color: "#e0635a", title: "RecOS",          desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
+              { num: "04", Icon: DollarSign,     color: "#10b981", title: "FinanceOS",      desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
+              { num: "05", Icon: BarChart3,      color: "#3b82f6", title: "Relatórios",     desc: "Resultados, histórico, insights e próximos passos em painel claro." },
+            ].map((step) => (
+              <div key={step.num} className="flex flex-col items-center text-center p-5" style={{ background: S.card, border: `1px solid ${S.border}` }}>
+                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: `${step.color}18`, border: `2px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".8rem", position: "relative", zIndex: 1, backgroundColor: S.card }}>
+                  <step.Icon style={{ width: "18px", height: "18px", color: step.color }} strokeWidth={1.5} />
+                </div>
+                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color, marginBottom: ".3rem" }}>{step.num}</span>
+                <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".3rem" }}>{step.title}</p>
+                <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Antes e Depois ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
+        <div className="mb-8 text-center">
+          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Transformação]</p>
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Antes e depois</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
+          {/* Antes */}
+          <div className="p-6 md:p-8" style={{ background: "#0d0d14" }}>
+            <div className="flex items-center gap-2 mb-5">
+              <div style={{ width: "28px", height: "28px", background: "#ef444418", border: "1px solid #ef444430", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X style={{ width: "14px", height: "14px", color: "#ef4444" }} strokeWidth={2} />
+              </div>
+              <span style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#ef4444" }}>Antes</span>
+            </div>
+            <ul className="space-y-3">
+              {[
+                "Conteúdo aprovado por WhatsApp — sem rastreio",
+                "Cliente sem saber o status do post",
+                "Equipe sem prioridade definida",
+                "Financeiro em planilha separada",
+                "Relatório manual, demorado e impreciso",
+                "Briefings espalhados em e-mail e drive",
+                "Inadimplência descoberta tarde demais",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <X style={{ width: "13px", height: "13px", color: "#ef4444", flexShrink: 0, marginTop: "3px" }} strokeWidth={2.5} />
+                  <span style={{ ...S.grotesk, fontSize: ".75rem", color: S.muted, lineHeight: 1.5 }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* Depois */}
+          <div className="p-6 md:p-8" style={{ background: S.card }}>
+            <div className="flex items-center gap-2 mb-5">
+              <div style={{ width: "28px", height: "28px", background: "#10b98118", border: "1px solid #10b98130", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Check style={{ width: "14px", height: "14px", color: "#10b981" }} strokeWidth={2} />
+              </div>
+              <span style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#10b981" }}>Depois da LOKAT OS</span>
+            </div>
+            <ul className="space-y-3">
+              {[
+                "Aprovação por link público — com histórico e comentários",
+                "Calendário acessível para o cliente em tempo real",
+                "Equipe com tarefas, prioridade e status visíveis",
+                "FinanceOS com cobranças, status e histórico",
+                "Relatórios automáticos por cliente a cada mês",
+                "Briefings gerados com IA e aprovados em fluxo único",
+                "Inadimplência visível no painel com alerta automático",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <Check style={{ width: "13px", height: "13px", color: "#10b981", flexShrink: 0, marginTop: "3px" }} strokeWidth={2.5} />
+                  <span style={{ ...S.grotesk, fontSize: ".75rem", color: S.text, lineHeight: 1.5 }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -352,51 +445,76 @@ export default function HomePage() {
       </section>
 
       {/* ── CTA final ── */}
-      <section id="cta" style={{ background: S.accent, padding: "5rem 2rem", textAlign: "center" }}>
-        <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: "1rem" }}>[Pronto para começar?]</p>
-        <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.2rem)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: ".75rem" }}>
-          Diagnóstico gratuito.<br />Sem cartão de crédito.
-        </h2>
-        <p style={{ ...S.grotesk, color: "rgba(255,255,255,.75)", fontSize: ".95rem", maxWidth: "460px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
-          Entenda o potencial da sua presença digital e comece a organizar em minutos — seja você uma empresa, autônomo ou agência.
-        </p>
-        <div className="flex flex-wrap gap-3 justify-center">
-          <Link
-            href="/diagnostico"
-            style={{ background: "#fff", color: S.accent, padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
-          >
-            ■ Fazer diagnóstico →
-          </Link>
-          <Link
-            href="/criar-conta"
-            style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,.4)", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
-          >
-            Criar conta grátis
-          </Link>
-          <Link
-            href="/login"
-            style={{ background: "transparent", color: "rgba(255,255,255,.7)", border: "1px solid rgba(255,255,255,.2)", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
-          >
-            Já tenho conta
-          </Link>
+      <section id="cta" style={{ position: "relative", overflow: "hidden", padding: "6rem 2rem", textAlign: "center" }}>
+        {/* bg accent gradient */}
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${S.accent}22 0%, #a855f720 50%, ${S.accent}15 100%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, borderTop: `1px solid ${S.accent}30`, borderBottom: `1px solid ${S.accent}30`, pointerEvents: "none" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, marginBottom: "1rem" }}>[Pronto para começar?]</p>
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".75rem" }}>
+            Diagnóstico gratuito.<br />Resultado em minutos.
+          </h2>
+          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".95rem", maxWidth: "480px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
+            Entenda o potencial da sua presença digital e comece a organizar sem planilha, sem WhatsApp perdido e sem retrabalho.
+          </p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Link
+              href="/diagnostico"
+              style={{ background: S.accent, color: "#fff", padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
+            >
+              ■ Quero ver na prática →
+            </Link>
+            <Link
+              href="/criar-conta"
+              style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+            >
+              Criar conta grátis
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
       <footer style={{ borderTop: `1px solid ${S.border}`, padding: "3rem 2rem 2rem" }}>
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <span style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted }}>
-            © 2026 LOKAT OS — Marketing, conteúdo e operação em um único OS
-          </span>
-          <div className="flex gap-6">
-            {["Privacidade", "Termos", "Contato"].map((l) => (
-              <a key={l} href="#" style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted, textDecoration: "none" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = S.text)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = S.muted)}
-              >
-                {l}
-              </a>
-            ))}
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 mb-8 pb-8" style={{ borderBottom: `1px solid ${S.border}` }}>
+            <div>
+              <span style={{ ...S.mono, fontSize: ".8rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.text, fontWeight: 700 }}>LOKAT</span>
+              <p style={{ ...S.grotesk, fontSize: ".73rem", color: S.muted, marginTop: ".3rem", maxWidth: "260px" }}>
+                Marketing, conteúdo e operação em um único OS.
+              </p>
+            </div>
+            <div className="flex gap-8">
+              <div>
+                <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted, marginBottom: ".6rem" }}>Plataforma</p>
+                {[["LOKAT OS", "/"], ["LOKAT.REC", "/rec"], ["Diagnóstico", "/diagnostico"]].map(([l, h]) => (
+                  <a key={l} href={h} style={{ display: "block", ...S.grotesk, fontSize: ".75rem", color: S.muted, textDecoration: "none", marginBottom: ".35rem" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = S.text)}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = S.muted)}
+                  >{l}</a>
+                ))}
+              </div>
+              <div>
+                <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted, marginBottom: ".6rem" }}>Legal</p>
+                {["Privacidade", "Termos", "Contato"].map((l) => (
+                  <a key={l} href="#" style={{ display: "block", ...S.grotesk, fontSize: ".75rem", color: S.muted, textDecoration: "none", marginBottom: ".35rem" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = S.text)}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = S.muted)}
+                  >{l}</a>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <span style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted }}>
+              © 2026 LOKAT — Todos os direitos reservados
+            </span>
+            <a href="/rec" style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#c0392b", textDecoration: "none", border: "1px solid #c0392b40", padding: ".2rem .6rem" }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#c0392b80")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#c0392b40")}
+            >
+              LOKAT.REC →
+            </a>
           </div>
         </div>
       </footer>
