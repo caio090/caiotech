@@ -28,6 +28,17 @@ const PROD_OPTIONS = [
 
 type ProdOptionId = (typeof PROD_OPTIONS)[number]["id"];
 
+// Tipo validado para production_after_approval — lido pelo trigger SQL 27
+interface ProductionAfterApproval {
+  enabled: boolean;
+  task_type: string;
+  department: string;
+  assigned_role: string;
+  priority: string;
+  due_date: string | null;
+  internal_notes: string | null;
+}
+
 const PRIORITY_OPTIONS = [
   { id: "baixa", label: "Baixa" }, { id: "media", label: "Média" },
   { id: "alta",  label: "Alta"  }, { id: "urgente", label: "Urgente" },
@@ -543,6 +554,9 @@ export default function ContentosCriarPage() {
     setSubmitMode(mode);
     setSaving(true);
 
+    let newContentId: string | null = null;
+    let newClientId:  string | null = null;
+
     if (isSupabaseConfigured) {
       try {
         const supabase = createClient();
@@ -554,7 +568,7 @@ export default function ContentosCriarPage() {
 
         const dbStatus = mode === "producao" ? "em_producao" : mode === "agendar" ? "agendado" : "rascunho";
 
-        const { data: cd } = await supabase.from("content_items").insert({
+        const { data: cd, error: cdErr } = await supabase.from("content_items").insert({
           client_id: clientId, title,
           type:      isHybrid ? (hybridFormats[0] ?? null) : (tipo || null),
           channel:   canais.join(", ") || null, objective: objetivo || null,
@@ -565,13 +579,17 @@ export default function ContentosCriarPage() {
           metadata:             buildContentMetadata(),
         }).select("id").single();
 
-        if (cd?.id) { setSavedContentId(cd.id); setSavedClientId(clientId); }
+        if (cdErr) console.error("[criar] content_items:", cdErr);
+        if (cd?.id) {
+          newContentId = cd.id; newClientId = clientId;
+          setSavedContentId(cd.id); setSavedClientId(clientId);
+        }
       } catch (e) { console.error("[criar]", e); }
     }
 
     setSaving(false);
     setDone(true);
-    if (mode === "producao") setShowProdModal(true);
+    if (mode === "producao" && (!isSupabaseConfigured || newContentId)) setShowProdModal(true);
   }
 
   // ── Caminho B: aprovação → setor pós-aprovação ────────────────────────────────
@@ -595,12 +613,27 @@ export default function ContentosCriarPage() {
         setSavedTitle(title); setSavedClientName(clientName ?? "");
         preserveClient(clientId, clientName);
 
-        // Production config saved in content_item.metadata for DB trigger to read
-        const prodMeta = cfg.enabled ? {
-          enabled: true, task_type: optInfo.task_type, department: optInfo.department,
-          assigned_role: optInfo.assigned_role, priority: cfg.priority,
-          due_date: cfg.due_date || null, internal_notes: cfg.notes || null,
-        } : { enabled: false };
+        // Production config saved in content_item.metadata for DB trigger (SQL 27) to read.
+        // enabled must be explicit boolean true — trigger casts (v_prod->>'enabled')::boolean.
+        const prodMeta: ProductionAfterApproval = cfg.enabled && optInfo.task_type && optInfo.department
+          ? {
+              enabled: true,
+              task_type:      optInfo.task_type,
+              department:     optInfo.department,
+              assigned_role:  optInfo.assigned_role,
+              priority:       cfg.priority || "media",
+              due_date:       cfg.due_date || null,
+              internal_notes: cfg.notes    || null,
+            }
+          : {
+              enabled:        false,
+              task_type:      "",
+              department:     "",
+              assigned_role:  "",
+              priority:       "media",
+              due_date:       null,
+              internal_notes: null,
+            };
 
         const { data: cd } = await supabase.from("content_items").insert({
           client_id: clientId, title,
@@ -638,16 +671,16 @@ export default function ContentosCriarPage() {
   // ── Modal de produção direta (Caminho A, pós-criação) ────────────────────────
 
   async function handleSendToProd(cfg: ProdCfg) {
-    if (!savedContentId || sendingProd) return;
+    if (sendingProd) return;
     setSendingProd(true);
     const vs = buildVisualStructure();
 
-    if (isSupabaseConfigured) {
-      try {
+    try {
+      if (isSupabaseConfigured && savedContentId) {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
-        const { data: td } = await supabase.from("operational_tasks").insert({
+        const { data: td, error: tdErr } = await supabase.from("operational_tasks").insert({
           client_id: savedClientId, content_item_id: savedContentId,
           title:     savedTitle || tema.trim() || formatLabel,
           description: legenda || null,
@@ -665,11 +698,14 @@ export default function ContentosCriarPage() {
           },
         }).select("id").single();
 
+        if (tdErr) console.error("[criar] operational_tasks:", tdErr);
         if (td?.id) setSavedTaskId(td.id);
-      } catch (e) { console.error("[criar] prod:", e); }
+      }
+    } catch (e) {
+      console.error("[criar] prod:", e);
+    } finally {
+      setSendingProd(false); setSentToProd(true); setShowProdModal(false);
     }
-
-    setSendingProd(false); setSentToProd(true); setShowProdModal(false);
   }
 
   function resetWizard() {

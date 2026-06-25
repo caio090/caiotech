@@ -3,13 +3,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
-import { ArrowRight, Sparkles, Users, BookOpen, Shield, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Sparkles, Users, BookOpen, Shield, Loader2, Eye, EyeOff, Target, CalendarDays, CheckCircle2, BarChart2 } from "lucide-react";
+import type { ElementType } from "react";
 
-const perks = [
-  { icon: "🎯", text: "Diagnóstico gratuito da sua marca" },
-  { icon: "📅", text: "Calendário editorial montado pela equipe" },
-  { icon: "✅", text: "Aprovação de conteúdos pelo app" },
-  { icon: "📊", text: "Relatórios mensais de resultados" },
+const perks: { Icon: ElementType; text: string }[] = [
+  { Icon: Target,       text: "Diagnóstico gratuito da sua marca" },
+  { Icon: CalendarDays, text: "Calendário editorial montado pela equipe" },
+  { Icon: CheckCircle2, text: "Aprovação de conteúdos pelo app" },
+  { Icon: BarChart2,    text: "Relatórios mensais de resultados" },
 ];
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors";
@@ -122,7 +123,9 @@ export default function CriarContaPage() {
           <div className="space-y-3 mb-8">
             {perks.map((p) => (
               <div key={p.text} className="flex items-center gap-3">
-                <span className="text-xl">{p.icon}</span>
+                <div className="w-7 h-7 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <p.Icon className="w-3.5 h-3.5 text-indigo-500" strokeWidth={1.5} />
+                </div>
                 <span className="text-sm text-gray-600">{p.text}</span>
               </div>
             ))}

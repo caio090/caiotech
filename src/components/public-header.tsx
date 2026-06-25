@@ -10,7 +10,6 @@ const navLinks = [
   { href: "/diagnostico", label: "Diagnóstico" },
   { href: "/#contentos",  label: "ContentOS" },
   { href: "/planos",      label: "Planos" },
-  { href: "/academy",     label: "Academy" },
 ];
 
 export function PublicHeader() {

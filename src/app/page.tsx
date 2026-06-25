@@ -5,14 +5,24 @@ import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSear
 import type { ElementType } from "react";
 
 // ── Modules ──────────────────────────────────────────────────
-interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; }
+interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; coming?: boolean; }
 const modules: Module[] = [
-  { Icon: Users,         accent: "#7b6ef6", tag: "■ CRM",        num: "01", title: "Clientos",  desc: "CRM de clientes ativos com health status e linha do tempo completa." },
-  { Icon: Sparkles,      accent: "#a855f7", tag: "■ Conteúdo",   num: "02", title: "ContentOS", desc: "Criação, aprovação e publicação de conteúdo com IA integrada." },
-  { Icon: Video,         accent: "#e0635a", tag: "■ Audiovisual", num: "03", title: "RecOS",     desc: "Pré-produção audiovisual: roteiro, storyboard, shot list e gravação." },
-  { Icon: DollarSign,    accent: "#10b981", tag: "■ Finanças",    num: "04", title: "FinanceOS", desc: "Receitas, cobranças e fluxo de caixa centralizado em tempo real." },
-  { Icon: TrendingUp,    accent: "#3b82f6", tag: "■ Vendas",      num: "05", title: "GrowthOS",  desc: "Pipeline de vendas, leads, propostas e follow-ups automatizados." },
-  { Icon: GraduationCap, accent: "#f59e0b", tag: "■ Academy",     num: "06", title: "Academy",   desc: "Treinamento e onboarding da equipe em um único lugar integrado." },
+  { Icon: Users,         accent: "#7b6ef6", tag: "■ CRM",        num: "01", title: "Clientes",   desc: "Centralize clientes, histórico, entregas e relacionamento em um só lugar." },
+  { Icon: Sparkles,      accent: "#a855f7", tag: "■ Conteúdo",   num: "02", title: "ContentOS",  desc: "Planeje, crie e aprove conteúdos com mais velocidade e menos retrabalho." },
+  { Icon: Video,         accent: "#e0635a", tag: "■ Audiovisual", num: "03", title: "RecOS",      desc: "Organize roteiros, gravações e produção audiovisual com clareza." },
+  { Icon: DollarSign,    accent: "#10b981", tag: "■ Finanças",    num: "04", title: "FinanceOS",  desc: "Acompanhe cobranças, receitas e pagamentos sem perder o controle." },
+  { Icon: TrendingUp,    accent: "#3b82f6", tag: "■ Vendas",      num: "05", title: "GrowthOS",   desc: "Gerencie leads, propostas e oportunidades comerciais em um fluxo único." },
+  { Icon: GraduationCap, accent: "#f59e0b", tag: "■ Academy",     num: "06", title: "Academy",    desc: "Treinamento e onboarding da equipe — em breve.", coming: true },
+];
+
+// ── ContentOS features ────────────────────────────────────────
+const contentosFeatures: { Icon: ElementType; title: string; desc: string }[] = [
+  { Icon: FileSearch,   title: "Diagnóstico da marca",  desc: "Posicionamento, voz e público definidos antes de criar qualquer conteúdo." },
+  { Icon: CalendarDays, title: "Estratégia mensal",      desc: "Objetivos, formatos e canais planejados para o mês inteiro." },
+  { Icon: Calendar,     title: "Calendário editorial",   desc: "Publicações com datas, status e responsáveis em um único painel." },
+  { Icon: FileText,     title: "Roteiros e briefings",   desc: "Roteiros completos com legenda, CTA e referências visuais." },
+  { Icon: CheckCircle2, title: "Aprovação pelo cliente", desc: "Link de aprovação público — o cliente aprova sem precisar de login." },
+  { Icon: Video,        title: "Produção operacional",   desc: "Fluxo direto: briefing → produção → agendado → publicado." },
 ];
 
 // ── Client logos ─────────────────────────────────────────────
@@ -107,12 +117,12 @@ export default function HomePage() {
               >
                 ■ Fazer diagnóstico →
               </Link>
-              <Link
-                href="/plataforma"
+              <a
+                href="#modulos"
                 style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
               >
                 Ver como funciona
-              </Link>
+              </a>
             </div>
 
             <div className="hero-fade-up-d3 flex flex-wrap items-center gap-3 mt-8 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
@@ -123,7 +133,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Robot */}
+          {/* Drop visual */}
           <div className="relative hero-robot-in flex-shrink-0 w-full lg:w-[360px] h-[300px] lg:h-[500px] hidden lg:flex items-center justify-center">
             <div className="absolute inset-0 glow-pulse pointer-events-none rounded-full" style={{ background: "radial-gradient(circle at 50% 45%, rgba(123,110,246,0.2) 0%, rgba(139,92,246,0.07) 45%, transparent 70%)" }} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -155,15 +165,10 @@ export default function HomePage() {
                     <stop offset="100%" stopColor="#5040c0" stopOpacity="0.4" />
                   </linearGradient>
                 </defs>
-                {/* outer glow layer */}
                 <path d="M100 18 C148 78 178 122 178 165 C178 218 143 250 100 250 C57 250 22 218 22 165 C22 122 52 78 100 18Z" fill="#7b6ef6" opacity="0.18" />
-                {/* main drop fill */}
                 <path d="M100 22 C146 80 174 123 174 164 C174 215 141 247 100 247 C59 247 26 215 26 164 C26 123 54 80 100 22Z" fill="url(#dg)" />
-                {/* border stroke */}
                 <path d="M100 22 C146 80 174 123 174 164 C174 215 141 247 100 247 C59 247 26 215 26 164 C26 123 54 80 100 22Z" fill="none" stroke="url(#dborder)" strokeWidth="1.5" />
-                {/* specular highlight */}
                 <path d="M70 58 C78 46 92 38 104 37 C92 78 74 112 63 143 C50 114 56 76 70 58Z" fill="url(#dshine)" />
-                {/* tiny inner reflection dot */}
                 <ellipse cx="80" cy="82" rx="6" ry="9" fill="rgba(255,255,255,0.18)" />
               </svg>
             </div>
@@ -173,51 +178,18 @@ export default function HomePage() {
 
       {/* ── Info strip ── */}
       <div style={{ borderTop: `1px solid ${S.border}`, borderBottom: `1px solid ${S.border}` }}>
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-6">
-          <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted }}>IA · Automação · Dados · Conteúdo · Audiovisual</span>
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-6 overflow-x-auto">
+          <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, whiteSpace: "nowrap" }}>IA · Automação · Dados · Conteúdo · Audiovisual</span>
         </div>
       </div>
 
-      {/* ── Módulos ── */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="flex items-end justify-between mb-8 pb-4" style={{ borderBottom: `1px solid ${S.border}` }}>
-          <div>
-            <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Módulos]</p>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 4vw, 3rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>6 módulos. Um único OS.</h2>
-          </div>
-          <Link href="/plataforma" style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".4rem 1rem", textDecoration: "none", whiteSpace: "nowrap" }}>
-            ■ Ver tudo →
-          </Link>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
-          {modules.map((m) => (
-            <div
-              key={m.title}
-              style={{ background: S.card, padding: "1.5rem", position: "relative", transition: "background .2s", cursor: "default" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#191924")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = S.card)}
-            >
-              <div style={{ ...S.mono, fontSize: ".55rem", color: S.border, position: "absolute", top: ".5rem", left: ".5rem" }}>{m.num}</div>
-              <div style={{ width: "40px", height: "40px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
-                <m.Icon style={{ width: "18px", height: "18px", color: m.accent }} />
-              </div>
-              <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".15em", textTransform: "uppercase", color: m.accent, background: `${m.accent}15`, border: `1px solid ${m.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: ".5rem" }}>{m.tag}</span>
-              <div style={{ ...S.grotesk, fontSize: ".95rem", fontWeight: 600, color: S.text, marginBottom: ".5rem" }}>{m.title}</div>
-              <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Cases / Clientes ── */}
-      <section style={{ padding: "5rem 2rem 4rem", overflow: "hidden" }}>
-        <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".22em", textTransform: "uppercase", color: S.muted, textAlign: "center", marginBottom: "3rem" }}>
+      {/* ── Prova social — logos ── */}
+      <section className="py-12 md:py-16" style={{ overflow: "hidden" }}>
+        <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".22em", textTransform: "uppercase", color: S.muted, textAlign: "center", marginBottom: "2.5rem" }}>
           Empresas que confiam na Lokat
         </p>
-
-        <div style={{ overflow: "hidden", maskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)" }}>
-          <div className="lk-logo-track" style={{ display: "inline-flex", alignItems: "center", gap: "2.5rem" }}>
+        <div style={{ overflow: "hidden", maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)" }}>
+          <div className="lk-logo-track" style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem" }}>
             {[...clients, ...clients, ...clients].map((c, i) => (
               <div
                 key={i}
@@ -226,34 +198,24 @@ export default function HomePage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.07)",
                   borderRadius: "50%",
-                  padding: "0",
-                  minWidth: "88px",
-                  width: "88px",
-                  height: "88px",
+                  width: "76px",
+                  height: "76px",
                   filter: "grayscale(100%)",
-                  opacity: 0.5,
-                  transition: "opacity .3s ease, filter .3s ease, transform .3s ease",
+                  opacity: 0.45,
+                  transition: "opacity .3s, filter .3s, transform .3s",
                   cursor: "default",
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                  e.currentTarget.style.filter = "none";
-                  e.currentTarget.style.transform = "scale(1.04)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = "0.5";
-                  e.currentTarget.style.filter = "grayscale(100%)";
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "none"; e.currentTarget.style.transform = "scale(1.06)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.45"; e.currentTarget.style.filter = "grayscale(100%)"; e.currentTarget.style.transform = "scale(1)"; }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/clients/${c.file}`}
                   alt={c.name}
-                  style={{ height: "52px", width: "52px", objectFit: "contain", borderRadius: "4px" }}
+                  style={{ height: "44px", width: "44px", objectFit: "contain", borderRadius: "4px" }}
                   onError={(e) => {
                     const el = e.currentTarget;
                     el.style.display = "none";
@@ -261,7 +223,7 @@ export default function HomePage() {
                     if (next) next.style.display = "block";
                   }}
                 />
-                <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.muted, display: "none" }}>
+                <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted, display: "none" }}>
                   {c.name}
                 </span>
               </div>
@@ -270,75 +232,133 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Módulos ── */}
+      <section id="modulos" className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
+        <div className="flex items-end justify-between mb-8 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
+          <div>
+            <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Módulos]</p>
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.6rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>6 módulos. Um único OS.</h2>
+          </div>
+          <a
+            href="#contentos"
+            style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".4rem 1rem", textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            ■ Ver destaque →
+          </a>
+        </div>
+
+        {/* Grid: 1 col mobile, 2 col tablet, 3 col desktop — 6 cards = 3×2 perfeito */}
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+          style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}
+        >
+          {modules.map((m) => (
+            <div
+              key={m.title}
+              className="p-5 md:p-6"
+              style={{
+                background: m.coming ? "#0d0d14" : S.card,
+                position: "relative",
+                transition: "background .2s",
+                cursor: "default",
+                opacity: m.coming ? 0.55 : 1,
+              }}
+              onMouseEnter={(e) => { if (!m.coming) e.currentTarget.style.background = "#191924"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; }}
+            >
+              <div style={{ ...S.mono, fontSize: ".55rem", color: S.border, position: "absolute", top: ".5rem", left: ".5rem" }}>{m.num}</div>
+              {m.coming && (
+                <div style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#f59e0b", background: "#f59e0b18", border: "1px solid #f59e0b30", padding: ".15rem .5rem", position: "absolute", top: ".5rem", right: ".5rem" }}>
+                  em breve
+                </div>
+              )}
+              <div style={{ width: "38px", height: "38px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".85rem" }}>
+                <m.Icon style={{ width: "17px", height: "17px", color: m.accent }} strokeWidth={1.5} />
+              </div>
+              <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: m.accent, background: `${m.accent}15`, border: `1px solid ${m.accent}25`, padding: ".12rem .45rem", display: "inline-block", marginBottom: ".45rem" }}>{m.tag}</span>
+              <div style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 600, color: S.text, marginBottom: ".4rem" }}>{m.title}</div>
+              <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── ContentOS feature ── */}
-      <section id="contentos" className="max-w-6xl mx-auto px-6 py-20">
+      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
         <div style={{ border: `1px solid ${S.border}`, background: S.card }}>
-          <div className="p-8 md:p-12" style={{ borderBottom: `1px solid ${S.border}` }}>
-            <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.accent, background: `${S.accent}15`, border: `1px solid ${S.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: "1rem" }}>■ Módulo ContentOS</span>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".75rem" }}>
+          {/* Header */}
+          <div className="p-6 md:p-10" style={{ borderBottom: `1px solid ${S.border}` }}>
+            <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.accent, background: `${S.accent}15`, border: `1px solid ${S.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: ".85rem" }}>■ Módulo ContentOS</span>
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.6rem, 4vw, 2.6rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".65rem" }}>
               Content OS
             </h2>
-            <p style={{ ...S.grotesk, color: S.muted, fontSize: "1rem", maxWidth: "520px", lineHeight: 1.7 }}>
-              ContentOS é o módulo de criação de conteúdo da LOKAT OS — do diagnóstico de marca até a análise de resultados, tudo em um fluxo único e colaborativo.
+            <p style={{ ...S.grotesk, color: S.muted, fontSize: ".95rem", maxWidth: "500px", lineHeight: 1.7 }}>
+              Do diagnóstico de marca até a publicação aprovada — tudo em um fluxo único, sem planilhas, sem WhatsApp perdido.
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1px", background: S.border }}>
-            {([
-              { Icon: FileSearch,   title: "Diagnóstico da marca",  desc: "Posicionamento, voz e público antes de criar qualquer conteúdo." },
-              { Icon: CalendarDays, title: "Estratégia mensal",      desc: "Objetivos, formatos e canais para o mês inteiro de forma estruturada." },
-              { Icon: Calendar,     title: "Calendário editorial",   desc: "Todas as publicações com datas, status e responsáveis." },
-              { Icon: FileText,     title: "Roteiros e briefings",   desc: "Roteiros completos com legenda, CTA e referências visuais." },
-              { Icon: CheckCircle2, title: "Aprovação pelo cliente", desc: "Link de aprovação público — sem login do cliente." },
-              { Icon: Video,        title: "Produção operacional",   desc: "Fluxo: rascunho → revisão → aprovado → agendado → publicado." },
-            ] as { Icon: ElementType; title: string; desc: string }[]).map((f) => (
-              <div key={f.title} style={{ background: S.card, padding: "1.5rem" }}>
-                <div style={{ width: "36px", height: "36px", background: `${S.accent}18`, border: `1px solid ${S.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".75rem" }}>
-                  <f.Icon style={{ width: "16px", height: "16px", color: S.accent }} />
+          {/* Features grid: 1 col mobile, 2 col tablet, 3 col desktop */}
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+            style={{ gap: "1px", background: S.border }}
+          >
+            {contentosFeatures.map((f) => (
+              <div key={f.title} className="p-5 md:p-6" style={{ background: S.card }}>
+                <div style={{ width: "34px", height: "34px", background: `${S.accent}18`, border: `1px solid ${S.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".65rem" }}>
+                  <f.Icon style={{ width: "15px", height: "15px", color: S.accent }} strokeWidth={1.5} />
                 </div>
-                <p style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 600, color: S.text, marginBottom: ".3rem" }}>{f.title}</p>
-                <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.6, color: S.muted }}>{f.desc}</p>
+                <p style={{ ...S.grotesk, fontSize: ".83rem", fontWeight: 600, color: S.text, marginBottom: ".3rem" }}>{f.title}</p>
+                <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted }}>{f.desc}</p>
               </div>
             ))}
           </div>
 
-          <div className="p-8 flex flex-wrap gap-3">
-            <Link href="/login" style={{ background: S.accent, color: "#fff", padding: ".75rem 1.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
-              ■ Entrar no sistema →
+          {/* CTAs */}
+          <div className="p-6 md:p-8 flex flex-wrap gap-3">
+            <Link href="/criar-conta" style={{ background: S.accent, color: "#fff", padding: ".75rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
+              ■ Começar agora →
             </Link>
-            <Link href="/plataforma" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 1.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
+            <Link href="/plataforma" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
               Ver a plataforma
             </Link>
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section style={{ background: S.accent, padding: "5rem 2rem", textAlign: "center" }}>
+      {/* ── CTA final ── */}
+      <section id="cta" style={{ background: S.accent, padding: "5rem 2rem", textAlign: "center" }}>
         <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: "1rem" }}>[Pronto para começar?]</p>
-        <h2 style={{ ...S.grotesk, fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: "1rem" }}>
-          Acesse agora e explore o sistema.
+        <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.2rem)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: ".75rem" }}>
+          Diagnóstico gratuito.<br />Sem cartão de crédito.
         </h2>
-        <p style={{ ...S.grotesk, color: "rgba(255,255,255,.7)", fontSize: "1rem", marginBottom: "2.5rem", maxWidth: "480px", margin: "0 auto 2.5rem" }}>
-          Perfis de demonstração disponíveis. Sem cartão de crédito.
+        <p style={{ ...S.grotesk, color: "rgba(255,255,255,.75)", fontSize: ".95rem", maxWidth: "420px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
+          Entenda o que está travando sua agência e comece a organizar em minutos.
         </p>
-        <Link
-          href="/login"
-          style={{ background: "#fff", color: S.accent, padding: ".85rem 2.5rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
-        >
-          ■ Entrar na demonstração →
-        </Link>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Link
+            href="https://www.lokat.com.br/criar-conta"
+            style={{ background: "#fff", color: S.accent, padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
+          >
+            ■ Fazer diagnóstico →
+          </Link>
+          <Link
+            href="/login"
+            style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,.4)", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+          >
+            Já tenho conta
+          </Link>
+        </div>
       </section>
 
       {/* ── Footer ── */}
       <footer style={{ borderTop: `1px solid ${S.border}`, padding: "3rem 2rem 2rem" }}>
-        <div className="max-w-6xl mx-auto flex justify-between items-center flex-wrap gap-4">
-          <span style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted }}>
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+          <span style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted }}>
             © 2026 LOKAT OS — O sistema operacional do seu negócio
           </span>
           <div className="flex gap-6">
             {["Privacidade", "Termos", "Contato"].map((l) => (
-              <a key={l} href="#" style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted, textDecoration: "none" }}
+              <a key={l} href="#" style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted, textDecoration: "none" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = S.text)}
                 onMouseLeave={(e) => (e.currentTarget.style.color = S.muted)}
               >

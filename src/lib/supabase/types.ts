@@ -102,6 +102,7 @@ export interface DbApproval {
   created_at: string;
   approval_sent_at?: string | null;
   approval_due_at?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /** Approval joined with its content item (for list pages and public approval page) */

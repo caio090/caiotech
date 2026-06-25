@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { getRoleHome } from "@/lib/access-control";
-import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, GraduationCap } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, GraduationCap, KeyRound } from "lucide-react";
 
 const DEMO_ROLES = [
   { label: "Admin",        desc: "Dashboard completo da agência",   href: "/admin/dashboard",        icon: ShieldCheck,   color: "bg-indigo-600 hover:bg-indigo-700" },
@@ -113,6 +113,12 @@ export default function LoginPage() {
                   {error}
                 </p>
               )}
+
+              <div className="flex justify-end -mt-1">
+                <Link href="/recuperar-senha" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                  <KeyRound className="w-3 h-3" /> Esqueci minha senha
+                </Link>
+              </div>
 
               <button
                 type="submit"

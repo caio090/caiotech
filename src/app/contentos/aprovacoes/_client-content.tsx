@@ -5,7 +5,7 @@ import { mockApprovals } from "@/data/mock-data";
 import { cn } from "@/lib/utils";
 import {
   CalendarDays, AlertTriangle, Copy, MessageCircle, CheckCircle, XCircle, Clock,
-  X, Send, ArrowRight,
+  X, Send, ArrowRight, ClipboardList,
 } from "lucide-react";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import type { DbApprovalWithContent } from "@/lib/supabase/types";
@@ -75,6 +75,7 @@ interface UiApproval {
   approvalSentAt: string | null;
   approvalDueAt: string | null;
   clientComment: string | null;
+  operationalTaskId: string | null;
 }
 
 // ── ApprovalDetailModal ───────────────────────────────────────
@@ -169,8 +170,26 @@ function ApprovalDetailModal({
               <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-bold text-emerald-800">Cliente aprovou este conteúdo</p>
-                <p className="text-xs text-emerald-600 mt-0.5">Próximo passo: enviar para produção.</p>
+                <p className="text-xs text-emerald-600 mt-0.5">
+                  {item.operationalTaskId
+                    ? "Tarefa de produção criada automaticamente."
+                    : "Próximo passo: enviar para produção."}
+                </p>
               </div>
+            </div>
+          )}
+
+          {/* Badge tarefa criada automaticamente pelo trigger */}
+          {item.status === "approved" && item.operationalTaskId && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-indigo-500 flex-shrink-0" strokeWidth={1.5} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-indigo-800">Produção automática ativada</p>
+                <p className="text-xs text-indigo-500 mt-0.5 font-mono truncate">#{item.operationalTaskId.slice(0, 8)}</p>
+              </div>
+              <span className="text-[9px] font-black tracking-widest text-indigo-400 uppercase bg-indigo-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                AUTO
+              </span>
             </div>
           )}
 
@@ -352,7 +371,8 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId 
         token:          a.public_token,
         approvalSentAt: a.approval_sent_at ?? a.created_at,
         approvalDueAt:  a.approval_due_at ?? null,
-        clientComment:  a.client_comment ?? null,
+        clientComment:     a.client_comment ?? null,
+        operationalTaskId: (a.metadata as Record<string, string> | null)?.operational_task_id ?? null,
       };
     });
   } else {
@@ -374,7 +394,8 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId 
       token:          null,
       approvalSentAt: new Date(_NOW - i * 8 * 3600000).toISOString(),
       approvalDueAt:  new Date(_NOW + (48 - i * 8) * 3600000).toISOString(),
-      clientComment:  null,
+      clientComment:     null,
+      operationalTaskId: null,
     }));
   }
 

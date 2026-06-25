@@ -26,6 +26,8 @@ body {
 
 * { box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
 /* ── Scrollbar ──────────────────────────────────────────────── */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
