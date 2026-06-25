@@ -1,5 +1,7 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ClipboardList, FileSearch, Users, TrendingUp, Eye, Megaphone, MessageSquare, BarChart3 } from "lucide-react";
-import Link from "next/link";
 
 const QUESTIONS = [
   {
@@ -119,6 +121,26 @@ const QUESTIONS = [
 ];
 
 export default function DiagnosticoPage() {
+  const router = useRouter();
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [error, setError] = useState(false);
+
+  const answered = Object.keys(answers).filter((k) => answers[k]).length;
+  const allAnswered = answered === QUESTIONS.length;
+
+  const handleChange = (id: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSubmit = () => {
+    if (!allAnswered) { setError(true); return; }
+    setError(false);
+    try {
+      sessionStorage.setItem("lokat_diagnostico_answers", JSON.stringify(answers));
+    } catch {}
+    router.push("/diagnostico/resultado");
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
       <div className="text-center mb-10">
@@ -132,14 +154,29 @@ export default function DiagnosticoPage() {
         </p>
       </div>
 
+      {/* Progress */}
+      <div className="mb-6">
+        <div className="flex justify-between text-xs text-gray-400 mb-1">
+          <span>{answered} de {QUESTIONS.length} respondidas</span>
+          <span>{Math.round((answered / QUESTIONS.length) * 100)}%</span>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+            style={{ width: `${(answered / QUESTIONS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
       <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-7">
         {QUESTIONS.map((q, i) => {
           const Icon = q.icon;
+          const missing = error && !answers[q.id];
           return (
             <div key={q.id}>
               <div className="flex items-start gap-3 mb-1">
-                <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Icon className="w-3.5 h-3.5 text-indigo-600" />
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${missing ? "bg-red-50" : "bg-indigo-50"}`}>
+                  <Icon className={`w-3.5 h-3.5 ${missing ? "text-red-400" : "text-indigo-600"}`} />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-gray-800 mb-1">
@@ -150,14 +187,24 @@ export default function DiagnosticoPage() {
                   )}
                   <select
                     name={q.id}
-                    defaultValue=""
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-indigo-400 transition-colors bg-white hover:border-gray-300"
+                    value={answers[q.id] ?? ""}
+                    onChange={(e) => handleChange(q.id, e.target.value)}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none transition-colors bg-white ${
+                      missing
+                        ? "border-red-300 focus:border-red-400"
+                        : answers[q.id]
+                        ? "border-indigo-300 focus:border-indigo-400"
+                        : "border-gray-200 hover:border-gray-300 focus:border-indigo-400"
+                    }`}
                   >
                     <option value="" disabled>Selecione uma opção…</option>
                     {q.options.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
+                  {missing && (
+                    <p className="text-[11px] text-red-400 mt-1">Por favor, selecione uma opção.</p>
+                  )}
                 </div>
               </div>
               {i < QUESTIONS.length - 1 && (
@@ -168,15 +215,22 @@ export default function DiagnosticoPage() {
         })}
 
         <div className="pt-2">
-          <Link
-            href="/admin/diagnosticos"
-            className="flex items-center justify-center gap-2 w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors text-sm"
+          <button
+            onClick={handleSubmit}
+            className={`flex items-center justify-center gap-2 w-full py-3.5 font-bold rounded-xl text-sm transition-colors ${
+              allAnswered
+                ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                : "bg-indigo-100 text-indigo-400 cursor-not-allowed"
+            }`}
           >
             <FileSearch className="w-4 h-4" />
             Ver resultado do diagnóstico
-          </Link>
+          </button>
+          {error && !allAnswered && (
+            <p className="text-center text-xs text-red-400 mt-2">Responda todas as perguntas antes de continuar.</p>
+          )}
           <p className="text-center text-xs text-gray-400 mt-3">
-            Suas respostas ajudam a identificar oportunidades de crescimento digital.
+            Suas respostas ajudam a identificar oportunidades de crescimento digital. Sem cadastro necessário.
           </p>
         </div>
       </div>

@@ -39,13 +39,13 @@ const clients = [
 
 // ── Ticker content ───────────────────────────────────────────
 const tickerItems = [
-  "■ Sistema operacional para agências",
+  "■ Marketing, conteúdo e operação em um único OS",
   "✦ ContentOS · RecOS · GrowthOS · FinanceOS",
-  "■ Cases reais. Resultados mensuráveis.",
+  "■ Para empresas, agências e profissionais",
   "✦ Automação com inteligência estratégica",
-  "■ Sistema operacional para agências",
+  "■ Marketing, conteúdo e operação em um único OS",
   "✦ ContentOS · RecOS · GrowthOS · FinanceOS",
-  "■ Cases reais. Resultados mensuráveis.",
+  "■ Para empresas, agências e profissionais",
   "✦ Automação com inteligência estratégica",
 ];
 
@@ -101,13 +101,13 @@ export default function HomePage() {
               className="hero-fade-up-d1"
               style={{ ...S.grotesk, fontSize: "clamp(2.8rem, 8vw, 6.5rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-.03em", color: S.text, marginBottom: "1.5rem" }}
             >
-              Atendimento,<br />
+              Marketing,<br />
               <em style={{ fontStyle: "italic", color: S.accent }}>organizado</em><br />
               e escalável.
             </h1>
 
             <p className="hero-fade-up-d2" style={{ ...S.grotesk, maxWidth: "480px", fontSize: "1rem", lineHeight: 1.7, color: S.muted, marginBottom: "2.5rem" }}>
-              LOKAT OS é o sistema central da sua agência. Clientes, conteúdo, audiovisual, financeiro e vendas — integrados em um único OS.
+              Para empresas que querem autonomia e agências que precisam escalar. Conteúdo, aprovações, produção e resultados — em um único OS com IA.
             </p>
 
             <div className="hero-fade-up-d3 flex flex-wrap gap-3">
@@ -125,11 +125,11 @@ export default function HomePage() {
               </a>
             </div>
 
-            <div className="hero-fade-up-d3 flex flex-wrap items-center gap-3 mt-8 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
-              <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted }}>Um ecossistema</span>
-              <span style={{ ...S.mono, fontWeight: 700, fontSize: ".8rem", color: S.text }}>
-                Lokat<span style={{ color: S.accent }}>.</span><span style={{ color: S.muted, fontWeight: 400 }}>REC</span>
-              </span>
+            <div className="hero-fade-up-d3 flex flex-wrap items-center gap-4 mt-8 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
+              <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted }}>Para</span>
+              {["Empresas", "Agências", "Autônomos"].map((l) => (
+                <span key={l} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".15rem .6rem" }}>{l}</span>
+              ))}
             </div>
           </div>
 
@@ -232,6 +232,32 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Escolha seu caminho ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
+        <div className="mb-8 text-center">
+          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Para quem é?]</p>
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Escolha seu caminho</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
+          {[
+            { emoji: "🏢", title: "Sou empresa ou autônomo", desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.", cta: "Começar →", href: "/criar-conta", accent: "#7b6ef6" },
+            { emoji: "🚀", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.", cta: "Ver plataforma →", href: "/plataforma", accent: "#a855f7" },
+            { emoji: "✅", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e relatórios da sua marca atendida.", cta: "Entrar →", href: "/login", accent: "#10b981" },
+            { emoji: "🔍", title: "Quero só um diagnóstico", desc: "Receba uma análise da sua presença digital antes de criar conta. Grátis e sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico", accent: "#f59e0b" },
+          ].map((item) => (
+            <div key={item.title} className="p-6 md:p-8 flex flex-col" style={{ background: S.card, transition: "background .2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = S.card; }}
+            >
+              <span style={{ fontSize: "1.6rem", marginBottom: ".8rem" }}>{item.emoji}</span>
+              <h3 style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".5rem", lineHeight: 1.3 }}>{item.title}</h3>
+              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted, flexGrow: 1, marginBottom: "1.2rem" }}>{item.desc}</p>
+              <a href={item.href} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent, textDecoration: "none" }}>{item.cta}</a>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── Módulos ── */}
       <section id="modulos" className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
         <div className="flex items-end justify-between mb-8 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
@@ -331,19 +357,25 @@ export default function HomePage() {
         <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.2rem)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: ".75rem" }}>
           Diagnóstico gratuito.<br />Sem cartão de crédito.
         </h2>
-        <p style={{ ...S.grotesk, color: "rgba(255,255,255,.75)", fontSize: ".95rem", maxWidth: "420px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
-          Entenda o que está travando sua agência e comece a organizar em minutos.
+        <p style={{ ...S.grotesk, color: "rgba(255,255,255,.75)", fontSize: ".95rem", maxWidth: "460px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
+          Entenda o potencial da sua presença digital e comece a organizar em minutos — seja você uma empresa, autônomo ou agência.
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
           <Link
-            href="https://www.lokat.com.br/criar-conta"
+            href="/diagnostico"
             style={{ background: "#fff", color: S.accent, padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
           >
             ■ Fazer diagnóstico →
           </Link>
           <Link
-            href="/login"
+            href="/criar-conta"
             style={{ background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,.4)", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+          >
+            Criar conta grátis
+          </Link>
+          <Link
+            href="/login"
+            style={{ background: "transparent", color: "rgba(255,255,255,.7)", border: "1px solid rgba(255,255,255,.2)", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
           >
             Já tenho conta
           </Link>
@@ -354,7 +386,7 @@ export default function HomePage() {
       <footer style={{ borderTop: `1px solid ${S.border}`, padding: "3rem 2rem 2rem" }}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <span style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted }}>
-            © 2026 LOKAT OS — O sistema operacional do seu negócio
+            © 2026 LOKAT OS — Marketing, conteúdo e operação em um único OS
           </span>
           <div className="flex gap-6">
             {["Privacidade", "Termos", "Contato"].map((l) => (
