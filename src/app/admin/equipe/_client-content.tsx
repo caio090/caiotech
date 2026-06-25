@@ -10,6 +10,7 @@ import {
   UserPlus, KeyRound, BadgeCheck, XCircle, Clock3,
   ExternalLink, BriefcaseBusiness, ChevronDown, ChevronUp,
   MoreVertical, Archive, ArchiveRestore, Trash2, TestTube2,
+  Ban, RefreshCw,
 } from "lucide-react";
 import type { DbProfile } from "@/lib/supabase/types";
 
@@ -40,6 +41,18 @@ function formatDate(iso: string) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface TeamInvite {
+  id: string;
+  token: string;
+  email: string | null;
+  name:  string | null;
+  role:  string;
+  department: string | null;
+  status: "pending" | "sent" | "accepted" | "expired" | "cancelled";
+  expires_at: string | null;
+  created_at: string;
+}
 
 interface AccessRequest {
   id: string;
@@ -444,7 +457,14 @@ interface Props {
 
 export function AdminEquipeContent({ serverProfiles }: Props) {
   const serverHasReal = serverProfiles !== null && serverProfiles.length > 0;
-  const [activeTab, setActiveTab] = useState<"equipe" | "solicitacoes">("equipe");
+  const [activeTab, setActiveTab] = useState<"equipe" | "solicitacoes" | "convites">("equipe");
+
+  // ── Convites tab state ──
+  const [invites,        setInvites]        = useState<TeamInvite[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [invitesFetched, setInvitesFetched] = useState(false);
+  const [cancellingId,   setCancellingId]   = useState<string | null>(null);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
 
   // ── Equipe tab state ──
   const [isFetching,         setIsFetching]         = useState(isSupabaseConfigured && !serverHasReal);
@@ -487,6 +507,33 @@ export function AdminEquipeContent({ serverProfiles }: Props) {
     })();
     return () => { cancelled = true; };
   }, [serverHasReal]);
+
+  // Fetch convites when tab opens
+  useEffect(() => {
+    if (activeTab !== "convites" || invitesFetched || !isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      setInvitesLoading(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("team_invites")
+          .select("id, token, email, name, role, department, status, expires_at, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (!cancelled) {
+          if (error) { console.error("[equipe] invites:", error.message); setInvites([]); }
+          else { setInvites((data as TeamInvite[]) ?? []); }
+          setInvitesFetched(true);
+          setInvitesLoading(false);
+        }
+      } catch {
+        if (!cancelled) { setInvites([]); setInvitesFetched(true); setInvitesLoading(false); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, invitesFetched]);
 
   // Fetch access requests when tab opens (skipped in demo mode — state seeded above)
   useEffect(() => {
@@ -533,6 +580,28 @@ export function AdminEquipeContent({ serverProfiles }: Props) {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!confirm("Cancelar este convite? O link deixará de funcionar.")) return;
+    setCancellingId(inviteId);
+    try {
+      if (isSupabaseConfigured) {
+        const supabase = createClient();
+        await supabase.from("team_invites").update({ status: "cancelled" }).eq("id", inviteId);
+      }
+      setInvites((prev) => prev.map((inv) => inv.id === inviteId ? { ...inv, status: "cancelled" } : inv));
+      showToast("Convite cancelado.");
+    } catch { showToast("Erro ao cancelar convite."); }
+    finally { setCancellingId(null); }
+  };
+
+  const handleCopyInviteLink = (token: string, inviteId: string) => {
+    const url = `${window.location.origin}/convite/${token}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedInviteId(inviteId);
+      setTimeout(() => setCopiedInviteId(null), 2000);
+    });
   };
 
   const handleArchive = async (profileId: string, archive: boolean) => {
@@ -658,22 +727,27 @@ export function AdminEquipeContent({ serverProfiles }: Props) {
       </PageHeader>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 bg-gray-100 p-1 rounded-2xl w-fit">
+      <div className="flex items-center gap-1 mb-6 bg-gray-100 p-1 rounded-2xl w-fit flex-wrap">
         <button
           onClick={() => setActiveTab("equipe")}
-          className={cn(
-            "text-sm font-medium px-4 py-2 rounded-xl transition-all",
-            activeTab === "equipe" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-          )}
+          className={cn("text-sm font-medium px-4 py-2 rounded-xl transition-all", activeTab === "equipe" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
         >
           Equipe ativa
         </button>
         <button
-          onClick={() => setActiveTab("solicitacoes")}
-          className={cn(
-            "text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2",
-            activeTab === "solicitacoes" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          onClick={() => setActiveTab("convites")}
+          className={cn("text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2", activeTab === "convites" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+        >
+          Convites
+          {invites.filter((i) => i.status === "pending" || i.status === "sent").length > 0 && (
+            <span className="bg-indigo-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {invites.filter((i) => i.status === "pending" || i.status === "sent").length}
+            </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab("solicitacoes")}
+          className={cn("text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2", activeTab === "solicitacoes" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
         >
           Solicitações
           {pendingCount > 0 && (
@@ -830,6 +904,104 @@ export function AdminEquipeContent({ serverProfiles }: Props) {
             </button>
           </div>
         </>
+      )}
+
+      {/* ── Tab: Convites ── */}
+      {activeTab === "convites" && (
+        <div>
+          {!isSupabaseConfigured && (
+            <div className="mb-4 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              Supabase não configurado — convites reais indisponíveis
+            </div>
+          )}
+
+          {invitesLoading && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 py-8">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Carregando convites…
+            </div>
+          )}
+
+          {!invitesLoading && isSupabaseConfigured && invites.length === 0 && invitesFetched && (
+            <div className="text-center py-16">
+              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <KeyRound className="w-7 h-7 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-600 mb-1">Nenhum convite gerado</p>
+              <p className="text-xs text-gray-400">Convites gerados aparecerão aqui.</p>
+            </div>
+          )}
+
+          {!invitesLoading && invites.length > 0 && (
+            <div className="space-y-3">
+              {invites.map((inv) => {
+                const isActive   = inv.status === "pending" || inv.status === "sent";
+                const isExpired  = inv.status === "expired" || (inv.expires_at ? new Date(inv.expires_at) < new Date() : false);
+                const roleInfo   = ROLE_CONFIG[inv.role] ?? { label: inv.role, color: "bg-gray-100 text-gray-600" };
+                const isCopied   = copiedInviteId === inv.id;
+                const isCancelling = cancellingId === inv.id;
+
+                const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+                  pending:   { label: "Pendente",   cls: "bg-amber-100 text-amber-700" },
+                  sent:      { label: "Enviado",    cls: "bg-blue-100 text-blue-700" },
+                  accepted:  { label: "Aceito",     cls: "bg-emerald-100 text-emerald-700" },
+                  expired:   { label: "Expirado",   cls: "bg-gray-100 text-gray-500" },
+                  cancelled: { label: "Cancelado",  cls: "bg-red-100 text-red-600" },
+                };
+                const statusInfo = STATUS_MAP[isExpired && isActive ? "expired" : inv.status] ?? STATUS_MAP.pending;
+
+                return (
+                  <div key={inv.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", inv.status === "accepted" ? "bg-emerald-100" : "bg-indigo-100")}>
+                        <KeyRound className={cn("w-4 h-4", inv.status === "accepted" ? "text-emerald-600" : "text-indigo-600")} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-gray-900 truncate">{inv.name ?? inv.email ?? "Sem nome"}</span>
+                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", statusInfo.cls)}>{statusInfo.label}</span>
+                          <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-md", roleInfo.color)}>{roleInfo.label}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5 flex-wrap">
+                          {inv.email && <span className="truncate">{inv.email}</span>}
+                          {inv.department && <span>{inv.department}</span>}
+                          <span>Criado {formatDate(inv.created_at)}</span>
+                          {inv.expires_at && <span>Expira {formatDate(inv.expires_at)}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions — apenas para convites não encerrados */}
+                    {inv.status !== "accepted" && inv.status !== "cancelled" && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50 flex-wrap">
+                        <button
+                          onClick={() => handleCopyInviteLink(inv.token, inv.id)}
+                          className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors", isCopied ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "border-gray-200 text-gray-600 hover:bg-gray-50")}
+                        >
+                          {isCopied ? <><Check className="w-3 h-3" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar link</>}
+                        </button>
+                        <button
+                          onClick={() => { setInvitesFetched(false); }}
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Atualizar
+                        </button>
+                        <button
+                          onClick={() => handleCancelInvite(inv.id)}
+                          disabled={isCancelling}
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 ml-auto"
+                        >
+                          {isCancelling ? <><Loader2 className="w-3 h-3 animate-spin" /> Cancelando…</> : <><Ban className="w-3 h-3" /> Cancelar convite</>}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Tab: Solicitações ── */}
