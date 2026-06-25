@@ -1,7 +1,7 @@
 "use client";
 import { PageHeader } from "@/components/page-header";
 import { useState, useEffect } from "react";
-import { Loader2, CheckCircle2, XCircle, Mic, Sparkles, RefreshCw, Bot, Zap, FileText, MessageSquare, Brain, Mic2, Instagram } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Mic, Sparkles, RefreshCw, Bot, Zap, FileText, MessageSquare, Brain, Mic2, Share2, Link } from "lucide-react";
 
 const VOICE_ENABLED_KEY = "lokat_voice_enabled";
 const VOICE_FLOAT_KEY   = "lokat_voice_floating_button";
@@ -93,7 +93,6 @@ export default function AdminConfigPage() {
     { icon: Mic2,          label: "Lokat Voice",           desc: "Assistente de voz integrado" },
   ];
 
-  // Helper para badge de status Meta
   const metaBadge = () => {
     if (!metaTested) return null;
     if (!metaStatus) return <span className="text-xs text-red-500 font-medium">Erro ao verificar</span>;
@@ -234,7 +233,7 @@ export default function AdminConfigPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 bg-pink-100 rounded-lg flex items-center justify-center">
-              <Instagram className="w-4 h-4 text-pink-600" />
+              <Share2 className="w-4 h-4 text-pink-600" />
             </div>
             <h2 className="text-sm font-bold text-gray-800">Meta / Instagram</h2>
           </div>
@@ -259,7 +258,6 @@ export default function AdminConfigPage() {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {/* Botão: Testar configuração */}
             <button
               onClick={checkMetaStatus}
               disabled={metaLoading}
@@ -268,18 +266,15 @@ export default function AdminConfigPage() {
               {metaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               Testar configuração
             </button>
-            {/* Botão: Conectar conta Meta (OAuth) */}
             <a
               href="/api/meta/connect"
               className="flex items-center gap-2 text-sm font-medium text-white bg-pink-600 px-4 py-2 rounded-xl hover:bg-pink-700 transition-colors"
             >
-              <Instagram className="w-4 h-4" />
+              <Link className="w-4 h-4" />
               Conectar conta Meta
             </a>
-            {/* Status inline */}
             {metaBadge()}
           </div>
-          {/* Detalhes do status */}
           {metaTested && metaStatus?.ok && metaStatus.meta && (
             <div className="mt-3 p-3 bg-green-50 rounded-xl text-xs text-green-800 space-y-0.5">
               <div>App ID: {metaStatus.meta.appId}</div>
