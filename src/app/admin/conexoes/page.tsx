@@ -23,6 +23,10 @@ type MetaStatusResponse = {
   canConnect: boolean;
   sqlPending: boolean;
   message: string;
+  redirectConfigured?: boolean;
+  redirectHost?: string | null;
+  hasLocalhostRedirect?: boolean;
+  missing?: string[];
 } | null;
 
 type AiResponse = { openaiConfigured: boolean; environment: string } | null;
@@ -290,6 +294,22 @@ function ConexoesContent() {
               O dominio ou Redirect URI ainda nao esta cadastrado no App da Meta.
               Abra as instrucoes no card abaixo e configure antes de tentar novamente.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Alerta: META_REDIRECT_URI aponta para localhost em produção */}
+      {metaTested && metaStatus?.hasLocalhostRedirect && (
+        <div className="max-w-2xl mb-4 p-3.5 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Redirect URI de produção incorreto</p>
+            <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+              <code className="font-mono bg-amber-100 px-1 rounded">META_REDIRECT_URI</code> está apontando para{" "}
+              <strong>{metaStatus.redirectHost ?? "localhost"}</strong>. Em produção, atualize na Vercel para:{" "}
+              <code className="font-mono bg-amber-100 px-1 rounded">https://www.lokat.com.br/api/meta/callback</code>
+            </p>
+            <p className="text-xs text-amber-600 mt-1">Depois de corrigir a variável e fazer redeploy, reconecte a Meta.</p>
           </div>
         </div>
       )}

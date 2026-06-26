@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { hasLocalhostMetaRedirect, isProductionEnv } from "@/lib/app-url";
 
 // GET /api/meta/status
 // Retorna estado completo da integração Meta sem expor nenhum valor sensível.
@@ -56,20 +57,33 @@ export async function GET() {
     .filter(([, v]) => !v)
     .map(([k]) => k);
 
+  const localhostRedirect = hasLocalhostMetaRedirect();
+  const inProd            = isProductionEnv();
+  let redirectHost: string | null = null;
+  try {
+    if (redirectUri) redirectHost = new URL(redirectUri).hostname;
+  } catch { /* invalid URL — ignore */ }
+
   const message = !allConfigured
     ? `Variáveis não configuradas: ${missingVars.join(", ")}. Adicione no painel da Vercel e faça redeploy.`
-    : sqlPending
-      ? "Variáveis configuradas. Rode o SQL 35 no Supabase SQL Editor para ativar o salvamento de conexões."
-      : connected
-        ? "Meta configurada e conta conectada."
-        : "Meta configurada. Conecte uma conta para iniciar o fluxo OAuth.";
+    : inProd && localhostRedirect
+      ? "META_REDIRECT_URI aponta para localhost. Atualize para https://www.lokat.com.br/api/meta/callback na Vercel e faça redeploy."
+      : sqlPending
+        ? "Variáveis configuradas. Rode o SQL 35 no Supabase SQL Editor para ativar o salvamento de conexões."
+        : connected
+          ? "Meta configurada e conta conectada."
+          : "Meta configurada. Conecte uma conta para iniciar o fluxo OAuth.";
 
   return NextResponse.json({
-    ok:         allConfigured,
+    ok:                  allConfigured && (!inProd || !localhostRedirect),
     configured,
     connected,
-    canConnect,
+    canConnect:          allConfigured && (!inProd || !localhostRedirect),
     sqlPending,
     message,
+    redirectConfigured:  !!redirectUri,
+    redirectHost,
+    hasLocalhostRedirect: localhostRedirect,
+    missing:             missingVars,
   });
 }

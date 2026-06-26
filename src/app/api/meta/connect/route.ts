@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAppUrl, isProductionEnv, hasLocalhostMetaRedirect } from "@/lib/app-url";
 
 // GET /api/meta/connect
 // Monta a URL de autorização OAuth do Meta/Facebook e redireciona o usuário.
@@ -28,11 +29,21 @@ export async function GET() {
     );
   }
 
+  // Em produção, rejeita se META_REDIRECT_URI apontar para localhost
+  if (isProductionEnv() && hasLocalhostMetaRedirect()) {
+    const appUrl = getAppUrl();
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(
+        "META_REDIRECT_URI está apontando para localhost. Atualize na Vercel para https://www.lokat.com.br/api/meta/callback e faça redeploy."
+      )}`
+    );
+  }
+
   // Valida sessão antes de montar URL OAuth
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
+    return NextResponse.redirect(new URL("/login", getAppUrl()));
   }
 
   // state = userId codificado em base64 para validar no callback (proteção CSRF básica)

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+import { getAppUrl } from "@/lib/app-url";
 
 // GET /api/meta/callback
 // Recebe o callback OAuth do Meta após o usuário autorizar o app.
 // Fluxo: Meta redireciona aqui com ?code=...&state=...
 // O code é trocado por access_token via Graph API e salvo em meta_connections.
 export async function GET(request: NextRequest) {
+  const appUrl = getAppUrl();
   const { searchParams } = new URL(request.url);
   const code  = searchParams.get("code");
   const state = searchParams.get("state");
@@ -19,12 +19,12 @@ export async function GET(request: NextRequest) {
     const msg = errorReason === "user_denied"
       ? "Autorização cancelada pelo usuário."
       : "Não foi possível conectar. Tente novamente.";
-    return NextResponse.redirect(`${APP_URL}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
+    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
   }
 
   // Code não veio
   if (!code) {
-    return NextResponse.redirect(`${APP_URL}/admin/conexoes?meta_error=${encodeURIComponent("Parâmetro code ausente no callback.")}`);
+    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Parâmetro code ausente no callback.")}`);
   }
 
   // Valida sessão do usuário via state (base64url do userId)
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!userId) {
-    return NextResponse.redirect(`${APP_URL}/login?redirect=/admin/conexoes`);
+    return NextResponse.redirect(`${appUrl}/login?redirect=/admin/conexoes`);
   }
 
   // Variáveis necessárias para troca do code por token
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
   if (!appId || !appSecret || !redirectUri) {
     return NextResponse.redirect(
-      `${APP_URL}/admin/conexoes?meta_error=${encodeURIComponent("Variáveis Meta não configuradas. Adicione no painel da Vercel.")}`
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Variáveis Meta não configuradas. Adicione no painel da Vercel.")}`
     );
   }
 
@@ -77,13 +77,13 @@ export async function GET(request: NextRequest) {
 
     if (tokenData.error || !tokenData.access_token) {
       const msg = tokenData.error?.message ?? "Falha ao obter token da Meta.";
-      return NextResponse.redirect(`${APP_URL}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
+      return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
     }
 
     accessToken = tokenData.access_token;
   } catch {
     return NextResponse.redirect(
-      `${APP_URL}/admin/conexoes?meta_error=${encodeURIComponent("Erro ao comunicar com a API da Meta.")}`
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Erro ao comunicar com a API da Meta.")}`
     );
   }
 
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       if (insertError.code === "42P01") {
         // relation does not exist — SQL 35 não foi rodado
         return NextResponse.redirect(
-          `${APP_URL}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido com sucesso, mas a tabela meta_connections ainda não existe. Rode o SQL 35 no Supabase para salvar a conexão.")}`
+          `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido com sucesso, mas a tabela meta_connections ainda não existe. Rode o SQL 35 no Supabase para salvar a conexão.")}`
         );
       }
       throw insertError;
@@ -127,10 +127,10 @@ export async function GET(request: NextRequest) {
     const successMsg = metaUserName
       ? `Conta Meta conectada: ${metaUserName}`
       : "Conta Meta conectada com sucesso.";
-    return NextResponse.redirect(`${APP_URL}/admin/conexoes?meta_ok=${encodeURIComponent(successMsg)}`);
+    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_ok=${encodeURIComponent(successMsg)}`);
   } catch {
     return NextResponse.redirect(
-      `${APP_URL}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido. Rode o SQL 35 no Supabase para ativar o salvamento da conexão.")}`
+      `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido. Rode o SQL 35 no Supabase para ativar o salvamento da conexão.")}`
     );
   }
 }
