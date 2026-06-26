@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, X, Check, Send, BarChart2, RefreshCw } from "lucide-react";
+import { BeforeAfterSection } from "@/components/before-after-section";
+import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, Send, BarChart2, RefreshCw } from "lucide-react";
 import type { ElementType } from "react";
 
 // ── Modules ──────────────────────────────────────────────────
@@ -339,90 +340,27 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Antes e Depois ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
-        <div className="mb-8 text-center">
-          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Transformação]</p>
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Antes e depois</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
-          {/* Antes */}
-          <div className="p-6 md:p-8" style={{ background: "#0d0d14" }}>
-            <div className="flex items-center gap-2 mb-5">
-              <div style={{ width: "28px", height: "28px", background: "#ef444418", border: "1px solid #ef444430", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <X style={{ width: "14px", height: "14px", color: "#ef4444" }} strokeWidth={2} />
-              </div>
-              <span style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#ef4444" }}>Antes</span>
-            </div>
-            <ul className="space-y-3">
-              {[
-                "Conteúdo aprovado por WhatsApp — sem rastreio",
-                "Cliente sem saber o status do post",
-                "Equipe sem prioridade definida",
-                "Financeiro em planilha separada",
-                "Relatório manual, demorado e impreciso",
-                "Briefings espalhados em e-mail e drive",
-                "Inadimplência descoberta tarde demais",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <X style={{ width: "13px", height: "13px", color: "#ef4444", flexShrink: 0, marginTop: "3px" }} strokeWidth={2.5} />
-                  <span style={{ ...S.grotesk, fontSize: ".75rem", color: S.muted, lineHeight: 1.5 }}>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {/* Depois */}
-          <div className="p-6 md:p-8" style={{ background: S.card }}>
-            <div className="flex items-center gap-2 mb-5">
-              <div style={{ width: "28px", height: "28px", background: "#10b98118", border: "1px solid #10b98130", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Check style={{ width: "14px", height: "14px", color: "#10b981" }} strokeWidth={2} />
-              </div>
-              <span style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#10b981" }}>Depois da LOKAT OS</span>
-            </div>
-            <ul className="space-y-3">
-              {[
-                "Aprovação por link público — com histórico e comentários",
-                "Calendário acessível para o cliente em tempo real",
-                "Equipe com tarefas, prioridade e status visíveis",
-                "FinanceOS com cobranças, status e histórico",
-                "Relatórios automáticos por cliente a cada mês",
-                "Briefings gerados com IA e aprovados em fluxo único",
-                "Inadimplência visível no painel com alerta automático",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <Check style={{ width: "13px", height: "13px", color: "#10b981", flexShrink: 0, marginTop: "3px" }} strokeWidth={2.5} />
-                  <span style={{ ...S.grotesk, fontSize: ".75rem", color: S.text, lineHeight: 1.5 }}>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
+      {/* ── Antes e Depois (animado com IntersectionObserver) ── */}
+      <BeforeAfterSection />
 
       {/* ── Módulos ── */}
-      <section id="modulos" className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
-        <div className="flex items-end justify-between mb-8 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
+      <section id="modulos" className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-20">
+        <div className="flex items-end justify-between mb-6 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
           <div>
-            <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Módulos]</p>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.6rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>6 módulos. Um único OS.</h2>
+            <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".35rem" }}>[Módulos]</p>
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>6 módulos. Um único OS.</h2>
           </div>
-          <a
-            href="#contentos"
-            style={{ ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".4rem 1rem", textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            ■ Ver destaque →
+          <a href="#contentos" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".35rem .8rem", textDecoration: "none", whiteSpace: "nowrap" }}>
+            Ver destaque →
           </a>
         </div>
 
-        {/* Grid: 1 col mobile, 2 col tablet, 3 col desktop — 6 cards = 3×2 perfeito */}
-        <div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px"
-          style={{ background: S.border, border: `1px solid ${S.border}` }}
-        >
+        {/* Grid 2 col no mobile, 3 no desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
           {modules.map((m) => (
             <div
               key={m.title}
-              className="p-5 md:p-6"
+              className="p-4 md:p-6"
               style={{
                 background: m.coming ? "#0d0d14" : S.card,
                 position: "relative",
@@ -433,42 +371,39 @@ export default function HomePage() {
               onMouseEnter={(e) => { if (!m.coming) e.currentTarget.style.background = "#191924"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; }}
             >
-              <div style={{ ...S.mono, fontSize: ".55rem", color: S.border, position: "absolute", top: ".5rem", left: ".5rem" }}>{m.num}</div>
+              <div style={{ ...S.mono, fontSize: ".5rem", color: S.border, position: "absolute", top: ".4rem", left: ".4rem" }}>{m.num}</div>
               {m.coming && (
-                <div style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#f59e0b", background: "#f59e0b18", border: "1px solid #f59e0b30", padding: ".15rem .5rem", position: "absolute", top: ".5rem", right: ".5rem" }}>
-                  em breve
+                <div style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#f59e0b", background: "#f59e0b18", border: "1px solid #f59e0b30", padding: ".1rem .4rem", position: "absolute", top: ".4rem", right: ".4rem" }}>
+                  breve
                 </div>
               )}
-              <div style={{ width: "38px", height: "38px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".85rem" }}>
-                <m.Icon style={{ width: "17px", height: "17px", color: m.accent }} strokeWidth={1.5} />
+              <div style={{ width: "32px", height: "32px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".6rem" }}>
+                <m.Icon style={{ width: "14px", height: "14px", color: m.accent }} strokeWidth={1.5} />
               </div>
-              <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: m.accent, background: `${m.accent}15`, border: `1px solid ${m.accent}25`, padding: ".12rem .45rem", display: "inline-block", marginBottom: ".45rem" }}>{m.tag}</span>
-              <div style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 600, color: S.text, marginBottom: ".4rem" }}>{m.title}</div>
-              <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
+              <div style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".25rem", lineHeight: 1.2 }}>{m.title}</div>
+              <p className="hidden md:block" style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
+              <span className="md:hidden" style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".12em", textTransform: "uppercase", color: m.accent }}>{m.tag.replace("■ ", "")}</span>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── ContentOS feature ── */}
-      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
+      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-6 pb-10 md:pb-20">
         <div style={{ border: `1px solid ${S.border}`, background: S.card }}>
           {/* Header */}
-          <div className="p-6 md:p-10" style={{ borderBottom: `1px solid ${S.border}` }}>
-            <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.accent, background: `${S.accent}15`, border: `1px solid ${S.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: ".85rem" }}>■ Módulo ContentOS</span>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.6rem, 4vw, 2.6rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".65rem" }}>
+          <div className="p-5 md:p-10" style={{ borderBottom: `1px solid ${S.border}` }}>
+            <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.accent, background: `${S.accent}15`, border: `1px solid ${S.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: ".7rem" }}>■ Módulo ContentOS</span>
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.6rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".5rem" }}>
               Content OS
             </h2>
-            <p style={{ ...S.grotesk, color: S.muted, fontSize: ".95rem", maxWidth: "500px", lineHeight: 1.7 }}>
-              Do diagnóstico de marca até a publicação aprovada — tudo em um fluxo único, sem planilhas, sem WhatsApp perdido.
+            <p style={{ ...S.grotesk, color: S.muted, fontSize: "clamp(.8rem, 2.5vw, .95rem)", maxWidth: "500px", lineHeight: 1.6 }}>
+              Conteúdo, campanha, aprovação e operação no mesmo fluxo — sem planilhas, sem WhatsApp perdido.
             </p>
           </div>
 
-          {/* Features grid: 1 col mobile, 2 col tablet, 3 col desktop */}
-          <div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px"
-            style={{ background: S.border }}
-          >
+          {/* Features grid: oculto no mobile, visível no md+ */}
+          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: S.border }}>
             {contentosFeatures.map((f) => (
               <div key={f.title} className="p-5 md:p-6" style={{ background: S.card }}>
                 <div style={{ width: "34px", height: "34px", background: `${S.accent}18`, border: `1px solid ${S.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".65rem" }}>
@@ -480,13 +415,24 @@ export default function HomePage() {
             ))}
           </div>
 
+          {/* Features mobile: carrossel compacto */}
+          <div className="md:hidden lk-carousel px-4 py-4" style={{ borderBottom: `1px solid ${S.border}` }}>
+            {contentosFeatures.map((f) => (
+              <div key={f.title} className="lk-carousel-card" style={{ background: "#0d0d14", border: `1px solid ${S.border}`, padding: "1rem", minWidth: "200px", width: "70vw", maxWidth: "240px" }}>
+                <f.Icon style={{ width: "16px", height: "16px", color: S.accent, marginBottom: ".5rem" }} strokeWidth={1.5} />
+                <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 700, color: S.text, marginBottom: ".2rem", lineHeight: 1.2 }}>{f.title}</p>
+                <p style={{ ...S.grotesk, fontSize: ".68rem", lineHeight: 1.5, color: S.muted }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
           {/* CTAs */}
-          <div className="p-6 md:p-8 flex flex-wrap gap-3">
-            <Link href="/criar-conta" style={{ background: S.accent, color: "#fff", padding: ".75rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
-              ■ Começar agora →
+          <div className="p-4 md:p-8 flex flex-col sm:flex-row gap-3">
+            <Link href="/diagnostico" style={{ background: S.accent, color: "#fff", padding: ".85rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
+              ■ Quero ver na prática →
             </Link>
-            <Link href="/plataforma" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none" }}>
-              Ver a plataforma
+            <Link href="/criar-conta" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
+              Criar conta grátis
             </Link>
           </div>
         </div>
