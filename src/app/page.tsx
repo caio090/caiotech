@@ -415,15 +415,18 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Features mobile: carrossel compacto */}
-          <div className="md:hidden lk-carousel px-4 py-4" style={{ borderBottom: `1px solid ${S.border}` }}>
-            {contentosFeatures.map((f) => (
-              <div key={f.title} className="lk-carousel-card" style={{ background: "#0d0d14", border: `1px solid ${S.border}`, padding: "1rem", minWidth: "200px", width: "70vw", maxWidth: "240px" }}>
-                <f.Icon style={{ width: "16px", height: "16px", color: S.accent, marginBottom: ".5rem" }} strokeWidth={1.5} />
-                <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 700, color: S.text, marginBottom: ".2rem", lineHeight: 1.2 }}>{f.title}</p>
-                <p style={{ ...S.grotesk, fontSize: ".68rem", lineHeight: 1.5, color: S.muted }}>{f.desc}</p>
-              </div>
-            ))}
+          {/* Features mobile: carrossel compacto — wrapper md:hidden garante ocultação no desktop
+              sem conflito com .lk-carousel (display:flex vem depois no cascade) */}
+          <div className="md:hidden" style={{ borderBottom: `1px solid ${S.border}` }}>
+            <div className="lk-carousel px-4 py-4">
+              {contentosFeatures.map((f) => (
+                <div key={f.title} className="lk-carousel-card" style={{ background: "#0d0d14", border: `1px solid ${S.border}`, padding: "1rem", minWidth: "200px", width: "70vw", maxWidth: "240px" }}>
+                  <f.Icon style={{ width: "16px", height: "16px", color: S.accent, marginBottom: ".5rem" }} strokeWidth={1.5} />
+                  <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 700, color: S.text, marginBottom: ".2rem", lineHeight: 1.2 }}>{f.title}</p>
+                  <p style={{ ...S.grotesk, fontSize: ".68rem", lineHeight: 1.5, color: S.muted }}>{f.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* CTAs */}

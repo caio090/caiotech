@@ -39,32 +39,28 @@ body {
 .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
 
-/* ── Respect prefers-reduced-motion ─────────────────────────── */
-/* Only pause ambient/infinite animations. Entrance animations become instant. */
-@media (prefers-reduced-motion: reduce) {
-  /* Entrance / one-shot animations → complete instantly */
-  .hero-fade-up, .hero-fade-up-d1, .hero-fade-up-d2, .hero-fade-up-d3,
-  .hero-robot-in,
-  .rec-hero-in, .rec-hero-in-d1, .rec-hero-in-d2, .rec-hero-in-d3,
-  .rec-menu-in, .rec-reveal, .rec-reveal-d1, .rec-reveal-d2 {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0s !important;
-  }
-  /* Infinite/continuous ambient animations → pause (visible but static) */
-  .lk-ticker-track,
-  .lk-logo-track,
-  .orbit-slow,
-  .orbit-rev,
-  .glow-pulse,
-  .lk-drop-float,
-  .lk-carousel-hint::before,
-  .lk-carousel-hint::after {
-    animation-play-state: paused !important;
-  }
-  /* Transitions */
-  *, *::before, *::after {
-    transition-duration: 0.15ms !important;
-  }
+/* prefers-reduced-motion: not applied — all animations run regardless of OS setting */
+
+/* ── Antes/Depois hover glow ────────────────────────────────── */
+.lk-antes-card {
+  background: #0d0d14;
+  border: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.lk-antes-card:hover {
+  background: rgba(100, 10, 10, 0.25);
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: inset 0 0 60px rgba(239, 68, 68, 0.04), 0 0 28px rgba(239, 68, 68, 0.07);
+}
+.lk-depois-card {
+  background: #13131a;
+  border: 1px solid transparent;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.lk-depois-card:hover {
+  background: rgba(6, 60, 40, 0.35);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: inset 0 0 60px rgba(16, 185, 129, 0.04), 0 0 28px rgba(16, 185, 129, 0.07);
 }
 
 /* ── Horizontal carousel (etapas/módulos) ───────────────────── */

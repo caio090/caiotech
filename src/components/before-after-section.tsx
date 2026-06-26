@@ -57,12 +57,11 @@ export function BeforeAfterSection() {
       <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
         {/* Antes */}
         <div
-          className="p-6 md:p-8"
+          className="p-6 md:p-8 lk-antes-card"
           style={{
-            background: "#0d0d14",
             opacity: visible ? 1 : 0,
             transform: visible ? "translateX(0)" : "translateX(-24px)",
-            transition: "opacity 0.55s ease, transform 0.55s ease",
+            transition: "opacity 0.55s ease, transform 0.55s ease, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
           }}
         >
           <div className="flex items-center gap-2 mb-5">
@@ -91,12 +90,11 @@ export function BeforeAfterSection() {
 
         {/* Depois */}
         <div
-          className="p-6 md:p-8"
+          className="p-6 md:p-8 lk-depois-card"
           style={{
-            background: S.card,
             opacity: visible ? 1 : 0,
             transform: visible ? "translateX(0)" : "translateX(24px)",
-            transition: "opacity 0.55s ease 0.15s, transform 0.55s ease 0.15s",
+            transition: "opacity 0.55s ease 0.15s, transform 0.55s ease 0.15s, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
           }}
         >
           <div className="flex items-center gap-2 mb-5">
