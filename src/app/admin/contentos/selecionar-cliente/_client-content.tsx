@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Building2, Search, Check, ArrowRight, Tag, User } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Building2, Search, Check, ArrowRight, Tag, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY, clearActiveClient } from "@/lib/active-client";
 import type { AdminContentosClient } from "@/lib/admin-contentos-clients";
 
@@ -11,19 +11,40 @@ interface Props {
   isSupabaseActive: boolean;
 }
 
-export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Props) {
-  const [search, setSearch]         = useState("");
-  const [selectedId, setSelectedId] = useState<string>("");
+const PAGE_SIZE = 12;
 
-  // Clear any stale active client the moment this selection screen mounts.
-  // This prevents the purple bar from showing "Visualizando: X" while choosing.
+const STATUS_LABELS: Record<string, string> = {
+  active:   "Ativo",
+  inactive: "Inativo",
+  paused:   "Pausado",
+};
+
+export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Props) {
+  const [search,      setSearch]      = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "active" | "inactive" | "paused">("todos");
+  const [selectedId,  setSelectedId]  = useState<string>("");
+  const [page,        setPage]        = useState(1);
+
   useEffect(() => {
     clearActiveClient();
   }, []);
 
-  const filtered = clients.filter(
-    (c) => !search || (c.company_name ?? "").toLowerCase().includes(search.toLowerCase()),
-  );
+  // Reset page on filter change
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
+
+  const filtered = useMemo(() => {
+    return clients.filter((c) => {
+      const matchesSearch = !search ||
+        (c.company_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (c.responsible_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (c.segment ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === "todos" || c.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [clients, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleEnter() {
     const client = clients.find((c) => c.id === selectedId);
@@ -31,6 +52,13 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
     localStorage.setItem(ACTIVE_CLIENT_KEY, selectedId);
     localStorage.setItem(ACTIVE_CLIENT_NAME_KEY, client.company_name ?? "");
     window.location.href = `/admin/contentos/home?client=${selectedId}`;
+  }
+
+  function statusColor(status: string | null) {
+    if (status === "active")   return "text-emerald-600 bg-emerald-50";
+    if (status === "inactive") return "text-gray-400 bg-gray-50";
+    if (status === "paused")   return "text-amber-600 bg-amber-50";
+    return "text-gray-400 bg-gray-50";
   }
 
   return (
@@ -59,34 +87,57 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
         </div>
       ) : (
         <>
-          <div className="relative mb-4">
+          {/* Busca */}
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar cliente..."
+              placeholder="Buscar por nome, responsável ou segmento..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400 bg-white"
             />
           </div>
 
-          {filtered.length === 0 ? (
+          {/* Filtro de status */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {(["todos", "active", "inactive", "paused"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  statusFilter === s
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {s === "todos" ? "Todos" : STATUS_LABELS[s] ?? s}
+                {s !== "todos" && (
+                  <span className="ml-1 opacity-70">
+                    ({clients.filter((c) => c.status === s).length})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {paginated.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 mb-6">
               <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-200" />
               <p className="text-sm text-gray-400">
-                {search
-                  ? "Nenhum cliente encontrado."
+                {search || statusFilter !== "todos"
+                  ? "Nenhum cliente encontrado com esses filtros."
                   : "Nenhum cliente real cadastrado ainda."}
               </p>
-              {!search && (
+              {!search && statusFilter === "todos" && (
                 <p className="text-xs text-gray-300 mt-1">
                   Clientes precisam ter conta com role=cliente no sistema.
                 </p>
               )}
             </div>
           ) : (
-            <div className="space-y-2 mb-6">
-              {filtered.map((c) => (
+            <div className="space-y-2 mb-4">
+              {paginated.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
@@ -105,7 +156,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                     <span className={`text-sm font-semibold block truncate ${selectedId === c.id ? "text-purple-800" : "text-gray-800"}`}>
                       {c.company_name || "Sem nome"}
                     </span>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {c.responsible_name && (
                         <span className="flex items-center gap-1 text-xs text-gray-400">
                           <User className="w-3 h-3" />{c.responsible_name}
@@ -117,8 +168,8 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                         </span>
                       )}
                       {c.status && c.status !== "active" && (
-                        <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                          {c.status}
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusColor(c.status)}`}>
+                          {STATUS_LABELS[c.status] ?? c.status}
                         </span>
                       )}
                     </div>
@@ -128,6 +179,29 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                   )}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-600" />
+              </button>
+              <span className="text-xs text-gray-400">
+                {page} / {totalPages} · {filtered.length} clientes
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              </button>
             </div>
           )}
 

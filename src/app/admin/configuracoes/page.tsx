@@ -1,36 +1,37 @@
 "use client";
 import { PageHeader } from "@/components/page-header";
 import { useState, useEffect } from "react";
-import { Loader2, CheckCircle2, XCircle, Mic, Sparkles, RefreshCw, Bot, Zap, FileText, MessageSquare, Brain, Mic2, Share2, Link } from "lucide-react";
+import {
+  Loader2, CheckCircle2, XCircle, Mic, RefreshCw, Bot,
+  FileText, MessageSquare, Brain, Mic2, Sparkles, AtSign, ExternalLink,
+} from "lucide-react";
+import Link from "next/link";
 
 const VOICE_ENABLED_KEY = "lokat_voice_enabled";
 const VOICE_FLOAT_KEY   = "lokat_voice_floating_button";
 
-type AiStatus   = { openaiConfigured: boolean; environment: string } | null;
-type MetaStatus = {
-  ok: boolean;
-  meta?: { configured: boolean; appId: string; appSecret: string; redirectUri: string; apiVersion: string };
-  missing?: string[];
-} | null;
+type AiStatus = { openaiConfigured: boolean; environment: string } | null;
+
+const AI_RESOURCES = [
+  { icon: Brain,         label: "Diagnóstico com IA",     desc: "Análise estratégica da marca" },
+  { icon: FileText,      label: "Briefing com IA",        desc: "Briefing estruturado para design" },
+  { icon: MessageSquare, label: "Legenda com IA",         desc: "3 opções de copy e legenda" },
+  { icon: Sparkles,      label: "Sugestões inteligentes", desc: "Ideias de conteúdo e campanha" },
+  { icon: Mic2,          label: "Lokat Voice",            desc: "Assistente de voz integrado" },
+];
 
 export default function AdminConfigPage() {
   const [orgName, setOrgName] = useState("Lokat Agência");
   const [saved,   setSaved]   = useState(false);
 
-  // ── Lokat Voice ──────────────────────────────────────────────
-  const [voiceEnabled,  setVoiceEnabled]  = useState(false);
-  const [voiceFloat,    setVoiceFloat]    = useState(false);
-  const [voiceMounted,  setVoiceMounted]  = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceFloat,   setVoiceFloat]   = useState(false);
+  const [voiceMounted, setVoiceMounted] = useState(false);
 
-  // ── IA ───────────────────────────────────────────────────────
-  const [aiStatus,   setAiStatus]   = useState<AiStatus>(null);
-  const [aiLoading,  setAiLoading]  = useState(false);
-  const [aiTested,   setAiTested]   = useState(false);
-
-  // ── Meta / Instagram ─────────────────────────────────────────
-  const [metaStatus,  setMetaStatus]  = useState<MetaStatus>(null);
-  const [metaLoading, setMetaLoading] = useState(false);
-  const [metaTested,  setMetaTested]  = useState(false);
+  const [aiStatus,  setAiStatus]  = useState<AiStatus>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTested,  setAiTested]  = useState(false);
+  const [aiTestedAt, setAiTestedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     setVoiceEnabled(localStorage.getItem(VOICE_ENABLED_KEY) === "true");
@@ -57,52 +58,19 @@ export default function AdminConfigPage() {
       const data = await res.json() as AiStatus;
       setAiStatus(data);
       setAiTested(true);
+      setAiTestedAt(new Date());
     } catch {
       setAiStatus(null);
       setAiTested(true);
+      setAiTestedAt(new Date());
     } finally {
       setAiLoading(false);
-    }
-  };
-
-  const checkMetaStatus = async () => {
-    setMetaLoading(true);
-    try {
-      const res  = await fetch("/api/meta/status");
-      const data = await res.json() as MetaStatus;
-      setMetaStatus(data);
-      setMetaTested(true);
-    } catch {
-      setMetaStatus(null);
-      setMetaTested(true);
-    } finally {
-      setMetaLoading(false);
     }
   };
 
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const AI_RESOURCES = [
-    { icon: Brain,         label: "Diagnóstico com IA",    desc: "Análise estratégica da marca" },
-    { icon: FileText,      label: "Briefing com IA",       desc: "Briefing estruturado para design" },
-    { icon: MessageSquare, label: "Legenda com IA",        desc: "3 opções de copy e legenda" },
-    { icon: Sparkles,      label: "Sugestões inteligentes",desc: "Ideias de conteúdo e campanha" },
-    { icon: Mic2,          label: "Lokat Voice",           desc: "Assistente de voz integrado" },
-  ];
-
-  const metaBadge = () => {
-    if (!metaTested) return null;
-    if (!metaStatus) return <span className="text-xs text-red-500 font-medium">Erro ao verificar</span>;
-    if (metaStatus.ok) return <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Configurado</span>;
-    return (
-      <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
-        <XCircle className="w-3.5 h-3.5" />
-        Faltando: {metaStatus.missing?.join(", ")}
-      </span>
-    );
   };
 
   return (
@@ -116,7 +84,11 @@ export default function AdminConfigPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Nome da agência</label>
-              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400" />
+              <input
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Segmento</label>
@@ -127,7 +99,10 @@ export default function AdminConfigPage() {
                 <option>Freelancer</option>
               </select>
             </div>
-            <button onClick={handleSave} className="text-sm font-medium text-white bg-indigo-600 px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">
+            <button
+              onClick={handleSave}
+              className="text-sm font-medium text-white bg-indigo-600 px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors"
+            >
               {saved ? "✓ Salvo!" : "Salvar alterações"}
             </button>
           </div>
@@ -191,6 +166,7 @@ export default function AdminConfigPage() {
             <h2 className="text-sm font-bold text-gray-800">Inteligência Artificial</h2>
           </div>
           <p className="text-xs text-gray-500 mb-4">OpenAI conectada ao motor de IA da LOKAT OS.</p>
+
           <div className="grid grid-cols-1 gap-2 mb-4">
             {AI_RESOURCES.map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl">
@@ -204,90 +180,75 @@ export default function AdminConfigPage() {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={checkAiStatus}
-              disabled={aiLoading}
-              className="flex items-center gap-2 text-sm font-medium text-violet-600 bg-violet-50 px-4 py-2 rounded-xl hover:bg-violet-100 transition-colors disabled:opacity-60"
-            >
-              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Testar configuração
-            </button>
-            {aiTested && aiStatus && (
-              <span className={`flex items-center gap-1 text-xs font-medium ${aiStatus.openaiConfigured ? "text-green-600" : "text-red-500"}`}>
-                {aiStatus.openaiConfigured
-                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Configurado ({aiStatus.environment})</>
-                  : <><XCircle className="w-3.5 h-3.5" /> Chave ausente</>
-                }
-              </span>
-            )}
-            {aiTested && !aiStatus && (
-              <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
-                <XCircle className="w-3.5 h-3.5" /> Erro ao verificar
-              </span>
-            )}
-          </div>
+
+          <button
+            onClick={checkAiStatus}
+            disabled={aiLoading}
+            className="flex items-center gap-2 text-sm font-medium text-violet-600 bg-violet-50 px-4 py-2 rounded-xl hover:bg-violet-100 transition-colors disabled:opacity-60 mb-3"
+          >
+            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Testar configuração
+          </button>
+
+          {aiTested && (
+            <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+              aiStatus?.openaiConfigured
+                ? "bg-emerald-50 border-emerald-100"
+                : "bg-red-50 border-red-100"
+            }`}>
+              {aiStatus?.openaiConfigured ? (
+                <>
+                  <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> OpenAI configurada corretamente
+                  </div>
+                  <div className="text-emerald-700">Ambiente: <span className="font-medium">{aiStatus.environment}</span></div>
+                  <div className="text-emerald-700">
+                    Funções disponíveis: <span className="font-medium">diagnóstico, brief, legenda, sugestões, Lokat Voice</span>
+                  </div>
+                  {aiTestedAt && (
+                    <div className="text-emerald-600 text-[11px]">
+                      Último teste: {aiTestedAt.toLocaleString("pt-BR")}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-emerald-600 mt-1">
+                    Este é um teste de conexão — verifica apenas se a chave está configurada, não consome créditos.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 font-semibold text-red-700">
+                    <XCircle className="w-3.5 h-3.5" /> Chave da OpenAI ausente
+                  </div>
+                  <div className="text-red-600">
+                    Adicione <code className="font-mono bg-red-100 px-1 rounded">OPENAI_API_KEY</code> na Vercel e faça redeploy.
+                  </div>
+                  <div className="text-red-600">
+                    Funções de IA estarão indisponíveis até a configuração.
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ── Meta / Instagram ── */}
+        {/* ── Meta / Instagram — gerenciado em /admin/conexoes ── */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 bg-pink-100 rounded-lg flex items-center justify-center">
-              <Share2 className="w-4 h-4 text-pink-600" />
+            <div className="w-7 h-7 bg-pink-50 rounded-lg flex items-center justify-center">
+              <AtSign className="w-4 h-4 text-pink-500" />
             </div>
             <h2 className="text-sm font-bold text-gray-800">Meta / Instagram</h2>
           </div>
           <p className="text-xs text-gray-500 mb-4">
-            Conecte sua conta Meta para puxar insights do Instagram Business, páginas e campanhas.
+            A conexão com Meta/Instagram é gerenciada centralmente na página de Conexões.
           </p>
-          <div className="grid grid-cols-1 gap-2 mb-4">
-            {[
-              { label: "Insights do Instagram",  desc: "Alcance, impressões e engajamento" },
-              { label: "Páginas do Facebook",    desc: "Listagem e dados das páginas" },
-              { label: "Meta Business Manager",  desc: "Gerenciamento de contas e ativos" },
-            ].map(({ label, desc }) => (
-              <div key={label} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl">
-                <div className="w-7 h-7 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-pink-500" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-gray-800">{label}</div>
-                  <div className="text-xs text-gray-500">{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={checkMetaStatus}
-              disabled={metaLoading}
-              className="flex items-center gap-2 text-sm font-medium text-pink-600 bg-pink-50 px-4 py-2 rounded-xl hover:bg-pink-100 transition-colors disabled:opacity-60"
-            >
-              {metaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Testar configuração
-            </button>
-            <a
-              href="/api/meta/connect"
-              className="flex items-center gap-2 text-sm font-medium text-white bg-pink-600 px-4 py-2 rounded-xl hover:bg-pink-700 transition-colors"
-            >
-              <Link className="w-4 h-4" />
-              Conectar conta Meta
-            </a>
-            {metaBadge()}
-          </div>
-          {metaTested && metaStatus?.ok && metaStatus.meta && (
-            <div className="mt-3 p-3 bg-green-50 rounded-xl text-xs text-green-800 space-y-0.5">
-              <div>App ID: {metaStatus.meta.appId}</div>
-              <div>App Secret: {metaStatus.meta.appSecret}</div>
-              <div>Redirect URI: {metaStatus.meta.redirectUri}</div>
-              <div>API Version: {metaStatus.meta.apiVersion}</div>
-            </div>
-          )}
-          {metaTested && metaStatus && !metaStatus.ok && (
-            <div className="mt-3 p-3 bg-red-50 rounded-xl text-xs text-red-700">
-              Variáveis faltando: <strong>{metaStatus.missing?.join(", ")}</strong>. Adicione no painel da Vercel e faça redeploy.
-            </div>
-          )}
+          <Link
+            href="/admin/conexoes"
+            className="inline-flex items-center gap-2 text-sm font-medium text-pink-600 bg-pink-50 hover:bg-pink-100 px-4 py-2 rounded-xl transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Gerenciar em Conexões
+          </Link>
         </div>
 
       </div>

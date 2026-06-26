@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, X, Check, Zap, ArrowRight } from "lucide-react";
+import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, X, Check, Send, BarChart2, RefreshCw } from "lucide-react";
 import type { ElementType } from "react";
 
 // ── Modules ──────────────────────────────────────────────────
@@ -78,8 +78,8 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section
-        className="px-4 md:px-8 py-16 md:py-[4rem]"
-        style={{ minHeight: "85vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", textAlign: "center" }}
+        className="px-4 md:px-8 pt-10 pb-8 md:py-[4rem]"
+        style={{ minHeight: "clamp(auto, 70vh, 85vh)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", textAlign: "center" }}
       >
         {/* Background glow */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 60% at 50% 60%, rgba(59,47,160,.12) 0%, transparent 70%)", pointerEvents: "none" }} />
@@ -176,6 +176,41 @@ export default function HomePage() {
               </svg>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Da ideia ao post publicado — etapas ── */}
+      <section className="py-10 md:py-16" style={{ borderTop: `1px solid ${S.border}` }}>
+        <div className="px-4 md:px-8 mb-6 md:mb-8">
+          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".35rem" }}>[O fluxo]</p>
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.1rem, 3vw, 1.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Da ideia ao post publicado</h2>
+          <p className="lk-carousel-hint mt-2 md:hidden" style={{ color: S.muted }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M15 6l6 6-6 6"/></svg>
+            <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase" }}>deslize para ver</span>
+          </p>
+        </div>
+        <div className="lk-carousel px-4 md:px-8">
+          {[
+            { num: "01", Icon: ClipboardList, color: "#7b6ef6", title: "Diagnóstico",  desc: "Entenda posicionamento, público e oportunidades da marca antes de criar." },
+            { num: "02", Icon: BarChart2,     color: "#a855f7", title: "Estratégia",   desc: "Defina objetivos, formatos, canais e calendário para o mês inteiro." },
+            { num: "03", Icon: Sparkles,      color: "#e0635a", title: "Conteúdo",     desc: "Crie briefings, legendas e roteiros com IA — sem retrabalho." },
+            { num: "04", Icon: Video,         color: "#3b82f6", title: "Produção",      desc: "Organize gravações, storyboards e edição em um fluxo visual." },
+            { num: "05", Icon: CheckCircle2,  color: "#10b981", title: "Aprovação",    desc: "O cliente aprova por link público sem precisar de login ou WhatsApp." },
+            { num: "06", Icon: Send,          color: "#f59e0b", title: "Publicação",   desc: "Agende e publique com data, horário e status rastreável no calendário." },
+            { num: "07", Icon: BarChart3,     color: "#06b6d4", title: "Relatório",    desc: "Resultados por cliente, formato e período em painel automático." },
+            { num: "08", Icon: RefreshCw,     color: "#84cc16", title: "Automação",    desc: "Fluxos recorrentes, alertas e integrações que rodam sem intervenção." },
+          ].map((step) => (
+            <div key={step.num} className="lk-carousel-card" style={{ background: S.card, border: `1px solid ${S.border}`, padding: "1.25rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".85rem" }}>
+                <div style={{ width: "38px", height: "38px", flexShrink: 0, borderRadius: "10px", background: `${step.color}18`, border: `1px solid ${step.color}35`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <step.Icon style={{ width: "17px", height: "17px", color: step.color }} strokeWidth={1.5} />
+                </div>
+                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color }}>{step.num}</span>
+              </div>
+              <p style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".35rem", lineHeight: 1.2 }}>{step.title}</p>
+              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted }}>{step.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 

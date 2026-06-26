@@ -7,6 +7,7 @@ import { ContentosSubNav } from "../_contentos-subnav";
 import type { DbOnboardingProfile, DbContentItem, DbApprovalWithContent } from "@/lib/supabase/types";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
+import { BriefGate } from "./_brief-gate";
 
 export default async function AdminContentosHomePage({
   searchParams,
@@ -26,6 +27,7 @@ export default async function AdminContentosHomePage({
   const userRole = "admin";
   let companyName: string | null = null;
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let hasClientContext = false;
 
   if (isSupabaseConfigured) {
     // Validate that the client is a real client (not operacional/admin/test/archived)
@@ -38,15 +40,18 @@ export default async function AdminContentosHomePage({
       const supabase = await createServerSupabaseClient();
       companyName = validClient.company_name;
 
-      const [onbResult, contentsResult, approvalsResult] = await Promise.all([
+      const [onbResult, contentsResult, approvalsResult, contextResult] = await Promise.all([
         supabase.from("onboarding_profiles").select("*").eq("client_id", activeClientId).maybeSingle(),
         supabase.from("content_items").select("*").eq("client_id", activeClientId).order("created_at", { ascending: false }).limit(20),
         supabase.from("approvals").select("*, content_items(*)").eq("client_id", activeClientId).order("created_at", { ascending: false }).limit(10),
+        supabase.from("client_context").select("id").eq("client_id", activeClientId).maybeSingle(),
       ]);
-      serverOnboarding = onbResult.data;
-      serverContents   = contentsResult.data ?? [];
-      serverApprovals  = (approvalsResult.data as DbApprovalWithContent[]) ?? [];
-      suggestions      = await getContentOSSuggestions(supabase, activeClientId!);
+      serverOnboarding  = onbResult.data;
+      serverContents    = contentsResult.data ?? [];
+      serverApprovals   = (approvalsResult.data as DbApprovalWithContent[]) ?? [];
+      suggestions       = await getContentOSSuggestions(supabase, activeClientId!);
+      // contextResult.error.code 42P01 = table not yet created (SQL 36 pending)
+      hasClientContext  = !contextResult.error && !!contextResult.data;
     } catch (e) {
       console.error("[admin/contentos/home] Supabase fetch error:", e);
     }
@@ -55,6 +60,9 @@ export default async function AdminContentosHomePage({
   return (
     <>
       <ContentosSubNav />
+      {isSupabaseConfigured && !hasClientContext && (
+        <BriefGate clientId={activeClientId} companyName={companyName} />
+      )}
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} className="mb-5" />
       )}

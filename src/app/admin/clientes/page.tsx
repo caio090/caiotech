@@ -1,127 +1,453 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
-import { ClientCard } from "@/components/client-card";
-import { mockClients } from "@/data/mock-data";
-import Link from "next/link";
-import { Plus, Search, X } from "lucide-react";
+import {
+  Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
+  Edit2, Trash2, Loader2, Building2, User, Tag, Filter,
+} from "lucide-react";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-type HealthFilter = "todos" | "healthy" | "attention" | "risk";
+// ── Tipos ──────────────────────────────────────────────────────
+interface Client {
+  id: string;
+  company_name: string | null;
+  responsible_name: string | null;
+  email: string | null;
+  phone: string | null;
+  segment: string | null;
+  status: string | null;
+  has_meta?: boolean;
+  has_instagram?: boolean;
+  has_diagnostico?: boolean;
+  has_brief?: boolean;
+}
 
+type StatusFilter = "todos" | "active" | "onboarding" | "inactive";
+
+// ── Badges ─────────────────────────────────────────────────────
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${color}`}>
+      {label}
+    </span>
+  );
+}
+
+function ClientBadges({ c }: { c: Client }) {
+  return (
+    <div className="flex flex-wrap gap-1 mt-1.5">
+      {c.status === "active"     && <Badge label="Ativo"      color="text-emerald-700 bg-emerald-50" />}
+      {c.status === "onboarding" && <Badge label="Onboarding" color="text-blue-700 bg-blue-50" />}
+      {c.status === "inactive"   && <Badge label="Inativo"    color="text-gray-500 bg-gray-100" />}
+      {c.has_meta                && <Badge label="Meta"       color="text-indigo-700 bg-indigo-50" />}
+      {c.has_instagram           && <Badge label="Instagram"  color="text-pink-700 bg-pink-50" />}
+      {c.has_diagnostico         && <Badge label="Diagnóstico ok" color="text-violet-700 bg-violet-50" />}
+      {!c.has_brief              && <Badge label="Brief pendente" color="text-amber-700 bg-amber-50" />}
+    </div>
+  );
+}
+
+// ── Modal Excluir ──────────────────────────────────────────────
+function DeleteModal({
+  client, onConfirm, onCancel, loading,
+}: {
+  client: Client; onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+  const [typed, setTyped] = useState("");
+  const name = client.company_name ?? "";
+  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Trash2 className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Excluir cliente</p>
+            <p className="text-xs text-gray-400">Esta ação não pode ser desfeita</p>
+          </div>
+        </div>
+        <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-xs text-red-700 leading-relaxed">
+          Ao excluir <strong>{name}</strong>, dados vinculados (conteúdos, aprovações, briefings e contexto estratégico) podem ser removidos em cascata. Verifique se há histórico importante antes de confirmar.
+        </div>
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Digite o nome do cliente para confirmar:
+          </label>
+          <input
+            autoFocus
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={name}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} disabled={!matches || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Excluir definitivamente
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Editar ───────────────────────────────────────────────
+function EditModal({
+  client, onSave, onCancel, loading,
+}: {
+  client: Client; onSave: (data: Partial<Client>) => void; onCancel: () => void; loading: boolean;
+}) {
+  const [form, setForm] = useState({
+    company_name:     client.company_name     ?? "",
+    responsible_name: client.responsible_name ?? "",
+    email:            client.email            ?? "",
+    phone:            client.phone            ?? "",
+    segment:          client.segment          ?? "",
+    status:           client.status           ?? "active",
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center">
+            <Edit2 className="w-4 h-4 text-indigo-600" />
+          </div>
+          <p className="text-sm font-bold text-gray-900">Editar cliente</p>
+        </div>
+        <div className="space-y-3 mb-5">
+          {([
+            ["company_name",     "Nome da empresa"],
+            ["responsible_name", "Responsável"],
+            ["email",            "E-mail"],
+            ["phone",            "Telefone"],
+            ["segment",          "Segmento"],
+          ] as [keyof typeof form, string][]).map(([key, label]) => (
+            <div key={key}>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
+              <input
+                value={form[key]}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+              />
+            </div>
+          ))}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
+            >
+              <option value="active">Ativo</option>
+              <option value="onboarding">Onboarding</option>
+              <option value="inactive">Inativo</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={() => onSave(form)} disabled={loading} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Card de cliente ────────────────────────────────────────────
+function ClientCard({ c, onEdit, onDelete, isAdmin }: { c: Client; onEdit: (c: Client) => void; onDelete: (c: Client) => void; isAdmin: boolean }) {
+  const initials = (c.company_name ?? c.responsible_name ?? "?")
+    .split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold text-indigo-700">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-gray-900 truncate">{c.company_name ?? "Sem nome"}</p>
+          <p className="text-xs text-gray-400 truncate">{c.segment ?? "Sem segmento"}</p>
+          <ClientBadges c={c} />
+        </div>
+        <div className="flex gap-1 flex-shrink-0">
+          <button onClick={() => onEdit(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Editar">
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          {isAdmin && (
+            <button onClick={() => onDelete(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Excluir">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="space-y-1.5 text-xs">
+        {c.responsible_name && (
+          <div className="flex items-center gap-1.5 text-gray-500">
+            <User className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{c.responsible_name}</span>
+          </div>
+        )}
+        {c.email && (
+          <div className="flex items-center gap-1.5 text-gray-400">
+            <Tag className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{c.email}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Página principal ───────────────────────────────────────────
 export default function AdminClientesPage() {
-  const [search,       setSearch]       = useState("");
-  const [healthFilter, setHealthFilter] = useState<HealthFilter>("todos");
+  const [clients,       setClients]       = useState<Client[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [isAdmin,       setIsAdmin]       = useState(false);
+  const [actionMsg,     setActionMsg]     = useState<string | null>(null);
+  const [search,        setSearch]        = useState("");
+  const [statusFilter,  setStatusFilter]  = useState<StatusFilter>("todos");
+  const [segFilter,     setSegFilter]     = useState("");
+  const [metaFilter,    setMetaFilter]    = useState<"todos" | "connected" | "not_connected">("todos");
+  const [diagFilter,    setDiagFilter]    = useState<"todos" | "ok" | "pending">("todos");
+  const [showFilters,   setShowFilters]   = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [deletingClient,setDeletingClient]= useState<Client | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const fetchClients = useCallback(async () => {
+    if (!isSupabaseConfigured) { setLoading(false); return; }
+    try {
+      const res = await fetch("/api/admin/clients");
+      if (res.ok) {
+        const data = await res.json() as { clients: Client[]; isAdmin: boolean };
+        setClients(data.clients);
+        setIsAdmin(data.isAdmin);
+      }
+    } catch { /* estado vazio */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void fetchClients(); }, [fetchClients]);
+
+  const segments = useMemo(() => {
+    const set = new Set(clients.map((c) => c.segment).filter(Boolean));
+    return [...set].sort() as string[];
+  }, [clients]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return mockClients.filter((c) => {
-      if (healthFilter !== "todos" && c.health !== healthFilter) return false;
+    return clients.filter((c) => {
+      if (statusFilter !== "todos" && c.status !== statusFilter) return false;
+      if (segFilter && c.segment !== segFilter) return false;
+      if (metaFilter === "connected"     && !c.has_meta) return false;
+      if (metaFilter === "not_connected" && c.has_meta)  return false;
+      if (diagFilter === "ok"      && !c.has_diagnostico) return false;
+      if (diagFilter === "pending" && c.has_diagnostico)  return false;
+      const q = search.trim().toLowerCase();
       if (!q) return true;
-      const name      = (c.name ?? "").toLowerCase();
-      const company   = (c.company ?? "").toLowerCase();
-      const segment   = (c.segment ?? "").toLowerCase();
-      return name.includes(q) || company.includes(q) || segment.includes(q);
+      return (
+        (c.company_name ?? "").toLowerCase().includes(q) ||
+        (c.responsible_name ?? "").toLowerCase().includes(q) ||
+        (c.segment ?? "").toLowerCase().includes(q)
+      );
     });
-  }, [search, healthFilter]);
+  }, [clients, search, statusFilter, segFilter, metaFilter, diagFilter]);
 
-  const counts = useMemo(() => ({
-    todos:     mockClients.length,
-    healthy:   mockClients.filter((c) => c.health === "healthy").length,
-    attention: mockClients.filter((c) => c.health === "attention").length,
-    risk:      mockClients.filter((c) => c.health === "risk").length,
-  }), []);
+  const flash = (msg: string) => {
+    setActionMsg(msg);
+    setTimeout(() => setActionMsg(null), 3000);
+  };
 
-  const healthOptions: { value: HealthFilter; label: string; color: string }[] = [
-    { value: "todos",     label: "Todos",    color: "text-gray-500" },
-    { value: "healthy",   label: "Saudavel", color: "text-emerald-500" },
-    { value: "attention", label: "Atencao",  color: "text-amber-400" },
-    { value: "risk",      label: "Risco",    color: "text-red-500" },
+  const handleSaveEdit = async (data: Partial<Client>) => {
+    if (!editingClient) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${editingClient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        setClients((prev) => prev.map((c) => c.id === editingClient.id ? { ...c, ...data } : c));
+        flash("Cliente atualizado com sucesso.");
+      } else { flash("Erro ao salvar. Tente novamente."); }
+    } catch { flash("Erro de conexão."); }
+    finally { setActionLoading(false); setEditingClient(null); }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingClient) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${deletingClient.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setClients((prev) => prev.filter((c) => c.id !== deletingClient.id));
+        flash("Cliente excluído.");
+      } else { flash("Erro ao excluir. Verifique as permissões."); }
+    } catch { flash("Erro de conexão."); }
+    finally { setActionLoading(false); setDeletingClient(null); }
+  };
+
+  const statusOptions: { value: StatusFilter; label: string }[] = [
+    { value: "todos",      label: "Todos" },
+    { value: "active",     label: "Ativos" },
+    { value: "onboarding", label: "Onboarding" },
+    { value: "inactive",   label: "Inativos" },
   ];
 
   return (
     <div>
-      <PageHeader title="Clientes" description={`${mockClients.length} clientes ativos`}>
-        <Link
-          href="#"
+      <PageHeader title="Clientes" description={loading ? "Carregando..." : `${filtered.length} de ${clients.length} clientes`}>
+        <button
+          onClick={() => flash("Criação de clientes: disponível em breve via formulário.")}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Novo cliente
-        </Link>
+        </button>
       </PageHeader>
 
-      {/* Barra de busca + filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Busca */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, empresa ou segmento..."
-            className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-700 placeholder-gray-400 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-50 transition"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+      {actionMsg && (
+        <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">
+          {actionMsg}
+        </div>
+      )}
+
+      <div className="mb-5 space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nome, responsável ou segmento..."
+              className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-indigo-300"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-colors ${
+              showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <Filter className="w-4 h-4" /> Filtros
+          </button>
         </div>
 
-        {/* Filtros de saude */}
         <div className="flex gap-2 flex-wrap">
-          {healthOptions.map((opt) => (
+          {statusOptions.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setHealthFilter(opt.value)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                healthFilter === opt.value
+              onClick={() => setStatusFilter(opt.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                statusFilter === opt.value
                   ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
-              {opt.value !== "todos" && (
-                <span className={`w-2 h-2 rounded-full ${
-                  opt.value === "healthy"   ? "bg-emerald-500" :
-                  opt.value === "attention" ? "bg-amber-400" : "bg-red-500"
-                }`} />
-              )}
               {opt.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                healthFilter === opt.value
-                  ? "bg-white/20 text-white"
-                  : "bg-gray-100 text-gray-500"
-              }`}>
-                {counts[opt.value]}
-              </span>
+              {opt.value !== "todos" && (
+                <span className="ml-1 opacity-70">({clients.filter((c) => c.status === opt.value).length})</span>
+              )}
             </button>
           ))}
         </div>
+
+        {showFilters && (
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Segmento</label>
+              <select value={segFilter} onChange={(e) => setSegFilter(e.target.value)} className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm outline-none">
+                <option value="">Todos os segmentos</option>
+                {segments.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <AtSign className="inline w-3 h-3 mr-1" />Meta
+              </label>
+              <select value={metaFilter} onChange={(e) => setMetaFilter(e.target.value as typeof metaFilter)} className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm outline-none">
+                <option value="todos">Todos</option>
+                <option value="connected">Meta conectado</option>
+                <option value="not_connected">Sem Meta</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Diagnóstico</label>
+              <select value={diagFilter} onChange={(e) => setDiagFilter(e.target.value as typeof diagFilter)} className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm outline-none">
+                <option value="todos">Todos</option>
+                <option value="ok">Diagnóstico ok</option>
+                <option value="pending">Pendente</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Resultados */}
-      {filtered.length > 0 ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((client) => (
-            <ClientCard key={client.id} {...client} href={`/admin/clientes/${client.id}`} />
-          ))}
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-gray-400 py-12 justify-center">
+          <Loader2 className="w-5 h-5 animate-spin" /> Carregando clientes...
         </div>
-      ) : (
-        <div className="py-16 text-center text-gray-400">
-          <Search className="w-8 h-8 mx-auto mb-3 text-gray-200" />
-          <p className="text-sm font-medium text-gray-500">Nenhum cliente encontrado</p>
-          <p className="text-xs mt-1">Tente outro termo ou remova os filtros.</p>
-          <button
-            onClick={() => { setSearch(""); setHealthFilter("todos"); }}
-            className="mt-4 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-          >
+      )}
+      {!loading && !isSupabaseConfigured && (
+        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+          <Building2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-gray-600 mb-1">Banco de dados não configurado</p>
+          <p className="text-xs text-gray-400">Configure o Supabase para gerenciar clientes reais.</p>
+        </div>
+      )}
+      {!loading && isSupabaseConfigured && clients.length === 0 && (
+        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+          <Building2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-gray-600 mb-1">Nenhum cliente cadastrado</p>
+          <p className="text-xs text-gray-400">Adicione o primeiro cliente para começar.</p>
+        </div>
+      )}
+      {!loading && isSupabaseConfigured && clients.length > 0 && filtered.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
+          <AlertCircle className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Nenhum cliente encontrado com os filtros selecionados.</p>
+          <button onClick={() => { setSearch(""); setStatusFilter("todos"); setSegFilter(""); setMetaFilter("todos"); setDiagFilter("todos"); }} className="mt-2 text-xs text-indigo-600 hover:underline">
             Limpar filtros
           </button>
         </div>
       )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((c) => (
+            <ClientCard key={c.id} c={c} isAdmin={isAdmin} onEdit={setEditingClient} onDelete={setDeletingClient} />
+          ))}
+        </div>
+      )}
+
+      {!loading && clients.length > 0 && (
+        <div className="mt-6 flex items-center gap-4 text-[11px] text-gray-400">
+          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {clients.filter((c) => c.has_meta).length} com Meta</span>
+          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-violet-400" /> {clients.filter((c) => c.has_diagnostico).length} com diagnóstico</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" /> {clients.filter((c) => !c.has_brief).length} sem brief</span>
+        </div>
+      )}
+
+      {editingClient  && <EditModal  client={editingClient}  onSave={handleSaveEdit} onCancel={() => setEditingClient(null)}  loading={actionLoading} />}
+      {deletingClient && <DeleteModal client={deletingClient} onConfirm={handleDelete} onCancel={() => setDeletingClient(null)} loading={actionLoading} />}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Loader2, RefreshCw,
   Link2, Link2Off, AtSign, Bot, Palette, BarChart3, HardDrive,
   ChevronRight, Clock, Zap, TrendingUp, MapPin, Copy, Info,
-  ShieldCheck, CalendarDays, User,
+  ShieldCheck, CalendarDays, User, Globe, Layers,
 } from "lucide-react";
 
 // ── Tipos ──────────────────────────────────────────────────────
@@ -46,6 +46,29 @@ type InsightsResponse = {
   metrics_available?: string[];
   publish_available?: boolean;
   publish_note?: string;
+} | null;
+
+type MetaPage = {
+  id: string;
+  name: string;
+  picture_url: string | null;
+  instagram: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    picture_url: string | null;
+  } | null;
+};
+
+type AccountsResponse = {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  connection_id?: string;
+  pages?: MetaPage[];
+  instagram_accounts?: { id: string; name: string | null; username: string | null; picture_url: string | null }[];
+  total_pages?: number;
+  total_instagram?: number;
 } | null;
 
 // ── Helpers visuais ────────────────────────────────────────────
@@ -133,6 +156,10 @@ function ConexoesContent() {
 
   const [showSetup, setShowSetup] = useState(false);
 
+  const [accounts,        setAccounts]        = useState<AccountsResponse>(null);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsTested,  setAccountsTested]  = useState(false);
+
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
     setAiLoading(true);
@@ -161,12 +188,28 @@ function ConexoesContent() {
     finally { setInsightsLoading(false); }
   }, []);
 
+  const checkAccounts = useCallback(async () => {
+    setAccountsLoading(true);
+    try {
+      setAccounts(await fetch("/api/meta/accounts").then((r) => r.json()) as AccountsResponse);
+      setAccountsTested(true);
+    } catch { setAccountsTested(true); }
+    finally { setAccountsLoading(false); }
+  }, []);
+
   // Carrega tudo ao montar, incluindo insights
   useEffect(() => {
     void checkAi();
     void checkMeta();
     void checkInsights();
   }, [checkAi, checkMeta, checkInsights]);
+
+  // Busca ativos da Meta após confirmar conexão
+  useEffect(() => {
+    if (insightsTested && insights?.ok) {
+      void checkAccounts();
+    }
+  }, [insightsTested, insights?.ok, checkAccounts]);
 
   // ── Estado derivado Meta ───────────────────────────────────
   // Considera conectado se: status route diz connected=true OU insights ok
@@ -354,6 +397,103 @@ function ConexoesContent() {
                     Nenhuma Pagina ou Instagram Business vinculado ainda. Isso ocorre quando o escopo de paginas ainda nao foi aprovado pela Meta. Tente reconectar para atualizar.
                   </p>
                 )}
+              </div>
+
+              {/* ── Ativos encontrados na Meta ── */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ativos encontrados na Meta</p>
+                  <button
+                    onClick={() => void checkAccounts()}
+                    disabled={accountsLoading}
+                    className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                  >
+                    {accountsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Atualizar
+                  </button>
+                </div>
+
+                {!accountsTested && accountsLoading && (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando ativos...
+                  </div>
+                )}
+
+                {accountsTested && !accounts?.ok && (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+                    {accounts?.reason === "graph_error"
+                      ? <>Erro na Graph API: {accounts.message}</>
+                      : accounts?.message ?? "Nao foi possivel buscar ativos da Meta."}
+                  </div>
+                )}
+
+                {accountsTested && accounts?.ok && (
+                  <div className="space-y-2">
+                    {/* Páginas Facebook */}
+                    {(accounts.pages ?? []).length > 0 ? (
+                      (accounts.pages ?? []).map((page) => (
+                        <div key={page.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                          <div className="flex items-center gap-2 mb-1">
+                            {page.picture_url
+                              ? <img src={page.picture_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                              : <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0"><Globe className="w-3.5 h-3.5 text-blue-600" /></div>
+                            }
+                            <div>
+                              <p className="text-xs font-semibold text-blue-800">{page.name}</p>
+                              <p className="text-[10px] text-blue-500">Pagina Facebook · ID {page.id}</p>
+                            </div>
+                          </div>
+                          {page.instagram && (
+                            <div className="flex items-center gap-2 mt-1.5 pl-8">
+                              {page.instagram.picture_url
+                                ? <img src={page.instagram.picture_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                                : <div className="w-5 h-5 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0"><AtSign className="w-3 h-3 text-pink-500" /></div>
+                              }
+                              <div>
+                                <p className="text-[11px] font-medium text-gray-700">
+                                  {page.instagram.username ? `@${page.instagram.username}` : page.instagram.name ?? "Instagram Business"}
+                                </p>
+                                <p className="text-[10px] text-gray-400">Instagram Business vinculado</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-400 flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5 flex-shrink-0" />
+                        Nenhuma Pagina Facebook encontrada. Reconecte e autorize o escopo de paginas.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── O que a conexão habilita agora ── */}
+              <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl mb-4">
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">O que esta conexao habilita</p>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-start gap-2 text-indigo-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span>Leitura de métricas do Instagram Business (alcance, impressões, engajamento)</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-indigo-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span>Listagem de Páginas Facebook e contas Instagram vinculadas</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-indigo-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span>Vinculação de ativos Meta a clientes da agência</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-gray-400">
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Publicação automática · em breve (requer Meta App Review)</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-gray-400">
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Gestão de anúncios · em breve</span>
+                  </div>
+                </div>
               </div>
 
               {/* Botão insights expandível */}

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Video, Plus, Film, Clock, MapPin, Calendar, ChevronRight, Clapperboard } from "lucide-react";
+import { Video, Plus, Film, Clock, MapPin, Calendar, ChevronRight, Clapperboard, Trash2, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DbRecProject } from "@/lib/supabase/types";
 
@@ -38,12 +38,73 @@ const STATUS_FILTERS = [
   { value: "concluido", label: "Concluídos" },
 ];
 
+// ── Modal de exclusão ──────────────────────────────────────────
+function DeleteProjectModal({
+  project, onConfirm, onCancel, loading,
+}: { project: DbRecProject; onConfirm: () => void; onCancel: () => void; loading: boolean }) {
+  const [typed, setTyped] = useState("");
+  const name = project.title ?? "";
+  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Trash2 className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Excluir projeto</p>
+            <p className="text-xs text-gray-400">Esta ação não pode ser desfeita</p>
+          </div>
+          <button onClick={onCancel} className="ml-auto text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-xl p-3 mb-4 leading-relaxed">
+          Ao excluir <strong>{name}</strong>, todos os dados do projeto (roteiro, storyboard, cenas e arquivos vinculados) serão removidos permanentemente.
+        </p>
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">Digite o nome do projeto para confirmar:</label>
+          <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={name}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">Cancelar</button>
+          <button onClick={onConfirm} disabled={!matches || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Excluir projeto
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   projects: DbRecProject[];
 }
 
-export function RecosDashboardContent({ projects }: Props) {
+export function RecosDashboardContent({ projects: initialProjects }: Props) {
+  const [projects, setProjects] = useState(initialProjects);
   const [filter, setFilter] = useState("todos");
+  const [deletingProject, setDeletingProject] = useState<DbRecProject | null>(null);
+  const [deleteLoading,   setDeleteLoading]   = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!deletingProject) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/admin/rec-projects/${deletingProject.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== deletingProject.id));
+        setMsg("Projeto excluído.");
+      } else { setMsg("Erro ao excluir."); }
+    } catch { setMsg("Erro de conexão."); }
+    finally {
+      setDeleteLoading(false);
+      setDeletingProject(null);
+      setTimeout(() => setMsg(null), 3000);
+    }
+  };
 
   const visible = filter === "todos"
     ? projects
@@ -111,6 +172,9 @@ export function RecosDashboardContent({ projects }: Props) {
         </div>
       )}
 
+      {/* Flash msg */}
+      {msg && <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">{msg}</div>}
+
       {/* Project grid */}
       {visible.length === 0 ? (
         <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center">
@@ -138,15 +202,24 @@ export function RecosDashboardContent({ projects }: Props) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard key={project.id} project={project} onDelete={() => setDeletingProject(project)} />
           ))}
         </div>
+      )}
+
+      {deletingProject && (
+        <DeleteProjectModal
+          project={deletingProject}
+          onConfirm={handleDelete}
+          onCancel={() => setDeletingProject(null)}
+          loading={deleteLoading}
+        />
       )}
     </div>
   );
 }
 
-function ProjectCard({ project }: { project: DbRecProject }) {
+function ProjectCard({ project, onDelete }: { project: DbRecProject; onDelete: () => void }) {
   const clientName = project.clients?.[0]?.company_name;
   const statusCfg  = STATUS_CONFIG[project.status] ?? { label: project.status, color: "bg-gray-100 text-gray-600" };
   const typeLabel  = PROJECT_TYPE_LABELS[project.project_type] ?? project.project_type;
@@ -174,7 +247,16 @@ function ProjectCard({ project }: { project: DbRecProject }) {
               <p className="text-xs text-gray-400 mt-0.5 truncate">{clientName}</p>
             )}
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-rose-400 transition-colors flex-shrink-0 mt-0.5" />
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={(e) => { e.preventDefault(); onDelete(); }}
+              className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+              title="Excluir projeto"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-rose-400 transition-colors" />
+          </div>
         </div>
 
         {/* Badges */}

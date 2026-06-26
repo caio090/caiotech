@@ -29,6 +29,9 @@ interface AdminNotif {
   title: string;
   message: string;
   href: string;
+  clientName?: string;
+  count?: number;
+  urgency?: "normal" | "high";
 }
 
 interface Props {
@@ -87,14 +90,24 @@ export function AdminLayoutShell({ children }: Props) {
             .eq("status", "pending"),
           supabase
             .from("approvals")
-            .select("id", { count: "exact", head: true })
+            .select("client_id, clients(company_name)")
             .eq("status", "aguardando"),
         ]);
 
         if (cancelled) return;
 
-        const teamCount     = teamRes.count ?? 0;
-        const approvalCount = approvalRes.count ?? 0;
+        const teamCount = teamRes.count ?? 0;
+        const rawApprovals = approvalRes.data ?? [];
+
+        // Agrupa aprovações por cliente
+        const byClient = new Map<string, { name: string; count: number }>();
+        for (const a of rawApprovals) {
+          const id   = a.client_id as string;
+          const name = (a.clients as { company_name?: string } | null)?.company_name ?? "Cliente";
+          const cur  = byClient.get(id) ?? { name, count: 0 };
+          byClient.set(id, { name: cur.name, count: cur.count + 1 });
+        }
+        const approvalCount = rawApprovals.length;
         const total         = teamCount + approvalCount;
 
         const built: AdminNotif[] = [];
@@ -106,7 +119,30 @@ export function AdminLayoutShell({ children }: Props) {
             href:    "/admin/equipe",
           });
         }
-        if (approvalCount > 0) {
+        if (byClient.size === 1) {
+          const [clientId, info] = [...byClient.entries()][0];
+          built.push({
+            type:       "approval",
+            title:      `${info.count} aprovação${info.count > 1 ? "ões" : ""} — ${info.name}`,
+            message:    `${info.count} conteúdo${info.count > 1 ? "s" : ""} de ${info.name} aguardando revisão.`,
+            href:       `/admin/contentos/aprovacoes?client=${clientId}`,
+            clientName: info.name,
+            count:      info.count,
+            urgency:    info.count >= 3 ? "high" : "normal",
+          });
+        } else if (byClient.size > 1) {
+          for (const [clientId, info] of byClient.entries()) {
+            built.push({
+              type:       "approval",
+              title:      `${info.count} aprovação${info.count > 1 ? "ões" : ""} — ${info.name}`,
+              message:    `${info.count} conteúdo${info.count > 1 ? "s" : ""} aguardando.`,
+              href:       `/admin/contentos/aprovacoes?client=${clientId}`,
+              clientName: info.name,
+              count:      info.count,
+              urgency:    info.count >= 3 ? "high" : "normal",
+            });
+          }
+        } else if (approvalCount > 0) {
           built.push({
             type:    "approval",
             title:   `${approvalCount} aprovação${approvalCount > 1 ? "ões" : ""} pendente${approvalCount > 1 ? "s" : ""}`,
@@ -217,23 +253,30 @@ export function AdminLayoutShell({ children }: Props) {
                   {notifs.length > 0 ? (
                     <div className="p-3 space-y-2">
                       {notifs.map((n, i) => (
-                        <div
+                        <Link
                           key={i}
-                          className={`flex items-start gap-3 border rounded-xl p-3 ${
+                          href={n.href}
+                          onClick={() => setShowBell(false)}
+                          className={`flex items-start gap-3 border rounded-xl p-3 no-underline transition-colors ${
                             n.type === "team_request"
-                              ? "bg-indigo-50 border-indigo-100"
-                              : "bg-amber-50 border-amber-100"
+                              ? "bg-indigo-50 border-indigo-100 hover:bg-indigo-100"
+                              : n.urgency === "high"
+                              ? "bg-red-50 border-red-100 hover:bg-red-100"
+                              : "bg-amber-50 border-amber-100 hover:bg-amber-100"
                           }`}
                         >
                           {n.type === "team_request"
                             ? <UserRoundPlus className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
-                            : <CheckSquare className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                            : <CheckSquare className={`w-4 h-4 flex-shrink-0 mt-0.5 ${n.urgency === "high" ? "text-red-500" : "text-amber-500"}`} />
                           }
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-gray-800">{n.title}</p>
                             <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
+                            {n.urgency === "high" && (
+                              <span className="inline-block mt-1 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">Urgente</span>
+                            )}
                           </div>
-                        </div>
+                        </Link>
                       ))}
 
                       <div className="flex gap-2 pt-1">

@@ -15,6 +15,12 @@
   --foreground: var(--lk-text);
 }
 
+html {
+  scroll-behavior: smooth;
+  /* Prevent horizontal scroll globally */
+  overflow-x: hidden;
+}
+
 body {
   background: var(--lk-bg);
   color: var(--lk-text);
@@ -22,11 +28,98 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  /* iOS safe area support */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+/* ── Mobile safe area utilities ──────────────────────────────── */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
+
+/* ── Respect prefers-reduced-motion ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Horizontal carousel (etapas/módulos) ───────────────────── */
+.lk-carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 1rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  /* Mask edges to show peekthrough effect */
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 88%, transparent 100%);
+}
+.lk-carousel::-webkit-scrollbar { display: none; }
+
+.lk-carousel-card {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  /* ~80% width on mobile, ~30% on desktop */
+  width: 80vw;
+  max-width: 320px;
+}
+
+@media (min-width: 768px) {
+  .lk-carousel {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .lk-carousel-card {
+    width: calc(25% - 0.75rem);
+    max-width: none;
+  }
+}
+
+/* Drag hint indicator */
+.lk-carousel-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  color: #555566;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'Space Mono', monospace;
+}
+.lk-carousel-hint::before {
+  content: "←";
+  animation: lk-hint-bounce 1.8s ease-in-out infinite;
+}
+.lk-carousel-hint::after {
+  content: "→";
+  animation: lk-hint-bounce 1.8s ease-in-out infinite reverse;
+}
+@keyframes lk-hint-bounce {
+  0%, 100% { transform: translateX(0); opacity: 0.5; }
+  50% { transform: translateX(3px); opacity: 1; }
+}
+@media (min-width: 768px) { .lk-carousel-hint { display: none; } }
+
+/* ── Admin panel mobile bottom nav padding ──────────────────── */
+.lk-mobile-content-pad {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) { .lk-mobile-content-pad { padding-bottom: 0; } }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
