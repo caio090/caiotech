@@ -114,6 +114,20 @@ begin
   if not exists (select 1 from information_schema.columns
                  where table_schema = 'public'
                    and table_name   = 'meta_connections'
+                   and column_name  = 'ad_account_id') then
+    alter table public.meta_connections add column ad_account_id text;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'business_id') then
+    alter table public.meta_connections add column business_id text;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
                    and column_name  = 'meta_app_id') then
     alter table public.meta_connections add column meta_app_id text not null default '';
   end if;

@@ -46,13 +46,15 @@ export async function GET() {
     scopes: string | null;
     status: string;
     is_active: boolean | null;
+    created_at: string | null;
+    meta_user_id: string | null;
   } | null = null;
 
   try {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from("meta_connections")
-      .select("id, page_id, page_name, instagram_business_account_id, instagram_username, token_expires_at, scopes, status, is_active")
+      .select("id, page_id, page_name, instagram_business_account_id, instagram_username, token_expires_at, scopes, status, is_active, created_at, meta_user_id")
       .eq("connected_by", userId)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -99,13 +101,29 @@ export async function GET() {
     }
   }
 
-  // 5. Verifica se tem page_id ou instagram_business_account_id
+  // Estrutura segura da conexão (nunca expõe access_token)
+  const safeConnection = {
+    id:                            connection.id,
+    meta_user_id:                  connection.meta_user_id,
+    page_id:                       connection.page_id,
+    page_name:                     connection.page_name,
+    instagram_business_account_id: connection.instagram_business_account_id,
+    instagram_username:            connection.instagram_username,
+    created_at:                    connection.created_at,
+    api_version:                   apiVersion,
+  };
+
+  // 5. Conexão ativa sem páginas vinculadas
+  // Isso ocorre quando o callback salvou o token mas ainda não obteve os dados de página.
+  // Ainda é uma conexão válida — o usuário autorizou o app.
   if (!connection.page_id && !connection.instagram_business_account_id) {
     return NextResponse.json({
-      ok:            false,
-      reason:        "no_accounts",
-      message:       "Conta Meta conectada, mas nenhuma Página ou conta Instagram Business encontrada. Verifique as permissões no Meta Developers.",
-      connection_id: connection.id,
+      ok:         true,
+      reason:     "connected_no_pages",
+      message:    "Conta Meta conectada. Para vincular Páginas ou Instagram Business, o App Meta precisa de aprovação do escopo de páginas. Tente reconectar para atualizar os dados.",
+      connection: safeConnection,
+      metrics_available: [],
+      publish_available: false,
     });
   }
 
@@ -115,26 +133,19 @@ export async function GET() {
 
   if (!hasInsightsScope) {
     return NextResponse.json({
-      ok:            false,
-      reason:        "insufficient_permissions",
-      message:       "Permissões insuficientes para insights. Reconecte e aceite o escopo instagram_manage_insights.",
-      connection_id: connection.id,
+      ok:         false,
+      reason:     "insufficient_permissions",
+      message:    "Permissões insuficientes. Reconecte e aceite o escopo instagram_manage_insights.",
+      connection: safeConnection,
     });
   }
 
-  // 7. Conexão ativa — retorna estrutura preparada (dados reais virão via Graph API futuramente)
+  // 7. Conexão completa — pronta para leitura de insights
   return NextResponse.json({
     ok:      true,
     reason:  "ready",
     message: "Conexão ativa. Insights disponíveis.",
-    connection: {
-      id:                            connection.id,
-      page_id:                       connection.page_id,
-      page_name:                     connection.page_name,
-      instagram_business_account_id: connection.instagram_business_account_id,
-      instagram_username:            connection.instagram_username,
-      api_version:                   apiVersion,
-    },
+    connection: safeConnection,
     metrics_available: [
       "alcance",
       "impressoes",

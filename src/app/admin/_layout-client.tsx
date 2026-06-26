@@ -111,7 +111,7 @@ export function AdminLayoutShell({ children }: Props) {
             type:    "approval",
             title:   `${approvalCount} aprovação${approvalCount > 1 ? "ões" : ""} pendente${approvalCount > 1 ? "s" : ""}`,
             message: "Conteúdos aguardando revisão do cliente.",
-            href:    "/admin/contentos",
+            href:    "/admin/contentos/aprovacoes",
           });
         }
 
@@ -249,7 +249,7 @@ export function AdminLayoutShell({ children }: Props) {
                         )}
                         {notifs.some((n) => n.type === "approval") && (
                           <Link
-                            href="/admin/contentos"
+                            href="/admin/contentos/aprovacoes"
                             onClick={() => setShowBell(false)}
                             className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-amber-500 text-white text-xs font-semibold rounded-xl hover:bg-amber-600 transition-colors"
                           >
