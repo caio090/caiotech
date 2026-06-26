@@ -3,6 +3,8 @@ import { DashboardCard } from "@/components/dashboard-card";
 import {
   Users, Target, FolderOpen, CheckSquare, BarChart3,
   DollarSign, AlertTriangle, TrendingUp, Zap, UserRoundPlus, Clock,
+  Sparkles, Video, GraduationCap, Link2, FileText,
+  Package, Truck, ShoppingBag, MapPin, BarChart2, Eye, Bot,
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -172,6 +174,64 @@ export default async function AdminDashboardPage() {
 
       {/* ContentOS quick access */}
       <ContentOSAdminCard clients={clients} />
+
+      {/* ── Plataforma: módulos ativos e em breve ── */}
+      <div className="mb-8">
+        <h2 className="text-sm font-bold text-gray-800 mb-1">Plataforma LOKAT OS</h2>
+        <p className="text-xs text-gray-400 mb-4">Módulos disponíveis e próximos na sua conta.</p>
+
+        {/* Ativos */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+          {[
+            { href: "/admin/dashboard",     icon: BarChart2,  label: "Dashboard",    color: "indigo" },
+            { href: "/admin/contentos",     icon: Sparkles,   label: "ContentOS",    color: "purple" },
+            { href: "/admin/recos",         icon: Video,      label: "RecOS",        color: "red"    },
+            { href: "/admin/leads",         icon: Target,     label: "GrowthOS",     color: "emerald"},
+            { href: "/admin/financeiro",    icon: DollarSign, label: "FinanceOS",    color: "teal"   },
+            { href: "/admin/conexoes",      icon: Link2,      label: "Conexoes",     color: "blue"   },
+            { href: "/admin/relatorios",    icon: FileText,   label: "Relatorios",   color: "gray"   },
+            { href: "/admin/configuracoes", icon: Bot,        label: "IA / Config",  color: "violet" },
+          ].map(({ href, icon: Icon, label, color }) => (
+            <a
+              key={label}
+              href={href}
+              className={`flex items-center gap-2.5 bg-white border border-gray-100 rounded-xl px-3 py-2.5 hover:border-${color}-200 hover:bg-${color}-50 transition-colors group`}
+            >
+              <div className={`w-7 h-7 bg-${color}-50 rounded-lg flex items-center justify-center flex-shrink-0`}>
+                <Icon className={`w-3.5 h-3.5 text-${color}-500`} strokeWidth={1.5} />
+              </div>
+              <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900 truncate">{label}</span>
+            </a>
+          ))}
+        </div>
+
+        {/* Em breve */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[
+            { icon: Package,   label: "Estoque",                note: "Em breve"           },
+            { icon: Truck,     label: "Fornecedores",           note: "Em breve"           },
+            { icon: ShoppingBag, label: "Produtos",             note: "Em breve"           },
+            { icon: TrendingUp,  label: "Google Ads",           note: "Precisa conectar"   },
+            { icon: MapPin,    label: "Google Meu Negocio",     note: "Precisa conectar"   },
+            { icon: Eye,       label: "Visual Merchandising",   note: "Em breve"           },
+            { icon: BarChart3, label: "Trend Radar",            note: "Em breve"           },
+            { icon: GraduationCap, label: "Academy",            note: "Em breve"           },
+          ].map(({ icon: Icon, label, note }) => (
+            <div
+              key={label}
+              className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 opacity-60 cursor-default"
+            >
+              <div className="w-7 h-7 bg-white border border-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.5} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-500 truncate">{label}</p>
+                <p className="text-[10px] text-gray-400">{note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Clientes */}

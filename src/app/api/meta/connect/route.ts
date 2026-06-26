@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // GET /api/meta/connect
 // Monta a URL de autorização OAuth do Meta/Facebook e redireciona o usuário.
+// Requer sessão autenticada — redireciona para /login se não houver.
 //
 // Escopos solicitados:
-//   - pages_show_list           → listar páginas do Facebook
-//   - pages_read_engagement     → ler engajamento das páginas
-//   - instagram_basic           → acesso básico ao Instagram Business
-//   - instagram_manage_insights → acessar métricas/insights do Instagram
-//   - business_management       → acesso ao Meta Business Manager
+//   - pages_show_list              → listar páginas do Facebook
+//   - pages_read_engagement        → ler engajamento das páginas
+//   - instagram_basic              → acesso básico ao Instagram Business
+//   - instagram_manage_insights    → acessar métricas/insights do Instagram
+//   - business_management          → acesso ao Meta Business Manager
+//   - instagram_content_publish    → publicação (reservado, sem ativar agora)
 //
 // NOTA: instagram_manage_insights e business_management exigem
 // revisão e aprovação pelo Meta App Review antes de funcionar
@@ -20,10 +23,20 @@ export async function GET() {
 
   if (!appId || !redirectUri) {
     return NextResponse.json(
-      { ok: false, error: "META_APP_ID ou META_REDIRECT_URI não configurados." },
+      { ok: false, error: "META_APP_ID ou META_REDIRECT_URI não configurados. Adicione as variáveis no painel da Vercel e faça redeploy." },
       { status: 500 }
     );
   }
+
+  // Valida sessão antes de montar URL OAuth
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
+  }
+
+  // state = userId codificado em base64 para validar no callback (proteção CSRF básica)
+  const state = Buffer.from(user.id).toString("base64url");
 
   const scopes = [
     "pages_show_list",
@@ -38,6 +51,7 @@ export async function GET() {
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("scope", scopes);
   authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("state", state);
 
   return NextResponse.redirect(authUrl.toString());
 }

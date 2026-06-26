@@ -1,62 +1,133 @@
 -- ============================================================
 -- 35-meta-connections.sql
--- Tabela de conexões Meta / Instagram Business para LOKAT OS
+-- Tabela de conexoes Meta / Instagram Business para LOKAT OS
 --
--- ATENÇÃO: NÃO executar automaticamente.
--- Rodar manualmente no Supabase SQL Editor quando pronto para
--- iniciar o fluxo completo de OAuth + salvar tokens.
+-- ATENCAO: NAO executar automaticamente.
+-- Rodar manualmente no Supabase SQL Editor.
 --
--- Suporta três contextos de conexão:
---   a) Conta Meta da agência central LOKAT
---      → organization_id preenchido, client_id nulo
---   b) Conta Meta de agência cliente (multi-tenant)
---      → organization_id + client_id da agência-cliente
---   c) Conta Meta de cliente final / autônomo
---      → somente client_id (sem org intermediária)
+-- Contexto de uso:
+--   connected_by  → o usuario autenticado que conectou a conta Meta
+--   client_id     → o cliente da agencia associado a conexao (nullable)
+--   account_type  → contexto da conexao: 'agency' | 'client' | 'personal'
+--
+-- PENDENCIA FUTURA:
+--   Quando a tabela public.organizations existir no projeto,
+--   adicionar coluna organization_id uuid references public.organizations(id).
+--   Por enquanto, o isolamento e feito via connected_by + client_id.
+--
+-- Idempotente: pode ser rodado mais de uma vez sem erro.
+-- Usa IF NOT EXISTS, DO $$ para colunas novas, DROP POLICY IF EXISTS.
+-- NAO usa CREATE POLICY IF NOT EXISTS (invalido no PostgreSQL).
+-- NAO usa CASCADE em DROP.
 -- ============================================================
 
 create table if not exists public.meta_connections (
   id                              uuid primary key default gen_random_uuid(),
 
-  -- Contexto de quem conectou
-  organization_id                 uuid references public.organizations(id) on delete cascade,
-  client_id                       uuid references public.clients(id) on delete set null,
+  -- Quem conectou (dono da conexao)
   connected_by                    uuid references auth.users(id) on delete set null,
 
-  -- Identificação do provider
+  -- Cliente associado (opcional — usado quando a conexao pertence a um cliente especifico)
+  client_id                       uuid references public.clients(id) on delete set null,
+
+  -- Tipo de conta: 'agency' | 'client' | 'personal'
+  account_type                    text,
+
+  -- Identificacao do provider
   provider                        text not null default 'meta',
 
-  -- Dados do App Meta (não armazenar o secret aqui — ele fica só nas env vars)
+  -- Dados do App Meta (NAO armazenar o secret — fica nas env vars)
   meta_app_id                     text not null,
 
-  -- Dados da conta Meta do usuário autorizado
+  -- Dados da conta Meta do usuario autorizado
   meta_user_id                    text,
-  page_id                         text,
-  instagram_business_account_id   text,
 
-  -- Tokens (criptografar antes de salvar em produção — usar Vault ou pgcrypto)
+  -- Pagina do Facebook
+  page_id                         text,
+  page_name                       text,
+
+  -- Conta Instagram Business
+  instagram_business_account_id   text,
+  instagram_username              text,
+
+  -- Token de acesso (criptografar em producao — usar Vault ou pgcrypto)
   access_token                    text,
   refresh_token                   text,
   token_expires_at                timestamptz,
 
-  -- Status da conexão
-  -- Valores possíveis: pending | active | expired | revoked | error
+  -- Escopos concedidos (texto separado por virgula, ex: "instagram_basic,pages_show_list")
+  scopes                          text,
+
+  -- Status da conexao
+  -- Valores possiveis: pending | active | expired | revoked | error
   status                          text not null default 'pending'
     check (status in ('pending', 'active', 'expired', 'revoked', 'error')),
+
+  -- Atalho de atividade (true = conexao primaria ativa do usuario)
+  is_active                       boolean not null default true,
 
   -- Timestamps
   created_at                      timestamptz not null default now(),
   updated_at                      timestamptz not null default now()
 );
 
--- Índices úteis para queries frequentes
-create index if not exists meta_connections_org_idx      on public.meta_connections (organization_id);
-create index if not exists meta_connections_client_idx   on public.meta_connections (client_id);
-create index if not exists meta_connections_status_idx   on public.meta_connections (status);
-create index if not exists meta_connections_page_idx     on public.meta_connections (page_id);
-create index if not exists meta_connections_ig_idx       on public.meta_connections (instagram_business_account_id);
+-- ── Colunas adicionais (idempotente via bloco DO) ─────────────────────────────
+-- Garante que colunas introduzidas em revisoes posteriores existam
+-- sem quebrar caso a tabela ja tenha sido criada anteriormente.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'page_name') then
+    alter table public.meta_connections add column page_name text;
+  end if;
 
--- Trigger para atualizar updated_at automaticamente
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'instagram_username') then
+    alter table public.meta_connections add column instagram_username text;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'scopes') then
+    alter table public.meta_connections add column scopes text;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'is_active') then
+    alter table public.meta_connections add column is_active boolean not null default true;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'account_type') then
+    alter table public.meta_connections add column account_type text;
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name   = 'meta_connections'
+                   and column_name  = 'meta_app_id') then
+    alter table public.meta_connections add column meta_app_id text not null default '';
+  end if;
+end $$;
+
+-- ── Indices ───────────────────────────────────────────────────────────────────
+create index if not exists meta_connections_user_idx    on public.meta_connections (connected_by);
+create index if not exists meta_connections_client_idx  on public.meta_connections (client_id);
+create index if not exists meta_connections_status_idx  on public.meta_connections (status);
+create index if not exists meta_connections_active_idx  on public.meta_connections (is_active);
+create index if not exists meta_connections_page_idx    on public.meta_connections (page_id);
+create index if not exists meta_connections_ig_idx      on public.meta_connections (instagram_business_account_id);
+
+-- ── Trigger updated_at ────────────────────────────────────────────────────────
 create or replace function public.handle_meta_connections_updated_at()
 returns trigger language plpgsql as $$
 begin
@@ -70,11 +141,16 @@ create trigger meta_connections_updated_at
   before update on public.meta_connections
   for each row execute procedure public.handle_meta_connections_updated_at();
 
--- RLS: habilitar Row Level Security
+-- ── Row Level Security ────────────────────────────────────────────────────────
 alter table public.meta_connections enable row level security;
 
--- Política: apenas admins e o próprio usuário que conectou podem ver/editar
--- TODO: ajustar políticas conforme roles definidos no projeto (admin, agency, client)
+-- DROP antes de CREATE (unica forma idempotente no PostgreSQL)
+drop policy if exists "meta_connections_select_own"  on public.meta_connections;
+drop policy if exists "meta_connections_insert_own"  on public.meta_connections;
+drop policy if exists "meta_connections_update_own"  on public.meta_connections;
+drop policy if exists "meta_connections_delete_own"  on public.meta_connections;
+
+-- Selecao: proprio usuario OU admin (via tabela profiles)
 create policy "meta_connections_select_own"
   on public.meta_connections for select
   using (
@@ -85,14 +161,26 @@ create policy "meta_connections_select_own"
     )
   );
 
+-- Insercao: apenas o proprio usuario autenticado
 create policy "meta_connections_insert_own"
   on public.meta_connections for insert
   with check (connected_by = auth.uid());
 
+-- Atualizacao: apenas o proprio usuario
 create policy "meta_connections_update_own"
   on public.meta_connections for update
   using (connected_by = auth.uid());
 
--- Comentário final:
--- Após rodar este SQL, atualizar src/app/api/meta/callback/route.ts
--- para trocar o OAuth code por access_token e salvar nesta tabela.
+-- Remocao: apenas o proprio usuario (para desconectar)
+create policy "meta_connections_delete_own"
+  on public.meta_connections for delete
+  using (connected_by = auth.uid());
+
+-- ── Reload do schema ──────────────────────────────────────────────────────────
+notify pgrst, 'reload schema';
+
+-- ── Apos rodar este SQL ───────────────────────────────────────────────────────
+-- 1. O callback /api/meta/callback ja salva na tabela (sem organization_id).
+-- 2. A rota /api/meta/insights consulta por connected_by + status = 'active'.
+-- 3. A rota /api/meta/status detecta a tabela e exibe sqlPending = false.
+-- 4. A pagina /admin/conexoes mostra o status em tempo real.

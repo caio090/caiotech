@@ -9,6 +9,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const PUBLIC_PATH_PREFIXES = [
   "/login", "/criar-conta", "/plataforma", "/planos", "/diagnostico",
   "/aprovar/", "/convite", "/equipe/solicitar-acesso", "/rec",
+  "/api/meta/status", "/api/meta/callback",
 ];
 
 function isPublic(pathname: string): boolean {

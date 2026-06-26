@@ -78,7 +78,8 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section
-        style={{ minHeight: "90vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem 2rem", position: "relative", overflow: "hidden", textAlign: "center" }}
+        className="px-4 md:px-8 py-16 md:py-[4rem]"
+        style={{ minHeight: "85vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", textAlign: "center" }}
       >
         {/* Background glow */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 60% at 50% 60%, rgba(59,47,160,.12) 0%, transparent 70%)", pointerEvents: "none" }} />
@@ -96,36 +97,38 @@ export default function HomePage() {
 
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 w-full">
           {/* Text */}
-          <div className="flex-1 text-left">
+          <div className="flex-1 text-center lg:text-left">
             <h1
               className="hero-fade-up-d1"
-              style={{ ...S.grotesk, fontSize: "clamp(2.8rem, 8vw, 6.5rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-.03em", color: S.text, marginBottom: "1.5rem" }}
+              style={{ ...S.grotesk, fontSize: "clamp(2rem, 8vw, 6.5rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-.03em", color: S.text, marginBottom: "1.2rem" }}
             >
               Marketing que<br />
               <em style={{ fontStyle: "italic", color: S.accent }}>funciona</em><br />
               e gera resultado.
             </h1>
 
-            <p className="hero-fade-up-d2" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "1rem", lineHeight: 1.7, color: S.muted, marginBottom: "2.5rem" }}>
+            <p className="hero-fade-up-d2 mx-auto lg:mx-0" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "clamp(.85rem, 2.5vw, 1rem)", lineHeight: 1.7, color: S.muted, marginBottom: "2rem" }}>
               Gerencie conteúdo, aprovações, leads e finanças em um único lugar — sem planilha, sem WhatsApp perdido, sem retrabalho. Com IA do início ao fim.
             </p>
 
-            <div className="hero-fade-up-d3 flex flex-wrap gap-3">
+            <div className="hero-fade-up-d3 flex flex-col sm:flex-row flex-wrap gap-3">
               <Link
                 href="/diagnostico"
+                className="w-full sm:w-auto text-center"
                 style={{ background: S.accent, color: "#fff", padding: ".85rem 2.2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
               >
                 ■ Quero ver na prática →
               </Link>
               <a
                 href="#modulos"
+                className="w-full sm:w-auto text-center"
                 style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
               >
                 Ver a plataforma
               </a>
             </div>
 
-            <div className="hero-fade-up-d3 flex flex-wrap items-center gap-4 mt-8 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
+            <div className="hero-fade-up-d3 flex flex-wrap items-center justify-center lg:justify-start gap-3 mt-6 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
               <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted }}>Para</span>
               {["Empresas", "Agências", "Autônomos"].map((l) => (
                 <span key={l} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".15rem .6rem" }}>{l}</span>
@@ -238,14 +241,14 @@ export default function HomePage() {
           <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Para quem é?]</p>
           <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Escolha seu caminho</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
           {[
             { Icon: Building2, iconColor: "#7b6ef6", title: "Sou empresa ou autônomo", desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.", cta: "Começar →", href: "/criar-conta", accent: "#7b6ef6" },
             { Icon: Rocket,    iconColor: "#a855f7", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.", cta: "Ver plataforma →", href: "/plataforma", accent: "#a855f7" },
             { Icon: UserCheck, iconColor: "#10b981", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e relatórios da sua marca atendida.", cta: "Entrar →", href: "/login", accent: "#10b981" },
             { Icon: ClipboardList, iconColor: "#f59e0b", title: "Quero só um diagnóstico", desc: "Receba uma análise da sua presença digital antes de criar conta. Grátis e sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico", accent: "#f59e0b" },
           ].map((item) => (
-            <div key={item.title} className="p-6 md:p-8 flex flex-col" style={{ background: S.card, transition: "background .2s" }}
+            <a key={item.title} href={item.href} className="p-5 md:p-8 flex flex-col no-underline" style={{ background: S.card, transition: "background .2s", textDecoration: "none" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = S.card; }}
             >
@@ -254,8 +257,8 @@ export default function HomePage() {
               </div>
               <h3 style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".5rem", lineHeight: 1.3 }}>{item.title}</h3>
               <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted, flexGrow: 1, marginBottom: "1.2rem" }}>{item.desc}</p>
-              <a href={item.href} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent, textDecoration: "none" }}>{item.cta}</a>
-            </div>
+              <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent }}>{item.cta}</span>
+            </a>
           ))}
         </div>
       </section>
@@ -270,21 +273,31 @@ export default function HomePage() {
         <div style={{ position: "relative" }}>
           {/* Linha conectora desktop */}
           <div className="hidden lg:block" style={{ position: "absolute", top: "28px", left: "10%", right: "10%", height: "1px", background: `linear-gradient(to right, transparent, ${S.border}, ${S.accent}50, ${S.border}, transparent)` }} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="flex flex-col lg:grid lg:grid-cols-5 gap-3">
             {[
               { num: "01", Icon: ClipboardList, color: "#7b6ef6", title: "Diagnóstico",   desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
               { num: "02", Icon: Sparkles,      color: "#a855f7", title: "ContentOS",      desc: "Estratégia, campanhas, briefings, legendas e aprovações com IA." },
               { num: "03", Icon: Video,          color: "#e0635a", title: "RecOS",          desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
               { num: "04", Icon: DollarSign,     color: "#10b981", title: "FinanceOS",      desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
               { num: "05", Icon: BarChart3,      color: "#3b82f6", title: "Relatórios",     desc: "Resultados, histórico, insights e próximos passos em painel claro." },
-            ].map((step) => (
-              <div key={step.num} className="flex flex-col items-center text-center p-5" style={{ background: S.card, border: `1px solid ${S.border}` }}>
-                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: `${step.color}18`, border: `2px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".8rem", position: "relative", zIndex: 1, backgroundColor: S.card }}>
-                  <step.Icon style={{ width: "18px", height: "18px", color: step.color }} strokeWidth={1.5} />
+            ].map((step, idx, arr) => (
+              <div key={step.num}>
+                <div className="flex flex-row lg:flex-col items-center lg:items-center gap-4 lg:gap-0 p-4 lg:p-5 lg:text-center" style={{ background: S.card, border: `1px solid ${S.border}` }}>
+                  <div className="flex-shrink-0" style={{ width: "44px", height: "44px", borderRadius: "50%", background: `${step.color}18`, border: `2px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1, backgroundColor: S.card }}>
+                    <step.Icon style={{ width: "18px", height: "18px", color: step.color }} strokeWidth={1.5} />
+                  </div>
+                  <div className="lg:mt-3 flex-1">
+                    <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color, display: "block", marginBottom: ".25rem" }}>{step.num}</span>
+                    <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".2rem" }}>{step.title}</p>
+                    <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
+                  </div>
                 </div>
-                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color, marginBottom: ".3rem" }}>{step.num}</span>
-                <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".3rem" }}>{step.title}</p>
-                <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
+                {/* Seta conectora entre steps — visível só no mobile */}
+                {idx < arr.length - 1 && (
+                  <div className="flex lg:hidden justify-center py-1" style={{ color: S.border }}>
+                    <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 0v10M1 7l5 7 5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -368,8 +381,8 @@ export default function HomePage() {
 
         {/* Grid: 1 col mobile, 2 col tablet, 3 col desktop — 6 cards = 3×2 perfeito */}
         <div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          style={{ gap: "1px", background: S.border, border: `1px solid ${S.border}` }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px"
+          style={{ background: S.border, border: `1px solid ${S.border}` }}
         >
           {modules.map((m) => (
             <div
@@ -418,8 +431,8 @@ export default function HomePage() {
 
           {/* Features grid: 1 col mobile, 2 col tablet, 3 col desktop */}
           <div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-            style={{ gap: "1px", background: S.border }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px"
+            style={{ background: S.border }}
           >
             {contentosFeatures.map((f) => (
               <div key={f.title} className="p-5 md:p-6" style={{ background: S.card }}>
@@ -445,7 +458,7 @@ export default function HomePage() {
       </section>
 
       {/* ── CTA final ── */}
-      <section id="cta" style={{ position: "relative", overflow: "hidden", padding: "6rem 2rem", textAlign: "center" }}>
+      <section id="cta" className="px-4 md:px-8 py-16 md:py-[6rem]" style={{ position: "relative", overflow: "hidden", textAlign: "center" }}>
         {/* bg accent gradient */}
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${S.accent}22 0%, #a855f720 50%, ${S.accent}15 100%)`, pointerEvents: "none" }} />
         <div style={{ position: "absolute", inset: 0, borderTop: `1px solid ${S.accent}30`, borderBottom: `1px solid ${S.accent}30`, pointerEvents: "none" }} />
@@ -457,15 +470,17 @@ export default function HomePage() {
           <p style={{ ...S.grotesk, color: S.muted, fontSize: ".95rem", maxWidth: "480px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
             Entenda o potencial da sua presença digital e comece a organizar sem planilha, sem WhatsApp perdido e sem retrabalho.
           </p>
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/diagnostico"
+              className="w-full sm:w-auto text-center"
               style={{ background: S.accent, color: "#fff", padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
             >
               ■ Quero ver na prática →
             </Link>
             <Link
               href="/criar-conta"
+              className="w-full sm:w-auto text-center"
               style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
             >
               Criar conta grátis

@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useOnboardingStore, getObjetivoPrincipal, getObjetivosSecundarios, getTomDeVoz } from "@/lib/onboarding-store";
 import { useCanvaStore } from "@/lib/canva-store";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
-import { ExternalLink, Palette } from "lucide-react";
+import { ExternalLink, Palette, AtSign, AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 
 const objetivoLabel: Record<string, string> = {
   vender: "Vender mais 💰", leads: "Gerar leads 🎯", autoridade: "Construir autoridade 🏆",
@@ -24,10 +24,38 @@ const notificacoes = [
   "Nova sugestão de conteúdo",
 ];
 
+type MetaApiResponse = {
+  ok: boolean;
+  missing?: string[];
+  meta?: { configured: boolean; appId: string; appSecret: string; redirectUri: string; apiVersion: string };
+};
+
 export default function ContentosConfigPage() {
   const data = useOnboardingStore();
   const canva = useCanvaStore();
   const [notifs, setNotifs] = useState(new Set([0, 1, 2]));
+
+  // ── Estado Meta/Instagram ─────────────────────────────────
+  const [metaData,    setMetaData]    = useState<MetaApiResponse | null>(null);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaTested,  setMetaTested]  = useState(false);
+
+  const checkMeta = useCallback(async () => {
+    setMetaLoading(true);
+    try {
+      const res  = await fetch("/api/meta/status");
+      const json = await res.json() as MetaApiResponse;
+      setMetaData(json);
+      setMetaTested(true);
+    } catch {
+      setMetaData(null);
+      setMetaTested(true);
+    } finally {
+      setMetaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void checkMeta(); }, [checkMeta]);
 
   const brandName   = data.marca?.nome       || "";
   const brandSeg    = data.marca?.segmento   || "";
@@ -168,6 +196,50 @@ export default function ContentosConfigPage() {
             {canva.link && (
               <a href={canva.link} target="_blank" rel="noreferrer" className="ml-auto text-xs text-purple-600 hover:underline flex items-center gap-1">
                 Abrir <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Meta / Instagram */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-800">Meta / Instagram</h2>
+            <button onClick={() => void checkMeta()} disabled={metaLoading} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40" title="Atualizar">
+              <RefreshCw className={`w-3.5 h-3.5 ${metaLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${metaTested && metaData?.ok ? "bg-emerald-50" : "bg-gray-50"}`}>
+              <AtSign className={`w-5 h-5 ${metaTested && metaData?.ok ? "text-emerald-500" : "text-gray-400"}`} strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-800">Meta / Instagram Business</p>
+              {metaLoading && <p className="text-xs text-gray-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Verificando…</p>}
+              {!metaLoading && !metaTested && <p className="text-xs text-gray-400">Clique em atualizar para verificar</p>}
+              {!metaLoading && metaTested && metaData?.ok  && <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Variáveis configuradas</p>}
+              {!metaLoading && metaTested && metaData && !metaData.ok && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Faltando: {metaData.missing?.join(", ")}
+                </p>
+              )}
+              {!metaLoading && metaTested && !metaData && <p className="text-xs text-red-500">Erro ao verificar</p>}
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => void checkMeta()}
+              disabled={metaLoading}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50"
+            >
+              {metaLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Testar Meta
+            </button>
+            {metaTested && metaData?.ok && (
+              <a href="/api/meta/connect" className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors">
+                <AtSign className="w-3.5 h-3.5" /> Conectar Meta →
               </a>
             )}
           </div>
