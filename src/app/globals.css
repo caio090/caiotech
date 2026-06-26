@@ -17,8 +17,6 @@
 
 html {
   scroll-behavior: smooth;
-  /* Prevent horizontal scroll globally */
-  overflow-x: hidden;
 }
 
 body {
@@ -42,11 +40,30 @@ body {
 .safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
 
 /* ── Respect prefers-reduced-motion ─────────────────────────── */
+/* Only pause ambient/infinite animations. Entrance animations become instant. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  /* Entrance / one-shot animations → complete instantly */
+  .hero-fade-up, .hero-fade-up-d1, .hero-fade-up-d2, .hero-fade-up-d3,
+  .hero-robot-in,
+  .rec-hero-in, .rec-hero-in-d1, .rec-hero-in-d2, .rec-hero-in-d3,
+  .rec-menu-in, .rec-reveal, .rec-reveal-d1, .rec-reveal-d2 {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+  /* Infinite/continuous ambient animations → pause (visible but static) */
+  .lk-ticker-track,
+  .lk-logo-track,
+  .orbit-slow,
+  .orbit-rev,
+  .glow-pulse,
+  .lk-drop-float,
+  .lk-carousel-hint::before,
+  .lk-carousel-hint::after {
+    animation-play-state: paused !important;
+  }
+  /* Transitions */
+  *, *::before, *::after {
+    transition-duration: 0.15ms !important;
   }
 }
 
@@ -164,8 +181,8 @@ body {
 .hero-fade-up-d3 { animation: lokat-fade-up 0.75s 0.30s cubic-bezier(0.16,1,0.3,1) both; }
 .hero-robot-in   { animation: lokat-fade-up 1s 0.25s cubic-bezier(0.16,1,0.3,1) both; }
 .glow-pulse      { animation: lokat-glow 5s ease-in-out infinite; }
-.orbit-slow      { animation: lokat-orbit 22s linear infinite; transform-origin: center; }
-.orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; }
+.orbit-slow      { animation: lokat-orbit 22s linear infinite; transform-origin: center; transform-box: fill-box; }
+.orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; transform-box: fill-box; }
 .eye-blink       { animation: lokat-eye-blink 5s 2.5s ease-in-out infinite; }
 
 @keyframes lk-drop-float {

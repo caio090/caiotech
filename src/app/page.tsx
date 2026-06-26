@@ -229,7 +229,7 @@ export default function HomePage() {
         </p>
         <div style={{ overflow: "hidden", maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)" }}>
           <div className="lk-logo-track" style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem" }}>
-            {[...clients, ...clients, ...clients].map((c, i) => (
+            {[...clients, ...clients].map((c, i) => (
               <div
                 key={i}
                 style={{
