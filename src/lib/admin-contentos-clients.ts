@@ -90,9 +90,13 @@ export async function validateContentOSClient(
       .eq("id", clientId)
       .maybeSingle();
 
-    if (!error) return data as { id: string; company_name: string | null } | null;
+    // Only trust v_real_clients when it actually found the client.
+    // If data is null (no error, but empty — happens when v_real_clients still
+    // uses the profiles JOIN and the client has no role=cliente user), fall through
+    // to the direct clients table check.
+    if (!error && data !== null) return data as { id: string; company_name: string | null };
 
-    // Fallback when v_real_clients still has the profiles join issue
+    // Fallback: direct clients table — works regardless of v_real_clients definition
     const { data: fallback } = await supabase
       .from("clients")
       .select("id, company_name")
