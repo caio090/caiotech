@@ -79,9 +79,8 @@ export async function proxy(request: NextRequest) {
     (user.app_metadata?.role   as string | undefined) ??
     "cliente";
 
-  // ── Admin: can access everything ────────────────────────────
-  if (role === "admin") {
-    // Redirect /contentos/* to /admin/contentos/* for admin
+  // ── Admin / Super Admin: can access everything ───────────────
+  if (role === "admin" || role === "super_admin") {
     if (pathname.startsWith("/contentos/")) {
       return redirectTo(`/admin/contentos${pathname.slice("/contentos".length)}`, request);
     }
