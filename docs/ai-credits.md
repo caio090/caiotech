@@ -1,93 +1,114 @@
-# Créditos de IA — Arquitetura LOKAT OS
+# AI Credits — Sistema de Créditos da LOKAT OS
+
+> Créditos internos da LOKAT OS. NÃO equivalem diretamente ao custo do fornecedor.
+
+---
 
 ## Conceito
 
-Cada ação de IA na LOKAT OS consome créditos mensais incluídos no plano do usuário.
-Quando os créditos acabam, a ação é bloqueada com mensagem amigável — sem cobrar automaticamente.
+A LOKAT OS usa uma moeda interna (créditos) para controlar o uso de IA pelos clientes.
+
+- Clientes compram ou recebem créditos via plano
+- Cada geração consome créditos
+- A LOKAT OS (conta central) paga o fornecedor com dinheiro real
+- O preço do plano deve cobrir custo + margem
 
 ---
 
-## Tipos de consumo
+## Tabelas
 
-| Ação | Créditos estimados | Módulo |
+### `ai_credit_wallet`
+Saldo atual por cliente.
+
+| Campo | Descrição |
+|---|---|
+| client_id | Cliente dono da carteira |
+| plan_key | basic / pro / agency |
+| monthly_quota | Créditos mensais do plano |
+| extra_credits | Créditos comprados extra |
+| used_credits | Total usado no período |
+| remaining_credits | Calculado: quota + extra - used |
+| reset_day | Dia do mês para renovar |
+
+### `ai_credit_ledger`
+Histórico de cada movimentação.
+
+| movement_type | Quando |
+|---|---|
+| monthly_grant | Renovação mensal |
+| generation_debit | A cada geração |
+| extra_purchase | Compra de créditos extra |
+| manual_adjustment | Ajuste manual pelo admin |
+| refund | Estorno |
+| failed_generation_refund | Devolução por falha na geração |
+
+### `ai_generation_jobs`
+Histórico de gerações.
+
+Status: `draft` → `queued` → `running` → `completed` / `failed` / `cancelled`
+
+---
+
+## Planos
+
+| Plano | Créditos/mês | Jobs simultâneos |
 |---|---|---|
-| Diagnóstico de marca | 10 | ContentOS / Dashboard |
-| Briefing de campanha | 5 | ContentOS |
-| Legenda de post | 2 | ContentOS |
-| Roteiro para vídeo | 5 | RecOS |
-| Calendário editorial (mês) | 8 | ContentOS |
-| Geração de imagem | 15 | ContentOS / Anúncios |
-| Geração de carrossel | 20 | ContentOS |
-| Variações de anúncio (3x) | 10 | Anúncios |
-| Relatório inteligente | 8 | Relatórios |
-| Lokat Voice (por sessão) | 3 | Global |
+| Básico | 50 | 1 |
+| Pro | 150 | 3 |
+| Agência | 500 | 10 |
 
 ---
 
-## Estrutura de dados planejada
+## Custos internos (em créditos LOKAT OS)
 
-### Tabela `ai_credit_plans` (por plano de assinatura)
-```sql
-id                uuid primary key
-plan_name         text         -- basico | profissional | agencia | enterprise
-monthly_credits   integer      -- créditos incluídos por mês
-rollover          boolean      -- acumula créditos não usados?
-created_at        timestamptz
+| Modo | Créditos |
+|---|---|
+| Apenas estratégia / prompt | 0 |
+| Imagem simples 1x | 1 |
+| Com referência visual | 2 |
+| Com pessoa / produto / logo | 3 |
+| Lote 4 variações | 4 |
+| Multiplicador alta resolução | ×2 |
+
+---
+
+## Regras de segurança
+
+1. Nunca permitir geração se `remaining_credits < custo`
+2. Em falha real de geração → devolver créditos via `failed_generation_refund`
+3. Frontend mostra créditos restantes e custo estimado ANTES de gerar
+4. Custo do fornecedor (`estimated_provider_cost`) nunca aparece para o cliente
+5. Chaves de API nunca chegam ao frontend
+
+---
+
+## Custo do fornecedor vs. preço ao cliente
+
+- Custo real: pago pela conta central da LOKAT OS ao Google/OpenAI
+- Crédito interno: moeda LOKAT OS
+- A conversão crédito → custo real é gerenciada internamente
+- Definir margem mínima antes de abrir para clientes reais
+
+---
+
+## Fluxo de geração
+
+```
+1. Usuário seleciona modo de geração
+2. Frontend exibe estimativa de créditos
+3. Usuário confirma
+4. Server verifica remaining_credits
+5. Cria ai_generation_job (status: queued)
+6. Debita ledger (generation_debit)
+7. Chama provider de IA
+8. Atualiza job (completed/failed)
+9. Se failed: insere refund no ledger
 ```
 
-### Tabela `ai_credit_balances` (saldo por organização/usuário)
-```sql
-id                uuid primary key
-user_id           uuid references auth.users(id)
-organization_id   uuid  -- quando organizations existir
-plan_id           uuid references ai_credit_plans(id)
-credits_total     integer   -- créditos do ciclo atual
-credits_used      integer   -- créditos consumidos
-cycle_start       date      -- início do ciclo mensal
-cycle_end         date      -- fim do ciclo mensal
-created_at        timestamptz
-updated_at        timestamptz
-```
-
-### Tabela `ai_credit_usage` (histórico de consumo)
-```sql
-id                uuid primary key
-user_id           uuid references auth.users(id)
-organization_id   uuid
-action_type       text         -- diagnostico | briefing | legenda | roteiro | imagem ...
-credits_consumed  integer
-context           jsonb        -- client_id, content_id, etc.
-created_at        timestamptz
-```
-
 ---
 
-## Regras de negócio
+## Compra de créditos extras (V1.5)
 
-1. Antes de executar qualquer ação de IA, verificar saldo: `credits_total - credits_used >= custo_da_acao`
-2. Se saldo insuficiente: retornar `{ ok: false, reason: "no_credits", message: "Seus créditos de IA acabaram. Renova em X dias ou contrate créditos extras." }`
-3. Nunca bloquear silenciosamente — sempre explicar o motivo e oferecer caminho
-4. Créditos resetam no início de cada ciclo mensal (não no dia 1 — no aniversário da assinatura)
-5. Admin pode ver consumo de toda a organização
-
----
-
-## Próximos passos para implementar
-
-1. Criar SQL para as três tabelas acima (`37-ai-credits.sql`)
-2. Criar `GET /api/ai/credits` — retorna saldo do usuário autenticado
-3. Criar middleware `checkAiCredits(action, cost)` para chamar antes de cada ação de IA
-4. Criar tela `/admin/configuracoes#creditos` ou `/admin/financeiro#creditos` mostrando:
-   - Saldo atual
-   - Histórico de uso (últimas 30 ações)
-   - Data do próximo reset
-5. Adicionar badge de saldo no header do painel
-
----
-
-## Status atual
-
-**Não implementado.** As rotas de IA existentes (`/api/ai/diagnostico`, `/api/ai/briefing`, etc.)
-não verificam créditos ainda. Este documento serve como spec para a implementação futura.
-
-Cobrança real de créditos extras: **fora do escopo atual** — não implementar sem decisão explícita.
+- Créditos extras são adicionados via `extra_purchase` no ledger
+- Não integrado com gateway de pagamento ainda
+- Definir preço por crédito antes de ativar
