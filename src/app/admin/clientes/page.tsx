@@ -22,7 +22,7 @@ interface Client {
   has_brief?: boolean;
 }
 
-type StatusFilter = "todos" | "active" | "onboarding" | "inactive";
+type StatusFilter = "todos" | "operacionais" | "onboarding" | "inactive";
 
 // ── Badges ─────────────────────────────────────────────────────
 function Badge({ label, color }: { label: string; color: string }) {
@@ -247,7 +247,9 @@ export default function AdminClientesPage() {
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
-      if (statusFilter !== "todos" && c.status !== statusFilter) return false;
+      if (statusFilter === "operacionais" && !["active", "onboarding"].includes(c.status ?? "")) return false;
+      if (statusFilter === "onboarding" && c.status !== "onboarding") return false;
+      if (statusFilter === "inactive" && c.status !== "inactive") return false;
       if (segFilter && c.segment !== segFilter) return false;
       if (metaFilter === "connected"     && !c.has_meta) return false;
       if (metaFilter === "not_connected" && c.has_meta)  return false;
@@ -299,10 +301,10 @@ export default function AdminClientesPage() {
   };
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
-    { value: "todos",      label: "Todos" },
-    { value: "active",     label: "Ativos" },
-    { value: "onboarding", label: "Onboarding" },
-    { value: "inactive",   label: "Inativos" },
+    { value: "todos",         label: "Todos" },
+    { value: "operacionais",  label: "Ativos" },
+    { value: "onboarding",    label: "Onboarding" },
+    { value: "inactive",      label: "Inativos" },
   ];
 
   return (
@@ -362,7 +364,11 @@ export default function AdminClientesPage() {
             >
               {opt.label}
               {opt.value !== "todos" && (
-                <span className="ml-1 opacity-70">({clients.filter((c) => c.status === opt.value).length})</span>
+                <span className="ml-1 opacity-70">
+                  ({opt.value === "operacionais"
+                    ? clients.filter((c) => ["active", "onboarding"].includes(c.status ?? "")).length
+                    : clients.filter((c) => c.status === opt.value).length})
+                </span>
               )}
             </button>
           ))}

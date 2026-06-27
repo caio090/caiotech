@@ -14,14 +14,15 @@ interface Props {
 const PAGE_SIZE = 12;
 
 const STATUS_LABELS: Record<string, string> = {
-  active:   "Ativo",
-  inactive: "Inativo",
-  paused:   "Pausado",
+  active:     "Ativo",
+  onboarding: "Onboarding",
+  inactive:   "Inativo",
+  paused:     "Pausado",
 };
 
 export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Props) {
   const [search,      setSearch]      = useState("");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "active" | "inactive" | "paused">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "active" | "onboarding" | "inactive">("todos");
   const [selectedId,  setSelectedId]  = useState<string>("");
   const [page,        setPage]        = useState(1);
 
@@ -38,7 +39,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
         (c.company_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (c.responsible_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (c.segment ?? "").toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === "todos" || c.status === statusFilter;
+      const matchesStatus = statusFilter === "todos" || c.status === statusFilter || (statusFilter === "active" && c.status === "onboarding");
       return matchesSearch && matchesStatus;
     });
   }, [clients, search, statusFilter]);
@@ -55,9 +56,10 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
   }
 
   function statusColor(status: string | null) {
-    if (status === "active")   return "text-emerald-600 bg-emerald-50";
-    if (status === "inactive") return "text-gray-400 bg-gray-50";
-    if (status === "paused")   return "text-amber-600 bg-amber-50";
+    if (status === "active")     return "text-emerald-600 bg-emerald-50";
+    if (status === "onboarding") return "text-blue-600 bg-blue-50";
+    if (status === "inactive")   return "text-gray-400 bg-gray-50";
+    if (status === "paused")     return "text-amber-600 bg-amber-50";
     return "text-gray-400 bg-gray-50";
   }
 
@@ -101,7 +103,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
 
           {/* Filtro de status */}
           <div className="flex gap-2 mb-5 flex-wrap">
-            {(["todos", "active", "inactive", "paused"] as const).map((s) => (
+            {(["todos", "active", "onboarding", "inactive"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
@@ -114,7 +116,9 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                 {s === "todos" ? "Todos" : STATUS_LABELS[s] ?? s}
                 {s !== "todos" && (
                   <span className="ml-1 opacity-70">
-                    ({clients.filter((c) => c.status === s).length})
+                    ({s === "active"
+                      ? clients.filter((c) => ["active", "onboarding"].includes(c.status ?? "")).length
+                      : clients.filter((c) => c.status === s).length})
                   </span>
                 )}
               </button>

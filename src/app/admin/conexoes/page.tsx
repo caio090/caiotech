@@ -130,6 +130,12 @@ function CopyBtn({ value }: { value: string }) {
   );
 }
 
+function maskId(id: string | null | undefined): string {
+  if (!id) return "—";
+  if (id.length <= 6) return "••••••";
+  return id.slice(0, 4) + "••••••••" + id.slice(-4);
+}
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
@@ -581,7 +587,7 @@ function ConexoesContent() {
                 {conn?.meta_user_id && (
                   <div className="flex items-center gap-2 text-xs text-emerald-800">
                     <User className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                    <span>Meta User ID: <strong>{conn.meta_user_id}</strong></span>
+                    <span>Meta User ID: <strong>{maskId(conn.meta_user_id)}</strong></span>
                   </div>
                 )}
                 {conn?.created_at && (

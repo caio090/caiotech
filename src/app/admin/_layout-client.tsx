@@ -192,7 +192,24 @@ export function AdminLayoutShell({ children }: Props) {
       setActiveClientName(null);
       return;
     }
-    setActiveClientName(localStorage.getItem(ACTIVE_CLIENT_NAME_KEY) || null);
+    const storedName = localStorage.getItem(ACTIVE_CLIENT_NAME_KEY);
+    if (storedName) {
+      setActiveClientName(storedName);
+      return;
+    }
+    // Name not in localStorage — try to resolve from URL ?client= param
+    const urlParams  = new URLSearchParams(window.location.search);
+    const clientIdFromUrl = urlParams.get("client") ?? localStorage.getItem("lokat_active_client_id");
+    if (!clientIdFromUrl) return;
+    fetch(`/api/admin/clients/${clientIdFromUrl}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { company_name?: string } | null) => {
+        if (data?.company_name) {
+          localStorage.setItem(ACTIVE_CLIENT_NAME_KEY, data.company_name);
+          setActiveClientName(data.company_name);
+        }
+      })
+      .catch(() => {});
   }, [isOnContentosPage, isSelectingClient, pathname]);
   /* eslint-enable react-hooks/set-state-in-effect */
 

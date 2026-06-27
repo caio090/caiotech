@@ -1,6 +1,29 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+// GET /api/admin/clients/[id] — returns company_name for breadcrumb sync
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    const { data } = await supabase
+      .from("clients")
+      .select("id, company_name")
+      .eq("id", id)
+      .neq("status", "archived")
+      .maybeSingle();
+    if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    return NextResponse.json({ id: data.id, company_name: data.company_name });
+  } catch {
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
+  }
+}
+
 // PATCH /api/admin/clients/[id]
 export async function PATCH(
   req: Request,
