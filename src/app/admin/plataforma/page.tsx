@@ -89,7 +89,7 @@ export default async function PlataformaPage() {
     <div className="min-h-screen bg-gray-50">
       <PageHeader
         title="Plataforma"
-        subtitle="CRM Central — visão geral de toda a base de contas"
+        description="CRM Central — visão geral de toda a base de contas"
       />
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">

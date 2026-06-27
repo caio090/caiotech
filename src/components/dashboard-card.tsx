@@ -12,14 +12,43 @@ interface DashboardCardProps {
   trendLabel?: string;
   className?: string;
   alert?: boolean;
+  premium?: boolean;
 }
 
 export function DashboardCard({
   title, value, subtitle, icon: Icon, iconColor = "text-indigo-600",
-  iconBg = "bg-indigo-50", trend, trendLabel, className, alert,
+  iconBg = "bg-indigo-50", trend, trendLabel, className, alert, premium,
 }: DashboardCardProps) {
   const isPositive = trend !== undefined && trend > 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
+
+  if (premium) {
+    return (
+      <div className={cn("dashboard-card-premium reveal-up flex flex-col gap-3", className)}>
+        <div className="flex items-start justify-between">
+          <span className="text-sm font-medium" style={{ color: "#8888a0" }}>{title}</span>
+          {Icon && (
+            <div className="p-2 rounded-xl" style={{ background: "rgba(123,110,246,0.12)", border: "1px solid rgba(123,110,246,0.2)" }}>
+              <Icon className="w-4 h-4" style={{ color: "#7b6ef6" }} />
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="text-2xl font-bold" style={{ color: alert ? "#f87171" : "#eeeef0" }}>
+            {value}
+          </div>
+          {subtitle && <p className="text-xs mt-0.5" style={{ color: "#555568" }}>{subtitle}</p>}
+        </div>
+        {trend !== undefined && (
+          <div className={cn("flex items-center gap-1 text-xs font-medium", isPositive ? "text-emerald-400" : "text-red-400")}>
+            <TrendIcon className="w-3 h-3" />
+            <span>{Math.abs(trend)}%</span>
+            {trendLabel && <span className="font-normal" style={{ color: "#555568" }}>{trendLabel}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn(

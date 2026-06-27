@@ -13,6 +13,10 @@
 
   --background: var(--lk-bg);
   --foreground: var(--lk-text);
+
+  --lk-transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --lk-transition-base:   250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --lk-transition-spring: 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
@@ -39,7 +43,15 @@ body {
 .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
 
-/* prefers-reduced-motion: not applied — all animations run regardless of OS setting */
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ── Antes/Depois hover glow ────────────────────────────────── */
 .lk-antes-card {
@@ -214,6 +226,125 @@ body {
   gap: 2.5rem;
   animation: lk-scroll-x 40s linear infinite;
   will-change: transform;
+}
+
+/* ── Motion utility classes ─────────────────────────────────── */
+@keyframes lk-reveal-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes lk-reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes lk-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes lk-float-soft {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes lk-pulse-glow {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 0 0 rgba(123, 110, 246, 0); }
+  50%       { opacity: 1;   box-shadow: 0 0 18px 4px rgba(123, 110, 246, 0.22); }
+}
+
+.reveal-up   { animation: lk-reveal-up   var(--lk-transition-spring) both; }
+.reveal-fade { animation: lk-reveal-fade  var(--lk-transition-spring) both; }
+
+.reveal-stagger-1 { animation-delay: 60ms; }
+.reveal-stagger-2 { animation-delay: 120ms; }
+.reveal-stagger-3 { animation-delay: 180ms; }
+.reveal-stagger-4 { animation-delay: 240ms; }
+.reveal-stagger-5 { animation-delay: 300ms; }
+.reveal-stagger-6 { animation-delay: 360ms; }
+
+.animate-float-soft { animation: lk-float-soft 3.5s ease-in-out infinite; }
+.animate-pulse-glow { animation: lk-pulse-glow 3s ease-in-out infinite; }
+
+.card-hover-lift {
+  transition: transform var(--lk-transition-base), box-shadow var(--lk-transition-base);
+}
+.card-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.card-hover-glow {
+  transition: border-color var(--lk-transition-base), box-shadow var(--lk-transition-base);
+}
+.card-hover-glow:hover {
+  border-color: rgba(123, 110, 246, 0.4) !important;
+  box-shadow: 0 0 24px rgba(123, 110, 246, 0.1);
+}
+
+.glass-panel {
+  background: rgba(19, 19, 26, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glow-border-accent {
+  border: 1px solid rgba(123, 110, 246, 0.35);
+  box-shadow: 0 0 20px rgba(123, 110, 246, 0.08);
+  transition: border-color var(--lk-transition-base), box-shadow var(--lk-transition-base);
+}
+.glow-border-accent:hover {
+  border-color: rgba(123, 110, 246, 0.6);
+  box-shadow: 0 0 32px rgba(123, 110, 246, 0.16);
+}
+
+.skeleton-dark {
+  background: linear-gradient(90deg, #1a1a26 0%, #222232 50%, #1a1a26 100%);
+  background-size: 200% 100%;
+  animation: lk-skeleton-shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes lk-skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.bottom-fade-gradient {
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+
+.dashboard-card-premium {
+  background: linear-gradient(160deg, #16161f 0%, #0f0f18 100%);
+  border: 1px solid #252535;
+  border-radius: 16px;
+  padding: 1.25rem;
+  transition: border-color var(--lk-transition-base), box-shadow var(--lk-transition-base), transform var(--lk-transition-base);
+  will-change: transform;
+}
+.dashboard-card-premium:hover {
+  border-color: rgba(123, 110, 246, 0.3);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 16px rgba(123, 110, 246, 0.07);
+  transform: translateY(-2px);
+}
+
+.lk-active-indicator {
+  position: relative;
+}
+.lk-active-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--lk-accent);
+  border-radius: 0 2px 2px 0;
+  transition: height var(--lk-transition-spring), opacity var(--lk-transition-base);
+  opacity: 0;
+}
+.lk-active-indicator[data-active="true"]::before {
+  opacity: 1;
+  height: 65%;
 }
 
 /* ── Dark panel overrides ───────────────────────────────────── */

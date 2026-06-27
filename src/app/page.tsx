@@ -116,14 +116,18 @@ export default function HomePage() {
               <Link
                 href="/diagnostico"
                 className="w-full sm:w-auto text-center"
-                style={{ background: S.accent, color: "#fff", padding: ".85rem 2.2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
+                style={{ background: S.accent, color: "#fff", padding: ".85rem 2.2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700, transition: "background .2s, box-shadow .2s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#8f84f8"; e.currentTarget.style.boxShadow = `0 0 28px ${S.accent}55`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.boxShadow = "none"; }}
               >
                 ■ Quero ver na prática →
               </Link>
               <a
                 href="#modulos"
                 className="w-full sm:w-auto text-center"
-                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s, color .2s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.color = S.text; }}
               >
                 Ver a plataforma
               </a>
@@ -336,15 +340,18 @@ export default function HomePage() {
 
           {/* Module nodes — fixed positions, text does NOT rotate */}
           {[
-            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)" },
-            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
-            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
-            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
-            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
-            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)" },
+            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)", delay: "0ms" },
+            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)", delay: "80ms" },
+            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)", delay: "160ms" },
+            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)", delay: "240ms" },
+            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)", delay: "320ms" },
+            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)", delay: "400ms" },
           ].map((node) => (
-            <div key={node.num} style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center" }}>
-              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20` }}>
+            <div key={node.num} className="reveal-up" style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center", animationDelay: node.delay }}>
+              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20`, transition: "box-shadow .25s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 32px ${node.color}55`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 18px ${node.color}20`; }}
+              >
                 <span style={{ ...S.mono, fontSize: ".52rem", color: node.color, fontWeight: 700 }}>{node.num}</span>
               </div>
               <p style={{ ...S.grotesk, fontSize: ".75rem", fontWeight: 700, color: S.text, marginBottom: ".12rem", lineHeight: 1.2 }}>{node.title}</p>
@@ -407,12 +414,12 @@ export default function HomePage() {
               style={{
                 background: m.coming ? "#0d0d14" : S.card,
                 position: "relative",
-                transition: "background .2s",
+                transition: "background .2s, transform .2s, box-shadow .2s",
                 cursor: "default",
                 opacity: m.coming ? 0.55 : 1,
               }}
-              onMouseEnter={(e) => { if (!m.coming) e.currentTarget.style.background = "#191924"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; }}
+              onMouseEnter={(e) => { if (!m.coming) { e.currentTarget.style.background = "#191924"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.4)"; } }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
             >
               <div style={{ ...S.mono, fontSize: ".5rem", color: S.border, position: "absolute", top: ".4rem", left: ".4rem" }}>{m.num}</div>
               {m.coming && (
@@ -501,14 +508,18 @@ export default function HomePage() {
             <Link
               href="/diagnostico"
               className="w-full sm:w-auto text-center"
-              style={{ background: S.accent, color: "#fff", padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700 }}
+              style={{ background: S.accent, color: "#fff", padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700, transition: "background .2s, box-shadow .2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#8f84f8"; e.currentTarget.style.boxShadow = `0 0 36px ${S.accent}60`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.boxShadow = "none"; }}
             >
               ■ Quero ver na prática →
             </Link>
             <Link
               href="/criar-conta"
               className="w-full sm:w-auto text-center"
-              style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block" }}
+              style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s, color .2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.color = S.text; }}
             >
               Criar conta grátis
             </Link>

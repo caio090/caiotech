@@ -166,8 +166,9 @@ export function AppSidebar({ variant, userName = "Usuário", userRole = "", onSi
             <Link
               key={href}
               href={href}
+              data-active={active ? "true" : "false"}
               className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all",
+                "lk-active-indicator flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all",
                 active
                   ? "bg-white/10 text-white font-medium"
                   : "text-slate-400 hover:text-white hover:bg-white/5"

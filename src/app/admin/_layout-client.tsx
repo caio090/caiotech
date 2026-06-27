@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, Search, ArrowLeft, CheckSquare,
   UserRoundPlus, X, UsersRound,
@@ -238,8 +239,14 @@ export function AdminLayoutShell({ children }: Props) {
                 )}
               </button>
 
+              <AnimatePresence>
               {showBell && (
-                <div className="absolute right-0 top-10 z-50 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-10 z-50 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                     <span className="text-xs font-bold text-gray-800">Notificações</span>
                     <button
@@ -308,8 +315,9 @@ export function AdminLayoutShell({ children }: Props) {
                       <p className="text-xs">Nenhuma notificação no momento.</p>
                     </div>
                   )}
-                </div>
+                </motion.div>
               )}
+              </AnimatePresence>
             </div>
 
             <button
