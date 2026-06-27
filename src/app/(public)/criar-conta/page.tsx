@@ -18,6 +18,7 @@ const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm o
 export default function CriarContaPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", company: "", email: "", password: "" });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,10 @@ export default function CriarContaPage() {
     }
     if (form.password.length < 6) {
       setError("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (!acceptedTerms) {
+      setError("Aceite os Termos de Uso e a Política de Privacidade para continuar.");
       return;
     }
     setLoading(true);
@@ -222,6 +227,28 @@ export default function CriarContaPage() {
                   </div>
                 </div>
 
+                {/* Aceite de termos */}
+                <label className="flex items-start gap-2.5 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-indigo-600 cursor-pointer flex-shrink-0"
+                    disabled={loading}
+                  />
+                  <span className="text-xs text-gray-500 leading-relaxed">
+                    Li e aceito os{" "}
+                    <Link href="/termos" target="_blank" className="text-indigo-600 hover:underline font-medium">
+                      Termos de Uso
+                    </Link>{" "}
+                    e a{" "}
+                    <Link href="/privacidade" target="_blank" className="text-indigo-600 hover:underline font-medium">
+                      Política de Privacidade
+                    </Link>
+                    .
+                  </span>
+                </label>
+
                 {error && (
                   <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
                     {error}
@@ -230,7 +257,7 @@ export default function CriarContaPage() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !acceptedTerms}
                   className="w-full flex items-center justify-between p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-colors disabled:opacity-60 group mt-2"
                 >
                   <div className="flex items-center gap-3">

@@ -4,8 +4,9 @@ import { PageHeader } from "@/components/page-header";
 import {
   Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
   Edit2, Trash2, Loader2, Building2, User, Tag, Filter,
-  Mail, Copy, ExternalLink,
+  Mail, Copy, ExternalLink, TrendingUp,
 } from "lucide-react";
+import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 // ── Modal Novo Cliente ─────────────────────────────────────────
@@ -428,11 +429,44 @@ function ClientCard({ c, onEdit, onDelete, onInvite, isAdmin }: { c: Client; onE
   );
 }
 
+// ── Indicador de uso do plano ─────────────────────────────────
+function PlanUsageBar({ plan, clientCount, isAdmin }: { plan: string | null; clientCount: number; isAdmin: boolean }) {
+  if (isAdmin || plan === null) return null;
+  const limit = getClientLimitByPlan(plan);
+  const pct   = Math.min(100, Math.round((clientCount / limit) * 100));
+  const near  = pct >= 80;
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl border ${near ? "bg-amber-50 border-amber-100" : "bg-gray-50 border-gray-100"}`}>
+      <TrendingUp className={`w-4 h-4 flex-shrink-0 ${near ? "text-amber-500" : "text-gray-400"}`} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium text-gray-700">
+            {clientCount} de {isFinite(limit) ? limit : "∞"} clientes
+          </span>
+          <span className={`text-[10px] font-bold ${near ? "text-amber-600" : "text-gray-400"}`}>
+            {isFinite(limit) ? `${pct}%` : "Ilimitado"}
+          </span>
+        </div>
+        {isFinite(limit) && (
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${near ? "bg-amber-500" : "bg-indigo-500"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        )}
+      </div>
+      {near && <span className="text-[10px] font-bold text-amber-600 flex-shrink-0">Limite próximo</span>}
+    </div>
+  );
+}
+
 // ── Página principal ───────────────────────────────────────────
 export default function AdminClientesPage() {
   const [clients,       setClients]       = useState<Client[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [isAdmin,       setIsAdmin]       = useState(false);
+  const [userPlan,      setUserPlan]      = useState<string | null>(null);
   const [actionMsg,     setActionMsg]     = useState<string | null>(null);
   const [search,        setSearch]        = useState("");
   const [statusFilter,  setStatusFilter]  = useState<StatusFilter>("todos");
@@ -451,9 +485,10 @@ export default function AdminClientesPage() {
     try {
       const res = await fetch("/api/admin/clients");
       if (res.ok) {
-        const data = await res.json() as { clients: Client[]; isAdmin: boolean };
+        const data = await res.json() as { clients: Client[]; isAdmin: boolean; plan?: string };
         setClients(data.clients);
         setIsAdmin(data.isAdmin);
+        if (data.plan) setUserPlan(data.plan);
       }
     } catch { /* estado vazio */ }
     finally { setLoading(false); }
@@ -685,10 +720,13 @@ export default function AdminClientesPage() {
       )}
 
       {!loading && clients.length > 0 && (
-        <div className="mt-6 flex items-center gap-4 text-[11px] text-gray-400">
-          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {clients.filter((c) => c.has_meta).length} com Meta</span>
-          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-violet-400" /> {clients.filter((c) => c.has_diagnostico).length} com diagnóstico</span>
-          <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" /> {clients.filter((c) => !c.has_brief).length} sem brief</span>
+        <div className="mt-6 space-y-3">
+          <PlanUsageBar plan={userPlan} clientCount={clients.length} isAdmin={isAdmin} />
+          <div className="flex items-center gap-4 text-[11px] text-gray-400">
+            <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {clients.filter((c) => c.has_meta).length} com Meta</span>
+            <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-violet-400" /> {clients.filter((c) => c.has_diagnostico).length} com diagnóstico</span>
+            <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" /> {clients.filter((c) => !c.has_brief).length} sem brief</span>
+          </div>
         </div>
       )}
 

@@ -1,10 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { saveOnboarding } from "@/lib/onboarding-store";
-import { Building2, Rocket, Users, ClipboardList } from "lucide-react";
+import { Building2, Rocket, Users, ClipboardList, AlertCircle } from "lucide-react";
+import { useState } from "react";
 
 export default function OnboardingTipoPage() {
   const router = useRouter();
+  const [showClientInfo, setShowClientInfo] = useState(false);
 
   const select = (accountType: string, tipo: string, route: string) => {
     saveOnboarding({ tipo });
@@ -70,7 +72,7 @@ export default function OnboardingTipoPage() {
 
         {/* Card 3 — Cliente ou convidado */}
         <button
-          onClick={() => select("cliente_atendido", "equipe", "/convite")}
+          onClick={() => setShowClientInfo(true)}
           className="bg-white border-2 border-gray-100 rounded-2xl p-5 text-left transition-all hover:border-emerald-400 hover:bg-emerald-50/30 group"
         >
           <div className="flex items-start gap-4">
@@ -85,6 +87,33 @@ export default function OnboardingTipoPage() {
             </div>
           </div>
         </button>
+
+        {/* Info box para cliente convidado */}
+        {showClientInfo && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-emerald-800 mb-1">Acesse com o link de convite</p>
+                <p className="text-xs text-emerald-700 leading-relaxed mb-3">
+                  Para acessar o portal do cliente, você precisa de um link de convite enviado pela agência ou pela equipe Lokat. O link tem o formato:
+                </p>
+                <code className="block text-[11px] bg-white border border-emerald-200 rounded-lg px-3 py-2 text-emerald-700 mb-3 font-mono">
+                  lokat.app/convite/cliente/[token]
+                </code>
+                <p className="text-xs text-emerald-600">
+                  Se você ainda não recebeu o link, solicite à agência responsável ou à equipe Lokat.
+                </p>
+                <button
+                  onClick={() => setShowClientInfo(false)}
+                  className="mt-3 text-xs text-emerald-700 hover:underline font-medium"
+                >
+                  ← Voltar às opções
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Card 4 — Só diagnóstico */}
         <button

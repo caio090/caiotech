@@ -216,8 +216,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 2.5rem;
+  white-space: nowrap;
   animation: lk-scroll-x 40s linear infinite;
   will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-logo-track { animation: none; }
+  .lk-ticker-track { animation: none; }
 }
 
 /* ── Motion utility classes ─────────────────────────────────── */
