@@ -347,7 +347,7 @@ export default function HomePage() {
             { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)", delay: "320ms" },
             { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)", delay: "400ms" },
           ].map((node) => (
-            <div key={node.num} className="reveal-up" style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center", animationDelay: node.delay }}>
+            <div key={node.num} className="reveal-fade" style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center", animationDelay: node.delay }}>
               <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20`, transition: "box-shadow .25s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 32px ${node.color}55`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 18px ${node.color}20`; }}
