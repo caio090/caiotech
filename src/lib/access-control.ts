@@ -69,6 +69,7 @@ export type InvitableRole = typeof INVITABLE_ROLES[number];
 // ── Home page per role (used by login + proxy) ────────────────
 
 export const ROLE_HOME: Record<string, string> = {
+  super_admin:    "/admin/plataforma",
   admin:          "/admin/dashboard",
   cliente:        "/client/home",
   aluno:          "/academy/home",
@@ -93,11 +94,12 @@ export function getRoleHome(role: string | null | undefined): string {
 
 // ── Route permission helpers ──────────────────────────────────
 
-export function canAccessAdmin(role: string)       { return role === "admin"; }
-export function canAccessClient(role: string)      { return role === "cliente"; }
-export function canAccessOperacional(role: string) { return OPERACIONAL_ALLOWED.has(role); }
-export function canAccessContenOS(role: string)    { return CONTENT_ROLES.has(role); }
-export function canAccessAcademy(role: string)     { return role === "aluno" || role === "admin"; }
+export function canAccessAdmin(role: string)           { return role === "admin" || role === "super_admin"; }
+export function canAccessPlatformCentral(role: string) { return role === "super_admin"; }
+export function canAccessClient(role: string)          { return role === "cliente"; }
+export function canAccessOperacional(role: string)     { return OPERACIONAL_ALLOWED.has(role); }
+export function canAccessContenOS(role: string)        { return CONTENT_ROLES.has(role); }
+export function canAccessAcademy(role: string)         { return role === "aluno" || role === "admin" || role === "super_admin"; }
 
 // ── Department → task filter mapping ─────────────────────────
 
@@ -165,6 +167,7 @@ export function formatRoleDisplay(
 // ── Role display labels ───────────────────────────────────────
 
 export const ROLE_LABELS: Record<string, string> = {
+  super_admin:    "Super Admin",
   admin:          "Admin",
   cliente:        "Cliente",
   aluno:          "Aluno",

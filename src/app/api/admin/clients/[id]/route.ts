@@ -53,7 +53,7 @@ export async function DELETE(
 
     const { error } = await supabase
       .from("clients")
-      .delete()
+      .update({ status: "archived", archived_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });

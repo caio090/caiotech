@@ -93,7 +93,7 @@ export default function HomePage() {
         ))}
 
         <div className="hero-fade-up" style={{ fontSize: ".65rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, border: `1px solid ${S.accent}30`, background: `${S.accent}10`, padding: ".25rem .8rem", marginBottom: "2rem", display: "inline-block", ...S.mono }}>
-          [OS do Marketing que Vende]
+          Para agências, empresas e negócios locais
         </div>
 
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 w-full">
@@ -109,7 +109,7 @@ export default function HomePage() {
             </h1>
 
             <p className="hero-fade-up-d2 mx-auto lg:mx-0" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "clamp(.85rem, 2.5vw, 1rem)", lineHeight: 1.7, color: S.muted, marginBottom: "2rem" }}>
-              Gerencie conteúdo, aprovações, leads e finanças em um único lugar — sem planilha, sem WhatsApp perdido, sem retrabalho. Com IA do início ao fim.
+              Planeje conteúdo, aprovações, leads e finanças em um único lugar, sem planilha perdida, sem WhatsApp bagunçado e com IA do início ao fim.
             </p>
 
             <div className="hero-fade-up-d3 flex flex-col sm:flex-row flex-wrap gap-3">
@@ -337,10 +337,10 @@ export default function HomePage() {
           {/* Module nodes — fixed positions, text does NOT rotate */}
           {[
             { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)" },
-            { num: "02", color: "#a855f7", title: "ContentOS",     desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
-            { num: "03", color: "#e0635a", title: "RecOS",         desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
-            { num: "04", color: "#10b981", title: "FinanceOS",     desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
-            { num: "05", color: "#3b82f6", title: "GrowthOS",      desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
+            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
+            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
+            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
+            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
             { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)" },
           ].map((node) => (
             <div key={node.num} style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center" }}>
@@ -357,10 +357,10 @@ export default function HomePage() {
         <div className="lg:hidden flex flex-col gap-3">
           {[
             { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
-            { num: "02", color: "#a855f7", title: "ContentOS",     desc: "Estratégia, campanhas, briefings e aprovações — tudo conectado." },
-            { num: "03", color: "#e0635a", title: "RecOS",         desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
-            { num: "04", color: "#10b981", title: "FinanceOS",     desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
-            { num: "05", color: "#3b82f6", title: "GrowthOS",      desc: "Leads, propostas e oportunidades comerciais em um fluxo único." },
+            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, campanhas, briefings e aprovações — tudo conectado." },
+            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
+            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
+            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e oportunidades comerciais em um fluxo único." },
             { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados, insights e próximos passos em painel claro." },
           ].map((step, idx, arr) => (
             <div key={step.num}>

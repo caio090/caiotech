@@ -53,9 +53,8 @@ function DeleteModal({
 }: {
   client: Client; onConfirm: () => void; onCancel: () => void; loading: boolean;
 }) {
-  const [typed, setTyped] = useState("");
+  const [checked, setChecked] = useState(false);
   const name = client.company_name ?? "";
-  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
@@ -65,32 +64,31 @@ function DeleteModal({
             <Trash2 className="w-5 h-5 text-red-500" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Excluir cliente</p>
-            <p className="text-xs text-gray-400">Esta ação não pode ser desfeita</p>
+            <p className="text-sm font-bold text-gray-900">Excluir cliente?</p>
+            <p className="text-xs text-gray-400 truncate max-w-[220px]">{name}</p>
           </div>
         </div>
         <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-xs text-red-700 leading-relaxed">
-          Ao excluir <strong>{name}</strong>, dados vinculados (conteúdos, aprovações, briefings e contexto estratégico) podem ser removidos em cascata. Verifique se há histórico importante antes de confirmar.
+          Conteúdos, aprovações, briefings e contexto estratégico vinculados podem ser removidos. Essa ação remove o cliente das listas ativas.
         </div>
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-            Digite o nome do cliente para confirmar:
-          </label>
+        <label className="flex items-start gap-3 mb-5 cursor-pointer group">
           <input
-            autoFocus
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            placeholder={name}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0"
           />
-        </div>
+          <span className="text-xs text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
+            Entendo que este cliente será removido das listas ativas.
+          </span>
+        </label>
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
             Cancelar
           </button>
-          <button onClick={onConfirm} disabled={!matches || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          <button onClick={onConfirm} disabled={!checked || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Excluir definitivamente
+            Confirmar exclusão
           </button>
         </div>
       </div>
