@@ -262,6 +262,58 @@ body {
   font-family: 'Space Grotesk', sans-serif;
 }
 
+/* ── Page transitions (Swup convention + Next.js usePathname) ── */
+/*
+  Swup usa classes no container #swup para controlar animações.
+  Aqui usamos o atributo data-page-phase para o mesmo efeito,
+  acionado pelo componente PageTransition via usePathname.
+*/
+
+.page-transition-wrapper {
+  /* garante que o wrapper não quebre o layout */
+  display: contents;
+}
+
+/* Idle → visível e no lugar */
+#swup[data-page-phase="idle"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Leaving → sai para cima com fade */
+#swup[data-page-phase="leaving"] {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Entering → vem de baixo com fade */
+#swup[data-page-phase="entering"] {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: swup-enter 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes swup-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respeitar prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  #swup[data-page-phase="leaving"],
+  #swup[data-page-phase="entering"] {
+    transition: opacity 150ms ease;
+    animation: none;
+    transform: none;
+    opacity: 0;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    LOKAT.REC — Animações e comportamento visual
    ═══════════════════════════════════════════════════════════════ */
