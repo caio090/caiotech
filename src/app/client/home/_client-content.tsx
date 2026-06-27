@@ -121,10 +121,11 @@ export function ClientHomeContent({ serverData }: Props) {
 
   const hasOnboarding = !!(onb?.brand_name ?? cli?.company_name ?? (useMock && localOnboarding.marca?.nome));
 
-  const project          = mockProjects.find((p) => p.clientId === "client-1")!;
-  const pendingApprovals = mockApprovals.filter((a) => a.clientId === "client-1" && a.status === "pending");
-  const upcomingEvents   = mockCalendarEvents.filter((e) => e.clientId === "client-1").slice(0, 3);
-  const invoices         = mockInvoices.filter((i) => i.clientId === "client-1").slice(0, 2);
+  // Mock data only used in demo mode — never shown when the account has real Supabase data
+  const project          = useMock ? mockProjects.find((p) => p.clientId === "client-1") ?? null : null;
+  const pendingApprovals = useMock ? mockApprovals.filter((a) => a.clientId === "client-1" && a.status === "pending") : [];
+  const upcomingEvents   = useMock ? mockCalendarEvents.filter((e) => e.clientId === "client-1").slice(0, 3) : [];
+  const invoices         = useMock ? mockInvoices.filter((i) => i.clientId === "client-1").slice(0, 2) : [];
 
   return (
     <div>
@@ -208,8 +209,8 @@ export function ClientHomeContent({ serverData }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <DashboardCard
           title="Status do Projeto"
-          value={project.progress + "%"}
-          subtitle="concluído"
+          value={project ? project.progress + "%" : "—"}
+          subtitle={project ? "concluído" : "aguardando configuração"}
           icon={FolderOpen}
           iconColor="text-indigo-600"
           iconBg="bg-indigo-50"
@@ -217,7 +218,7 @@ export function ClientHomeContent({ serverData }: Props) {
         <DashboardCard
           title="Aprovações Pendentes"
           value={pendingApprovals.length}
-          subtitle="aguardando você"
+          subtitle={pendingApprovals.length > 0 ? "aguardando você" : "nenhuma pendente"}
           icon={CheckSquare}
           iconColor="text-amber-600"
           iconBg="bg-amber-50"
@@ -225,14 +226,16 @@ export function ClientHomeContent({ serverData }: Props) {
         />
         <DashboardCard
           title="Publicações esta semana"
-          value={3}
+          value={useMock ? 3 : 0}
+          subtitle={useMock ? undefined : "aguardando integração"}
           icon={Calendar}
           iconColor="text-purple-600"
           iconBg="bg-purple-50"
         />
         <DashboardCard
           title="Fatura em aberto"
-          value={formatCurrency(1800)}
+          value={useMock ? formatCurrency(1800) : "—"}
+          subtitle={useMock ? undefined : "aguardando configuração"}
           icon={DollarSign}
           iconColor="text-emerald-600"
           iconBg="bg-emerald-50"
@@ -287,51 +290,64 @@ export function ClientHomeContent({ serverData }: Props) {
         {/* Projeto */}
         <div>
           <h2 className="text-sm font-bold text-gray-800 mb-3">Seu Projeto</h2>
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">{project.name}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">{project.description}</p>
+          {project ? (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">{project.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">{project.description}</p>
+                </div>
+                <StatusBadge status={project.status} />
               </div>
-              <StatusBadge status={project.status} />
-            </div>
-            <div className="mb-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                <span>Progresso geral</span>
-                <span className="font-bold text-gray-700">{project.progress}%</span>
+              <div className="mb-3">
+                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                  <span>Progresso geral</span>
+                  <span className="font-bold text-gray-700">{project.progress}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${project.progress}%` }} />
+                </div>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${project.progress}%` }} />
+              <div className="flex gap-3 text-xs text-gray-500">
+                <span>{project.tasks.done} concluídas</span>
+                <span>{project.tasks.total - project.tasks.done} pendentes</span>
+                <span>{new Date(project.dueDate).toLocaleDateString("pt-BR")}</span>
               </div>
+              <Link
+                href="/client/projeto"
+                className="mt-4 block text-center py-2 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-xl hover:bg-indigo-100 transition-colors"
+              >
+                Ver detalhes →
+              </Link>
             </div>
-            <div className="flex gap-3 text-xs text-gray-500">
-              <span>{project.tasks.done} concluídas</span>
-              <span>{project.tasks.total - project.tasks.done} pendentes</span>
-              <span>{new Date(project.dueDate).toLocaleDateString("pt-BR")}</span>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-6 text-center">
+              <p className="text-sm font-semibold text-gray-600 mb-1">Projeto em configuração</p>
+              <p className="text-xs text-gray-400">Quando a equipe configurar seu projeto, ele aparecerá aqui.</p>
             </div>
-            <Link
-              href="/client/projeto"
-              className="mt-4 block text-center py-2 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-xl hover:bg-indigo-100 transition-colors"
-            >
-              Ver detalhes →
-            </Link>
-          </div>
+          )}
 
           <h2 className="text-sm font-bold text-gray-800 mb-3 mt-5">Próximas Publicações</h2>
-          <div className="space-y-2">
-            {upcomingEvents.map((e) => (
-              <div key={e.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-                <div className="w-9 h-9 bg-pink-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-pink-500">{(e.platform ?? "IG")[0]}</span>
+          {upcomingEvents.length > 0 ? (
+            <div className="space-y-2">
+              {upcomingEvents.map((e) => (
+                <div key={e.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 bg-pink-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-pink-500">{(e.platform ?? "IG")[0]}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{e.title}</p>
+                    <p className="text-xs text-gray-400">{e.platform} · {new Date(e.date).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <StatusBadge status={e.status as "scheduled"} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-800 truncate">{e.title}</p>
-                  <p className="text-xs text-gray-400">{e.platform} · {new Date(e.date).toLocaleDateString("pt-BR")}</p>
-                </div>
-                <StatusBadge status={e.status as "scheduled"} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 text-center">
+              <p className="text-xs text-gray-400">Nenhuma publicação agendada ainda.</p>
+            </div>
+          )}
         </div>
 
         {/* Aprovações + Financeiro */}
@@ -346,26 +362,33 @@ export function ClientHomeContent({ serverData }: Props) {
           ) : (
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
               <div className="w-10 h-10 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-2"><CheckSquare className="w-5 h-5 text-emerald-500" /></div>
-              <p className="text-sm font-semibold text-emerald-700">Tudo aprovado!</p>
+              <p className="text-sm font-semibold text-emerald-700">Sem pendências</p>
               <p className="text-xs text-emerald-600 mt-1">Nenhuma aprovação pendente no momento.</p>
             </div>
           )}
 
           <h2 className="text-sm font-bold text-gray-800 mb-3 mt-5">Financeiro</h2>
-          <div className="space-y-2">
-            {invoices.map((inv) => (
-              <div key={inv.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-800">{inv.description}</p>
-                  <p className="text-xs text-gray-400">{new Date(inv.dueDate).toLocaleDateString("pt-BR")}</p>
+          {invoices.length > 0 ? (
+            <div className="space-y-2">
+              {invoices.map((inv) => (
+                <div key={inv.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{inv.description}</p>
+                    <p className="text-xs text-gray-400">{new Date(inv.dueDate).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(inv.amount)}</p>
+                    <StatusBadge status={inv.status} />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(inv.amount)}</p>
-                  <StatusBadge status={inv.status} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 text-center">
+              <p className="text-xs text-gray-400">Nenhuma cobrança ativa no momento.</p>
+              <Link href="/client/financeiro" className="text-xs text-indigo-600 hover:underline mt-1 inline-block">Ver financeiro →</Link>
+            </div>
+          )}
 
           {/* Nudge onboarding quando não há dados */}
           {!hasOnboarding && (
