@@ -195,6 +195,7 @@ export default async function AdminDashboardPage() {
             { href: "/admin/conexoes",      icon: Link2,      label: "Conexoes",     color: "blue"   },
             { href: "/admin/relatorios",    icon: FileText,   label: "Relatorios",   color: "gray"   },
             { href: "/admin/configuracoes", icon: Bot,        label: "IA / Config",  color: "violet" },
+            { href: "/admin/status",        icon: CheckSquare, label: "Status V1",    color: "gray"   },
           ].map(({ href, icon: Icon, label, color }) => (
             <a
               key={label}

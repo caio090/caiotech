@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Building2, Search, Check, ArrowRight, Tag, User, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, Search, Check, ArrowRight, Tag, User, ChevronLeft, ChevronRight, AtSign, Globe, Clock } from "lucide-react";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY, clearActiveClient } from "@/lib/active-client";
 import type { AdminContentosClient } from "@/lib/admin-contentos-clients";
 
@@ -156,7 +156,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                     <span className={`text-sm font-semibold block truncate ${selectedId === c.id ? "text-purple-800" : "text-gray-800"}`}>
                       {c.company_name || "Sem nome"}
                     </span>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       {c.responsible_name && (
                         <span className="flex items-center gap-1 text-xs text-gray-400">
                           <User className="w-3 h-3" />{c.responsible_name}
@@ -165,6 +165,21 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                       {c.segment && (
                         <span className="flex items-center gap-1 text-xs text-gray-400">
                           <Tag className="w-3 h-3" />{c.segment}
+                        </span>
+                      )}
+                      {c.has_meta && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-indigo-700 bg-indigo-50">
+                          <Globe className="w-2.5 h-2.5" />Meta
+                        </span>
+                      )}
+                      {c.has_instagram && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-pink-700 bg-pink-50">
+                          <AtSign className="w-2.5 h-2.5" />IG
+                        </span>
+                      )}
+                      {c.has_brief === false && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-amber-700 bg-amber-50">
+                          <Clock className="w-2.5 h-2.5" />Brief pendente
                         </span>
                       )}
                       {c.status && c.status !== "active" && (

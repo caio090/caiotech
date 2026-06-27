@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosSubNav } from "../_contentos-subnav";
 import { PageHeader } from "@/components/page-header";
-import { FileText, BarChart3, MessageSquare, Database, Calendar, ClipboardList } from "lucide-react";
+import { FileText, BarChart3, MessageSquare, Calendar, ClipboardList, TrendingUp, Clock, CheckSquare } from "lucide-react";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 
@@ -56,38 +56,38 @@ export default async function AdminContentosRelatoriosPage({
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {[
           {
-            icon: BarChart3,    color: "purple",
-            label: "Relatório digital",
-            desc:  "Instagram, Meta Ads, Google Analytics, conteúdos publicados e tráfego",
+            icon: BarChart3,     color: "purple",
+            label: "Desempenho dos conteúdos",
+            desc:  "Conteúdos produzidos, aprovados e publicados no período",
             badge: "Em breve",
           },
           {
-            icon: Database,     color: "indigo",
-            label: "Dados físicos do cliente",
-            desc:  "Curva ABC, vendas, estoque, produtos de alto giro e margem por produto",
+            icon: CheckSquare,   color: "indigo",
+            label: "Aprovações e gargalos",
+            desc:  "Tempo médio de aprovação, revisões solicitadas e taxa de aprovação",
             badge: "Em breve",
           },
           {
-            icon: FileText,     color: "blue",
+            icon: FileText,      color: "blue",
             label: "PDF do relatório",
-            desc:  "Geração automática de PDF com resumo executivo e dados do período",
+            desc:  "Geração automática de PDF com resumo executivo de conteúdo do período",
             badge: "Em breve",
           },
           {
-            icon: MessageSquare,color: "emerald",
-            label: "Mensagem WhatsApp",
-            desc:  "Resumo textual pronto para envio ao cliente via WhatsApp",
+            icon: TrendingUp,    color: "emerald",
+            label: "Campanhas e formatos",
+            desc:  "Quais campanhas foram executadas, formatos mais usados e canais",
             badge: "Em breve",
           },
           {
-            icon: Calendar,     color: "amber",
-            label: "Histórico de envios",
-            desc:  "Controle de quais relatórios foram enviados e quando",
+            icon: Clock,         color: "amber",
+            label: "Tempo médio de produção",
+            desc:  "Do briefing à publicação: onde está o gargalo de cada conteúdo",
             badge: "Em breve",
           },
           {
-            icon: BarChart3,    color: "teal",
-            label: "Recomendações",
+            icon: BarChart3,     color: "teal",
+            label: "Próximos passos",
             desc:  "O que funcionou, o que ajustar e qual a direção para o próximo ciclo",
             badge: "Em breve",
           },
@@ -103,18 +103,22 @@ export default async function AdminContentosRelatoriosPage({
         ))}
       </div>
 
-      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center">
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center mb-4">
         <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
           <ClipboardList className="w-6 h-6 text-gray-400" />
         </div>
-        <p className="text-sm font-bold text-gray-700 mb-1">Nenhum relatório disponível</p>
+        <p className="text-sm font-bold text-gray-700 mb-1">Nenhum relatório de conteúdo disponível</p>
         <p className="text-xs text-gray-400 max-w-md mx-auto">
-          Os relatórios serão gerados automaticamente com base nos dados do cliente. Se o cliente anexou dados físicos,
-          eles também serão considerados na análise.
+          Os relatórios serão gerados automaticamente com base nos conteúdos produzidos, aprovados e publicados para este cliente.
         </p>
         <p className="text-[10px] text-gray-400 mt-3 italic">
           Esta funcionalidade será ativada em fase futura.
         </p>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-500">
+        💡 Dados comerciais e faturamento ficam em <strong>Financeiro / Relatórios gerais</strong>, não aqui.
+        Este módulo é focado exclusivamente em conteúdo, campanhas e desempenho editorial.
       </div>
     </>
   );

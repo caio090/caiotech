@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosSubNav } from "../_contentos-subnav";
 import { PageHeader } from "@/components/page-header";
-import { MousePointerClick, Target, DollarSign, Clock, CheckCircle2, AlertCircle, Megaphone, Sparkles } from "lucide-react";
+import { MousePointerClick, Target, DollarSign, Clock, CheckCircle2, AlertCircle, Megaphone, Sparkles, Smartphone, Link2 } from "lucide-react";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 
@@ -20,6 +20,7 @@ export default async function AdminContentosDistribuicaoPage({
 
   let companyName = "";
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let metaConnected = false;
 
   if (isSupabaseConfigured) {
     const valid = await validateContentOSClient(clientId);
@@ -28,6 +29,13 @@ export default async function AdminContentosDistribuicaoPage({
     try {
       const supabase = await createServerSupabaseClient();
       suggestions = await getContentOSSuggestions(supabase, clientId);
+      const { data: assets } = await supabase
+        .from("client_meta_assets")
+        .select("id")
+        .eq("client_id", clientId)
+        .limit(1)
+        .maybeSingle();
+      if (assets) metaConnected = true;
     } catch {}
   }
 
@@ -35,20 +43,40 @@ export default async function AdminContentosDistribuicaoPage({
     <>
       <ContentosSubNav />
       <PageHeader
-        title="Distribuição / Tráfego"
-        description={`Publicação orgânica e paga para ${companyName}`}
+        title="Distribuição"
+        description={`Como e onde o conteúdo de ${companyName} será publicado`}
       />
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} compact className="mb-5" />
       )}
+
+      {/* Badge Meta */}
+      <div className={`mb-4 flex items-start gap-3 rounded-2xl border p-4 ${metaConnected ? "bg-indigo-50 border-indigo-100" : "bg-gray-50 border-gray-100"}`}>
+        <Smartphone className={`w-4 h-4 flex-shrink-0 mt-0.5 ${metaConnected ? "text-indigo-500" : "text-gray-300"}`} strokeWidth={1.5} />
+        <div className="flex-1">
+          {metaConnected ? (
+            <p className="text-xs font-bold text-indigo-800">Meta conectada para este cliente</p>
+          ) : (
+            <>
+              <p className="text-xs font-bold text-gray-600">Meta não vinculada a este cliente</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Conecte a Meta para liberar leitura de canais e futuras publicações.
+              </p>
+              <a href="/admin/conexoes" className="inline-flex items-center gap-1.5 mt-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                <Link2 className="w-3 h-3" /> Ir para Conexões →
+              </a>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="mb-6 bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-start gap-3">
         <MousePointerClick className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-xs font-bold text-orange-800">Módulo de distribuição em desenvolvimento</p>
           <p className="text-xs text-orange-600 mt-0.5">
-            Esta aba centralizará sugestões de anúncio, status de tráfego, verbas, públicos e resultados de campanhas pagas.
-            A IA vai sugerir. O humano vai aprovar. A Meta vai executar.
+            Esta aba mostrará onde cada conteúdo será publicado, canal, formato, data, se foi publicado, se tem tráfego pago e qual o status de veiculação.
+            Publicação automática: em breve, requer aprovação Meta.
           </p>
         </div>
       </div>

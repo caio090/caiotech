@@ -28,6 +28,8 @@ export default async function AdminContentosHomePage({
   let companyName: string | null = null;
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
   let hasClientContext = false;
+  let metaAsset: { page_name: string | null; instagram_username: string | null } | null = null;
+  let hasOlaClick = false;
 
   if (isSupabaseConfigured) {
     // Validate that the client is a real client (not operacional/admin/test/archived)
@@ -40,18 +42,41 @@ export default async function AdminContentosHomePage({
       const supabase = await createServerSupabaseClient();
       companyName = validClient.company_name;
 
-      const [onbResult, contentsResult, approvalsResult, contextResult] = await Promise.all([
+      const [onbResult, contentsResult, approvalsResult, contextResult, assetsResult] = await Promise.all([
         supabase.from("onboarding_profiles").select("*").eq("client_id", activeClientId).maybeSingle(),
         supabase.from("content_items").select("*").eq("client_id", activeClientId).order("created_at", { ascending: false }).limit(20),
         supabase.from("approvals").select("*, content_items(*)").eq("client_id", activeClientId).order("created_at", { ascending: false }).limit(10),
         supabase.from("client_context").select("id").eq("client_id", activeClientId).maybeSingle(),
+        supabase.from("client_meta_assets").select("asset_type, asset_name, username").eq("client_id", activeClientId),
       ]);
       serverOnboarding  = onbResult.data;
       serverContents    = contentsResult.data ?? [];
       serverApprovals   = (approvalsResult.data as DbApprovalWithContent[]) ?? [];
       suggestions       = await getContentOSSuggestions(supabase, activeClientId!);
-      // contextResult.error.code 42P01 = table not yet created (SQL 36 pending)
       hasClientContext  = !contextResult.error && !!contextResult.data;
+
+      // Enriquece com ativo Meta vinculado (SQL 37 — graceful se não rodado)
+      if (!assetsResult.error && assetsResult.data && assetsResult.data.length > 0) {
+        const rows = assetsResult.data as Array<{ asset_type: string; asset_name: string | null; username: string | null }>;
+        const page = rows.find((r) => r.asset_type === "facebook_page");
+        const ig   = rows.find((r) => r.asset_type === "instagram_business");
+        metaAsset = {
+          page_name:          page?.asset_name ?? null,
+          instagram_username: ig?.username     ?? null,
+        };
+      }
+
+      // Verifica se cliente tem Cardápio Digital / OlaClick (SQL 39)
+      const olaClickRes = await supabase
+        .from("olaclick_connections")
+        .select("id")
+        .eq("client_id", activeClientId)
+        .eq("status", "connected")
+        .limit(1)
+        .maybeSingle();
+      if (!olaClickRes.error && olaClickRes.data) {
+        hasOlaClick = true;
+      }
     } catch (e) {
       console.error("[admin/contentos/home] Supabase fetch error:", e);
     }
@@ -73,6 +98,9 @@ export default async function AdminContentosHomePage({
         userRole={userRole}
         isSupabaseActive={isSupabaseConfigured}
         companyName={companyName}
+        metaAsset={metaAsset}
+        clientId={activeClientId}
+        hasOlaClick={hasOlaClick}
       />
     </>
   );

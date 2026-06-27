@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosSubNav } from "../_contentos-subnav";
 import { PageHeader } from "@/components/page-header";
-import { Flag, Plus, Target, CalendarDays, Users, TrendingUp, Rocket } from "lucide-react";
+import { Flag, Plus, Target, CalendarDays, Users, TrendingUp, Rocket, BookOpen, Sparkles } from "lucide-react";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 
@@ -75,18 +75,31 @@ export default async function AdminContentosCampanhasPage({
       </div>
 
       {/* Empty state */}
-      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center">
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-8 text-center mb-4">
         <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
           <Rocket className="w-6 h-6 text-gray-400" strokeWidth={1.5} />
         </div>
         <p className="text-sm font-bold text-gray-700 mb-1">Nenhuma campanha criada ainda</p>
         <p className="text-xs text-gray-400 max-w-md mx-auto">
-          As campanhas do cliente serão listadas aqui. Cada campanha organiza objetivos, conteúdos, calendário e tráfego em um único ciclo estratégico.
+          Crie uma campanha para organizar conteúdos, canais, prazos e metas em um único plano estratégico.
         </p>
-        <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl border border-indigo-100 opacity-60 cursor-not-allowed">
-          <Plus className="w-3.5 h-3.5" />
-          Nova campanha · Em breve
+
+        {/* Ações */}
+        <div className="mt-5 flex flex-wrap gap-2 justify-center">
+          <button disabled className="flex items-center gap-1.5 text-xs font-bold text-white bg-purple-600 px-3 py-2 rounded-xl opacity-50 cursor-not-allowed">
+            <Plus className="w-3.5 h-3.5" /> Criar campanha
+          </button>
+          <button disabled className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-xl opacity-50 cursor-not-allowed">
+            <Flag className="w-3.5 h-3.5" /> Criar a partir de conteúdo
+          </button>
+          <button disabled className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-xl opacity-50 cursor-not-allowed">
+            <Sparkles className="w-3.5 h-3.5" /> Criar a partir de tendência
+          </button>
+          <button disabled className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-xl opacity-50 cursor-not-allowed">
+            <BookOpen className="w-3.5 h-3.5" /> Criar a partir da base estratégica
+          </button>
         </div>
+        <p className="text-[10px] text-gray-400 mt-3">Funcionalidade em desenvolvimento</p>
       </div>
     </>
   );

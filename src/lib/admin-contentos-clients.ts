@@ -6,6 +6,9 @@ export interface AdminContentosClient {
   responsible_name: string | null;
   segment: string | null;
   status: string | null;
+  has_meta?: boolean;
+  has_instagram?: boolean;
+  has_brief?: boolean;
 }
 
 /**
@@ -20,7 +23,34 @@ export async function getAdminContentOSClients(): Promise<AdminContentosClient[]
       .from("v_real_clients")
       .select("id, company_name, responsible_name, segment, status")
       .order("company_name");
-    return (data ?? []) as AdminContentosClient[];
+    const clients = (data ?? []) as AdminContentosClient[];
+
+    // Enriquece com dados de client_meta_assets (SQL 37) e client_context (brief)
+    const [assetsRes, contextsRes] = await Promise.all([
+      supabase.from("client_meta_assets").select("client_id, asset_type"),
+      supabase.from("client_context").select("client_id"),
+    ]);
+
+    const metaIds     = new Set<string>();
+    const instagramIds = new Set<string>();
+    if (!assetsRes.error) {
+      (assetsRes.data ?? []).forEach((a: { client_id: string; asset_type: string }) => {
+        if (a.asset_type === "facebook_page")      metaIds.add(a.client_id);
+        if (a.asset_type === "instagram_business") instagramIds.add(a.client_id);
+      });
+    }
+
+    const briefIds = new Set<string>();
+    if (!contextsRes.error) {
+      (contextsRes.data ?? []).forEach((c: { client_id: string }) => briefIds.add(c.client_id));
+    }
+
+    return clients.map((c) => ({
+      ...c,
+      has_meta:      metaIds.has(c.id),
+      has_instagram: instagramIds.has(c.id),
+      has_brief:     briefIds.has(c.id),
+    }));
   } catch {
     return [];
   }

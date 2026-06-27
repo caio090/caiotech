@@ -36,10 +36,10 @@ export function BriefGate({ clientId, companyName }: Props) {
           </p>
           <div className="flex flex-wrap gap-2">
             <a
-              href={`/admin/clientes?highlight=${clientId}`}
+              href={`/admin/contentos/base-estrategica?client=${clientId}`}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-xl transition-colors"
             >
-              <FileText className="w-3.5 h-3.5" /> Preencher diagnóstico
+              <FileText className="w-3.5 h-3.5" /> Criar base estratégica
             </a>
             <button
               onClick={() => setDismissed(true)}

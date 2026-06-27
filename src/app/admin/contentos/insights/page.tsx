@@ -6,7 +6,7 @@ import { ContentosSubNav } from "../_contentos-subnav";
 import { PageHeader } from "@/components/page-header";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
-import { BarChart3 as BarChart3Icon, Factory, Sparkles } from "lucide-react";
+import { BarChart3 as BarChart3Icon, Factory, Sparkles, Smartphone, Link2 } from "lucide-react";
 
 type ContentRow = { id: string; title: string; status: string; type: string | null; channel: string | null; created_at: string; scheduled_date: string | null };
 
@@ -48,6 +48,9 @@ export default async function AdminContentosInsightsPage({
   let companyName = "";
   let contents: ContentRow[] = [];
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let metaStatus: { connected: boolean; page_name: string | null; instagram_username: string | null; reason?: string } = {
+    connected: false, page_name: null, instagram_username: null,
+  };
 
   if (isSupabaseConfigured) {
     const valid = await validateContentOSClient(clientId);
@@ -56,14 +59,29 @@ export default async function AdminContentosInsightsPage({
 
     try {
       const supabase = await createServerSupabaseClient();
-      const { data } = await supabase
-        .from("content_items")
-        .select("id, title, status, type, channel, created_at, scheduled_date")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      contents = data ?? [];
+      const [contentsRes, assetsRes] = await Promise.all([
+        supabase
+          .from("content_items")
+          .select("id, title, status, type, channel, created_at, scheduled_date")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("client_meta_assets")
+          .select("asset_type, asset_name, username")
+          .eq("client_id", clientId),
+      ]);
+      contents = contentsRes.data ?? [];
       suggestions = await getContentOSSuggestions(supabase, clientId);
+
+      if (!assetsRes.error && assetsRes.data && assetsRes.data.length > 0) {
+        const rows = assetsRes.data as Array<{ asset_type: string; asset_name: string | null; username: string | null }>;
+        const page = rows.find((r) => r.asset_type === "facebook_page");
+        const ig   = rows.find((r) => r.asset_type === "instagram_business");
+        metaStatus = { connected: true, page_name: page?.asset_name ?? null, instagram_username: ig?.username ?? null };
+      } else if (assetsRes.error?.code !== "42P01") {
+        metaStatus = { connected: false, page_name: null, instagram_username: null, reason: "not_linked" };
+      }
     } catch {}
   }
 
@@ -100,6 +118,46 @@ export default async function AdminContentosInsightsPage({
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} compact className="mb-5" />
       )}
+
+      {/* Bloco Meta / Instagram */}
+      <div className={`mb-6 flex items-start gap-3 rounded-2xl border p-4 ${metaStatus.connected ? "bg-indigo-50 border-indigo-100" : "bg-gray-50 border-gray-100"}`}>
+        <Smartphone className={`w-5 h-5 flex-shrink-0 mt-0.5 ${metaStatus.connected ? "text-indigo-500" : "text-gray-300"}`} strokeWidth={1.5} />
+        <div className="flex-1">
+          {metaStatus.connected ? (
+            <>
+              <p className="text-sm font-bold text-indigo-800">Meta conectada a este cliente</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {metaStatus.page_name && (
+                  <span className="text-[10px] font-medium bg-white text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full">
+                    📄 {metaStatus.page_name}
+                  </span>
+                )}
+                {metaStatus.instagram_username && (
+                  <span className="text-[10px] font-medium bg-white text-pink-700 border border-pink-100 px-2 py-0.5 rounded-full">
+                    @{metaStatus.instagram_username}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-indigo-600 mt-1.5">
+                Insights em tempo real (alcance, engajamento, seguidores) estarão disponíveis em breve, após integração com a API de insights da Meta.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-gray-600">Meta não vinculada a este cliente</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Vincule uma Página Facebook ou Instagram Business para habilitar insights de alcance, engajamento e seguidores.
+              </p>
+              <a
+                href="/admin/conexoes"
+                className="inline-flex items-center gap-1.5 mt-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                <Link2 className="w-3 h-3" />Ir para Conexões →
+              </a>
+            </>
+          )}
+        </div>
+      </div>
 
       {total === 0 ? (
         <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center">

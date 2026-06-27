@@ -304,9 +304,172 @@ const TEMPLATE_OPTIONS = [
   { id: "sem_template", label: "Só legenda",       desc: "Sem visual, apenas texto"        },
 ];
 
+// ── Criação rápida ─────────────────────────────────────────────────────────────
+
+const QUICK_TYPES = [
+  { id: "feed",      label: "Post feed"   },
+  { id: "story",     label: "Stories"     },
+  { id: "reels",     label: "Reels"       },
+  { id: "carousel",  label: "Carrossel"   },
+  { id: "whatsapp",  label: "WhatsApp"    },
+  { id: "trafego",   label: "Tráfego"     },
+  { id: "outro",     label: "Outro"       },
+];
+
+const QUICK_OBJ = [
+  { id: "vender",        label: "Vender"          },
+  { id: "engajar",       label: "Engajar"         },
+  { id: "informar",      label: "Informar"        },
+  { id: "avisar",        label: "Avisar"          },
+  { id: "oferta",        label: "Divulgar oferta" },
+  { id: "institucional", label: "Institucional"   },
+];
+
+const QUICK_DEST = [
+  { id: "rascunho",   label: "Salvar rascunho"       },
+  { id: "aprovacao",  label: "Enviar para aprovação" },
+  { id: "producao",   label: "Enviar para produção"  },
+];
+
+function QuickCreateForm({ onBack, brandName, clientId }: { onBack: () => void; brandName: string; clientId: string | null }) {
+  const [tipo,      setTipo]      = useState("");
+  const [ideia,     setIdeia]     = useState("");
+  const [objetivo,  setObjetivo]  = useState("");
+  const [prazo,     setPrazo]     = useState("");
+  const [destino,   setDestino]   = useState("rascunho");
+  const [obs,       setObs]       = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [done,      setDone]      = useState(false);
+
+  async function handleSubmit() {
+    if (!tipo || !ideia.trim()) return;
+    setSaving(true);
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        const storedId = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_CLIENT_KEY) : null;
+        const cid = clientId ?? storedId;
+        const dbStatus = destino === "aprovacao" ? "enviado_aprovacao" : destino === "producao" ? "em_producao" : "rascunho";
+        await supabase.from("content_items").insert({
+          client_id: cid, title: ideia.trim().slice(0, 120),
+          type: tipo, objective: objetivo || null,
+          scheduled_date: prazo ? new Date(`${prazo}T09:00:00`).toISOString() : null,
+          status: dbStatus,
+          metadata: { quick_create: true, internal_notes: obs || null },
+          responsible_id: user?.id ?? null,
+        });
+      } catch (e) { console.error("[criação rápida]", e); }
+    }
+    setSaving(false);
+    setDone(true);
+  }
+
+  if (done) {
+    return (
+      <div className="max-w-lg text-center py-10">
+        <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-7 h-7 text-purple-600" />
+        </div>
+        <h2 className="text-lg font-black text-gray-900 mb-1">Demanda anotada!</h2>
+        <p className="text-sm text-gray-500 mb-5">O conteúdo foi salvo como "{QUICK_TYPES.find(t => t.id === tipo)?.label}".</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={() => { setDone(false); setTipo(""); setIdeia(""); setObjetivo(""); setPrazo(""); setObs(""); }}
+            className="text-sm font-medium text-gray-700 bg-gray-100 px-4 py-2.5 rounded-xl hover:bg-gray-200">
+            Nova demanda rápida
+          </button>
+          <button onClick={onBack} className="text-sm font-medium text-purple-600 px-4 py-2.5 rounded-xl hover:bg-purple-50">
+            ← Voltar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-5">
+        <ArrowLeft className="w-3.5 h-3.5" /> Criar
+      </button>
+      <div className="mb-6">
+        <h1 className="text-xl font-black text-gray-900 mb-1">Demanda rápida</h1>
+        <p className="text-sm text-gray-500">Anote uma demanda em segundos. Sem briefing completo.</p>
+      </div>
+
+      <div className="space-y-5">
+        {/* Tipo */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-2">Tipo de conteúdo *</label>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_TYPES.map((t) => (
+              <button key={t.id} onClick={() => setTipo(t.id)}
+                className={cn("text-xs font-medium px-3 py-1.5 rounded-xl border-2 transition-all",
+                  tipo === t.id ? "border-purple-500 bg-purple-50 text-purple-700" : "border-gray-100 bg-white text-gray-600 hover:border-gray-200")}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ideia */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-1.5">Ideia ou pedido principal *</label>
+          <textarea value={ideia} onChange={(e) => setIdeia(e.target.value)}
+            placeholder="Ex: Post de lançamento do produto novo, Stories com promoção de fim de semana..."
+            rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-purple-400 resize-none" />
+        </div>
+
+        {/* Objetivo */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-2">Objetivo</label>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_OBJ.map((o) => (
+              <button key={o.id} onClick={() => setObjetivo(objetivo === o.id ? "" : o.id)}
+                className={cn("text-xs font-medium px-3 py-1.5 rounded-xl border-2 transition-all",
+                  objetivo === o.id ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-100 bg-white text-gray-600 hover:border-gray-200")}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Prazo e destino em linha */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Prazo</label>
+            <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Enviar para</label>
+            <select value={destino} onChange={(e) => setDestino(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-400 bg-white">
+              {QUICK_DEST.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Obs opcional */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-1.5">Observação interna <span className="font-normal text-gray-400">(opcional)</span></label>
+          <input value={obs} onChange={(e) => setObs(e.target.value)}
+            placeholder="Ex: Usar foto do produto novo, incluir preço"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-400" />
+        </div>
+
+        <button onClick={handleSubmit} disabled={!tipo || !ideia.trim() || saving}
+          className={cn("w-full py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2",
+            tipo && ideia.trim() ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-100 text-gray-400 cursor-not-allowed")}>
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : "Anotar demanda"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Hub ────────────────────────────────────────────────────────────────────────
 
-type CreateMode = "manual" | "ia" | "pacote" | null;
+type CreateMode = "manual" | "ia" | "pacote" | "rapido" | null;
 
 const MODE_CARDS = [
   { id: "manual" as CreateMode, icon: PenLine, label: "Criar manualmente", desc: "Preencha as informações com controle total.", color: "border-purple-200 hover:border-purple-400", iconColor: "text-purple-600" },
@@ -345,13 +508,13 @@ function CreateHub({ onSelect }: { onSelect: (mode: CreateMode) => void }) {
         })}
       </div>
       <div className="mt-8">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Criação rápida</p>
-        <div className="flex flex-wrap gap-2">
-          {["Feed", "Stories", "Reels", "Carrossel", "Tráfego", "Legenda", "Roteiro"].map((t) => (
-            <button key={t} onClick={() => onSelect("manual")}
-              className="text-xs font-medium text-purple-700 bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-xl hover:bg-purple-100 transition-colors">{t}</button>
-          ))}
-        </div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Criação rápida</p>
+        <p className="text-[10px] text-gray-400 mb-3">Anote uma demanda rapidamente, sem preencher briefing completo.</p>
+        <button onClick={() => onSelect("rapido")}
+          className="flex items-center gap-2 text-xs font-bold text-purple-700 bg-purple-50 border-2 border-purple-100 hover:border-purple-300 px-4 py-2.5 rounded-xl transition-colors">
+          <PenLine className="w-3.5 h-3.5" />
+          Demanda rápida →
+        </button>
       </div>
     </div>
   );
@@ -732,6 +895,7 @@ export default function ContentosCriarPage() {
   // ── Hub / IA / Pacote ────────────────────────────────────────────────────────
 
   if (mode === null) return <CreateHub onSelect={setMode} />;
+  if (mode === "rapido") return <QuickCreateForm onBack={() => setMode(null)} brandName={brandName} clientId={null} />;
   if (mode === "ia") return <IaComingSoon onBack={() => setMode(null)} />;
   if (mode === "pacote") {
     return (

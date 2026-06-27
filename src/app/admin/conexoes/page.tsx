@@ -8,6 +8,7 @@ import {
   Link2, Link2Off, AtSign, Bot, Palette, BarChart3, HardDrive,
   ChevronRight, Clock, Zap, TrendingUp, MapPin, Copy, Info,
   ShieldCheck, CalendarDays, User, Globe, Layers,
+  UtensilsCrossed, X, Eye, EyeOff, ShieldAlert, Lock, ChevronDown,
 } from "lucide-react";
 
 // ── Tipos ──────────────────────────────────────────────────────
@@ -138,6 +139,181 @@ function formatDate(iso: string | null | undefined): string {
   } catch { return "—"; }
 }
 
+// ── Modal OlaClick ─────────────────────────────────────────────
+function OlaClickModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [clientId,   setClientId]   = useState("");
+  const [connName,   setConnName]   = useState("");
+  const [token,      setToken]      = useState("");
+  const [notes,      setNotes]      = useState("");
+  const [showToken,  setShowToken]  = useState(false);
+  const [showSteps,  setShowSteps]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [error,      setError]      = useState("");
+
+  async function handleSave() {
+    if (!clientId || !connName || !token) { setError("Preencha todos os campos obrigatórios."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const r = await fetch("/api/olaclick/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, connection_name: connName, access_token: token, notes }),
+      });
+      const d = await r.json() as { ok: boolean; reason?: string; message?: string };
+      if (d.ok) { onSaved(); onClose(); }
+      else if (d.reason === "sql_pending") { setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase."); }
+      else { setError(d.message ?? "Erro ao salvar conexão."); }
+    } catch { setError("Erro de rede. Tente novamente."); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center">
+              <UtensilsCrossed className="w-4 h-4 text-orange-500" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Conectar Cardápio Digital</p>
+              <p className="text-[10px] text-gray-400">via OlaClick</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Aviso de segurança */}
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+            <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-700">
+              Se o token apareceu em print ou conversa, revogue e gere outro no OlaClick antes de conectar.
+            </p>
+          </div>
+
+          {/* Cliente */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">ID do cliente <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="Cole o client_id do cliente na LOKAT OS"
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Encontre em Clientes → selecione o cliente → copie o ID da URL.</p>
+          </div>
+
+          {/* Nome da conexão */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Nome da conexão <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={connName}
+              onChange={(e) => setConnName(e.target.value)}
+              placeholder="Ex: Duh Lanches — OlaClick"
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
+            />
+          </div>
+
+          {/* Token */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Token OlaClick <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Cole o token gerado no OlaClick"
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 pr-10 outline-none focus:border-orange-400 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" />Token salvo criptografado. Não aparece em tela após salvar.
+            </p>
+          </div>
+
+          {/* Observações */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Observações internas</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notas sobre essa conexão..."
+              rows={2}
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-orange-400"
+            />
+          </div>
+
+          {/* Como gerar token — accordion */}
+          <div className="border border-gray-100 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowSteps((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <span className="text-xs font-semibold text-gray-700">Como gerar token no OlaClick</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showSteps ? "rotate-180" : ""}`} />
+            </button>
+            {showSteps && (
+              <div className="p-4 space-y-2 text-xs text-gray-600">
+                {[
+                  "Acesse o painel OlaClick.",
+                  "Vá em Integrações.",
+                  "Clique em API Keys.",
+                  "Clique em Gerar novo token.",
+                  "Marque permissões de leitura: menu:read, orders:read, clients:read e companies:read.",
+                  "Copie o token gerado.",
+                  "Cole aqui na LOKAT OS.",
+                  "Clique em Salvar e testar conexão.",
+                ].map((step, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="w-4 h-4 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
+              <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Botões */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-xs font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving || !clientId || !connName || !token}
+              className="flex-1 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+              {saving ? "Salvando..." : "Salvar conexão"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────
 function ConexoesContent() {
   const searchParams = useSearchParams();
@@ -163,6 +339,9 @@ function ConexoesContent() {
   const [accounts,        setAccounts]        = useState<AccountsResponse>(null);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsTested,  setAccountsTested]  = useState(false);
+
+  const [showOlaModal, setShowOlaModal] = useState(false);
+  const [olaConnected, setOlaConnected] = useState(false);
 
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
@@ -412,9 +591,9 @@ function ConexoesContent() {
                   </div>
                 )}
 
-                {insightReason === "connected_no_pages" && (
+                {insightReason === "connected_no_pages" && !accounts?.ok && (
                   <p className="text-[11px] text-emerald-700 mt-1 leading-snug">
-                    Nenhuma Pagina ou Instagram Business vinculado ainda. Isso ocorre quando o escopo de paginas ainda nao foi aprovado pela Meta. Tente reconectar para atualizar.
+                    Conta conectada. Para vincular Páginas ou Instagram Business, reconecte a Meta e autorize o escopo de páginas no fluxo OAuth.
                   </p>
                 )}
               </div>
@@ -449,6 +628,18 @@ function ConexoesContent() {
 
                 {accountsTested && accounts?.ok && (
                   <div className="space-y-2">
+                    {/* Banner contextual */}
+                    {(accounts.pages ?? []).length > 0 ? (
+                      <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                        Ativos encontrados na Meta. Vincule cada Página/Instagram ao cliente correspondente na LOKAT OS.
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-400 flex items-center gap-2 mb-2">
+                        <Layers className="w-3.5 h-3.5 flex-shrink-0" />
+                        Nenhuma Página ou Instagram Business encontrada. Reconecte a Meta e selecione páginas no fluxo OAuth.
+                      </div>
+                    )}
                     {/* Páginas Facebook */}
                     {(accounts.pages ?? []).length > 0 ? (
                       (accounts.pages ?? []).map((page) => (
@@ -479,12 +670,7 @@ function ConexoesContent() {
                           )}
                         </div>
                       ))
-                    ) : (
-                      <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-400 flex items-center gap-2">
-                        <Layers className="w-3.5 h-3.5 flex-shrink-0" />
-                        Nenhuma Pagina Facebook encontrada. Reconecte e autorize o escopo de paginas.
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -837,7 +1023,132 @@ function ConexoesContent() {
           </div>
         </div>
 
+        {/* ── Separador: Por nicho ───────────────────────────── */}
+        <div className="pt-2">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Restaurante / Delivery</p>
+        </div>
+
+        {/* ══ Cardápio Digital / OlaClick ═════════════════════ */}
+        <div className={`bg-white rounded-2xl border p-5 ${olaConnected ? "border-orange-100" : "border-gray-100"}`}>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${olaConnected ? "bg-orange-50" : "bg-gray-50"}`}>
+                <UtensilsCrossed className={`w-5 h-5 ${olaConnected ? "text-orange-500" : "text-gray-400"}`} strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">Cardápio Digital</p>
+                <p className="text-xs text-gray-400">OlaClick · Pedidos, produtos e faturamento</p>
+              </div>
+            </div>
+            {olaConnected
+              ? <StatusBadge ok={true} label="Conectado" />
+              : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
+            }
+          </div>
+
+          <div className="space-y-1 mb-4 text-xs text-gray-500">
+            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Cardápio, categorias e produtos</p>
+            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Pedidos e faturamento do período</p>
+            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Clientes recorrentes e frequência</p>
+            <p className="flex items-center gap-1.5 text-gray-300"><ChevronRight className="w-3 h-3" />Publicação no cardápio · em breve</p>
+          </div>
+
+          {/* Grid de status funcionalidades */}
+          <div className="grid grid-cols-3 gap-2 mb-4 pt-3 border-t border-gray-50">
+            {[
+              { label: "Cardápio",   ok: olaConnected },
+              { label: "Pedidos",    ok: false, soon: true },
+              { label: "Faturamento", ok: false, soon: true },
+            ].map(({ label, ok, soon }) => (
+              <div key={label} className="p-2.5 bg-gray-50 rounded-xl">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+                <p className={`text-xs font-medium ${ok ? "text-emerald-600" : "text-gray-400"}`}>
+                  {ok ? "Disponível" : soon ? "Em breve" : "Conectar"}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!olaConnected && (
+              <button
+                onClick={() => setShowOlaModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                <Link2 className="w-3.5 h-3.5" /> Conectar Cardápio Digital
+              </button>
+            )}
+            {olaConnected && (
+              <>
+                <button className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition-colors">
+                  <RefreshCw className="w-3.5 h-3.5" /> Sincronizar
+                </button>
+                <button
+                  onClick={() => setShowOlaModal(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <Info className="w-3.5 h-3.5" /> Gerenciar
+                </button>
+                <button
+                  onClick={() => setOlaConnected(false)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <Link2Off className="w-3.5 h-3.5" /> Desconectar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Separador: Clínica ──────────────────────────────── */}
+        <div className="pt-2">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Clínica / Atendimento</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-60">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">Agenda / Clínica</p>
+                <p className="text-xs text-gray-400">Agendamentos, prontuários e atendimento</p>
+              </div>
+            </div>
+            <ComingSoonBadge />
+          </div>
+        </div>
+
+        {/* ── Separador: Comercial ───────────────────────────── */}
+        <div className="pt-2">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Serviços / Comercial</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-60">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Globe className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">CRM Externo</p>
+                <p className="text-xs text-gray-400">HubSpot, RD Station, Pipedrive e similares</p>
+              </div>
+            </div>
+            <ComingSoonBadge />
+          </div>
+        </div>
+
       </div>
+
+      {/* Modal OlaClick */}
+      {showOlaModal && (
+        <OlaClickModal
+          onClose={() => setShowOlaModal(false)}
+          onSaved={() => setOlaConnected(true)}
+        />
+      )}
     </div>
   );
 }

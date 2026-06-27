@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ApprovalCard } from "@/components/approval-card";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { mockProjects, mockApprovals, mockCalendarEvents, mockInvoices } from "@/data/mock-data";
-import { FolderOpen, CheckSquare, Calendar, DollarSign } from "lucide-react";
+import { FolderOpen, CheckSquare, Calendar, DollarSign, UtensilsCrossed, AtSign as AtSignIcon, Globe, Link2, Clock } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
@@ -237,6 +237,50 @@ export function ClientHomeContent({ serverData }: Props) {
           iconColor="text-emerald-600"
           iconBg="bg-emerald-50"
         />
+      </div>
+
+      {/* Conexões do negócio */}
+      <div className="mb-8 bg-white border border-gray-100 rounded-2xl p-4">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">Conexões do negócio</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {/* Instagram */}
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 ${instagram ? "bg-pink-50 border-pink-100" : "bg-gray-50 border-gray-100"}`}>
+            <AtSignIcon className={`w-3.5 h-3.5 flex-shrink-0 ${instagram ? "text-pink-500" : "text-gray-300"}`} strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className={`text-[10px] font-bold truncate ${instagram ? "text-pink-700" : "text-gray-400"}`}>Instagram</p>
+              <p className="text-[10px] text-gray-500 truncate">{instagram ? `@${instagram}` : "Não conectado"}</p>
+            </div>
+          </div>
+
+          {/* Cardápio digital */}
+          {segmento?.toLowerCase().includes("restaur") || segmento?.toLowerCase().includes("aliment") || segmento?.toLowerCase().includes("delivery") ? (
+            <div className="flex items-center gap-2 rounded-xl border bg-gray-50 border-gray-100 px-3 py-2.5">
+              <UtensilsCrossed className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-gray-400">Cardápio Digital</p>
+                <p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Em breve</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border bg-gray-50 border-gray-100 px-3 py-2.5">
+              <Globe className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-gray-400">Site / Landing</p>
+                <p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Em breve</p>
+              </div>
+            </div>
+          )}
+
+          {/* Leads */}
+          <div className="flex items-center gap-2 rounded-xl border bg-gray-50 border-gray-100 px-3 py-2.5">
+            <Link2 className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-gray-400">Leads</p>
+              <p className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Em breve</p>
+            </div>
+          </div>
+        </div>
+        <p className="text-[9px] text-gray-300 mt-2.5">Solicite à LOKAT para conectar canais do seu negócio.</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

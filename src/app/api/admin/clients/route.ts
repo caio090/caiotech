@@ -26,38 +26,49 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Busca diagnósticos existentes
-    const { data: diagnoses } = await supabase
-      .from("onboarding_profiles")
-      .select("client_id");
-
-    const contextsRes = await supabase
-      .from("client_context")
-      .select("client_id");
+    // Busca diagnósticos / briefs
+    const { data: diagnoses } = await supabase.from("onboarding_profiles").select("client_id");
+    const contextsRes = await supabase.from("client_context").select("client_id");
     const contexts = contextsRes.error ? null : contextsRes.data;
 
-    // Busca conexões Meta ativas
-    const metaConnsRes = await supabase
-      .from("meta_connections")
-      .select("connected_by, page_id, instagram_business_account_id")
-      .eq("status", "active")
-      .eq("is_active", true);
-    const metaConns = metaConnsRes.error ? null : metaConnsRes.data;
+    const diagIds  = new Set((diagnoses ?? []).map((d) => d.client_id));
+    const briefIds = new Set((contexts ?? []).map((c: { client_id: string }) => c.client_id));
 
-    const diagIds   = new Set((diagnoses ?? []).map((d) => d.client_id));
-    const briefIds  = new Set((contexts ?? []).map((c: { client_id: string }) => c.client_id));
+    // Tenta buscar vínculos client_meta_assets (SQL 37)
+    const assetsRes = await supabase
+      .from("client_meta_assets")
+      .select("client_id, asset_type");
 
-    // Para Meta, a conexão é por usuário (connected_by), não por cliente diretamente.
-    // Como a vinculação cliente<>meta ainda está em desenvolvimento (client_meta_assets),
-    // usamos uma heurística: se há alguma conexão Meta ativa no sistema, marca como disponível.
-    // Quando client_meta_assets estiver populado, substituir por join.
-    const hasAnyMeta      = (metaConns ?? []).length > 0;
-    const hasAnyInstagram = (metaConns ?? []).some((m) => m.instagram_business_account_id);
+    let metaClientIds    = new Set<string>();
+    let instagramClientIds = new Set<string>();
+    let useAssets = false;
+
+    if (!assetsRes.error) {
+      useAssets = true;
+      (assetsRes.data ?? []).forEach((a: { client_id: string; asset_type: string }) => {
+        if (a.asset_type === "facebook_page")     metaClientIds.add(a.client_id);
+        if (a.asset_type === "instagram_business") instagramClientIds.add(a.client_id);
+      });
+    } else {
+      // SQL 37 não rodado — heurística: se há conexão Meta ativa no sistema
+      const metaConnsRes = await supabase
+        .from("meta_connections")
+        .select("id")
+        .eq("status", "active")
+        .eq("is_active", true)
+        .limit(1);
+      if (!metaConnsRes.error && (metaConnsRes.data ?? []).length > 0) {
+        // Marca todos como potencialmente com meta até SQL 37 ser rodado
+        // (campo informativo, não crítico)
+        metaClientIds    = new Set<string>();
+        instagramClientIds = new Set<string>();
+      }
+    }
 
     const enriched = (clients ?? []).map((c) => ({
       ...c,
-      has_meta:        hasAnyMeta,
-      has_instagram:   hasAnyInstagram,
+      has_meta:        useAssets ? metaClientIds.has(c.id)     : false,
+      has_instagram:   useAssets ? instagramClientIds.has(c.id) : false,
       has_diagnostico: diagIds.has(c.id),
       has_brief:       briefIds.has(c.id),
     }));
