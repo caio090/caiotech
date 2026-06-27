@@ -18,12 +18,12 @@ const modules: Module[] = [
 
 // ── ContentOS features ────────────────────────────────────────
 const contentosFeatures: { Icon: ElementType; title: string; desc: string }[] = [
-  { Icon: FileSearch,   title: "Diagnóstico da marca",  desc: "Posicionamento, voz e público definidos antes de criar qualquer conteúdo." },
-  { Icon: CalendarDays, title: "Estratégia mensal",      desc: "Objetivos, formatos e canais planejados para o mês inteiro." },
-  { Icon: Calendar,     title: "Calendário editorial",   desc: "Publicações com datas, status e responsáveis em um único painel." },
-  { Icon: FileText,     title: "Roteiros e briefings",   desc: "Roteiros completos com legenda, CTA e referências visuais." },
-  { Icon: CheckCircle2, title: "Aprovação pelo cliente", desc: "Link de aprovação público — o cliente aprova sem precisar de login." },
-  { Icon: Video,        title: "Produção operacional",   desc: "Fluxo direto: briefing → produção → agendado → publicado." },
+  { Icon: FileSearch,   title: "Diagnóstico da marca",  desc: "Posicionamento, tom de voz e público-alvo definidos antes de criar qualquer conteúdo." },
+  { Icon: CalendarDays, title: "Estratégia mensal",      desc: "Pautas, formatos e canais planejados por ciclo — com base na realidade do cliente, não em achismo." },
+  { Icon: Calendar,     title: "Calendário editorial",   desc: "Cada conteúdo com data, responsável e status. Sem planilha, sem grupo de WhatsApp." },
+  { Icon: FileText,     title: "Roteiros e briefings",   desc: "Briefings completos com legenda, CTA e referência visual. O time executa sem perguntar no grupo." },
+  { Icon: CheckCircle2, title: "Aprovação pelo cliente", desc: "O cliente aprova com um clique, sem login. Feedback centralizado e histórico claro." },
+  { Icon: Video,        title: "Produção operacional",   desc: "Do briefing à publicação: um fluxo único com etapas, responsáveis e prazos visíveis." },
 ];
 
 // ── Client logos ─────────────────────────────────────────────
@@ -279,20 +279,20 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
           {[
-            { Icon: Building2, iconColor: "#7b6ef6", title: "Sou empresa ou autônomo", desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.", cta: "Começar →", href: "/criar-conta", accent: "#7b6ef6" },
-            { Icon: Rocket,    iconColor: "#a855f7", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.", cta: "Ver plataforma →", href: "/plataforma", accent: "#a855f7" },
-            { Icon: UserCheck, iconColor: "#10b981", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e relatórios da sua marca atendida.", cta: "Entrar →", href: "/login", accent: "#10b981" },
-            { Icon: ClipboardList, iconColor: "#f59e0b", title: "Quero só um diagnóstico", desc: "Receba uma análise da sua presença digital antes de criar conta. Grátis e sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico", accent: "#f59e0b" },
+            { Icon: Building2,    iconColor: "#7b6ef6", title: "Sou empresa ou autônomo",      desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.",        cta: "Começar →",           href: "/criar-conta",  accent: "#7b6ef6" },
+            { Icon: Rocket,       iconColor: "#a855f7", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.",           cta: "Ver plataforma →",    href: "/plataforma",   accent: "#a855f7" },
+            { Icon: UserCheck,    iconColor: "#10b981", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e acompanhe os conteúdos da sua marca sendo produzidos.",      cta: "Entrar →",            href: "/login",        accent: "#10b981" },
+            { Icon: ClipboardList,iconColor: "#f59e0b", title: "Quero só um diagnóstico",       desc: "Análise da sua presença digital antes de criar conta. Resultado em minutos, sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico",  accent: "#f59e0b" },
           ].map((item) => (
-            <a key={item.title} href={item.href} className="p-5 md:p-8 flex flex-col no-underline" style={{ background: S.card, transition: "background .2s", textDecoration: "none" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = S.card; }}
+            <a key={item.title} href={item.href} className="p-5 md:p-8 flex flex-col no-underline" style={{ background: S.card, transition: "background .2s, border-color .2s", textDecoration: "none", borderTop: `2px solid ${item.accent}20` }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; e.currentTarget.style.borderTopColor = `${item.iconColor}60`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = S.card; e.currentTarget.style.borderTopColor = `${item.iconColor}20`; }}
             >
-              <div style={{ width: "36px", height: "36px", background: `${item.iconColor}18`, border: `1px solid ${item.iconColor}30`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".85rem" }}>
+              <div style={{ width: "38px", height: "38px", background: `${item.iconColor}18`, border: `1px solid ${item.iconColor}35`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".9rem" }}>
                 <item.Icon style={{ width: "17px", height: "17px", color: item.iconColor }} strokeWidth={1.5} />
               </div>
               <h3 style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".5rem", lineHeight: 1.3 }}>{item.title}</h3>
-              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted, flexGrow: 1, marginBottom: "1.2rem" }}>{item.desc}</p>
+              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.65, color: S.muted, flexGrow: 1, marginBottom: "1.3rem" }}>{item.desc}</p>
               <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent }}>{item.cta}</span>
             </a>
           ))}
@@ -306,37 +306,80 @@ export default function HomePage() {
           <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Do diagnóstico à execução</h2>
           <p style={{ ...S.grotesk, fontSize: ".85rem", color: S.muted, marginTop: ".6rem" }}>Cada módulo conectado ao próximo.</p>
         </div>
-        <div style={{ position: "relative" }}>
-          {/* Linha conectora desktop */}
-          <div className="hidden lg:block" style={{ position: "absolute", top: "28px", left: "10%", right: "10%", height: "1px", background: `linear-gradient(to right, transparent, ${S.border}, ${S.accent}50, ${S.border}, transparent)` }} />
-          <div className="flex flex-col lg:grid lg:grid-cols-5 gap-3">
-            {[
-              { num: "01", Icon: ClipboardList, color: "#7b6ef6", title: "Diagnóstico",   desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
-              { num: "02", Icon: Sparkles,      color: "#a855f7", title: "ContentOS",      desc: "Estratégia, campanhas, briefings, legendas e aprovações com IA." },
-              { num: "03", Icon: Video,          color: "#e0635a", title: "RecOS",          desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
-              { num: "04", Icon: DollarSign,     color: "#10b981", title: "FinanceOS",      desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
-              { num: "05", Icon: BarChart3,      color: "#3b82f6", title: "Relatórios",     desc: "Resultados, histórico, insights e próximos passos em painel claro." },
-            ].map((step, idx, arr) => (
-              <div key={step.num}>
-                <div className="flex flex-row lg:flex-col items-center lg:items-center gap-4 lg:gap-0 p-4 lg:p-5 lg:text-center" style={{ background: S.card, border: `1px solid ${S.border}` }}>
-                  <div className="flex-shrink-0" style={{ width: "44px", height: "44px", borderRadius: "50%", background: `${step.color}18`, border: `2px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1, backgroundColor: S.card }}>
-                    <step.Icon style={{ width: "18px", height: "18px", color: step.color }} strokeWidth={1.5} />
-                  </div>
-                  <div className="lg:mt-3 flex-1">
-                    <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color, display: "block", marginBottom: ".25rem" }}>{step.num}</span>
-                    <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".2rem" }}>{step.title}</p>
-                    <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
-                  </div>
-                </div>
-                {/* Seta conectora entre steps — visível só no mobile */}
-                {idx < arr.length - 1 && (
-                  <div className="flex lg:hidden justify-center py-1" style={{ color: S.border }}>
-                    <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 0v10M1 7l5 7 5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
-                )}
-              </div>
-            ))}
+
+        {/* Orbital layout — desktop only */}
+        <div className="relative hidden lg:block" style={{ height: "600px" }}>
+          {/* Orbit ring 1 (slow, dashed) */}
+          <div className="orbit-slow" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <svg width="420" height="420" viewBox="-210 -210 420 420" style={{ overflow: "visible" }}>
+              <circle cx="0" cy="0" r="210" stroke="#7b6ef622" strokeWidth="1" fill="none" strokeDasharray="8 12" />
+              <circle cx="0" cy="-210" r="3.5" fill="#7b6ef635" />
+            </svg>
           </div>
+          {/* Orbit ring 2 (reverse, subtle) */}
+          <div className="orbit-rev" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <svg width="280" height="280" viewBox="-140 -140 280 280" style={{ overflow: "visible" }}>
+              <circle cx="0" cy="0" r="140" stroke="#7b6ef612" strokeWidth="1" fill="none" strokeDasharray="3 18" />
+            </svg>
+          </div>
+
+          {/* Central panel */}
+          <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "176px", zIndex: 2, background: `linear-gradient(160deg, ${S.card} 60%, #0d0d14)`, border: `1px solid ${S.accent}35`, padding: "1.25rem", textAlign: "center", boxShadow: `0 0 48px ${S.accent}10` }}>
+            <div style={{ ...S.mono, fontSize: ".44rem", letterSpacing: ".22em", textTransform: "uppercase", color: S.accent, marginBottom: ".55rem" }}>LOKAT OS</div>
+            <div style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, lineHeight: 1.2, marginBottom: ".65rem" }}>Plataforma<br />completa</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: ".22rem" }}>
+              {["Conteúdo", "Finanças", "Leads", "Audiovisual"].map((t) => (
+                <div key={t} style={{ ...S.grotesk, fontSize: ".6rem", color: S.muted, borderTop: `1px solid ${S.border}`, paddingTop: ".22rem" }}>{t}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Module nodes — fixed positions, text does NOT rotate */}
+          {[
+            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)" },
+            { num: "02", color: "#a855f7", title: "ContentOS",     desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
+            { num: "03", color: "#e0635a", title: "RecOS",         desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
+            { num: "04", color: "#10b981", title: "FinanceOS",     desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
+            { num: "05", color: "#3b82f6", title: "GrowthOS",      desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
+            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)" },
+          ].map((node) => (
+            <div key={node.num} style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center" }}>
+              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20` }}>
+                <span style={{ ...S.mono, fontSize: ".52rem", color: node.color, fontWeight: 700 }}>{node.num}</span>
+              </div>
+              <p style={{ ...S.grotesk, fontSize: ".75rem", fontWeight: 700, color: S.text, marginBottom: ".12rem", lineHeight: 1.2 }}>{node.title}</p>
+              <p style={{ ...S.grotesk, fontSize: ".6rem", lineHeight: 1.45, color: S.muted }}>{node.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile fallback — vertical list */}
+        <div className="lg:hidden flex flex-col gap-3">
+          {[
+            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
+            { num: "02", color: "#a855f7", title: "ContentOS",     desc: "Estratégia, campanhas, briefings e aprovações — tudo conectado." },
+            { num: "03", color: "#e0635a", title: "RecOS",         desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
+            { num: "04", color: "#10b981", title: "FinanceOS",     desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
+            { num: "05", color: "#3b82f6", title: "GrowthOS",      desc: "Leads, propostas e oportunidades comerciais em um fluxo único." },
+            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados, insights e próximos passos em painel claro." },
+          ].map((step, idx, arr) => (
+            <div key={step.num}>
+              <div className="flex flex-row items-center gap-4 p-4" style={{ background: S.card, border: `1px solid ${S.border}` }}>
+                <div style={{ flexShrink: 0, width: "40px", height: "40px", borderRadius: "50%", background: `${step.color}18`, border: `1.5px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ ...S.mono, fontSize: ".52rem", color: step.color, fontWeight: 700 }}>{step.num}</span>
+                </div>
+                <div>
+                  <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".2rem" }}>{step.title}</p>
+                  <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
+                </div>
+              </div>
+              {idx < arr.length - 1 && (
+                <div className="flex justify-center py-1" style={{ color: S.border }}>
+                  <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 0v10M1 7l5 7 5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -348,7 +391,7 @@ export default function HomePage() {
         <div className="flex items-end justify-between mb-6 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
           <div>
             <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".35rem" }}>[Módulos]</p>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>6 módulos. Um único OS.</h2>
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Tudo conectado em um único painel.</h2>
           </div>
           <a href="#contentos" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".35rem .8rem", textDecoration: "none", whiteSpace: "nowrap" }}>
             Ver destaque →
@@ -397,8 +440,8 @@ export default function HomePage() {
             <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.6rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".5rem" }}>
               Content OS
             </h2>
-            <p style={{ ...S.grotesk, color: S.muted, fontSize: "clamp(.8rem, 2.5vw, .95rem)", maxWidth: "500px", lineHeight: 1.6 }}>
-              Conteúdo, campanha, aprovação e operação no mesmo fluxo — sem planilhas, sem WhatsApp perdido.
+            <p style={{ ...S.grotesk, color: S.muted, fontSize: "clamp(.8rem, 2.5vw, .95rem)", maxWidth: "520px", lineHeight: 1.6 }}>
+              Planeje, crie, aprove e acompanhe conteúdos sem perder nada no WhatsApp. Estratégia, calendário, briefings e aprovação do cliente em um único fluxo.
             </p>
           </div>
 
