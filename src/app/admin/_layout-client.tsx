@@ -97,7 +97,8 @@ export function AdminLayoutShell({ children }: Props) {
 
         if (cancelled) return;
 
-        const teamCount = teamRes.count ?? 0;
+        // team_access_requests may not exist yet (503/404) — treat as 0
+        const teamCount = teamRes.error ? 0 : (teamRes.count ?? 0);
         const rawApprovals = approvalRes.data ?? [];
 
         // Agrupa aprovações por cliente

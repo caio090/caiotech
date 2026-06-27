@@ -7,6 +7,119 @@ import {
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
+// ── Modal Novo Cliente ─────────────────────────────────────────
+interface NewClientForm {
+  company_name: string;
+  responsible_name: string;
+  email: string;
+  phone: string;
+  segment: string;
+  status: string;
+}
+
+const SEGMENTS = [
+  "Restaurante", "Delivery", "Construção", "Materiais de construção",
+  "Clínica", "Odontologia", "Serviços", "Varejo", "Agência",
+  "Tecnologia", "Educação", "Beleza", "Fitness", "Outro",
+];
+
+function NewClientModal({ onSave, onCancel, loading }: {
+  onSave: (data: NewClientForm) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [form, setForm] = useState<NewClientForm>({
+    company_name: "", responsible_name: "", email: "",
+    phone: "", segment: "", status: "onboarding",
+  });
+  const valid = form.company_name.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center">
+            <Plus className="w-4 h-4 text-indigo-600" />
+          </div>
+          <p className="text-sm font-bold text-gray-900">Novo cliente</p>
+        </div>
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Nome da empresa <span className="text-red-500">*</span></label>
+            <input
+              value={form.company_name}
+              onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+              placeholder="Ex: Duh Lanches"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Responsável</label>
+            <input
+              value={form.responsible_name}
+              onChange={(e) => setForm((f) => ({ ...f, responsible_name: e.target.value }))}
+              placeholder="Nome do dono ou responsável"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="email@empresa.com"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">WhatsApp</label>
+              <input
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="(00) 00000-0000"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Segmento / Nicho</label>
+            <select
+              value={form.segment}
+              onChange={(e) => setForm((f) => ({ ...f, segment: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
+            >
+              <option value="">Selecione...</option>
+              {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Status inicial</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
+            >
+              <option value="onboarding">Onboarding</option>
+              <option value="active">Ativo</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={() => onSave(form)} disabled={!valid || loading} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Criar cliente
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tipos ──────────────────────────────────────────────────────
 interface Client {
   id: string;
@@ -221,9 +334,10 @@ export default function AdminClientesPage() {
   const [metaFilter,    setMetaFilter]    = useState<"todos" | "connected" | "not_connected">("todos");
   const [diagFilter,    setDiagFilter]    = useState<"todos" | "ok" | "pending">("todos");
   const [showFilters,   setShowFilters]   = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [deletingClient,setDeletingClient]= useState<Client | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [editingClient,  setEditingClient]  = useState<Client | null>(null);
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [actionLoading,  setActionLoading]  = useState(false);
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
@@ -270,6 +384,27 @@ export default function AdminClientesPage() {
     setTimeout(() => setActionMsg(null), 3000);
   };
 
+  const handleCreateClient = async (data: NewClientForm) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const created = await res.json() as Client;
+        setClients((prev) => [created, ...prev]);
+        flash(`Cliente "${created.company_name}" criado com sucesso.`);
+        setCreatingClient(false);
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        flash(err.error ?? "Erro ao criar cliente.");
+      }
+    } catch { flash("Erro de conexão."); }
+    finally { setActionLoading(false); }
+  };
+
   const handleSaveEdit = async (data: Partial<Client>) => {
     if (!editingClient) return;
     setActionLoading(true);
@@ -311,7 +446,7 @@ export default function AdminClientesPage() {
     <div>
       <PageHeader title="Clientes" description={loading ? "Carregando..." : `${filtered.length} de ${clients.length} clientes`}>
         <button
-          onClick={() => flash("Criação de clientes: disponível em breve via formulário.")}
+          onClick={() => setCreatingClient(true)}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -450,6 +585,7 @@ export default function AdminClientesPage() {
         </div>
       )}
 
+      {creatingClient && <NewClientModal onSave={handleCreateClient} onCancel={() => setCreatingClient(false)} loading={actionLoading} />}
       {editingClient  && <EditModal  client={editingClient}  onSave={handleSaveEdit} onCancel={() => setEditingClient(null)}  loading={actionLoading} />}
       {deletingClient && <DeleteModal client={deletingClient} onConfirm={handleDelete} onCancel={() => setDeletingClient(null)} loading={actionLoading} />}
     </div>

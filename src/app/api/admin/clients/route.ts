@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // GET /api/admin/clients
@@ -76,5 +76,49 @@ export async function GET() {
     return NextResponse.json({ clients: enriched, isAdmin });
   } catch {
     return NextResponse.json({ clients: [], isAdmin: false });
+  }
+}
+
+// POST /api/admin/clients — cria novo cliente
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const role = (profile as { role?: string } | null)?.role ?? "";
+    if (!["admin", "super_admin"].includes(role)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    const body = await req.json() as {
+      company_name?: string; responsible_name?: string; email?: string;
+      phone?: string; segment?: string; status?: string;
+    };
+
+    if (!body.company_name?.trim()) {
+      return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
+    }
+
+    const insert: Record<string, unknown> = {
+      company_name:     body.company_name.trim(),
+      responsible_name: body.responsible_name?.trim() ?? null,
+      email:            body.email?.trim() ?? null,
+      phone:            body.phone?.trim() ?? null,
+      segment:          body.segment?.trim() ?? null,
+      status:           ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding",
+    };
+
+    const { data, error } = await supabase
+      .from("clients")
+      .insert(insert)
+      .select("id, company_name, responsible_name, email, phone, segment, status")
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ...data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }

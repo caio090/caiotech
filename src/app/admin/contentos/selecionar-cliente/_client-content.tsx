@@ -1,6 +1,11 @@
-"use client";
+﻿"use client";
 import { useState, useEffect, useMemo } from "react";
-import { Building2, Search, Check, ArrowRight, Tag, User, ChevronLeft, ChevronRight, AtSign, Globe, Clock } from "lucide-react";
+import {
+  Building2, Search, Check, ArrowRight, Tag, User,
+  ChevronLeft, ChevronRight, AtSign, Globe, Clock,
+  UserCheck, UserX, ShoppingCart, Plus,
+} from "lucide-react";
+import Link from "next/link";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY, clearActiveClient } from "@/lib/active-client";
 import type { AdminContentosClient } from "@/lib/admin-contentos-clients";
 
@@ -21,16 +26,12 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Props) {
-  const [search,      setSearch]      = useState("");
+  const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "active" | "onboarding" | "inactive">("todos");
-  const [selectedId,  setSelectedId]  = useState<string>("");
-  const [page,        setPage]        = useState(1);
+  const [selectedId,   setSelectedId]   = useState<string>("");
+  const [page,         setPage]         = useState(1);
 
-  useEffect(() => {
-    clearActiveClient();
-  }, []);
-
-  // Reset page on filter change
+  useEffect(() => { clearActiveClient(); }, []);
   useEffect(() => { setPage(1); }, [search, statusFilter]);
 
   const filtered = useMemo(() => {
@@ -39,7 +40,10 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
         (c.company_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (c.responsible_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (c.segment ?? "").toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === "todos" || c.status === statusFilter || (statusFilter === "active" && c.status === "onboarding");
+      const matchesStatus =
+        statusFilter === "todos" ||
+        c.status === statusFilter ||
+        (statusFilter === "active" && c.status === "onboarding");
       return matchesSearch && matchesStatus;
     });
   }, [clients, search, statusFilter]);
@@ -56,7 +60,6 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
   }
 
   function statusColor(status: string | null) {
-    if (status === "active")     return "text-emerald-600 bg-emerald-50";
     if (status === "onboarding") return "text-blue-600 bg-blue-50";
     if (status === "inactive")   return "text-gray-400 bg-gray-50";
     if (status === "paused")     return "text-amber-600 bg-amber-50";
@@ -89,7 +92,6 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
         </div>
       ) : (
         <>
-          {/* Busca */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -101,16 +103,13 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
             />
           </div>
 
-          {/* Filtro de status */}
           <div className="flex gap-2 mb-5 flex-wrap">
-            {(["todos", "active", "onboarding", "inactive"] as const).map((s) => (
+            {(["todos", "active", "onboarding"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  statusFilter === s
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  statusFilter === s ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
               >
                 {s === "todos" ? "Todos" : STATUS_LABELS[s] ?? s}
@@ -128,16 +127,38 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
           {paginated.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 mb-6">
               <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-200" />
-              <p className="text-sm text-gray-400">
+              <p className="text-sm font-semibold text-gray-700 mb-1">
                 {search || statusFilter !== "todos"
                   ? "Nenhum cliente encontrado com esses filtros."
-                  : "Nenhum cliente real cadastrado ainda."}
+                  : "Nenhum cliente ativo cadastrado."}
               </p>
-              {!search && statusFilter === "todos" && (
-                <p className="text-xs text-gray-300 mt-1">
-                  Clientes precisam ter conta com role=cliente no sistema.
-                </p>
-              )}
+              <p className="text-xs text-gray-400 mb-4">
+                {search || statusFilter !== "todos"
+                  ? "Tente ajustar os filtros ou a busca."
+                  : "Adicione um cliente para começar a usar o ContentOS."}
+              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {(search || statusFilter !== "todos") && (
+                  <button
+                    onClick={() => { setSearch(""); setStatusFilter("todos"); }}
+                    className="text-xs text-purple-600 hover:underline"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+                <Link
+                  href="/admin/clientes"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 px-3 py-1.5 rounded-xl hover:bg-indigo-700 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />Adicionar cliente
+                </Link>
+                <Link
+                  href="/admin/clientes"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Ver clientes
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-2 mb-4">
@@ -171,6 +192,11 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                           <Tag className="w-3 h-3" />{c.segment}
                         </span>
                       )}
+                      {c.status === "onboarding" && (
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusColor(c.status)}`}>
+                          {STATUS_LABELS[c.status]}
+                        </span>
+                      )}
                       {c.has_meta && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-indigo-700 bg-indigo-50">
                           <Globe className="w-2.5 h-2.5" />Meta
@@ -181,14 +207,23 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
                           <AtSign className="w-2.5 h-2.5" />IG
                         </span>
                       )}
-                      {c.has_brief === false && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-amber-700 bg-amber-50">
-                          <Clock className="w-2.5 h-2.5" />Brief pendente
+                      {c.has_olaclick && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-emerald-700 bg-emerald-50">
+                          <ShoppingCart className="w-2.5 h-2.5" />Cardápio
                         </span>
                       )}
-                      {c.status && c.status !== "active" && (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusColor(c.status)}`}>
-                          {STATUS_LABELS[c.status] ?? c.status}
+                      {c.has_user ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-teal-700 bg-teal-50">
+                          <UserCheck className="w-2.5 h-2.5" />Acesso criado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-gray-500 bg-gray-100">
+                          <UserX className="w-2.5 h-2.5" />Sem acesso
+                        </span>
+                      )}
+                      {!c.has_brief && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-amber-700 bg-amber-50">
+                          <Clock className="w-2.5 h-2.5" />Brief pendente
                         </span>
                       )}
                     </div>
@@ -201,7 +236,6 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
             </div>
           )}
 
-          {/* Paginação */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mb-4">
               <button
