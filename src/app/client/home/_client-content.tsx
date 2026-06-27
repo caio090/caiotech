@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import type { ServerPageData, DbClient, DbOnboardingProfile } from "@/lib/supabase/types";
+import { WelcomeTourModal } from "@/components/welcome-tour-modal";
 
 const objetivoLabel: Record<string, string> = {
   vender:      "Vender mais",
@@ -129,6 +130,7 @@ export function ClientHomeContent({ serverData }: Props) {
 
   return (
     <div>
+      <WelcomeTourModal accountType={useMock ? "business_owner" : "invited_client"} />
       <WelcomeBanner />
 
       {/* Badge de origem dos dados */}

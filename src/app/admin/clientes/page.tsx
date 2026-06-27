@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import {
   Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
   Edit2, Trash2, Loader2, Building2, User, Tag, Filter,
+  Mail, Copy, ExternalLink,
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -160,6 +161,108 @@ function ClientBadges({ c }: { c: Client }) {
   );
 }
 
+// ── Modal Convite ─────────────────────────────────────────────
+function InviteModal({ client, onClose }: { client: Client; onClose: () => void }) {
+  const [email,   setEmail]   = useState(client.email ?? "");
+  const [loading, setLoading] = useState(false);
+  const [link,    setLink]    = useState<string | null>(null);
+  const [error,   setError]   = useState("");
+  const [copied,  setCopied]  = useState(false);
+
+  async function handleGenerate() {
+    if (!email.trim()) { setError("Informe o e-mail do cliente."); return; }
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { link: string };
+        setLink(data.link);
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        setError(err.error ?? "Erro ao gerar convite.");
+      }
+    } catch { setError("Erro de conexão."); }
+    finally { setLoading(false); }
+  }
+
+  function handleCopy() {
+    if (!link) return;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center">
+            <Mail className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Convidar cliente</p>
+            <p className="text-xs text-gray-400 truncate max-w-[220px]">{client.company_name}</p>
+          </div>
+        </div>
+
+        {!link ? (
+          <>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-700 mb-1">E-mail do cliente</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="cliente@empresa.com"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">O cliente usará este e-mail para criar a senha de acesso.</p>
+            </div>
+            {error && (
+              <p className="text-xs text-red-600 mb-3 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" /> {error}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleGenerate} disabled={loading} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Gerar link
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+              <p className="text-xs font-semibold text-emerald-700 mb-2">Link de convite gerado!</p>
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <span className="text-xs text-gray-600 flex-1 truncate">{link}</span>
+                <button onClick={handleCopy} title="Copiar" className="text-gray-400 hover:text-indigo-600">
+                  {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <a href={link} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-indigo-600">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2">Válido por 7 dias. Envie este link para {email}.</p>
+            </div>
+            <button onClick={onClose} className="w-full py-2.5 bg-gray-100 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+              Fechar
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Modal Excluir ──────────────────────────────────────────────
 function DeleteModal({
   client, onConfirm, onCancel, loading,
@@ -278,7 +381,7 @@ function EditModal({
 }
 
 // ── Card de cliente ────────────────────────────────────────────
-function ClientCard({ c, onEdit, onDelete, isAdmin }: { c: Client; onEdit: (c: Client) => void; onDelete: (c: Client) => void; isAdmin: boolean }) {
+function ClientCard({ c, onEdit, onDelete, onInvite, isAdmin }: { c: Client; onEdit: (c: Client) => void; onDelete: (c: Client) => void; onInvite: (c: Client) => void; isAdmin: boolean }) {
   const initials = (c.company_name ?? c.responsible_name ?? "?")
     .split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 
@@ -294,6 +397,9 @@ function ClientCard({ c, onEdit, onDelete, isAdmin }: { c: Client; onEdit: (c: C
           <ClientBadges c={c} />
         </div>
         <div className="flex gap-1 flex-shrink-0">
+          <button onClick={() => onInvite(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Convidar cliente">
+            <Mail className="w-3.5 h-3.5" />
+          </button>
           <button onClick={() => onEdit(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Editar">
             <Edit2 className="w-3.5 h-3.5" />
           </button>
@@ -337,6 +443,7 @@ export default function AdminClientesPage() {
   const [editingClient,  setEditingClient]  = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [creatingClient, setCreatingClient] = useState(false);
+  const [invitingClient, setInvitingClient] = useState<Client | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
 
   const fetchClients = useCallback(async () => {
@@ -572,7 +679,7 @@ export default function AdminClientesPage() {
       {!loading && filtered.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((c) => (
-            <ClientCard key={c.id} c={c} isAdmin={isAdmin} onEdit={setEditingClient} onDelete={setDeletingClient} />
+            <ClientCard key={c.id} c={c} isAdmin={isAdmin} onEdit={setEditingClient} onDelete={setDeletingClient} onInvite={setInvitingClient} />
           ))}
         </div>
       )}
@@ -586,6 +693,7 @@ export default function AdminClientesPage() {
       )}
 
       {creatingClient && <NewClientModal onSave={handleCreateClient} onCancel={() => setCreatingClient(false)} loading={actionLoading} />}
+      {invitingClient && <InviteModal client={invitingClient} onClose={() => setInvitingClient(null)} />}
       {editingClient  && <EditModal  client={editingClient}  onSave={handleSaveEdit} onCancel={() => setEditingClient(null)}  loading={actionLoading} />}
       {deletingClient && <DeleteModal client={deletingClient} onConfirm={handleDelete} onCancel={() => setDeletingClient(null)} loading={actionLoading} />}
     </div>
