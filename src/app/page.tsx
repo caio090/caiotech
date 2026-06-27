@@ -340,14 +340,14 @@ export default function HomePage() {
 
           {/* Module nodes — fixed positions, text does NOT rotate */}
           {[
-            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)", delay: "0ms" },
-            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)", delay: "80ms" },
-            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)", delay: "160ms" },
-            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)", delay: "240ms" },
-            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)", delay: "320ms" },
-            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)", delay: "400ms" },
+            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)" },
+            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
+            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
+            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
+            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
+            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)" },
           ].map((node) => (
-            <div key={node.num} className="reveal-fade" style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center", animationDelay: node.delay }}>
+            <div key={node.num} style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center" }}>
               <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20`, transition: "box-shadow .25s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 32px ${node.color}55`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 18px ${node.color}20`; }}
