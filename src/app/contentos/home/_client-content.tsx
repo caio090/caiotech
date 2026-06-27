@@ -14,6 +14,7 @@ import {
 import { useCanvaStore, CanvaConfig } from "@/lib/canva-store";
 import { mockContents, mockApprovals, mockCalendarEvents } from "@/data/mock-data";
 import { Sparkles, CheckSquare, Calendar, BarChart3, ArrowRight, Bell, Clock, X, Loader2, Palette, Camera, Smartphone, Folder, CheckCircle2, Target, MessageCircle, Star } from "lucide-react";
+import { SaudeEmpresaCards } from "@/components/saude-empresa-cards";
 import Link from "next/link";
 import type { DbOnboardingProfile, DbContentItem, DbApprovalWithContent } from "@/lib/supabase/types";
 import { dbStatusToUi, contentTypeEmoji } from "@/lib/supabase/types";
@@ -446,6 +447,9 @@ interface Props {
   userRole?: string;
   isSupabaseActive?: boolean;
   companyName?: string | null;
+  metaAsset?: { page_name: string | null; instagram_username: string | null } | null;
+  clientId?: string | null;
+  hasOlaClick?: boolean;
 }
 
 export function ContentOSHomeContent({
@@ -455,6 +459,9 @@ export function ContentOSHomeContent({
   userRole = "",
   isSupabaseActive = false,
   companyName = null,
+  metaAsset = null,
+  clientId = null,
+  hasOlaClick = false,
 }: Props) {
   const [scheduleItem,          setScheduleItem]          = useState<DbContentItem | null>(null);
   const [scheduledIds,          setScheduledIds]          = useState<Set<string>>(new Set());
@@ -574,25 +581,135 @@ export function ContentOSHomeContent({
         </div>
       </div>
 
-      {/* Integration chips */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        <Link href="/contentos/canva" className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border ${chip.cls}`}>
-          <Palette className="w-3.5 h-3.5" strokeWidth={1.5} />{chip.label}
-        </Link>
-        <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border ${instagram ? "text-pink-700 bg-pink-50 border-pink-100" : "text-gray-500 bg-gray-50 border-gray-100"}`}>
-          <Camera className="w-3.5 h-3.5" strokeWidth={1.5} />Instagram · {instagram || "Não configurado"}
-        </div>
-        {(serverOnboarding?.uses_meta_business ?? data.operacao?.usaMeta) && (
-          <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border text-blue-700 bg-blue-50 border-blue-100">
-            <Smartphone className="w-3.5 h-3.5" strokeWidth={1.5} />Meta Business · Ativo
+      {/* Canais conectados */}
+      <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">Canais conectados</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {/* Instagram */}
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${instagram ? "border-pink-100 bg-pink-50" : "border-gray-100 bg-gray-50"}`}>
+            <Camera className={`w-3.5 h-3.5 flex-shrink-0 ${instagram ? "text-pink-500" : "text-gray-300"}`} strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className={`text-[10px] font-bold ${instagram ? "text-pink-700" : "text-gray-400"}`}>Instagram</p>
+              <p className="text-[10px] text-gray-500 truncate">{instagram ? `@${instagram}` : (metaAsset?.instagram_username ? `@${metaAsset.instagram_username}` : "Não configurado")}</p>
+            </div>
           </div>
-        )}
-        {(serverOnboarding?.uses_drive ?? data.operacao?.usaDrive) && (
-          <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border text-emerald-700 bg-emerald-50 border-emerald-100">
-            <Folder className="w-3.5 h-3.5" strokeWidth={1.5} />Drive · Conectado
+
+          {/* Página Facebook */}
+          {isAdmin && isSupabaseActive ? (
+            metaAsset?.page_name ? (
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+                <Smartphone className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" strokeWidth={1.5} />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-indigo-700">Página Facebook</p>
+                  <p className="text-[10px] text-indigo-600 truncate">{metaAsset.page_name}</p>
+                </div>
+              </div>
+            ) : (
+              <Link href="/admin/conexoes" className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-gray-100 transition-colors">
+                <Smartphone className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-gray-400">Página Facebook</p>
+                  <p className="text-[10px] text-indigo-500">Vincular →</p>
+                </div>
+              </Link>
+            )
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+              <Smartphone className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-gray-400">Página Facebook</p>
+                <p className="text-[10px] text-gray-400">{(serverOnboarding?.uses_meta_business ?? data.operacao?.usaMeta) ? "Ativo" : "Não vinculada"}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Canva */}
+          <Link href="/contentos/canva" className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors hover:opacity-80 ${chip.cls}`}>
+            <Palette className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold truncate">{chip.label.split("·")[0]?.trim()}</p>
+              <p className="text-[10px] opacity-70 truncate">{chip.label.split("·")[1]?.trim() ?? "Configurar"}</p>
+            </div>
+          </Link>
+
+          {/* Insights Meta */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+            <BarChart3 className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-gray-400">Insights Meta</p>
+              <p className="text-[10px] text-gray-400">Em breve</p>
+            </div>
+          </div>
+
+          {/* Publicação automática */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+            <Star className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-gray-400">Publicação auto.</p>
+              <p className="text-[10px] text-gray-400">Em breve</p>
+            </div>
+          </div>
+
+          {/* Anúncios */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+            <Target className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-gray-400">Anúncios</p>
+              <p className="text-[10px] text-gray-400">Em breve</p>
+            </div>
+          </div>
+        </div>
+
+        {/* OlaClick badges */}
+        {hasOlaClick && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Cardápio Digital conectado
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Dados de pedidos disponíveis
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 rounded-full px-2.5 py-1">
+              <Sparkles className="w-3 h-3" />
+              Pode gerar ideias com base em vendas
+            </span>
           </div>
         )}
       </div>
+
+      {/* Saúde da empresa */}
+      {isSupabaseActive && (
+        <SaudeEmpresaCards
+          hasOnboarding={!!serverOnboarding}
+          metaConnected={!!(metaAsset?.page_name || metaAsset?.instagram_username)}
+          hasOlaClick={hasOlaClick}
+          clientId={clientId}
+          isAdmin={isAdmin}
+          companyName={brandName}
+        />
+      )}
+
+      {/* Base estratégica (resumo compacto) */}
+      {isAdmin && isSupabaseActive && serverOnboarding && (
+        <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black text-purple-400 uppercase tracking-wider">Base Estratégica</p>
+            <Link href={`/admin/contentos/base-estrategica?client=${clientId ?? ""}`} className="text-[10px] font-bold text-purple-600 hover:text-purple-800 transition-colors">Ver completa →</Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {brandSeg && <span className="text-[10px] font-medium bg-white/70 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-full">{brandSeg}</span>}
+            {principal && <span className="text-[10px] font-medium bg-white/70 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full">{objetivoMeta[principal]?.label ?? principal}</span>}
+            {tomFinal.slice(0,2).map((t) => (
+              <span key={t} className="text-[10px] font-medium bg-white/70 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full">{tomMeta[t] ?? t}</span>
+            ))}
+            {redes.slice(0,3).map((r) => (
+              <span key={r} className="text-[10px] font-medium bg-white/70 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">{r}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

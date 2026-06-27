@@ -4,9 +4,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosSubNav } from "../_contentos-subnav";
 import { PageHeader } from "@/components/page-header";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, TrendingUp, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
+import { SaudeEmpresaCards } from "@/components/saude-empresa-cards";
 
 export default async function AdminContentosBaseEstrategicaPage({
   searchParams,
@@ -22,6 +24,8 @@ export default async function AdminContentosBaseEstrategicaPage({
   let onboarding: Record<string, string | string[] | null> | null = null;
   let clientInfo: { segment?: string | null; city?: string | null } | null = null;
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let metaConnected = false;
+  let hasOlaClick   = false;
 
   if (isSupabaseConfigured) {
     const valid = await validateContentOSClient(clientId);
@@ -30,23 +34,17 @@ export default async function AdminContentosBaseEstrategicaPage({
 
     try {
       const supabase = await createServerSupabaseClient();
-      const { data: onb } = await supabase
-        .from("onboarding_profiles")
-        .select("*")
-        .eq("client_id", clientId)
-        .maybeSingle();
-
-      if (onb) {
-        onboarding = onb as Record<string, string | string[] | null>;
-      }
-
-      const { data: client } = await supabase
-        .from("clients")
-        .select("segment, city")
-        .eq("id", clientId)
-        .maybeSingle();
-      clientInfo = client;
-      suggestions = await getContentOSSuggestions(supabase, clientId);
+      const [onbRes, clientRes, metaRes, olaRes] = await Promise.all([
+        supabase.from("onboarding_profiles").select("*").eq("client_id", clientId).maybeSingle(),
+        supabase.from("clients").select("segment, city").eq("id", clientId).maybeSingle(),
+        supabase.from("client_meta_assets").select("id").eq("client_id", clientId).limit(1).maybeSingle(),
+        supabase.from("olaclick_connections").select("id").eq("client_id", clientId).eq("status", "connected").limit(1).maybeSingle(),
+      ]);
+      if (onbRes.data) onboarding = onbRes.data as Record<string, string | string[] | null>;
+      clientInfo    = clientRes.data;
+      metaConnected = !!(metaRes.data && !metaRes.error);
+      hasOlaClick   = !!(olaRes.data && !olaRes.error);
+      suggestions   = await getContentOSSuggestions(supabase, clientId);
     } catch {}
   }
 
@@ -93,6 +91,15 @@ export default async function AdminContentosBaseEstrategicaPage({
           </div>
         </div>
       )}
+
+      <SaudeEmpresaCards
+        hasOnboarding={hasData}
+        metaConnected={metaConnected}
+        hasOlaClick={hasOlaClick}
+        clientId={clientId}
+        isAdmin
+        companyName={brand || companyName}
+      />
 
       <div className="grid lg:grid-cols-2 gap-5">
 
@@ -145,6 +152,36 @@ export default async function AdminContentosBaseEstrategicaPage({
                 )) ?? <span className="text-xs text-gray-300">Não definido</span>}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Radar e oportunidades */}
+        <div className="lg:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" strokeWidth={1.5} />
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Radar e oportunidades</p>
+            </div>
+            <Link
+              href={`/admin/contentos/radar?client=${clientId}`}
+              className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 transition-colors"
+            >
+              Ver Radar de Tendências <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { emoji: "📅", label: "Datas sazonais", desc: "Próximas datas relevantes para conteúdo" },
+              { emoji: "📣", label: "Mudanças de plataforma", desc: "Algoritmos, formatos e novidades das redes" },
+              { emoji: "💡", label: "Oportunidades de conteúdo", desc: "Ideias por nicho e momento de mercado" },
+              { emoji: "🔥", label: "Tendências relevantes", desc: "Temas em alta no segmento do cliente" },
+            ].map((d) => (
+              <div key={d.label} className="bg-white/70 rounded-xl border border-emerald-100 px-3 py-2.5">
+                <p className="text-base mb-1">{d.emoji}</p>
+                <p className="text-xs font-bold text-gray-800">{d.label}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{d.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
 
