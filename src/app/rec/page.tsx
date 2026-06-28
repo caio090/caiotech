@@ -380,7 +380,7 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
             <div style={{ marginTop: ".75rem", display: "flex", alignItems: "center", gap: ".6rem" }}>
               <div style={{ width: "6px", height: "6px", background: R.red, borderRadius: "50%", flexShrink: 0 }} />
               <span style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>
-                Sandubão · Hamburgueria · Fortaleza — CE
+                Sandubão · Hamburgueria · Floriano — PI
               </span>
             </div>
           </div>
