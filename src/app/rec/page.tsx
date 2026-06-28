@@ -39,12 +39,13 @@ function mkv(id: string, title: string, file: string, category: string, order: n
 
 // Filenames exatos do bucket rec-videos no Supabase Storage
 const STATIC_VIDEOS: RecVideo[] = [
-  mkv("s1", "Sandubão Vol. 1",   "duhlanche1.mp4",            "campanha", 0),
-  mkv("s2", "Sandubão Vol. 2",   "duhlache2.mp4",             "campanha", 1),
-  mkv("s3", "Sandubão Vol. 3",   "duhlanche3.mp4",            "campanha", 2),
-  mkv("s4", "Sandubão Vol. 4",   "duhlanche4.mp4",            "campanha", 3),
-  mkv("s5", "Sandubão Vol. 5",   "dulanche5.mp4",             "campanha", 4),
-  mkv("s6", "VT HP",             "VT HP II 30 SEG V2.mp4",   "institucional", 5),
+  mkv("s0", "Dia dos Solteiros", "duh-dia-solteiro.mp4",      "campanha", 0),
+  mkv("s1", "Sandubão Vol. 1",   "duhlanche1.mp4",            "campanha", 1),
+  mkv("s2", "Sandubão Vol. 2",   "duhlache2.mp4",             "campanha", 2),
+  mkv("s3", "Sandubão Vol. 3",   "duhlanche3.mp4",            "campanha", 3),
+  mkv("s4", "Sandubão Vol. 4",   "duhlanche4.mp4",            "campanha", 4),
+  mkv("s5", "Sandubão Vol. 5",   "dulanche5.mp4",             "campanha", 5),
+  mkv("s6", "VT HP",             "VT HP II 30 SEG V2.mp4",   "institucional", 6),
 ];
 
 const STATIC_FEEDBACK: RecVideo = {
