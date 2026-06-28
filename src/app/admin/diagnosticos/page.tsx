@@ -2,11 +2,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Sparkles, BarChart3, CheckCircle2, Clock, AlertCircle, Link2,
-  FileText, RefreshCw, Trash2, Info, ExternalLink,
+  FileText, RefreshCw, Trash2, Info, ExternalLink, TrendingUp, Flame, Thermometer, Snowflake, MessageSquare, X,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { buildWhatsappUrl } from "@/lib/marketing-diagnostic";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type StatusKey = "completo" | "parcial" | "pendente" | "aguardando_conexao" | "aguardando_leitura";
@@ -220,6 +221,115 @@ function DiagCard({ d, onRemoveDemo }: { d: ClientDiag; onRemoveDemo?: () => voi
   );
 }
 
+// ── Marketing Diagnostics (funil público) ─────────────────────────────────────
+interface MktDiag {
+  id: string;
+  created_at: string;
+  full_name: string;
+  company_name: string;
+  instagram: string | null;
+  whatsapp: string;
+  best_contact_time: string | null;
+  business_type: string;
+  marketing_responsible: string | null;
+  main_problem: string;
+  lead_score: number;
+  lead_temperature: string;
+  offer_suggestion: string | null;
+  advice: string | null;
+  status: string;
+}
+
+const TEMP_ICON: Record<string, { icon: typeof Flame; color: string }> = {
+  quente: { icon: Flame,       color: "text-red-500"   },
+  morno:  { icon: Thermometer, color: "text-amber-500" },
+  frio:   { icon: Snowflake,   color: "text-blue-400"  },
+};
+
+function MktDiagModal({ d, onClose }: { d: MktDiag; onClose: () => void }) {
+  const temp = TEMP_ICON[d.lead_temperature] ?? TEMP_ICON.morno;
+  const TempIcon = temp.icon;
+  const waMsg = `Olá, ${d.full_name}. Aqui é da Lokat. Recebemos o diagnóstico da ${d.company_name} e vi que o principal ponto hoje é ${d.main_problem}. Podemos te mostrar os próximos passos?`;
+  const waUrl = buildWhatsappUrl(d.whatsapp, waMsg);
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl border border-gray-100 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-gray-900">{d.full_name}</h3>
+            <p className="text-xs text-gray-400">{d.company_name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              ["WhatsApp", d.whatsapp],
+              ["Instagram", d.instagram ?? "—"],
+              ["Tipo de negócio", d.business_type],
+              ["Responsável pelo mkt", d.marketing_responsible ?? "—"],
+              ["Problema principal", d.main_problem],
+              ["Melhor horário", d.best_contact_time ?? "—"],
+              ["Data", new Date(d.created_at).toLocaleDateString("pt-BR")],
+              ["Status", d.status],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{k}</p>
+                <p className="text-xs text-gray-700">{v}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <TempIcon className={`w-3.5 h-3.5 ${temp.color}`} />
+              <span className="text-xs font-bold text-gray-700">Score {d.lead_score} · Lead {d.lead_temperature}</span>
+            </div>
+            {d.offer_suggestion && <p className="text-xs text-purple-800 font-medium">{d.offer_suggestion}</p>}
+            {d.advice && <p className="text-[11px] text-purple-600">{d.advice}</p>}
+          </div>
+
+          <a href={waUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors">
+            <MessageSquare className="w-4 h-4" /> Chamar no WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MktDiagRow({ d, onSelect }: { d: MktDiag; onSelect: () => void }) {
+  const temp = TEMP_ICON[d.lead_temperature] ?? TEMP_ICON.morno;
+  const TempIcon = temp.icon;
+  return (
+    <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={onSelect}>
+      <td className="py-3 px-4">
+        <p className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">{d.full_name}</p>
+        <p className="text-[11px] text-gray-400 truncate max-w-[140px]">{d.company_name}</p>
+      </td>
+      <td className="py-3 px-4 text-xs text-gray-500 hidden sm:table-cell">{d.business_type}</td>
+      <td className="py-3 px-4 text-xs text-gray-500 hidden md:table-cell">{d.main_problem}</td>
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-1">
+          <TempIcon className={`w-3.5 h-3.5 ${temp.color}`} />
+          <span className="text-xs font-semibold capitalize text-gray-700">{d.lead_temperature}</span>
+        </div>
+      </td>
+      <td className="py-3 px-4 text-[11px] text-gray-400 hidden lg:table-cell">
+        {new Date(d.created_at).toLocaleDateString("pt-BR")}
+      </td>
+      <td className="py-3 px-4">
+        <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full",
+          d.status === "new" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-gray-100 text-gray-500")}>
+          {d.status === "new" ? "Novo" : d.status}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 const DEMO_HIDDEN_KEY = "lokat_diag_demo_hidden";
 
@@ -241,6 +351,10 @@ export default function AdminDiagnosticosPage() {
   const [clients,     setClients]     = useState<ClientDiag[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [showDemo,    setShowDemo]    = useState(false);
+  const [activeTab,   setActiveTab]   = useState<"clientes" | "marketing">("clientes");
+  const [mktDiags,    setMktDiags]    = useState<MktDiag[]>([]);
+  const [mktLoading,  setMktLoading]  = useState(false);
+  const [mktSelected, setMktSelected] = useState<MktDiag | null>(null);
 
   // Demo pode ser ocultado pelo admin
   useEffect(() => {
@@ -322,24 +436,127 @@ export default function AdminDiagnosticosPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const loadMkt = useCallback(async () => {
+    setMktLoading(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("marketing_diagnostics")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      setMktDiags((data as MktDiag[]) ?? []);
+    } catch {
+      setMktDiags([]);
+    } finally {
+      setMktLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "marketing" && mktDiags.length === 0) void loadMkt();
+  }, [activeTab, mktDiags.length, loadMkt]);
+
   // Separa clientes com diagnóstico dos sem
   const withDiag    = clients.filter((c) => c.score !== null);
   const withoutDiag = clients.filter((c) => c.score === null);
 
   return (
     <div>
+      {mktSelected && <MktDiagModal d={mktSelected} onClose={() => setMktSelected(null)} />}
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Diagnósticos</h1>
           <p className="text-sm text-gray-400 mt-0.5">Saúde digital e comercial por cliente — dados reais</p>
         </div>
-        <button onClick={() => void load()} disabled={loading} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors disabled:opacity-40">
-          <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+        <button
+          onClick={() => activeTab === "clientes" ? void load() : void loadMkt()}
+          disabled={loading || mktLoading}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors disabled:opacity-40"
+        >
+          <RefreshCw className={cn("w-3.5 h-3.5", (loading || mktLoading) && "animate-spin")} />
           Atualizar
         </button>
       </div>
 
+      {/* Abas */}
+      <div className="flex gap-1 mb-6 border-b border-gray-100 pb-0">
+        {([
+          { key: "clientes", label: "Diagnóstico de Clientes", icon: Sparkles },
+          { key: "marketing", label: "Marketing Local", icon: TrendingUp },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setActiveTab(key)}
+            className={cn("flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px",
+              activeTab === key ? "border-indigo-500 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600")}>
+            <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {label}
+            {key === "marketing" && mktDiags.length > 0 && (
+              <span className="ml-1 bg-red-100 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{mktDiags.filter(d => d.status === "new").length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── ABA MARKETING LOCAL ──────────────────────────────────── */}
+      {activeTab === "marketing" && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs font-bold text-gray-600">{mktDiags.length} diagnóstico{mktDiags.length !== 1 ? "s" : ""} recebido{mktDiags.length !== 1 ? "s" : ""}</p>
+              <p className="text-[11px] text-gray-400">Funil público /diagnostico-marketing</p>
+            </div>
+            <a href="/diagnostico-marketing" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+              Ver página pública <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          {mktLoading && (
+            <div className="flex items-center justify-center py-16 text-gray-400 text-sm">
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Carregando…
+            </div>
+          )}
+
+          {!mktLoading && mktDiags.length === 0 && (
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
+              <TrendingUp className="w-8 h-8 text-gray-300 mx-auto mb-3" strokeWidth={1.5} />
+              <p className="text-sm font-semibold text-gray-500 mb-1">Nenhum diagnóstico ainda</p>
+              <p className="text-xs text-gray-400">Quando alguém preencher o funil em /diagnostico-marketing, aparecerá aqui.</p>
+            </div>
+          )}
+
+          {!mktLoading && mktDiags.length > 0 && (
+            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {["Lead", "Segmento", "Problema", "Temperatura", "Data", "Status"].map((h) => (
+                      <th key={h} className={cn("text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider",
+                        h === "Segmento" && "hidden sm:table-cell",
+                        h === "Problema" && "hidden md:table-cell",
+                        h === "Data" && "hidden lg:table-cell",
+                      )}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {mktDiags.map((d) => (
+                    <MktDiagRow key={d.id} d={d} onSelect={() => setMktSelected(d)} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ABA CLIENTES ────────────────────────────────────────── */}
+      {activeTab === "clientes" && (
+      <div>
       {/* Explicação do sistema */}
       <div className="grid sm:grid-cols-2 gap-4 mb-6 p-5 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl">
         <div>
@@ -440,6 +657,8 @@ export default function AdminDiagnosticosPage() {
             </p>
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   );
