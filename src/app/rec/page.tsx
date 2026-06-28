@@ -22,11 +22,26 @@ const R = {
 
 const CAIS = "/rec/cais-floriano.jpg";
 
-// ── Fallback vazio se banco não existir ───────────────────────────────────────
-const FALLBACK_VIDEOS: RecVideo[] = [
-  { id: "f1", title: "Portfólio em breve",   client_name: "LOKAT.REC", category: "campanha",     video_url: "", storage_path: null, thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 0, status: "active", description: null, created_at: "" },
-  { id: "f2", title: "Trabalhos carregando", client_name: "LOKAT.REC", category: "institucional",video_url: "", storage_path: null, thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 1, status: "active", description: null, created_at: "" },
+// URL base do bucket Supabase — preenchida automaticamente pelo env var
+const SUPABASE_REC_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/rec-videos`
+  : "";
+
+// Vídeos estáticos — usados enquanto a tabela rec_videos não existir no banco.
+// Substitua os filenames pelos caminhos reais do bucket Supabase Storage.
+const STATIC_VIDEOS: RecVideo[] = [
+  { id: "s1", title: "Dia dos Solteiros",   client_name: "Sandubão",  category: "campanha",      video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-dia-solteiro.mp4`   : "", storage_path: "duh-dia-solteiro.mp4",   thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 0, status: "active", description: null, created_at: "" },
+  { id: "s2", title: "Checklist Copa",      client_name: "Sandubão",  category: "campanha",      video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-checklist-copa.mp4`  : "", storage_path: "duh-checklist-copa.mp4",  thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 1, status: "active", description: null, created_at: "" },
+  { id: "s3", title: "Gosta de Suco?",      client_name: "Sandubão",  category: "produto",       video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-gosta-suco.mp4`     : "", storage_path: "duh-gosta-suco.mp4",     thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 2, status: "active", description: null, created_at: "" },
 ];
+
+const STATIC_FEEDBACK: RecVideo = {
+  id: "fb1", title: "Depoimento Sandubão", client_name: "Sandubão", category: "feedback",
+  video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/feedback-duh.mp4` : "",
+  storage_path: "feedback-duh.mp4", thumbnail_url: null,
+  is_public: true, is_featured: true, is_feedback: true, show_in_cards: false,
+  sort_order: 999, status: "active", description: null, created_at: "",
+};
 
 function caisOverlay(dir: "hero" | "qs" | "contato" = "hero", pos = "center 55%"): React.CSSProperties {
   const overlays = {
@@ -247,7 +262,7 @@ function PortfolioCard({ video, position, onActivate, onOpen }: {
           )}
           {isActive && !video.video_url && (
             <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", color: `${R.muted}70`, marginTop: ".35rem" }}>
-              vídeo em breve
+              vídeo indisponível
             </p>
           )}
         </div>
@@ -343,7 +358,7 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
               ) : (
                 <div style={{ width: "100%", aspectRatio: "9/16", background: "#14100a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: ".75rem" }}>
                   <Video style={{ width: "32px", height: "32px", color: R.muted, opacity: 0.4 }} strokeWidth={1} />
-                  <p style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, opacity: 0.6 }}>Depoimento em breve</p>
+                  <p style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, opacity: 0.6 }}>Vídeo indisponível</p>
                 </div>
               )}
               <div style={{ position: "absolute", top: ".75rem", left: ".75rem", width: "14px", height: "14px", borderTop: `1px solid ${R.red}55`, borderLeft: `1px solid ${R.red}55`, pointerEvents: "none" }} />
@@ -386,6 +401,54 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
   );
 }
 
+// ── Formulário de contato — envia via WhatsApp ────────────────────────────────
+function ContactForm() {
+  const [nome,    setNome]    = useState("");
+  const [email,   setEmail]   = useState("");
+  const [wpp,     setWpp]     = useState("");
+  const [msg,     setMsg]     = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const texto = [
+      `Olá, sou ${nome || "alguém"} e tenho um projeto para a LOKAT.REC.`,
+      email   ? `E-mail: ${email}` : "",
+      wpp     ? `WhatsApp: ${wpp}` : "",
+      msg     ? `Sobre a gravação: ${msg}` : "",
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/5589994217181?text=${encodeURIComponent(texto)}`, "_blank");
+  };
+
+  const fieldStyle: React.CSSProperties = { width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", transition: "border-color .2s" };
+  const focus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = R.red);
+  const blur  = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = R.border);
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: ".75rem", background: "rgba(10,8,6,0.75)", padding: "2rem", backdropFilter: "blur(12px)", border: `1px solid ${R.border}` }}>
+      {[
+        { label: "Nome / Empresa", ph: "Sua marca",              type: "text",  val: nome,  set: setNome },
+        { label: "E-mail",         ph: "contato@suamarca.com.br", type: "email", val: email, set: setEmail },
+        { label: "WhatsApp",       ph: "(89) 9 0000-0000",        type: "tel",   val: wpp,   set: setWpp },
+      ].map(({ label, ph, type, val, set }) => (
+        <div key={label}>
+          <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>{label}</label>
+          <input type={type} placeholder={ph} value={val} onChange={(e) => set(e.target.value)} style={fieldStyle} onFocus={focus} onBlur={blur} />
+        </div>
+      ))}
+      <div>
+        <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>Sobre a gravação</label>
+        <textarea rows={3} placeholder="Tipo de vídeo, objetivo, prazo…" value={msg} onChange={(e) => setMsg(e.target.value)}
+          style={{ ...fieldStyle, resize: "vertical" }} onFocus={focus} onBlur={blur} />
+      </div>
+      <button type="submit"
+        style={{ background: R.red, color: "#fff", padding: ".9rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, transition: "background .2s" }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#a02a20")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = R.red)}
+      >■ Enviar no WhatsApp →</button>
+    </form>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function LokatRecPage() {
   const [introComplete, setIntroComplete] = useState(false);
@@ -406,21 +469,23 @@ export default function LokatRecPage() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // Buscar vídeos do Supabase
+  // Buscar vídeos do Supabase; usa STATIC_VIDEOS como fallback
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setVideos(FALLBACK_VIDEOS);
+      setVideos(STATIC_VIDEOS);
+      setFeedbackVideo(STATIC_FEEDBACK);
       setDataLoaded(true);
       return;
     }
     void getPublicRecVideos().then((data) => {
-      const feedback = data.find((v) => v.is_feedback && v.is_featured) ?? data.find((v) => v.is_feedback) ?? null;
+      const feedback = data.find((v) => v.is_feedback && v.is_featured) ?? data.find((v) => v.is_feedback) ?? STATIC_FEEDBACK;
       const cards    = data.filter((v) => v.show_in_cards && !v.is_feedback);
       setFeedbackVideo(feedback);
-      setVideos(cards.length > 0 ? cards : FALLBACK_VIDEOS);
+      setVideos(cards.length > 0 ? cards : STATIC_VIDEOS);
       setDataLoaded(true);
     }).catch(() => {
-      setVideos(FALLBACK_VIDEOS);
+      setVideos(STATIC_VIDEOS);
+      setFeedbackVideo(STATIC_FEEDBACK);
       setDataLoaded(true);
     });
   }, []);
@@ -485,7 +550,7 @@ export default function LokatRecPage() {
           <div className="rec-hero-in" style={{ display: "flex", alignItems: "center", gap: "1.4rem", marginBottom: "2rem" }}>
             <div className="rec-drop-float"><RecDrop size={52} phase="red" /></div>
             <div>
-              <span style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".24em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".3rem" }}>Produção audiovisual · Fortaleza CE</span>
+              <span style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".24em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".3rem" }}>Produção audiovisual · Floriano PI</span>
               <div style={{ height: "1px", width: "80px", background: `linear-gradient(to right, ${R.red}, transparent)` }} />
             </div>
           </div>
@@ -665,9 +730,9 @@ export default function LokatRecPage() {
               <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted, marginBottom: "2rem" }}>Conta sobre sua marca e o que você quer comunicar.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: R.border }}>
                 {[
-                  { label: "WhatsApp", sub: "Falar sobre gravação", Icon: Video,  href: "https://wa.me/5585999999999" },
-                  { label: "E-mail",   sub: "rec@lokat.com.br",    Icon: Mail,  href: "mailto:rec@lokat.com.br" },
-                  { label: "Instagram",sub: "@lokat.rec",           Icon: AtSign, href: "#" },
+                  { label: "WhatsApp", sub: "(89) 9 9421-7181",       Icon: Video,  href: "https://wa.me/5589994217181?text=Ol%C3%A1%2C%20vi%20a%20LOKAT.REC%20e%20tenho%20um%20projeto%20em%20mente." },
+                  { label: "E-mail",   sub: "lokat.rec@hotmail.com",   Icon: Mail,  href: "mailto:lokat.rec@hotmail.com" },
+                  { label: "Instagram",sub: "@Lokat.rec",              Icon: AtSign, href: "https://instagram.com/lokat.rec" },
                 ].map(({ label, sub, Icon, href }) => (
                   <a key={label} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer"
                     style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem", background: "rgba(20,16,10,0.85)", textDecoration: "none", transition: "background .2s", backdropFilter: "blur(6px)" }}
@@ -687,35 +752,7 @@ export default function LokatRecPage() {
               </div>
             </div>
 
-            <form onSubmit={(e) => e.preventDefault()} style={{ display: "flex", flexDirection: "column", gap: ".75rem", background: "rgba(10,8,6,0.75)", padding: "2rem", backdropFilter: "blur(12px)", border: `1px solid ${R.border}` }}>
-              {[
-                { label: "Nome / Empresa", ph: "Sua marca",              type: "text" },
-                { label: "E-mail",         ph: "contato@suamarca.com.br", type: "email" },
-                { label: "WhatsApp",       ph: "(85) 9 0000-0000",         type: "tel" },
-              ].map(({ label, ph, type }) => (
-                <div key={label}>
-                  <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>{label}</label>
-                  <input type={type} placeholder={ph}
-                    style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", transition: "border-color .2s" }}
-                    onFocus={(e) => (e.currentTarget.style.borderColor = R.red)}
-                    onBlur={(e)  => (e.currentTarget.style.borderColor = R.border)}
-                  />
-                </div>
-              ))}
-              <div>
-                <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>Sobre a gravação</label>
-                <textarea rows={3} placeholder="Tipo de vídeo, objetivo, prazo…"
-                  style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", resize: "vertical", transition: "border-color .2s" }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = R.red)}
-                  onBlur={(e)  => (e.currentTarget.style.borderColor = R.border)}
-                />
-              </div>
-              <button type="submit"
-                style={{ background: R.red, color: "#fff", padding: ".9rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, transition: "background .2s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#a02a20")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = R.red)}
-              >■ Enviar mensagem →</button>
-            </form>
+            <ContactForm />
           </div>
         </div>
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "80px", background: `linear-gradient(to bottom, transparent, ${R.bg})`, pointerEvents: "none" }} />
@@ -724,7 +761,7 @@ export default function LokatRecPage() {
       {/* ── FOOTER ───────────────────────────────────────────────── */}
       <footer style={{ borderTop: `1px solid ${R.border}`, padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", textAlign: "center", background: R.bg }}>
         <span style={{ ...R.mono, fontSize: ".7rem", letterSpacing: ".1em", fontWeight: 700, color: R.text }}>LOKAT<span style={{ color: R.red }}>.</span><span style={{ color: R.red }}>REC</span></span>
-        <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>Fortaleza — CE · Brasil · Desde 2022</p>
+        <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>Floriano — PI · Brasil · Desde 2022</p>
         <Link href="/" style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
           onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}

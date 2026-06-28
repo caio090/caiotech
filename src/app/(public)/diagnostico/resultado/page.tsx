@@ -93,15 +93,15 @@ function buildFallback(answers: Answers): DiagResult {
   if (opportunities.length === 0) opportunities.push("Automatizar relatórios e expandir canais de distribuição");
 
   // Definir plano recomendado
-  let recommended_plan = "Autonomia";
-  let plan_description = "Para empresas que querem organizar conteúdo, calendário e acompanhar resultados com apoio de IA.";
+  let recommended_plan = "Plano Essencial";
+  let plan_description = "Para marcas que querem organizar presença digital, calendário editorial e acompanhar resultados.";
 
   if (score >= 70) {
-    recommended_plan = "Empresa";
-    plan_description = "Para negócios em crescimento que precisam de ContentOS completo, CRM e relatórios avançados.";
+    recommended_plan = "Plano Avançado";
+    plan_description = "Para negócios com base sólida que precisam de estratégia, automação e escalabilidade de conteúdo.";
   } else if (score < 25) {
-    recommended_plan = "Diagnóstico Grátis";
-    plan_description = "Começar com diagnóstico completo, ver resultado e decidir o próximo passo sem compromisso.";
+    recommended_plan = "Começar pelo Diagnóstico";
+    plan_description = "Entender o ponto de partida da marca e definir as prioridades antes de qualquer investimento.";
   }
 
   return {
@@ -270,7 +270,7 @@ export default function DiagnosticoResultadoPage() {
         <p className="text-xs text-gray-400 uppercase tracking-wider text-center mb-4">O que você quer fazer agora?</p>
 
         <Link
-          href="/criar-conta"
+          href="/criar-conta?from=diagnostic"
           className="flex items-center justify-center gap-2 w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors text-sm"
         >
           <ArrowRight className="w-4 h-4" />
@@ -278,7 +278,7 @@ export default function DiagnosticoResultadoPage() {
         </Link>
 
         <a
-          href="https://wa.me/5511999999999?text=Olá,%20fiz%20o%20diagnóstico%20da%20LOKAT%20OS%20e%20quero%20entender%20os%20próximos%20passos."
+          href="https://wa.me/5589994217181?text=Ol%C3%A1%2C%20fiz%20o%20diagn%C3%B3stico%20da%20LOKAT%20OS%20e%20quero%20entender%20os%20pr%C3%B3ximos%20passos."
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors text-sm"

@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { ArrowRight, Sparkles, Users, BookOpen, Shield, Loader2, Eye, EyeOff, Target, CalendarDays, CheckCircle2, BarChart2 } from "lucide-react";
 import type { ElementType } from "react";
@@ -15,8 +15,10 @@ const perks: { Icon: ElementType; text: string }[] = [
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors";
 
-export default function CriarContaPage() {
+function CriarContaForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromDiagnostic = searchParams.get("from") === "diagnostic";
   const [form, setForm] = useState({ name: "", company: "", email: "", password: "" });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
@@ -112,7 +114,7 @@ export default function CriarContaPage() {
         })
         .eq("id", userId);
 
-      router.push("/onboarding/tipo");
+      router.push(fromDiagnostic ? "/client/home" : "/onboarding/tipo");
     } catch {
       setError("Erro de conexão. Verifique sua internet e tente novamente.");
     } finally {
@@ -334,5 +336,13 @@ export default function CriarContaPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CriarContaPage() {
+  return (
+    <Suspense>
+      <CriarContaForm />
+    </Suspense>
   );
 }
