@@ -224,29 +224,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 
-  .reveal-up,
-  .reveal-fade,
-  .hero-fade-up,
-  .hero-fade-up-d1,
-  .hero-fade-up-d2,
-  .hero-fade-up-d3,
-  .hero-robot-in {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-
   .lk-ticker-track,
   .lk-logo-track,
   .orbit-slow,
   .orbit-rev,
   .lk-drop-float,
-  .glow-pulse,
-  .eye-blink,
-  .robot-eye-l,
-  .robot-eye-r,
-  .animate-float-soft,
-  .animate-pulse-glow {
-    animation-play-state: paused !important;
+  .glow-pulse {
+    animation-play-state: paused;
   }
 }
 
