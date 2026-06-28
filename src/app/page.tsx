@@ -36,6 +36,7 @@ const clients = [
   { name: "Odonto Lura",       file: "odonto-lura.jpg"  },
   { name: "Sandubão Lanches",  file: "sandubao.jpg"     },
   { name: "Banca do Jean",     file: "banca-jean.png"   },
+  { name: "DR",                file: "logo-dr.jpg"      },
 ];
 
 // ── Ticker content (4 cópias para garantir loop sem fim seco em qualquer tela) ─
