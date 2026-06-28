@@ -38,17 +38,14 @@ const clients = [
   { name: "Banca do Jean",     file: "banca-jean.png"   },
 ];
 
-// ── Ticker content ───────────────────────────────────────────
-const tickerItems = [
-  "■ DO CONTEÚDO À VENDA EM UM ÚNICO OS",
-  "✦ CONTEÚDO · LEADS · FINANÇAS · APROVAÇÕES",
-  "■ PARA EMPRESAS, AGÊNCIAS E AUTÔNOMOS",
-  "✦ COM IA E AUTOMAÇÃO DO INÍCIO AO FIM",
+// ── Ticker content (4 cópias para garantir loop sem fim seco em qualquer tela) ─
+const _tickerBase = [
   "■ DO CONTEÚDO À VENDA EM UM ÚNICO OS",
   "✦ CONTEÚDO · LEADS · FINANÇAS · APROVAÇÕES",
   "■ PARA EMPRESAS, AGÊNCIAS E AUTÔNOMOS",
   "✦ COM IA E AUTOMAÇÃO DO INÍCIO AO FIM",
 ];
+const tickerItems = [..._tickerBase, ..._tickerBase, ..._tickerBase, ..._tickerBase];
 
 const S = {
   mono: { fontFamily: "'Space Mono', monospace" } as React.CSSProperties,
@@ -233,7 +230,7 @@ export default function HomePage() {
         </p>
         <div style={{ overflow: "hidden", maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)" }}>
           <div className="lk-logo-track" style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem" }}>
-            {[...clients, ...clients].map((c, i) => (
+            {[...clients, ...clients, ...clients, ...clients].map((c, i) => (
               <div
                 key={i}
                 style={{
