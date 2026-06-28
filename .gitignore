@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vídeos grandes — hospedar no Supabase Storage ou CDN
+public/rec/*.mp4
+dev-out*.txt
+dev-err*.txt
+dev-server.log
