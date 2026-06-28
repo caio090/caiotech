@@ -146,7 +146,13 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 // ── Modal OlaClick ─────────────────────────────────────────────
-function OlaClickModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+type ClientOption = { id: string; company_name: string };
+
+function OlaClickModal({ onClose, onSaved, clients }: {
+  onClose: () => void;
+  onSaved: () => void;
+  clients: ClientOption[];
+}) {
   const [clientId,   setClientId]   = useState("");
   const [connName,   setConnName]   = useState("");
   const [token,      setToken]      = useState("");
@@ -204,15 +210,21 @@ function OlaClickModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
           {/* Cliente */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">ID do cliente <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="Cole o client_id do cliente na LOKAT OS"
-              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
-            />
-            <p className="text-[10px] text-gray-400 mt-1">Encontre em Clientes → selecione o cliente → copie o ID da URL.</p>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Cliente <span className="text-red-500">*</span></label>
+            {clients.length > 0 ? (
+              <select
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 bg-white"
+              >
+                <option value="">Selecione o cliente…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.company_name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-xs text-gray-400 italic">Nenhum cliente cadastrado.</p>
+            )}
           </div>
 
           {/* Nome da conexão */}
@@ -348,6 +360,16 @@ function ConexoesContent() {
 
   const [showOlaModal, setShowOlaModal] = useState(false);
   const [olaConnected, setOlaConnected] = useState(false);
+  const [olaClients,   setOlaClients]   = useState<ClientOption[]>([]);
+
+  // Carrega lista de clientes quando modal OlaClick é aberto
+  useEffect(() => {
+    if (!showOlaModal || olaClients.length > 0) return;
+    void fetch("/api/admin/clients")
+      .then((r) => r.json())
+      .then((d: { clients?: ClientOption[] }) => setOlaClients(d.clients ?? []))
+      .catch(() => undefined);
+  }, [showOlaModal, olaClients.length]);
 
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
@@ -1153,6 +1175,7 @@ function ConexoesContent() {
         <OlaClickModal
           onClose={() => setShowOlaModal(false)}
           onSaved={() => setOlaConnected(true)}
+          clients={olaClients}
         />
       )}
     </div>
