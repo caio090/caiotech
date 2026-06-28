@@ -12,11 +12,12 @@ export async function GET() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, plan")
       .eq("id", user.id)
       .maybeSingle();
 
     const isAdmin = profile?.role === "admin";
+    const userPlan = (profile as { plan?: string } | null)?.plan ?? null;
 
     // Busca clientes
     const { data: clients, error } = await supabase
@@ -73,7 +74,7 @@ export async function GET() {
       has_brief:       briefIds.has(c.id),
     }));
 
-    return NextResponse.json({ clients: enriched, isAdmin });
+    return NextResponse.json({ clients: enriched, isAdmin, plan: userPlan });
   } catch {
     return NextResponse.json({ clients: [], isAdmin: false });
   }

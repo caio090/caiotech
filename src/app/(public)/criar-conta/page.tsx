@@ -101,6 +101,17 @@ export default function CriarContaPage() {
         }
       }
 
+      // Salva aceite dos termos no perfil (melhor esforço — não bloqueia cadastro)
+      const termsNow = new Date().toISOString();
+      await supabase
+        .from("profiles")
+        .update({
+          accepted_terms_at:      termsNow,
+          accepted_terms_version: "1.0",
+          accepted_privacy_at:    termsNow,
+        })
+        .eq("id", userId);
+
       router.push("/onboarding/tipo");
     } catch {
       setError("Erro de conexão. Verifique sua internet e tente novamente.");

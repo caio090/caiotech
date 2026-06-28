@@ -85,11 +85,18 @@ export default function ClientSolicitacoesPage() {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
+        // Resolve o responsável pela conta do cliente (agency_id > owner_id > created_by)
+        const { data: ownerRaw } = await supabase.rpc("get_request_owner_for_client", {
+          p_client_id: clientId,
+        });
+        const ownerProfileId = (ownerRaw as string | null) ?? null;
+
         const { error: insertErr } = await supabase
           .from("client_requests")
           .insert({
             client_id:         clientId,
             requester_user_id: user?.id,
+            owner_profile_id:  ownerProfileId,
             title:             title.trim(),
             description:       body.trim() || null,
             status:            "open",
