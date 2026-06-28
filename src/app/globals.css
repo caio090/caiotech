@@ -207,7 +207,7 @@ body {
 
 .lk-ticker-track {
   display: inline-flex;
-  animation: lk-ticker 56s linear infinite;
+  animation: lk-ticker 70s linear infinite;
   white-space: nowrap;
 }
 .lk-ticker-track:hover { animation-play-state: paused; }
