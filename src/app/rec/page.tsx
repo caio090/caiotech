@@ -545,10 +545,10 @@ export default function LokatRecPage() {
             >{label as string}</button>
           ))}
         </nav>
-        <Link href="/" style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none", display: "flex", alignItems: "center", gap: ".4rem", transition: "color .2s" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
-          onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
-        ><ArrowLeft style={{ width: "12px" }} /> LOKAT OS</Link>
+        <Link href="/" style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#c4baff", textDecoration: "none", display: "flex", alignItems: "center", gap: ".5rem", padding: ".35rem .75rem", border: "1px solid #7b6ef640", background: "#7b6ef610", transition: "background .2s, border-color .2s" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#7b6ef620"; e.currentTarget.style.borderColor = "#7b6ef680"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#7b6ef610"; e.currentTarget.style.borderColor = "#7b6ef640"; }}
+        ><ArrowLeft style={{ width: "11px" }} /> LOKAT OS</Link>
       </header>
 
       {/* ── HERO ─────────────────────────────────────────────────── */}
