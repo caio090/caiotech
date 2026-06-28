@@ -295,25 +295,19 @@ function PortfolioCard({ video, position, onActivate, onOpen }: {
 }
 
 // ── Seção de feedback/depoimento Sandubão ─────────────────────────────────────
-function FeedbackSection({ video }: { video: RecVideo | null }) {
+function FeedbackSection({ video, isMobile }: { video: RecVideo | null; isMobile: boolean }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const videoRef   = useRef<HTMLVideoElement>(null);
-  const [visible,  setVisible]  = useState(false);
+  const isInView   = useInView(sectionRef, { once: true, amount: 0.15 });
   const [playing,  setPlaying]  = useState(false);
+  const [showCover,setShowCover] = useState(true);
   const [muted,    setMuted]    = useState(true);
 
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) { setVisible(true); return; }
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
-      { threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const _yVid  = useSpring(useTransform(scrollYProgress, [0, 1], [50, -50]), { stiffness: 55, damping: 20 });
+  const _yText = useSpring(useTransform(scrollYProgress, [0, 1], [30, -30]), { stiffness: 55, damping: 20 });
+  const yVid  = isMobile ? 0 : _yVid;
+  const yText = isMobile ? 0 : _yText;
 
   useEffect(() => {
     const el = videoRef.current;
@@ -325,6 +319,12 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+
+  const handlePlay = () => {
+    setShowCover(false);
+    setPlaying(true);
+    setTimeout(() => videoRef.current?.play().catch(() => undefined), 50);
+  };
 
   const togglePlay = () => {
     const el = videoRef.current;
@@ -342,39 +342,95 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
 
         {/* Título */}
-        <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)", transition: "opacity .7s ease, transform .7s ease", marginBottom: "3rem" }}>
-          <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".4rem" }}>[Feedback real]</p>
-          <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,3.5vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
-            Cliente falando<br />vale mais que promessa.
-          </h2>
-          <p style={{ ...R.grotesk, fontSize: ".9rem", color: R.muted, marginTop: ".6rem", maxWidth: "480px" }}>
-            Um feedback real de quem passou por reposicionamento, criativos e retomada de presença.
-          </p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: .8, ease: [0.16, 1, 0.3, 1] }}
+          style={{ marginBottom: "3rem" }}
+        >
+          <div>
+            <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".4rem" }}>[Feedback real]</p>
+            <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,3.5vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
+              Cliente falando<br />vale mais que promessa.
+            </h2>
+            <p style={{ ...R.grotesk, fontSize: ".9rem", color: R.muted, marginTop: ".6rem", maxWidth: "480px" }}>
+              Um feedback real de quem passou por reposicionamento, criativos e retomada de presença.
+            </p>
+          </div>
+        </motion.div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4rem", alignItems: "center" }}>
           {/* Vídeo */}
-          <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)", transition: "opacity .8s .1s ease, transform .8s .1s ease" }}>
+          <motion.div
+            style={{ y: yVid }}
+            initial={{ opacity: 0, y: 40 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: .9, delay: .1, ease: [0.16, 1, 0.3, 1] }}
+          >
             <div style={{ position: "relative", border: `1px solid ${R.border}`, overflow: "hidden" }}>
               {video?.video_url ? (
                 <>
+                  {/* Cover / thumbnail antes de tocar */}
+                  {showCover && (
+                    <motion.div
+                      onClick={handlePlay}
+                      whileHover="hov"
+                      style={{ position: "absolute", inset: 0, zIndex: 4, cursor: "pointer", background: `linear-gradient(155deg, #180e08 0%, #0e0804 60%, #1a0c06 100%)` }}
+                    >
+                      {/* Grain */}
+                      <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.7 }} />
+                      {/* Linha vermelha top */}
+                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(to right, ${R.red}, ${R.red}40, transparent)` }} />
+                      {/* Cantos */}
+                      <div style={{ position: "absolute", top: ".75rem", left: ".75rem", width: "16px", height: "16px", borderTop: `1px solid ${R.red}70`, borderLeft: `1px solid ${R.red}70` }} />
+                      <div style={{ position: "absolute", top: ".75rem", right: ".75rem", width: "16px", height: "16px", borderTop: `1px solid ${R.red}40`, borderRight: `1px solid ${R.red}40` }} />
+                      <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", width: "16px", height: "16px", borderBottom: `1px solid ${R.red}70`, borderLeft: `1px solid ${R.red}70` }} />
+                      <div style={{ position: "absolute", bottom: ".75rem", right: ".75rem", width: "16px", height: "16px", borderBottom: `1px solid ${R.red}40`, borderRight: `1px solid ${R.red}40` }} />
+
+                      {/* Conteúdo central */}
+                      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
+                        {/* Ícone S */}
+                        <div style={{ width: "64px", height: "64px", border: `1px solid ${R.red}40`, background: `${R.red}10`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1.2rem" }}>
+                          <span style={{ ...R.grotesk, fontSize: "1.6rem", fontWeight: 900, color: R.red, opacity: 0.7 }}>S</span>
+                        </div>
+                        <p style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.muted, marginBottom: ".5rem" }}>Sandubão · Hamburgueria</p>
+                        <p style={{ ...R.grotesk, fontSize: "1rem", fontWeight: 700, color: R.text, lineHeight: 1.2, marginBottom: "1.8rem" }}>
+                          O que o cliente<br />tem a dizer.
+                        </p>
+                        {/* Botão play */}
+                        <motion.div
+                          variants={{ hov: { scale: 1.1 } }}
+                          style={{ width: "58px", height: "58px", border: `2px solid ${R.red}90`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${R.red}18`, backdropFilter: "blur(4px)", marginBottom: ".75rem" }}
+                        >
+                          <Play style={{ width: "20px", height: "20px", color: R.red, marginLeft: "3px" }} strokeWidth={1.5} />
+                        </motion.div>
+                        <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", textTransform: "uppercase", color: `${R.muted}90` }}>Toque para assistir</p>
+                      </div>
+
+                      {/* Aspect ratio placeholder */}
+                      <div style={{ width: "100%", aspectRatio: "9/16", visibility: "hidden" }} />
+                    </motion.div>
+                  )}
+
                   <video ref={videoRef} src={video.video_url} muted={muted} playsInline preload="metadata"
                     style={{ width: "100%", display: "block", background: "#0a0806", aspectRatio: "9/16", objectFit: "cover" }} />
-                  {!playing && (
-                    <div onClick={togglePlay} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,8,6,0.5)", cursor: "pointer" }}>
+                  {!playing && !showCover && (
+                    <div onClick={togglePlay} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,8,6,0.5)", cursor: "pointer", zIndex: 3 }}>
                       <div style={{ width: "60px", height: "60px", border: `1px solid ${R.red}80`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${R.red}22`, backdropFilter: "blur(4px)" }}>
                         <Play style={{ width: "22px", height: "22px", color: R.red, marginLeft: "2px" }} strokeWidth={1.5} />
                       </div>
                     </div>
                   )}
-                  <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem" }}>
-                    <button onClick={togglePlay} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      {playing ? <Pause style={{ width: "12px" }} /> : <Play style={{ width: "12px" }} />}
-                    </button>
-                    <button onClick={() => setMuted((m) => !m)} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      {muted ? <VolumeX style={{ width: "12px" }} /> : <Volume2 style={{ width: "12px" }} />}
-                    </button>
-                  </div>
+                  {!showCover && (
+                    <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem", zIndex: 3 }}>
+                      <button onClick={togglePlay} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                        {playing ? <Pause style={{ width: "12px" }} /> : <Play style={{ width: "12px" }} />}
+                      </button>
+                      <button onClick={() => setMuted((m) => !m)} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                        {muted ? <VolumeX style={{ width: "12px" }} /> : <Volume2 style={{ width: "12px" }} />}
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ width: "100%", aspectRatio: "9/16", background: "#14100a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: ".75rem" }}>
@@ -382,8 +438,8 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
                   <p style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, opacity: 0.6 }}>Vídeo indisponível</p>
                 </div>
               )}
-              <div style={{ position: "absolute", top: ".75rem", left: ".75rem", width: "14px", height: "14px", borderTop: `1px solid ${R.red}55`, borderLeft: `1px solid ${R.red}55`, pointerEvents: "none" }} />
-              <div style={{ position: "absolute", bottom: ".75rem", right: ".75rem", width: "14px", height: "14px", borderBottom: `1px solid ${R.red}30`, borderRight: `1px solid ${R.red}30`, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", top: ".75rem", left: ".75rem", width: "14px", height: "14px", borderTop: `1px solid ${R.red}55`, borderLeft: `1px solid ${R.red}55`, pointerEvents: "none", zIndex: 5 }} />
+              <div style={{ position: "absolute", bottom: ".75rem", right: ".75rem", width: "14px", height: "14px", borderBottom: `1px solid ${R.red}30`, borderRight: `1px solid ${R.red}30`, pointerEvents: "none", zIndex: 5 }} />
             </div>
             <div style={{ marginTop: ".75rem", display: "flex", alignItems: "center", gap: ".6rem" }}>
               <div style={{ width: "6px", height: "6px", background: R.red, borderRadius: "50%", flexShrink: 0 }} />
@@ -391,10 +447,14 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
                 Sandubão · Hamburgueria · Floriano — PI
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Texto do case */}
-          <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)", transition: "opacity .8s .25s ease, transform .8s .25s ease" }}>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: .9, delay: .2, ease: [0.16, 1, 0.3, 1] }}
+          >
             <div style={{ ...R.mono, fontSize: "3rem", color: R.red, opacity: 0.35, lineHeight: 1, marginBottom: ".5rem" }}>"</div>
             <p style={{ ...R.grotesk, fontSize: "1.1rem", fontWeight: 600, color: R.text, lineHeight: 1.45, marginBottom: "1.5rem" }}>
               A Sandubão já tinha história, mas precisava voltar para o jogo com clareza.
@@ -415,7 +475,7 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -426,25 +486,28 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
 const FILME_YT   = "fkImA1oe_3E";
 const FILME_THUMB = `https://img.youtube.com/vi/${FILME_YT}/maxresdefault.jpg`;
 
-function FilmeSection() {
+function FilmeSection({ isMobile }: { isMobile: boolean }) {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const isInView    = useInView(sectionRef, { once: true, amount: 0.15 });
-  const [playing,   setPlaying] = useState(false);
+  const [playing,  setPlaying] = useState(false);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start end", "end start"],
   });
 
-  const yFrame  = useSpring(useTransform(scrollYProgress, [0, 1], [80, -80]),  { stiffness: 60, damping: 20 });
-  const yText   = useSpring(useTransform(scrollYProgress, [0, 1], [50, -50]),  { stiffness: 60, damping: 20 });
-  const scale   = useSpring(useTransform(scrollYProgress, [0, 0.4], [0.88, 1]), { stiffness: 80, damping: 22 });
-  const opacity = useTransform(scrollYProgress, [0, 0.18], [0, 1]);
+  const _yFrame  = useSpring(useTransform(scrollYProgress, [0, 1], [70, -70]),  { stiffness: 55, damping: 20 });
+  const _yText   = useSpring(useTransform(scrollYProgress, [0, 1], [40, -40]),  { stiffness: 55, damping: 20 });
+  const _scale   = useSpring(useTransform(scrollYProgress, [0, 0.4], [0.9, 1]), { stiffness: 80, damping: 22 });
+
+  // Mobile: sem parallax, sem fade por scroll (usa whileInView direto)
+  const yFrame  = isMobile ? 0 : _yFrame;
+  const yText   = isMobile ? 0 : _yText;
+  const scale   = isMobile ? 1 : _scale;
+  const opacity = isMobile ? 1 : undefined;
 
   return (
     <section ref={sectionRef} style={{ position: "relative", padding: "10rem 0", overflow: "hidden", background: `linear-gradient(180deg, ${R.bg} 0%, #0e0a06 50%, ${R.bg} 100%)` }}>
-      {/* Linha lateral esquerda */}
-      <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "60%", background: `linear-gradient(to bottom, transparent, #7b6ef655, transparent)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "60%", background: `linear-gradient(to bottom, transparent, ${R.red}40, transparent)`, pointerEvents: "none" }} />
       <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.45 }} />
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
@@ -452,46 +515,48 @@ function FilmeSection() {
         {/* Headline */}
         <motion.div
           style={{ y: yText, opacity }}
-          className="rec-filme-text"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: .8, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".22em", textTransform: "uppercase", color: "#7b6ef6", marginBottom: ".6rem" }}>[Produção especial]</p>
-          <h2 style={{ ...R.grotesk, fontSize: "clamp(2rem,5.5vw,4rem)", fontWeight: 700, lineHeight: .96, letterSpacing: "-.03em", color: R.text, maxWidth: "620px", marginBottom: "1.2rem" }}>
-            Quinze anos<br />
-            <em style={{ fontStyle: "italic", color: "#7b6ef6" }}>filmados com roteiro</em><br />
-            e alma.
+          <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".22em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Produção especial]</p>
+          <h2 style={{ ...R.grotesk, fontSize: "clamp(2rem,5.5vw,4rem)", fontWeight: 700, lineHeight: .96, letterSpacing: "-.03em", color: R.text, maxWidth: "680px", marginBottom: "1.2rem" }}>
+            O dia dela,<br />
+            <em style={{ fontStyle: "italic", color: R.red }}>gravado pra durar</em><br />
+            para sempre.
           </h2>
-          <div style={{ height: "2px", width: "48px", background: "#7b6ef6", marginBottom: "1.4rem" }} />
+          <div style={{ height: "2px", width: "48px", background: R.red, marginBottom: "1.4rem" }} />
           <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.75, color: R.muted, maxWidth: "460px" }}>
-            Um filme de aniversário com roteiro, direção e edição completos. Não é só um vídeo comemorativo — é uma história contada com intenção cinematográfica.
+            XV anos. Um momento único que merecia mais do que fotos — merecia um filme com começo, meio e emoção real.
           </p>
         </motion.div>
 
-        {/* Frame do vídeo com parallax */}
+        {/* Frame com parallax */}
         <motion.div
           style={{ y: yFrame, scale, opacity, marginTop: "4rem", position: "relative" }}
-          initial={{ opacity: 0, y: 60 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.15 }}
+          transition={{ duration: 1, delay: .1, ease: [0.16, 1, 0.3, 1] }}
         >
           {/* Cantos decorativos */}
           {[
-            { top: "-.75rem", left: "-.75rem", borderTop: `2px solid #7b6ef680`, borderLeft: `2px solid #7b6ef680` },
-            { top: "-.75rem", right: "-.75rem", borderTop: `2px solid #7b6ef640`, borderRight: `2px solid #7b6ef640` },
-            { bottom: "-.75rem", left: "-.75rem", borderBottom: `2px solid #7b6ef680`, borderLeft: `2px solid #7b6ef680` },
-            { bottom: "-.75rem", right: "-.75rem", borderBottom: `2px solid #7b6ef640`, borderRight: `2px solid #7b6ef640` },
+            { top: "-.75rem", left: "-.75rem", borderTop: `2px solid ${R.red}70`, borderLeft: `2px solid ${R.red}70` },
+            { top: "-.75rem", right: "-.75rem", borderTop: `2px solid ${R.red}40`, borderRight: `2px solid ${R.red}40` },
+            { bottom: "-.75rem", left: "-.75rem", borderBottom: `2px solid ${R.red}70`, borderLeft: `2px solid ${R.red}70` },
+            { bottom: "-.75rem", right: "-.75rem", borderBottom: `2px solid ${R.red}40`, borderRight: `2px solid ${R.red}40` },
           ].map((s, i) => (
             <div key={i} style={{ position: "absolute", width: "22px", height: "22px", ...s, pointerEvents: "none" }} />
           ))}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(to right, ${R.red}, ${R.red}40, transparent)`, zIndex: 2, pointerEvents: "none" }} />
 
-          {/* Linha roxa superior */}
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(to right, #7b6ef6, #7b6ef640, transparent)", zIndex: 2, pointerEvents: "none" }} />
-
-          {/* Thumbnail + Play / iframe */}
-          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", border: `1px solid #7b6ef625`, background: "#0a0806" }}>
+          {/* Thumbnail → iframe */}
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", border: `1px solid ${R.red}20`, background: "#0a0806" }}>
             {playing ? (
               <iframe
                 src={`https://www.youtube.com/embed/${FILME_YT}?autoplay=1&rel=0&modestbranding=1&color=white`}
-                title="Filme de 15 Anos — LOKAT.REC"
+                title="Filme XV Maria Clara — LOKAT.REC"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
@@ -502,59 +567,52 @@ function FilmeSection() {
                 whileHover="hov"
                 style={{ position: "absolute", inset: 0, cursor: "pointer", overflow: "hidden" }}
               >
-                {/* Thumbnail */}
-                <img
-                  src={FILME_THUMB}
-                  alt="Filme 15 anos"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                />
+                <img src={FILME_THUMB} alt="Filme XV Maria Clara" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
 
-                {/* Overlay escuro gradiente */}
+                {/* Overlay */}
                 <motion.div
-                  variants={{ hov: { opacity: 0.5 } }}
-                  style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,8,6,0.92) 0%, rgba(10,8,6,0.45) 50%, rgba(10,8,6,0.25) 100%)", opacity: 0.65, transition: "opacity .4s" }}
+                  variants={{ hov: { opacity: 0.55 } }}
+                  style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,8,6,0.96) 0%, rgba(10,8,6,0.55) 45%, rgba(10,8,6,0.2) 100%)", opacity: 0.72, transition: "opacity .4s" }}
                 />
 
-                {/* Texto sobre a thumbnail */}
-                <div style={{ position: "absolute", top: "1.5rem", left: "1.8rem", right: "1.8rem" }}>
-                  <span style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".22em", textTransform: "uppercase", color: "#c4baff", background: "rgba(123,110,246,0.18)", border: "1px solid #7b6ef635", padding: ".25rem .65rem", display: "inline-block" }}>
-                    Produção completa · 2024
+                {/* Badge no topo */}
+                <div style={{ position: "absolute", top: "1.5rem", left: "1.8rem" }}>
+                  <span style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.text, background: `${R.red}22`, border: `1px solid ${R.red}40`, padding: ".25rem .7rem", display: "inline-block" }}>
+                    XV anos · Filme completo
                   </span>
                 </div>
 
                 {/* Título na thumbnail */}
-                <div style={{ position: "absolute", bottom: "4.5rem", left: "1.8rem", right: "1.8rem" }}>
-                  <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: "#7b6ef6", marginBottom: ".4rem" }}>Filme de aniversário</p>
-                  <p style={{ ...R.grotesk, fontSize: "clamp(1.1rem,2.5vw,1.8rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, letterSpacing: "-.02em" }}>
-                    15 Anos de História.<br />Um filme com roteiro.
+                <div style={{ position: "absolute", bottom: "4.8rem", left: "1.8rem", right: "1.8rem" }}>
+                  <p style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".18em", textTransform: "uppercase", color: `${R.red}cc`, marginBottom: ".35rem" }}>Maria Clara</p>
+                  <p style={{ ...R.grotesk, fontSize: "clamp(1.2rem,2.8vw,2rem)", fontWeight: 700, color: R.text, lineHeight: 1.02, letterSpacing: "-.02em" }}>
+                    O dia que ela<br />nunca vai esquecer.
                   </p>
                 </div>
 
                 {/* Botão play */}
-                <div style={{ position: "absolute", bottom: "1.5rem", left: "1.8rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div style={{ position: "absolute", bottom: "1.4rem", left: "1.8rem", display: "flex", alignItems: "center", gap: ".9rem" }}>
                   <motion.div
-                    variants={{ hov: { scale: 1.12 } }}
-                    style={{ width: "56px", height: "56px", border: "2px solid #7b6ef6", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(123,110,246,0.18)", backdropFilter: "blur(6px)", transition: "background .3s" }}
+                    variants={{ hov: { scale: 1.1 } }}
+                    style={{ width: "52px", height: "52px", border: `2px solid ${R.red}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${R.red}22`, backdropFilter: "blur(6px)" }}
                   >
-                    <Play style={{ width: "20px", height: "20px", color: "#c4baff", marginLeft: "3px" }} strokeWidth={1.5} />
+                    <Play style={{ width: "18px", height: "18px", color: R.red, marginLeft: "2px" }} strokeWidth={1.5} />
                   </motion.div>
                   <div>
-                    <p style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".16em", textTransform: "uppercase", color: "#7b6ef6" }}>Assistir agora</p>
-                    <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".12em", color: R.muted, marginTop: ".15rem" }}>YouTube · sem sair da página</p>
+                    <p style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.red }}>Assistir agora</p>
+                    <p style={{ ...R.mono, fontSize: ".4rem", letterSpacing: ".1em", color: R.muted, marginTop: ".12rem" }}>YouTube · sem sair da página</p>
                   </div>
                 </div>
 
-                {/* Linha roxa inferior */}
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(to right, #7b6ef6, #7b6ef630, transparent)" }} />
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(to right, ${R.red}, ${R.red}40, transparent)` }} />
               </motion.div>
             )}
           </div>
 
-          {/* Badge */}
           <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: ".75rem" }}>
-            <div style={{ width: "8px", height: "8px", background: "#7b6ef6", borderRadius: "50%", flexShrink: 0 }} />
-            <span style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
-              Filme de aniversário · 15 anos · Roteiro, direção e edição
+            <div style={{ width: "6px", height: "6px", background: R.red, borderRadius: "50%", flexShrink: 0 }} />
+            <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>
+              Maria Clara · XV anos · Filme de aniversário
             </span>
           </div>
         </motion.div>
@@ -611,8 +669,21 @@ function ContactForm() {
   );
 }
 
+// ── Hook: detecta mobile para desligar parallax ───────────────────────────────
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth < 768 || navigator.maxTouchPoints > 0);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return mobile;
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function LokatRecPage() {
+  const isMobile = useIsMobile();
   const [introComplete, setIntroComplete] = useState(false);
   const [dropPhase,     setDropPhase]     = useState<"purple" | "red">("purple");
   const [activeIdx,     setActiveIdx]     = useState(0);
@@ -758,7 +829,13 @@ export default function LokatRecPage() {
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.5 }} />
 
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
-          <div style={{ marginBottom: "3rem" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: .8, ease: [0.16, 1, 0.3, 1] }}
+            style={{ marginBottom: "3rem" }}
+          >
             <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Trabalhos]</p>
             <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,4vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
               Passe o mouse.<br />O vídeo toca.
@@ -766,7 +843,7 @@ export default function LokatRecPage() {
             <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.muted, marginTop: ".6rem" }}>
               Clique no card ativo para assistir em tela cheia.
             </p>
-          </div>
+          </motion.div>
 
           {/* Deck */}
           <div className="rec-case-carousel" style={{ position: "relative", height: "440px", userSelect: "none" }}>
@@ -831,19 +908,25 @@ export default function LokatRecPage() {
       </section>
 
       {/* ── FEEDBACK SANDUBÃO ─────────────────────────────────────── */}
-      <FeedbackSection video={feedbackVideo} />
+      <FeedbackSection video={feedbackVideo} isMobile={isMobile} />
 
       {/* ── FILME 15 ANOS ─────────────────────────────────────────── */}
-      <FilmeSection />
+      <FilmeSection isMobile={isMobile} />
 
       {/* ── PROCESSO ──────────────────────────────────────────────── */}
       <section style={{ background: R.bg, padding: "6rem 0", position: "relative" }}>
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.35 }} />
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
-          <div style={{ marginBottom: "3rem" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: .8, ease: [0.16, 1, 0.3, 1] }}
+            style={{ marginBottom: "3rem" }}
+          >
             <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Como fazemos]</p>
             <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>Do roteiro ao resultado.</h2>
-          </div>
+          </motion.div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1px", background: R.border }}>
             {[
               { n: "01", t: "Roteiro",   d: "Briefing, conceito e estrutura do vídeo antes de ligar a câmera." },
@@ -875,7 +958,12 @@ export default function LokatRecPage() {
                 </div>
               </div>
             </div>
-            <div>
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: .9, ease: [0.16, 1, 0.3, 1] }}
+            >
               <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Quem somos]</p>
               <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1.5rem" }}>
                 Câmera, roteiro<br />e intenção de campanha.
@@ -887,7 +975,7 @@ export default function LokatRecPage() {
               <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted }}>
                 Roteiro, direção, gravação e edição organizados para transformar conteúdo em presença real.
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
