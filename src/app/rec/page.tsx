@@ -671,10 +671,13 @@ function ContactForm() {
 
 // ── Hook: detecta mobile para desligar parallax ───────────────────────────────
 function useIsMobile() {
-  const [mobile, setMobile] = useState(false);
+  // Inicia detectando imediatamente para evitar re-render que causa flash
+  const [mobile, setMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 768 || navigator.maxTouchPoints > 0;
+  });
   useEffect(() => {
     const check = () => setMobile(window.innerWidth < 768 || navigator.maxTouchPoints > 0);
-    check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
@@ -684,7 +687,11 @@ function useIsMobile() {
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function LokatRecPage() {
   const isMobile = useIsMobile();
-  const [introComplete, setIntroComplete] = useState(false);
+  // Mobile pula intro — animação pesada com drop-shadow trava GPU mobile
+  const [introComplete, setIntroComplete] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 768 || navigator.maxTouchPoints > 0;
+  });
   const [dropPhase,     setDropPhase]     = useState<"purple" | "red">("purple");
   const [activeIdx,     setActiveIdx]     = useState(0);
   const [modalVideo,    setModalVideo]    = useState<RecVideo | null>(null);
