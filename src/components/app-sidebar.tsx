@@ -12,7 +12,7 @@ import {
   CreditCard, FileSignature, Receipt, AlertTriangle,
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
-  ScrollText, Palette, Video, MousePointerClick, Link2,
+  ScrollText, Palette, Video, MousePointerClick, Link2, Upload,
 } from "lucide-react";
 
 export type SidebarVariant = "admin" | "client" | "contentos" | "growth" | "financeiro" | "academy" | "operacional";
@@ -31,6 +31,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
       { href: "/admin/contentos",    label: "ContentOS",    icon: Sparkles },
       { href: "/admin/recos",        label: "RecOS",        icon: Video },
+      { href: "/admin/rec/videos",   label: "REC Vídeos",   icon: Upload },
       { href: "/admin/operacional",  label: "Operacional",  icon: KanbanSquare },
       { href: "/admin/clientes",     label: "Clientes",     icon: Users },
       { href: "/admin/leads",        label: "Leads",        icon: Target },

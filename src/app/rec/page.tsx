@@ -1,9 +1,14 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Mail, AtSign, Video, ChevronLeft, ChevronRight, Pause, Volume2, VolumeX } from "lucide-react";
+import {
+  ArrowLeft, Play, Mail, AtSign, Video,
+  ChevronLeft, ChevronRight, Pause, Volume2, VolumeX,
+} from "lucide-react";
+import { getPublicRecVideos, type RecVideo } from "@/lib/rec-videos";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
+// ── Design tokens ─────────────────────────────────────────────────────────────
 const R = {
   bg:      "#0a0806",
   warm:    "#14100a",
@@ -17,174 +22,66 @@ const R = {
 
 const CAIS = "/rec/cais-floriano.jpg";
 
-function caisOverlay(direction: "hero" | "qs" | "contato" = "hero", position = "center 55%"): React.CSSProperties {
-  const overlays: Record<typeof direction, string> = {
+// ── Fallback vazio se banco não existir ───────────────────────────────────────
+const FALLBACK_VIDEOS: RecVideo[] = [
+  { id: "f1", title: "Portfólio em breve",   client_name: "LOKAT.REC", category: "campanha",     video_url: "", storage_path: null, thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 0, status: "active", description: null, created_at: "" },
+  { id: "f2", title: "Trabalhos carregando", client_name: "LOKAT.REC", category: "institucional",video_url: "", storage_path: null, thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 1, status: "active", description: null, created_at: "" },
+];
+
+function caisOverlay(dir: "hero" | "qs" | "contato" = "hero", pos = "center 55%"): React.CSSProperties {
+  const overlays = {
     hero:    `linear-gradient(180deg,rgba(4,4,3,0.82) 0%,rgba(8,6,4,0.70) 35%,rgba(10,8,6,0.80) 70%,rgba(10,8,6,0.97) 100%),linear-gradient(to right,rgba(192,57,43,0.06) 0%,transparent 60%)`,
     qs:      `linear-gradient(170deg,rgba(6,5,3,0.90) 0%,rgba(18,12,6,0.86) 55%,rgba(12,8,4,0.92) 100%)`,
-    contato: `linear-gradient(180deg,rgba(10,8,6,0.96) 0%,rgba(14,10,6,0.88) 50%,rgba(10,8,6,0.96) 100%),radial-gradient(ellipse 100% 60% at 40% 100%,rgba(80,35,10,0.18) 0%,transparent 70%)`,
+    contato: `linear-gradient(180deg,rgba(10,8,6,0.96) 0%,rgba(14,10,6,0.88) 50%,rgba(10,8,6,0.96) 100%)`,
   };
   return {
-    backgroundImage: `${overlays[direction]}, url('${CAIS}')`,
-    backgroundSize: `auto, cover`,
-    backgroundPosition: `center, ${position}`,
+    backgroundImage: `${overlays[dir]}, url('${CAIS}')`,
+    backgroundSize: "auto, cover",
+    backgroundPosition: `center, ${pos}`,
     backgroundRepeat: "no-repeat",
   };
 }
 
-// ── Vídeos reais ─────────────────────────────────────────────────────────────
-const VIDEOS = [
-  { id: 1, file: "/rec/duh-dia-solteiro.mp4",   title: "Dia do Solteiro",        client: "Duh Lanches",  tag: "Reel",      frame: "01" },
-  { id: 2, file: "/rec/duh-checklist-copa.mp4",  title: "Checklist da Copa",       client: "Duh Lanches",  tag: "Campanha",  frame: "02" },
-  { id: 3, file: "/rec/duh-gosta-suco.mp4",      title: "Gosta de Suco?",          client: "Duh Lanches",  tag: "Produto",   frame: "03" },
-  { id: 4, file: "/rec/duh-carnaval.mp4",        title: "Preparada pro Carnaval",  client: "Duh Lanches",  tag: "Ação",      frame: "04" },
-  { id: 5, file: "/rec/duh-depoimento.mp4",      title: "Depoimento real",         client: "Duh Lanches",  tag: "Social",    frame: "05" },
-  { id: 6, file: "/rec/vt-hp.mp4",              title: "VT Institucional",         client: "HP",           tag: "VT",        frame: "06" },
-];
-
-// ── Drop SVG ─────────────────────────────────────────────────────────────────
+// ── Drop SVG ──────────────────────────────────────────────────────────────────
 function RecDrop({ size = 130, phase = "purple" }: { size?: number; phase?: "purple" | "red" }) {
   const isRed = phase === "red";
-  const c1 = isRed ? "#ff9a9a" : "#c4baff";
-  const c2 = isRed ? "#c0392b" : "#7b6ef6";
-  const c3 = isRed ? "#7a1a10" : "#3a2a9a";
-  const glow = isRed
+  const c1    = isRed ? "#ff9a9a" : "#c4baff";
+  const c2    = isRed ? "#c0392b" : "#7b6ef6";
+  const c3    = isRed ? "#7a1a10" : "#3a2a9a";
+  const glow  = isRed
     ? "drop-shadow(0 0 36px rgba(192,57,43,0.8)) drop-shadow(0 0 90px rgba(192,57,43,0.35))"
     : "drop-shadow(0 0 28px rgba(123,110,246,0.6)) drop-shadow(0 0 60px rgba(123,110,246,0.2))";
   return (
     <svg viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ width: size, height: Math.round(size * 1.3), filter: glow, transition: "filter 1.4s ease" }}>
       <defs>
-        <linearGradient id="rdg" x1="0.3" y1="0" x2="0.7" y2="1">
-          <stop offset="0%"   stopColor={c1} style={{ transition: "stop-color 1.4s ease" }} />
-          <stop offset="45%"  stopColor={c2} style={{ transition: "stop-color 1.4s ease" }} />
-          <stop offset="100%" stopColor={c3} style={{ transition: "stop-color 1.4s ease" }} />
+        <linearGradient id={`rdg-${phase}`} x1="0.3" y1="0" x2="0.7" y2="1">
+          <stop offset="0%"   stopColor={c1} />
+          <stop offset="45%"  stopColor={c2} />
+          <stop offset="100%" stopColor={c3} />
         </linearGradient>
         <linearGradient id="rdshine" x1="0" y1="0" x2="0.6" y2="0.6">
           <stop offset="0%"   stopColor="rgba(255,255,255,0.25)" />
           <stop offset="100%" stopColor="rgba(255,255,255,0)" />
         </linearGradient>
       </defs>
-      <path d="M100 18 C148 78 178 122 178 165 C178 218 143 250 100 250 C57 250 22 218 22 165 C22 122 52 78 100 18Z" fill={c2} opacity="0.15" style={{ transition: "fill 1.4s ease" }} />
-      <path d="M100 22 C146 80 174 123 174 164 C174 215 141 247 100 247 C59 247 26 215 26 164 C26 123 54 80 100 22Z" fill="url(#rdg)" />
+      <path d="M100 18 C148 78 178 122 178 165 C178 218 143 250 100 250 C57 250 22 218 22 165 C22 122 52 78 100 18Z" fill={c2} opacity="0.15" />
+      <path d="M100 22 C146 80 174 123 174 164 C174 215 141 247 100 247 C59 247 26 215 26 164 C26 123 54 80 100 22Z" fill={`url(#rdg-${phase})`} />
       <path d="M70 58 C78 46 92 38 104 37 C92 78 74 112 63 143 C50 114 56 76 70 58Z" fill="url(#rdshine)" />
       <ellipse cx="80" cy="82" rx="6" ry="9" fill="rgba(255,255,255,0.18)" />
     </svg>
   );
 }
 
-// ── VideoCard — card com vídeo real ──────────────────────────────────────────
-function VideoCard({ video, active, onClick }: {
-  video: typeof VIDEOS[0];
-  active: boolean;
-  onClick: () => void;
-}) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [hovered, setHovered] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (hovered) {
-      el.play().catch(() => undefined);
-    } else {
-      el.pause();
-      el.currentTime = 0;
-    }
-  }, [hovered]);
-
-  // Pause when card goes off screen
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (!entry.isIntersecting) { el.pause(); el.currentTime = 0; } },
-      { threshold: 0.1 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  return (
-    <div
-      className="rec-card"
-      data-pos={active ? "0" : "1"}
-      style={{ cursor: "pointer", position: "relative", overflow: "hidden" }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={onClick}
-    >
-      {/* Vídeo real como fundo */}
-      <video
-        ref={ref}
-        src={video.file}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          objectFit: "cover",
-          opacity: hovered ? 1 : 0,
-          transition: "opacity .5s ease",
-        }}
-      />
-
-      {/* Overlay escuro quando não está em hover */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: hovered
-          ? "linear-gradient(to top, rgba(10,8,6,0.92) 0%, rgba(10,8,6,0.3) 60%, transparent 100%)"
-          : `linear-gradient(155deg, rgba(8,4,2,0.90) 0%, rgba(25,12,6,0.82) 55%, rgba(10,6,4,0.94) 100%), url('${CAIS}') center/cover`,
-        transition: "background .5s ease",
-      }} />
-
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: "1.2rem" }}>
-        {/* Topo */}
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".2em", color: R.red }}>{video.frame}</span>
-          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>{video.tag}</span>
-        </div>
-
-        {/* Ícone central */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "relative", width: "64px", height: "64px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: `1px solid ${R.red}60`, borderLeft: `1px solid ${R.red}60` }} />
-            <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: `1px solid ${R.red}60`, borderRight: `1px solid ${R.red}60` }} />
-            <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: `1px solid ${R.red}60`, borderLeft: `1px solid ${R.red}60` }} />
-            <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `1px solid ${R.red}60`, borderRight: `1px solid ${R.red}60` }} />
-            <Play style={{ width: "20px", height: "20px", color: hovered ? R.red : R.text, opacity: hovered ? 1 : 0.45, transition: "color .3s, opacity .3s" }} strokeWidth={1.5} />
-          </div>
-        </div>
-
-        {/* Rodapé */}
-        <div>
-          <p style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted, marginBottom: ".3rem" }}>
-            {video.client} · LOKAT.REC
-          </p>
-          <p style={{ ...R.grotesk, fontSize: "1.3rem", fontWeight: 700, color: R.text, lineHeight: 1, marginBottom: ".2rem", letterSpacing: "-.01em" }}>
-            {video.title.toUpperCase()}
-          </p>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(to right, ${R.red}, ${R.red}50, transparent)` }} />
-        <div style={{ position: "absolute", top: 0, left: 0, width: "2px", height: "30%", background: `linear-gradient(to bottom, ${R.red}70, transparent)` }} />
-      </div>
-
-      <div style={{ position: "absolute", inset: 0, border: "1px solid rgba(255,255,255,0.07)", pointerEvents: "none" }} />
-      <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
-    </div>
-  );
-}
-
-// ── VideoModal — player completo ao clicar no card ──────────────────────────
-function VideoModal({ video, onClose }: { video: typeof VIDEOS[0]; onClose: () => void }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(false);
+// ── Modal de vídeo ────────────────────────────────────────────────────────────
+function VideoModal({ video, onClose }: { video: RecVideo; onClose: () => void }) {
+  const ref       = useRef<HTMLVideoElement>(null);
+  const [muted,   setMuted]   = useState(false);
   const [playing, setPlaying] = useState(true);
 
   useEffect(() => {
-    ref.current?.play().catch(() => undefined);
-  }, []);
+    if (video.video_url) ref.current?.play().catch(() => undefined);
+  }, [video.video_url]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -200,69 +97,188 @@ function VideoModal({ video, onClose }: { video: typeof VIDEOS[0]; onClose: () =
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(4,3,2,0.96)", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}
-    >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(4,3,2,0.97)", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "900px", position: "relative" }}>
-        <video
-          ref={ref}
-          src={video.file}
-          muted={muted}
-          loop
-          playsInline
-          controls={false}
-          style={{ width: "100%", display: "block", background: "#000" }}
-        />
 
-        {/* Controles */}
-        <div style={{ position: "absolute", bottom: "1rem", left: "1rem", display: "flex", gap: ".5rem" }}>
-          <button onClick={togglePlay} style={{ width: "36px", height: "36px", background: "rgba(10,8,6,0.8)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            {playing ? <Pause style={{ width: "14px", height: "14px" }} /> : <Play style={{ width: "14px", height: "14px" }} />}
-          </button>
-          <button onClick={() => { setMuted((m) => !m); }} style={{ width: "36px", height: "36px", background: "rgba(10,8,6,0.8)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            {muted ? <VolumeX style={{ width: "14px", height: "14px" }} /> : <Volume2 style={{ width: "14px", height: "14px" }} />}
-          </button>
-        </div>
+        {video.video_url ? (
+          <video ref={ref} src={video.video_url} muted={muted} loop playsInline controls={false}
+            style={{ width: "100%", display: "block", background: "#000", maxHeight: "80vh", objectFit: "contain" }} />
+        ) : (
+          <div style={{ width: "100%", aspectRatio: "16/9", background: "#1a1210", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <p style={{ ...R.mono, fontSize: ".65rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted }}>Arquivo indisponível</p>
+          </div>
+        )}
 
-        {/* Info */}
+        {video.video_url && (
+          <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem" }}>
+            <button onClick={togglePlay} style={{ width: "36px", height: "36px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              {playing ? <Pause style={{ width: "14px" }} /> : <Play style={{ width: "14px" }} />}
+            </button>
+            <button onClick={() => setMuted((m) => !m)} style={{ width: "36px", height: "36px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              {muted ? <VolumeX style={{ width: "12px" }} /> : <Volume2 style={{ width: "12px" }} />}
+            </button>
+          </div>
+        )}
+
         <div style={{ position: "absolute", top: "-2.5rem", left: 0, display: "flex", gap: "1rem", alignItems: "baseline" }}>
-          <span style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.red }}>{video.tag}</span>
+          {video.category && <span style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.red }}>{video.category}</span>}
           <span style={{ ...R.grotesk, fontSize: ".9rem", fontWeight: 700, color: R.text }}>{video.title}</span>
-          <span style={{ ...R.mono, fontSize: ".44rem", color: R.muted }}>{video.client}</span>
+          {video.client_name && <span style={{ ...R.mono, fontSize: ".44rem", color: R.muted }}>{video.client_name}</span>}
         </div>
-
-        {/* Fechar */}
-        <button onClick={onClose} style={{ position: "absolute", top: "-2.5rem", right: 0, ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer" }}>
-          ✕ fechar
-        </button>
+        <button onClick={onClose} style={{ position: "absolute", top: "-2.5rem", right: 0, ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer" }}>✕ fechar</button>
       </div>
     </div>
   );
 }
 
-// ── FeedbackSection — depoimento em vídeo ───────────────────────────────────
-function FeedbackSection() {
+// ── Card do portfolio — deck com profundidade ─────────────────────────────────
+function PortfolioCard({ video, position, onActivate, onOpen }: {
+  video: RecVideo;
+  position: number;   // -1 | 0 | 1  (0 = ativo)
+  onActivate: () => void;
+  onOpen:     () => void;
+}) {
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const isActive  = position === 0;
+  const [hov, setHov] = useState(false);
+
+  // Toca preview muted só quando ativo + hover
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !video.video_url) return;
+    if (isActive && hov) { el.play().catch(() => undefined); }
+    else                 { el.pause(); el.currentTime = 0; }
+  }, [isActive, hov, video.video_url]);
+
+  // Pausa quando sai da viewport
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (!e.isIntersecting) { el.pause(); el.currentTime = 0; } }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const styles: Record<string, React.CSSProperties> = {
+    "-1": { transform: "translateX(-52%) scale(0.78) rotate(-4deg)", opacity: 0.55, zIndex: 1 },
+     "0": { transform: "translateX(0) scale(1) rotate(0deg)",        opacity: 1,    zIndex: 3 },
+     "1": { transform: "translateX(52%) scale(0.78) rotate(4deg)",   opacity: 0.55, zIndex: 1 },
+  };
+  const st = styles[String(Math.max(-1, Math.min(1, position)))] ?? { transform: "scale(0.5)", opacity: 0, zIndex: 0 };
+
+  return (
+    <div
+      onClick={isActive ? onOpen : onActivate}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        position: "absolute",
+        width: "320px", height: "400px",
+        left: "50%", top: "50%",
+        marginLeft: "-160px", marginTop: "-200px",
+        overflow: "hidden",
+        cursor: "pointer",
+        border: `1px solid ${isActive ? `${R.red}60` : R.border}`,
+        transition: "transform .55s cubic-bezier(.22,.68,0,1.2), opacity .4s ease, border-color .3s",
+        ...st,
+      }}
+    >
+      {/* Vídeo preview */}
+      {video.video_url && (
+        <video ref={videoRef} src={video.video_url} muted loop playsInline preload="metadata"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: hov && isActive ? 1 : 0, transition: "opacity .5s ease" }} />
+      )}
+
+      {/* Fundo */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: hov && isActive && video.video_url
+          ? "linear-gradient(to top, rgba(10,8,6,0.96) 0%, rgba(10,8,6,0.35) 50%, transparent 100%)"
+          : `linear-gradient(155deg, rgba(8,4,2,0.93) 0%, rgba(22,10,5,0.84) 55%, rgba(10,6,4,0.96) 100%), url('${CAIS}') center/cover`,
+        transition: "background .5s ease",
+      }} />
+
+      {/* Cantos do viewfinder — apenas no card ativo */}
+      {isActive && (
+        <>
+          <div style={{ position: "absolute", top: "1rem", left: "1rem",  width: "16px", height: "16px", borderTop: `2px solid ${R.red}90`, borderLeft: `2px solid ${R.red}90` }} />
+          <div style={{ position: "absolute", top: "1rem", right: "1rem", width: "16px", height: "16px", borderTop: `2px solid ${R.red}50`, borderRight: `2px solid ${R.red}50` }} />
+          <div style={{ position: "absolute", bottom: "1rem", left: "1rem",  width: "16px", height: "16px", borderBottom: `2px solid ${R.red}90`, borderLeft: `2px solid ${R.red}90` }} />
+          <div style={{ position: "absolute", bottom: "1rem", right: "1rem", width: "16px", height: "16px", borderBottom: `2px solid ${R.red}50`, borderRight: `2px solid ${R.red}50` }} />
+          {/* Linha inferior */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(to right, ${R.red}, ${R.red}40, transparent)` }} />
+          {/* Linha lateral esquerda */}
+          <div style={{ position: "absolute", top: 0, left: 0, width: "2px", height: "35%", background: `linear-gradient(to bottom, ${R.red}60, transparent)` }} />
+        </>
+      )}
+
+      {/* Conteúdo */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: "1.2rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".2em", color: isActive ? R.red : R.muted }}>
+            {String(video.sort_order + 1).padStart(2, "0")}
+          </span>
+          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
+            {video.category ?? ""}
+          </span>
+        </div>
+
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "relative", width: "64px", height: "64px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* Anel orbital no card ativo */}
+            {isActive && (
+              <div className="rec-card-orbit" style={{ position: "absolute", inset: "-10px", border: `1px solid ${R.red}30`, borderRadius: "50%" }} />
+            )}
+            <Play style={{ width: "22px", height: "22px", color: isActive ? R.red : R.muted, opacity: isActive ? 0.9 : 0.4 }} strokeWidth={1.5} />
+          </div>
+        </div>
+
+        <div>
+          <p style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted, marginBottom: ".3rem" }}>
+            {video.client_name ?? "LOKAT.REC"}
+          </p>
+          <p style={{ ...R.grotesk, fontSize: "1.15rem", fontWeight: 700, color: isActive ? R.text : "#7a6a5a", lineHeight: 1, letterSpacing: "-.01em" }}>
+            {video.title.toUpperCase()}
+          </p>
+          {isActive && video.video_url && (
+            <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", color: `${R.muted}90`, marginTop: ".35rem" }}>
+              passe o mouse para preview · clique para abrir
+            </p>
+          )}
+          {isActive && !video.video_url && (
+            <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", color: `${R.muted}70`, marginTop: ".35rem" }}>
+              vídeo em breve
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
+    </div>
+  );
+}
+
+// ── Seção de feedback/depoimento Sandubão ─────────────────────────────────────
+function FeedbackSection({ video }: { video: RecVideo | null }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const videoRef   = useRef<HTMLVideoElement>(null);
-  const [visible, setVisible]   = useState(false);
-  const [playing, setPlaying]   = useState(false);
-  const [muted,   setMuted]     = useState(true);
+  const [visible,  setVisible]  = useState(false);
+  const [playing,  setPlaying]  = useState(false);
+  const [muted,    setMuted]    = useState(true);
 
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { setVisible(true); return; }
     const obs = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     );
-    if (prefersReduced) { setVisible(true); }
-    else { obs.observe(el); }
+    obs.observe(el);
     return () => obs.disconnect();
   }, []);
 
-  // Pause when out of view
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -276,120 +292,92 @@ function FeedbackSection() {
 
   const togglePlay = () => {
     const el = videoRef.current;
-    if (!el) return;
+    if (!el || !video?.video_url) return;
     if (el.paused) { el.play().catch(() => undefined); setPlaying(true); }
     else           { el.pause(); setPlaying(false); }
   };
 
   return (
     <section ref={sectionRef} style={{ position: "relative", padding: "8rem 0", overflow: "hidden" }}>
-      {/* Fundo */}
       <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${R.bg} 0%, #100c06 50%, ${R.bg} 100%)`, pointerEvents: "none" }} />
       <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.5 }} />
-      {/* Acento vermelho */}
-      <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "40%", background: `linear-gradient(to bottom, transparent, ${R.red}50, transparent)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "40%", background: `linear-gradient(to bottom, transparent, ${R.red}45, transparent)`, pointerEvents: "none" }} />
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
-        {/* Label */}
-        <div style={{
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(20px)",
-          transition: "opacity .7s ease, transform .7s ease",
-          marginBottom: "3rem",
-        }}>
+
+        {/* Título */}
+        <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)", transition: "opacity .7s ease, transform .7s ease", marginBottom: "3rem" }}>
           <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".4rem" }}>[Feedback real]</p>
           <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,3.5vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
-            O resultado<br />em palavras.
+            Cliente falando<br />vale mais que promessa.
           </h2>
+          <p style={{ ...R.grotesk, fontSize: ".9rem", color: R.muted, marginTop: ".6rem", maxWidth: "480px" }}>
+            Um feedback real de quem passou por reposicionamento, criativos e retomada de presença.
+          </p>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4rem", alignItems: "center" }}>
-          {/* Vídeo de feedback */}
-          <div style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? "translateY(0)" : "translateY(30px)",
-            transition: "opacity .8s .1s ease, transform .8s .1s ease",
-            position: "relative",
-          }}>
+          {/* Vídeo */}
+          <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)", transition: "opacity .8s .1s ease, transform .8s .1s ease" }}>
             <div style={{ position: "relative", border: `1px solid ${R.border}`, overflow: "hidden" }}>
-              <video
-                ref={videoRef}
-                src="/rec/feedback-duh.mp4"
-                muted={muted}
-                playsInline
-                preload="metadata"
-                style={{ width: "100%", display: "block", background: "#0a0806", aspectRatio: "9/16", objectFit: "cover" }}
-              />
-
-              {/* Overlay play */}
-              {!playing && (
-                <div
-                  onClick={togglePlay}
-                  style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,8,6,0.5)", cursor: "pointer" }}
-                >
-                  <div style={{ width: "60px", height: "60px", border: `1px solid ${R.red}80`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${R.red}22`, backdropFilter: "blur(4px)" }}>
-                    <Play style={{ width: "22px", height: "22px", color: R.red, marginLeft: "2px" }} strokeWidth={1.5} />
+              {video?.video_url ? (
+                <>
+                  <video ref={videoRef} src={video.video_url} muted={muted} playsInline preload="metadata"
+                    style={{ width: "100%", display: "block", background: "#0a0806", aspectRatio: "9/16", objectFit: "cover" }} />
+                  {!playing && (
+                    <div onClick={togglePlay} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,8,6,0.5)", cursor: "pointer" }}>
+                      <div style={{ width: "60px", height: "60px", border: `1px solid ${R.red}80`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: `${R.red}22`, backdropFilter: "blur(4px)" }}>
+                        <Play style={{ width: "22px", height: "22px", color: R.red, marginLeft: "2px" }} strokeWidth={1.5} />
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem" }}>
+                    <button onClick={togglePlay} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      {playing ? <Pause style={{ width: "12px" }} /> : <Play style={{ width: "12px" }} />}
+                    </button>
+                    <button onClick={() => setMuted((m) => !m)} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      {muted ? <VolumeX style={{ width: "12px" }} /> : <Volume2 style={{ width: "12px" }} />}
+                    </button>
                   </div>
+                </>
+              ) : (
+                <div style={{ width: "100%", aspectRatio: "9/16", background: "#14100a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: ".75rem" }}>
+                  <Video style={{ width: "32px", height: "32px", color: R.muted, opacity: 0.4 }} strokeWidth={1} />
+                  <p style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, opacity: 0.6 }}>Depoimento em breve</p>
                 </div>
               )}
-
-              {/* Controles */}
-              <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem" }}>
-                <button onClick={togglePlay} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  {playing ? <Pause style={{ width: "12px" }} /> : <Play style={{ width: "12px" }} />}
-                </button>
-                <button onClick={() => setMuted((m) => !m)} style={{ width: "32px", height: "32px", background: "rgba(10,8,6,0.85)", border: `1px solid ${R.border}`, color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  {muted ? <VolumeX style={{ width: "12px" }} /> : <Volume2 style={{ width: "12px" }} />}
-                </button>
-              </div>
-
-              {/* Cantos de frame */}
               <div style={{ position: "absolute", top: ".75rem", left: ".75rem", width: "14px", height: "14px", borderTop: `1px solid ${R.red}55`, borderLeft: `1px solid ${R.red}55`, pointerEvents: "none" }} />
-              <div style={{ position: "absolute", top: ".75rem", right: ".75rem", width: "14px", height: "14px", borderTop: `1px solid ${R.red}30`, borderRight: `1px solid ${R.red}30`, pointerEvents: "none" }} />
               <div style={{ position: "absolute", bottom: ".75rem", right: ".75rem", width: "14px", height: "14px", borderBottom: `1px solid ${R.red}30`, borderRight: `1px solid ${R.red}30`, pointerEvents: "none" }} />
             </div>
-
-            {/* Tag do cliente */}
             <div style={{ marginTop: ".75rem", display: "flex", alignItems: "center", gap: ".6rem" }}>
               <div style={{ width: "6px", height: "6px", background: R.red, borderRadius: "50%", flexShrink: 0 }} />
               <span style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>
-                Duh Lanches · Fortaleza — CE
+                Sandubão · Hamburgueria · Fortaleza — CE
               </span>
             </div>
           </div>
 
-          {/* Contexto textual */}
-          <div style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? "translateY(0)" : "translateY(30px)",
-            transition: "opacity .8s .25s ease, transform .8s .25s ease",
-          }}>
-            <div style={{ ...R.mono, fontSize: "3rem", color: R.red, opacity: 0.4, lineHeight: 1, marginBottom: ".5rem" }}>"</div>
-            <p style={{ ...R.grotesk, fontSize: "1.15rem", fontWeight: 600, color: R.text, lineHeight: 1.5, marginBottom: "1.5rem" }}>
-              Quem assiste, para.
+          {/* Texto do case */}
+          <div style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)", transition: "opacity .8s .25s ease, transform .8s .25s ease" }}>
+            <div style={{ ...R.mono, fontSize: "3rem", color: R.red, opacity: 0.35, lineHeight: 1, marginBottom: ".5rem" }}>"</div>
+            <p style={{ ...R.grotesk, fontSize: "1.1rem", fontWeight: 600, color: R.text, lineHeight: 1.45, marginBottom: "1.5rem" }}>
+              A Sandubão já tinha história, mas precisava voltar para o jogo com clareza.
             </p>
-            <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.75, color: R.muted, marginBottom: "2rem" }}>
-              Os vídeos da Duh Lanches foram produzidos para parar o scroll. Cada peça tem roteiro, direção de cena e edição alinhados à identidade da marca — o resultado fala por si.
+            <p style={{ ...R.grotesk, fontSize: ".88rem", lineHeight: 1.8, color: R.muted, marginBottom: "2rem" }}>
+              A marca já existia no mercado, mas uma pausa na operação dificultou a retomada. O trabalho foi reorganizar a comunicação, reacostumar o público e voltar a vender com mais clareza — sem parecer recomeço forçado.
             </p>
-
-            {/* Stats simples */}
-            <div style={{ display: "flex", flexDirection: "column", gap: ".75rem", borderLeft: `2px solid ${R.red}40`, paddingLeft: "1.2rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: ".75rem", borderLeft: `2px solid ${R.red}35`, paddingLeft: "1.2rem" }}>
               {[
-                ["Cliente",    "Duh Lanches"],
-                ["Serviço",    "Reels + VTs + Depoimento"],
-                ["Localidade", "Fortaleza — CE"],
+                ["Cliente",   "Sandubão"],
+                ["Nicho",     "Hamburgueria"],
+                ["Serviço",   "Remarketing · Posicionamento · Criativos"],
+                ["Resultado", "Retomada de presença e comunicação organizada"],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: "flex", gap: ".75rem", alignItems: "baseline" }}>
                   <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, minWidth: "80px" }}>{k}</span>
                   <span style={{ ...R.grotesk, fontSize: ".82rem", fontWeight: 600, color: R.text }}>{v}</span>
                 </div>
               ))}
-            </div>
-
-            <div style={{ marginTop: "2rem" }}>
-              <span style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
-                ■ PRODUÇÃO AUDIOVISUAL · LOKAT.REC
-              </span>
             </div>
           </div>
         </div>
@@ -398,16 +386,19 @@ function FeedbackSection() {
   );
 }
 
-// ── Página principal ─────────────────────────────────────────────────────────
+// ── Página ────────────────────────────────────────────────────────────────────
 export default function LokatRecPage() {
   const [introComplete, setIntroComplete] = useState(false);
   const [dropPhase,     setDropPhase]     = useState<"purple" | "red">("purple");
-  const [activeCard,    setActiveCard]    = useState(0);
-  const [modalVideo,    setModalVideo]    = useState<typeof VIDEOS[0] | null>(null);
+  const [activeIdx,     setActiveIdx]     = useState(0);
+  const [modalVideo,    setModalVideo]    = useState<RecVideo | null>(null);
+  const [videos,        setVideos]        = useState<RecVideo[]>([]);
+  const [feedbackVideo, setFeedbackVideo] = useState<RecVideo | null>(null);
+  const [dataLoaded,    setDataLoaded]    = useState(false);
 
-  const portfolioRef  = useRef<HTMLDivElement>(null);
-  const quemSomosRef  = useRef<HTMLDivElement>(null);
-  const contatoRef    = useRef<HTMLDivElement>(null);
+  const portfolioRef = useRef<HTMLDivElement>(null);
+  const quemRef      = useRef<HTMLDivElement>(null);
+  const contatoRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t1 = setTimeout(() => setDropPhase("red"), 800);
@@ -415,409 +406,329 @@ export default function LokatRecPage() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // Buscar vídeos do Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setVideos(FALLBACK_VIDEOS);
+      setDataLoaded(true);
+      return;
+    }
+    void getPublicRecVideos().then((data) => {
+      const feedback = data.find((v) => v.is_feedback && v.is_featured) ?? data.find((v) => v.is_feedback) ?? null;
+      const cards    = data.filter((v) => v.show_in_cards && !v.is_feedback);
+      setFeedbackVideo(feedback);
+      setVideos(cards.length > 0 ? cards : FALLBACK_VIDEOS);
+      setDataLoaded(true);
+    }).catch(() => {
+      setVideos(FALLBACK_VIDEOS);
+      setDataLoaded(true);
+    });
+  }, []);
+
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>
     ref.current?.scrollIntoView({ behavior: "smooth" });
 
-  const prevCard = useCallback(() => setActiveCard((i) => (i - 1 + VIDEOS.length) % VIDEOS.length), []);
-  const nextCard = useCallback(() => setActiveCard((i) => (i + 1) % VIDEOS.length), []);
-  const getPos = useCallback((index: number) => {
-    let pos = index - activeCard;
-    if (pos > 2) pos -= VIDEOS.length;
-    if (pos < -2) pos += VIDEOS.length;
-    return pos;
-  }, [activeCard]);
+  const prev = useCallback(() => setActiveIdx((i) => (i - 1 + videos.length) % videos.length), [videos.length]);
+  const next = useCallback(() => setActiveIdx((i) => (i + 1) % videos.length), [videos.length]);
+
+  const getPos = useCallback((idx: number) => {
+    let p = idx - activeIdx;
+    const half = Math.floor(videos.length / 2);
+    if (p > half)  p -= videos.length;
+    if (p < -half) p += videos.length;
+    return Math.max(-1, Math.min(1, p));
+  }, [activeIdx, videos.length]);
 
   return (
     <div style={{ background: R.bg, color: R.text, minHeight: "100vh", overflowX: "hidden" }}>
 
-      {/* Modal de vídeo */}
       {modalVideo && <VideoModal video={modalVideo} onClose={() => setModalVideo(null)} />}
 
-      {/* ══ INTRO ═══════════════════════════════════════════════════ */}
+      {/* ── INTRO ────────────────────────────────────────────────── */}
       {!introComplete && (
-        <div className="rec-intro-overlay" style={{
-          position: "fixed", inset: 0, zIndex: 100, background: R.bg,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem",
-        }}>
+        <div className="rec-intro-overlay" style={{ position: "fixed", inset: 0, zIndex: 100, background: R.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem" }}>
           <div className={`rec-drop-float ${dropPhase === "red" ? "rec-drop-morph" : ""}`}>
             <RecDrop size={110} phase={dropPhase} />
           </div>
-          <div style={{ textAlign: "center" }}>
-            <span style={{ ...R.mono, fontSize: ".65rem", letterSpacing: ".3em", textTransform: "uppercase", color: dropPhase === "red" ? R.red : "#7b6ef6", transition: "color 1.4s ease" }}>
-              LOKAT.REC
-            </span>
-          </div>
+          <span style={{ ...R.mono, fontSize: ".65rem", letterSpacing: ".3em", textTransform: "uppercase", color: dropPhase === "red" ? R.red : "#7b6ef6", transition: "color 1.4s ease" }}>
+            LOKAT.REC
+          </span>
         </div>
       )}
 
-      {/* ══ MENU ════════════════════════════════════════════════════ */}
-      <header className="rec-menu-in" style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: ".9rem 2rem",
-        background: "rgba(10,8,6,0.92)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
-        borderBottom: `1px solid ${R.border}`,
-      }}>
+      {/* ── NAV ──────────────────────────────────────────────────── */}
+      <header className="rec-menu-in" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".9rem 2rem", background: "rgba(10,8,6,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderBottom: `1px solid ${R.border}` }}>
         <span style={{ ...R.mono, fontSize: ".82rem", letterSpacing: ".08em", fontWeight: 700, color: R.text }}>
           LOKAT<span style={{ color: R.red }}>.</span><span style={{ color: R.red }}>REC</span>
         </span>
-
-        <nav style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
-          {[
-            { label: "Trabalhos",  ref: portfolioRef },
-            { label: "Quem somos", ref: quemSomosRef },
-            { label: "Contato",    ref: contatoRef },
-          ].map(({ label, ref }) => (
-            <button key={label} onClick={() => scrollTo(ref)}
-              style={{ ...R.mono, fontSize: ".62rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer", transition: "color .2s", padding: 0 }}
+        <nav style={{ display: "flex", gap: "2rem" }}>
+          {[["Trabalhos", portfolioRef], ["Quem somos", quemRef], ["Contato", contatoRef]] .map(([label, ref]) => (
+            <button key={label as string} onClick={() => scrollTo(ref as React.RefObject<HTMLDivElement>)}
+              style={{ ...R.mono, fontSize: ".62rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color .2s" }}
               onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
               onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
-            >{label}</button>
+            >{label as string}</button>
           ))}
         </nav>
-
-        <Link href="/"
-          style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none", display: "flex", alignItems: "center", gap: ".4rem", transition: "color .2s" }}
+        <Link href="/" style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none", display: "flex", alignItems: "center", gap: ".4rem", transition: "color .2s" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
           onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
-        >
-          <ArrowLeft style={{ width: "12px", height: "12px" }} /> LOKAT OS
-        </Link>
+        ><ArrowLeft style={{ width: "12px" }} /> LOKAT OS</Link>
       </header>
 
-      {/* ══ HERO ════════════════════════════════════════════════════ */}
-      <section style={{
-        position: "relative", minHeight: "100vh", paddingTop: "5rem", overflow: "hidden",
-        ...caisOverlay("hero", "center 55%"),
-      }}>
+      {/* ── HERO ─────────────────────────────────────────────────── */}
+      <section style={{ position: "relative", minHeight: "100vh", paddingTop: "5rem", overflow: "hidden", ...caisOverlay("hero", "center 55%") }}>
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "10%", left: "15%", width: "500px", height: "160px", background: `radial-gradient(ellipse 80% 60% at 35% 100%, ${R.red}10 0%, transparent 80%)`, pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "2px", background: `linear-gradient(to bottom, transparent, ${R.red}28 30%, ${R.red}18 70%, transparent)`, pointerEvents: "none" }} />
 
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "12vh 2rem 8rem", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2rem", position: "relative", zIndex: 1 }}>
-
-          <div className="rec-hero-in" style={{ display: "flex", alignItems: "center", gap: "1.4rem" }}>
-            <div className="rec-drop-float">
-              <RecDrop size={52} phase="red" />
-            </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "14vh 2rem 6rem", position: "relative", zIndex: 1 }}>
+          <div className="rec-hero-in" style={{ display: "flex", alignItems: "center", gap: "1.4rem", marginBottom: "2rem" }}>
+            <div className="rec-drop-float"><RecDrop size={52} phase="red" /></div>
             <div>
-              <span style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".24em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".3rem" }}>
-                Produção audiovisual · Fortaleza CE
-              </span>
+              <span style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".24em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".3rem" }}>Produção audiovisual · Fortaleza CE</span>
               <div style={{ height: "1px", width: "80px", background: `linear-gradient(to right, ${R.red}, transparent)` }} />
             </div>
           </div>
 
-          {/* Headline melhorada — mais direta, menos genérica */}
-          <h1 className="rec-hero-in-d1"
-            style={{ ...R.grotesk, fontSize: "clamp(2.2rem, 6vw, 4.8rem)", fontWeight: 700, lineHeight: .96, letterSpacing: "-.03em", color: R.text, maxWidth: "820px" }}
-          >
+          <h1 className="rec-hero-in-d1" style={{ ...R.grotesk, fontSize: "clamp(2rem,5.5vw,4.2rem)", fontWeight: 700, lineHeight: .96, letterSpacing: "-.03em", color: R.text, maxWidth: "680px", marginBottom: "1.5rem" }}>
             Vídeos com<br />
             <em style={{ fontStyle: "italic", color: R.red }}>direção, ritmo</em><br />
             e intenção.
           </h1>
 
-          <span className="rec-divider rec-hero-in-d2" />
+          <span className="rec-divider rec-hero-in-d2" style={{ display: "block", marginBottom: "1.5rem" }} />
 
-          <p className="rec-hero-in-d2"
-            style={{ ...R.grotesk, fontSize: ".95rem", lineHeight: 1.75, color: R.muted, maxWidth: "440px" }}
-          >
-            Criamos vídeos e campanhas para marcas locais que precisam vender, posicionar e aparecer com consistência.
-            Da ideia ao corte final.
+          <p className="rec-hero-in-d2" style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.75, color: R.muted, maxWidth: "400px", marginBottom: "2rem" }}>
+            Campanhas, reels e peças audiovisuais para marcas locais venderem melhor sem parecer anúncio barato.
           </p>
 
           <div className="rec-hero-in-d3" style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            <button onClick={() => scrollTo(portfolioRef)}
-              style={{ background: R.red, color: "#fff", padding: ".85rem 2.2rem", ...R.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: ".5rem" }}
-            >
-              <Play style={{ width: "14px", height: "14px" }} strokeWidth={2} /> Ver trabalhos
+            <button onClick={() => scrollTo(portfolioRef)} style={{ background: R.red, color: "#fff", padding: ".85rem 2rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: ".5rem" }}>
+              <Play style={{ width: "14px" }} strokeWidth={2} /> Ver trabalhos
             </button>
-            <button onClick={() => scrollTo(contatoRef)}
-              style={{ background: "rgba(10,8,6,0.6)", color: R.text, border: `1px solid ${R.border}`, padding: ".85rem 2rem", ...R.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", backdropFilter: "blur(8px)" }}
+            <button onClick={() => scrollTo(contatoRef)} style={{ background: "rgba(10,8,6,0.6)", color: R.text, border: `1px solid ${R.border}`, padding: ".85rem 1.8rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", backdropFilter: "blur(8px)" }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = R.red)}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = R.border)}
-            >
-              Falar sobre gravação
-            </button>
-          </div>
-
-          <div className="rec-hero-in-d3" style={{ display: "flex", gap: "2.5rem", paddingTop: "3rem", borderTop: `1px solid ${R.border}`, width: "100%", flexWrap: "wrap" }}>
-            {[
-              ["Localização",   "Fortaleza — CE"],
-              ["Desde",         "2022"],
-              ["Especialidade", "Audiovisual"],
-              ["Clientes",      "Marcas locais"],
-            ].map(([top, bot]) => (
-              <div key={top}>
-                <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>{top}</p>
-                <p style={{ ...R.grotesk, fontSize: ".82rem", fontWeight: 600, color: R.text, marginTop: ".15rem" }}>{bot}</p>
-              </div>
-            ))}
+            >Falar com a Lokat</button>
           </div>
         </div>
-
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "120px", background: `linear-gradient(to bottom, transparent, ${R.bg})`, pointerEvents: "none" }} />
       </section>
 
-      {/* ══ TRABALHOS — cards com vídeos reais ══════════════════════ */}
+      {/* ── PORTFOLIO / DECK DE CARTAS ─────────────────────────── */}
       <section ref={portfolioRef} style={{ padding: "6rem 0 8rem", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${R.bg} 0%, #100d08 40%, #14100a 60%, ${R.bg} 100%)`, pointerEvents: "none" }} />
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.5 }} />
 
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
-          <div className="rec-reveal" style={{ marginBottom: "4rem" }}>
+          <div style={{ marginBottom: "3rem" }}>
             <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Trabalhos]</p>
-            <h2 style={{ ...R.grotesk, fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
+            <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,4vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
               Passe o mouse.<br />O vídeo toca.
             </h2>
-            <p style={{ ...R.grotesk, fontSize: ".85rem", color: R.muted, marginTop: ".75rem" }}>
-              Clique para assistir em tela cheia com som.
+            <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.muted, marginTop: ".6rem" }}>
+              Clique no card ativo para assistir em tela cheia.
             </p>
           </div>
 
-          {/* Deck de cards */}
-          <div className="rec-deck">
-            {VIDEOS.map((video, index) => (
-              <VideoCard
-                key={video.id}
-                video={video}
-                active={index === activeCard}
-                onClick={() => setModalVideo(video)}
-              />
-            ))}
+          {/* Deck */}
+          <div className="rec-case-carousel" style={{ position: "relative", height: "440px", userSelect: "none" }}>
+            {dataLoaded
+              ? videos.map((video, idx) => {
+                  const pos    = getPos(idx);
+                  const hidden = Math.abs(pos) > 1;
+                  return (
+                    <div key={video.id} style={{ pointerEvents: hidden ? "none" : "auto" }}>
+                      <PortfolioCard
+                        video={video}
+                        position={pos}
+                        onActivate={() => setActiveIdx(idx)}
+                        onOpen={() => setModalVideo(video)}
+                      />
+                    </div>
+                  );
+                })
+              : (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <p style={{ ...R.mono, fontSize: ".55rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted }}>Carregando…</p>
+                </div>
+              )
+            }
           </div>
 
-          {/* Navegação */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2rem", marginTop: "3rem" }}>
-            <button onClick={prevCard}
+          {/* Nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2rem", marginTop: "2rem" }}>
+            <button onClick={prev} aria-label="Anterior"
               style={{ width: "44px", height: "44px", border: `1px solid ${R.border}`, background: "transparent", color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "border-color .2s" }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = R.red)}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = R.border)}
-            ><ChevronLeft style={{ width: "18px", height: "18px" }} strokeWidth={1.5} /></button>
+            ><ChevronLeft style={{ width: "18px" }} strokeWidth={1.5} /></button>
 
             <div style={{ display: "flex", gap: ".5rem" }}>
-              {VIDEOS.map((_, i) => (
-                <button key={i} onClick={() => setActiveCard(i)}
-                  style={{ width: i === activeCard ? "20px" : "6px", height: "6px", background: i === activeCard ? R.red : R.border, border: "none", cursor: "pointer", transition: "all .3s ease", padding: 0 }}
+              {videos.map((_, i) => (
+                <button key={i} onClick={() => setActiveIdx(i)}
+                  style={{ width: i === activeIdx ? "20px" : "6px", height: "6px", background: i === activeIdx ? R.red : R.border, border: "none", cursor: "pointer", transition: "all .3s ease", padding: 0 }}
                 />
               ))}
             </div>
 
-            <button onClick={nextCard}
+            <button onClick={next} aria-label="Próximo"
               style={{ width: "44px", height: "44px", border: `1px solid ${R.border}`, background: "transparent", color: R.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "border-color .2s" }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = R.red)}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = R.border)}
-            ><ChevronRight style={{ width: "18px", height: "18px" }} strokeWidth={1.5} /></button>
+            ><ChevronRight style={{ width: "18px" }} strokeWidth={1.5} /></button>
           </div>
 
-          <div style={{ textAlign: "center", marginTop: "2.5rem" }}>
-            <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.muted, marginBottom: ".3rem" }}>
-              {VIDEOS[activeCard].client} · {VIDEOS[activeCard].tag}
-            </p>
-            <p style={{ ...R.grotesk, fontSize: "1.4rem", fontWeight: 700, color: R.text }}>
-              {VIDEOS[activeCard].title}
-            </p>
+          {/* Label do card ativo */}
+          {videos[activeIdx] && (
+            <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
+              <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.muted }}>
+                {videos[activeIdx].client_name ?? "LOKAT.REC"} · {videos[activeIdx].category}
+              </p>
+              <p style={{ ...R.grotesk, fontSize: "1.25rem", fontWeight: 700, color: R.text, marginTop: ".2rem" }}>
+                {videos[activeIdx].title}
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── FEEDBACK SANDUBÃO ─────────────────────────────────────── */}
+      <FeedbackSection video={feedbackVideo} />
+
+      {/* ── PROCESSO ──────────────────────────────────────────────── */}
+      <section style={{ background: R.bg, padding: "6rem 0", position: "relative" }}>
+        <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.35 }} />
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
+          <div style={{ marginBottom: "3rem" }}>
+            <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Como fazemos]</p>
+            <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>Do roteiro ao resultado.</h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1px", background: R.border }}>
+            {[
+              { n: "01", t: "Roteiro",   d: "Briefing, conceito e estrutura do vídeo antes de ligar a câmera." },
+              { n: "02", t: "Captação",  d: "Direção de cena, enquadramento, luz e ritmo de produção no set." },
+              { n: "03", t: "Edição",    d: "Corte, trilha, texto e identidade visual alinhados à marca." },
+              { n: "04", t: "Resultado", d: "Peça pronta para publicação, campanha ou distribuição orgânica." },
+            ].map(({ n, t, d }) => (
+              <div key={n} style={{ background: R.bg, padding: "2rem 1.5rem" }}>
+                <span style={{ ...R.mono, fontSize: ".7rem", color: R.red, display: "block", marginBottom: ".75rem" }}>{n}</span>
+                <p style={{ ...R.grotesk, fontSize: "1rem", fontWeight: 700, color: R.text, marginBottom: ".5rem" }}>{t}</p>
+                <p style={{ ...R.grotesk, fontSize: ".8rem", lineHeight: 1.65, color: R.muted }}>{d}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ══ FEEDBACK — depoimento em vídeo ══════════════════════════ */}
-      <FeedbackSection />
-
-      {/* ══ QUEM SOMOS ══════════════════════════════════════════════ */}
-      <section ref={quemSomosRef} style={{ background: R.bg, position: "relative", overflow: "hidden" }}>
+      {/* ── QUEM SOMOS ────────────────────────────────────────────── */}
+      <section ref={quemRef} style={{ background: R.bg, position: "relative", overflow: "hidden" }}>
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.6 }} />
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "8rem 2rem", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "6rem 2rem", position: "relative", zIndex: 1 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "center" }}>
-
-            <div className="rec-reveal" style={{ position: "relative" }}>
-              <div style={{ width: "100%", aspectRatio: "4/5", position: "relative", overflow: "hidden", border: `1px solid ${R.border}`, ...caisOverlay("qs", "center 60%") }}>
+            <div>
+              <div style={{ width: "100%", aspectRatio: "4/5", overflow: "hidden", border: `1px solid ${R.border}`, ...caisOverlay("qs", "center 60%"), position: "relative" }}>
                 <div className="rec-grain" style={{ position: "absolute", inset: 0 }} />
-                <div style={{ position: "absolute", top: "42%", left: 0, right: 0, height: "1px", background: `linear-gradient(to right, transparent 5%, rgba(200,150,70,0.18) 30%, rgba(220,170,80,0.22) 55%, transparent 95%)` }} />
-                {[18, 36, 60, 76, 90].map((pct) => (
-                  <div key={pct} style={{ position: "absolute", bottom: `${pct}%`, left: "6%", right: "6%", height: "1px", background: `rgba(255,255,255,${pct > 42 ? "0.03" : "0.02"})` }} />
-                ))}
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", opacity: .06, zIndex: 1 }}>
-                  <RecDrop size={200} phase="red" />
+                <div style={{ position: "absolute", bottom: "2rem", left: "2rem", right: "2rem", zIndex: 1 }}>
+                  <p style={{ ...R.grotesk, fontSize: "2rem", fontWeight: 700, color: R.text, lineHeight: 1, opacity: .4 }}>QUEM</p>
+                  <p style={{ ...R.grotesk, fontSize: "2rem", fontWeight: 700, color: R.red, lineHeight: 1 }}>SOMOS.</p>
                 </div>
-                <div style={{ position: "absolute", top: "1rem", right: "1rem", width: "16px", height: "16px", borderTop: `1px solid ${R.red}55`, borderRight: `1px solid ${R.red}55` }} />
-                <div style={{ position: "absolute", top: "1rem", left: "1rem", width: "16px", height: "16px", borderTop: `1px solid ${R.red}30`, borderLeft: `1px solid ${R.red}30` }} />
-                <div style={{ position: "absolute", bottom: "1rem", left: "1rem", width: "16px", height: "16px", borderBottom: `1px solid ${R.red}55`, borderLeft: `1px solid ${R.red}55` }} />
-                <div style={{ position: "absolute", bottom: "1rem", right: "1rem", width: "16px", height: "16px", borderBottom: `1px solid ${R.red}30`, borderRight: `1px solid ${R.red}30` }} />
-                <div style={{ position: "absolute", top: "1.5rem", left: "50%", transform: "translateX(-50%)", ...R.mono, fontSize: ".38rem", letterSpacing: ".2em", color: R.muted, opacity: 0.45, zIndex: 1, whiteSpace: "nowrap" }}>LOKAT REC · CE · BR</div>
-                <div style={{ position: "absolute", bottom: "2.5rem", left: "2rem", right: "2rem", zIndex: 1 }}>
-                  <p style={{ ...R.grotesk, fontSize: "2.2rem", fontWeight: 700, color: R.text, lineHeight: 1, opacity: .42 }}>QUEM</p>
-                  <p style={{ ...R.grotesk, fontSize: "2.2rem", fontWeight: 700, color: R.text, lineHeight: 1, opacity: .42 }}>SOMOS</p>
-                  <p style={{ ...R.grotesk, fontSize: "2.2rem", fontWeight: 700, color: R.red, lineHeight: 1 }}>NÓS.</p>
-                </div>
-              </div>
-              <div style={{ position: "absolute", bottom: "-1.5rem", right: "-1.5rem", background: R.warm, border: `1px solid ${R.border}`, padding: "1rem 1.3rem" }}>
-                <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".15em", textTransform: "uppercase", color: R.muted }}>Localização</p>
-                <p style={{ ...R.grotesk, fontSize: ".82rem", fontWeight: 600, color: R.text, marginTop: ".2rem" }}>Fortaleza — CE · Brasil</p>
               </div>
             </div>
-
-            <div className="rec-reveal-d1">
+            <div>
               <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Quem somos]</p>
-              <h2 style={{ ...R.grotesk, fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1.5rem" }}>
+              <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1.5rem" }}>
                 Câmera, roteiro<br />e intenção de campanha.
               </h2>
               <span className="rec-divider" />
-              <p style={{ ...R.grotesk, fontSize: ".95rem", lineHeight: 1.8, color: R.muted, marginBottom: "1.2rem" }}>
+              <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted, marginBottom: "1rem" }}>
                 Somos a frente audiovisual da LOKAT. Uma produtora que filma marcas locais com olhar de campanha, não só câmera ligada.
               </p>
-              <p style={{ ...R.grotesk, fontSize: ".95rem", lineHeight: 1.8, color: R.muted, marginBottom: "2rem" }}>
-                Roteiro, direção, gravação e edição organizados para transformar conteúdo em presença real — consistente, com identidade e resultado.
-              </p>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: R.border, border: `1px solid ${R.border}`, marginBottom: "2rem" }}>
-                {[
-                  ["Direção criativa",  "Conceito, storyboard e direção de cena"],
-                  ["Produção",          "Gravação, trilha, edição e pós-produção"],
-                  ["Reels e VTs",       "Peças curtas com impacto e clareza"],
-                  ["Branded content",   "Conteúdo de marca com estratégia real"],
-                ].map(([title, desc]) => (
-                  <div key={title} style={{ background: R.bg, padding: "1rem" }}>
-                    <p style={{ ...R.grotesk, fontSize: ".75rem", fontWeight: 700, color: R.text, marginBottom: ".25rem" }}>{title}</p>
-                    <p style={{ ...R.grotesk, fontSize: ".68rem", lineHeight: 1.5, color: R.muted }}>{desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <p style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>
-                ROTEIRO · DIREÇÃO · GRAVAÇÃO · EDIÇÃO · RESULTADO.
+              <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted }}>
+                Roteiro, direção, gravação e edição organizados para transformar conteúdo em presença real.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ══ CONTATO ══════════════════════════════════════════════════ */}
+      {/* ── CONTATO ───────────────────────────────────────────────── */}
       <section ref={contatoRef} style={{ position: "relative", overflow: "hidden", ...caisOverlay("contato", "center 45%") }}>
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", background: `linear-gradient(to bottom, ${R.bg}, transparent)`, pointerEvents: "none" }} />
-
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "8rem 2rem", position: "relative", zIndex: 1 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "start" }}>
-
-            <div className="rec-reveal">
+            <div>
               <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Contato]</p>
-              <h2 style={{ ...R.grotesk, fontSize: "clamp(1.8rem, 4vw, 2.6rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1rem" }}>
-                Tem um projeto<br />em mente?
-              </h2>
+              <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1rem" }}>Tem um projeto<br />em mente?</h2>
               <span className="rec-divider" />
-              <p style={{ ...R.grotesk, fontSize: ".95rem", lineHeight: 1.8, color: R.muted, marginBottom: "2.5rem" }}>
-                Conta sobre sua marca e o que você quer comunicar. Vamos criar algo que conecta de verdade.
-              </p>
-
+              <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted, marginBottom: "2rem" }}>Conta sobre sua marca e o que você quer comunicar.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: R.border }}>
-                <a href="https://wa.me/5585999999999?text=Olá!%20Vi%20os%20trabalhos%20da%20LOKAT.REC%20e%20quero%20conversar%20sobre%20uma%20gravação."
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1.1rem 1rem", background: "rgba(20,16,10,0.85)", textDecoration: "none", transition: "background .2s", backdropFilter: "blur(6px)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,22,12,0.9)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(20,16,10,0.85)")}
-                >
-                  <div style={{ width: "36px", height: "36px", background: `${R.red}18`, border: `1px solid ${R.red}28`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Video style={{ width: "14px", height: "14px", color: R.red }} strokeWidth={1.5} />
-                  </div>
-                  <div>
-                    <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>WhatsApp</p>
-                    <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.text, fontWeight: 600 }}>Falar sobre gravação</p>
-                  </div>
-                  <div style={{ marginLeft: "auto", ...R.mono, fontSize: ".44rem", color: R.red }}>→</div>
-                </a>
-                <a href="mailto:rec@lokat.com.br"
-                  style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1.1rem 1rem", background: "rgba(20,16,10,0.85)", textDecoration: "none", transition: "background .2s", backdropFilter: "blur(6px)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,22,12,0.9)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(20,16,10,0.85)")}
-                >
-                  <div style={{ width: "36px", height: "36px", background: `${R.red}18`, border: `1px solid ${R.red}28`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Mail style={{ width: "14px", height: "14px", color: R.red }} strokeWidth={1.5} />
-                  </div>
-                  <div>
-                    <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>E-mail</p>
-                    <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.text, fontWeight: 600 }}>rec@lokat.com.br</p>
-                  </div>
-                  <div style={{ marginLeft: "auto", ...R.mono, fontSize: ".44rem", color: R.red }}>→</div>
-                </a>
-              </div>
-
-              <div style={{ display: "flex", gap: ".75rem", marginTop: "1.5rem" }}>
                 {[
-                  { label: "Instagram", Icon: AtSign, href: "#" },
-                  { label: "YouTube",   Icon: Video,  href: "#" },
-                ].map(({ label, Icon, href }) => (
-                  <a key={label} href={href} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "flex", alignItems: "center", gap: ".5rem", ...R.mono, fontSize: ".52rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none", border: `1px solid ${R.border}`, padding: ".5rem .8rem", transition: "color .2s, border-color .2s", background: "rgba(10,8,6,0.5)", backdropFilter: "blur(4px)" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = R.text; e.currentTarget.style.borderColor = R.red; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = R.muted; e.currentTarget.style.borderColor = R.border; }}
+                  { label: "WhatsApp", sub: "Falar sobre gravação", Icon: Video,  href: "https://wa.me/5585999999999" },
+                  { label: "E-mail",   sub: "rec@lokat.com.br",    Icon: Mail,  href: "mailto:rec@lokat.com.br" },
+                  { label: "Instagram",sub: "@lokat.rec",           Icon: AtSign, href: "#" },
+                ].map(({ label, sub, Icon, href }) => (
+                  <a key={label} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer"
+                    style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem", background: "rgba(20,16,10,0.85)", textDecoration: "none", transition: "background .2s", backdropFilter: "blur(6px)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,22,12,0.9)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(20,16,10,0.85)")}
                   >
-                    <Icon style={{ width: "13px", height: "13px" }} strokeWidth={1.5} /> {label}
+                    <div style={{ width: "36px", height: "36px", background: `${R.red}18`, border: `1px solid ${R.red}28`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Icon style={{ width: "14px", height: "14px", color: R.red }} strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>{label}</p>
+                      <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.text, fontWeight: 600 }}>{sub}</p>
+                    </div>
+                    <div style={{ marginLeft: "auto", ...R.mono, fontSize: ".44rem", color: R.red }}>→</div>
                   </a>
                 ))}
               </div>
             </div>
 
-            <div className="rec-reveal-d1">
-              <form onSubmit={(e) => e.preventDefault()}
-                style={{ display: "flex", flexDirection: "column", gap: ".75rem", background: "rgba(10,8,6,0.75)", padding: "2rem", backdropFilter: "blur(12px)", border: `1px solid ${R.border}` }}
-              >
-                {[
-                  { label: "Nome / Empresa",      placeholder: "Sua marca ou nome",      type: "text" },
-                  { label: "E-mail",               placeholder: "contato@suamarca.com.br", type: "email" },
-                  { label: "Telefone / WhatsApp",  placeholder: "(85) 9 0000-0000",        type: "tel" },
-                ].map(({ label, placeholder, type }) => (
-                  <div key={label}>
-                    <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>{label}</label>
-                    <input type={type} placeholder={placeholder}
-                      style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", transition: "border-color .2s" }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = R.red)}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = R.border)}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>Conte sobre sua gravação</label>
-                  <textarea rows={4} placeholder="Tipo de vídeo, objetivo, prazo, referências…"
-                    style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", resize: "vertical", transition: "border-color .2s" }}
+            <form onSubmit={(e) => e.preventDefault()} style={{ display: "flex", flexDirection: "column", gap: ".75rem", background: "rgba(10,8,6,0.75)", padding: "2rem", backdropFilter: "blur(12px)", border: `1px solid ${R.border}` }}>
+              {[
+                { label: "Nome / Empresa", ph: "Sua marca",              type: "text" },
+                { label: "E-mail",         ph: "contato@suamarca.com.br", type: "email" },
+                { label: "WhatsApp",       ph: "(85) 9 0000-0000",         type: "tel" },
+              ].map(({ label, ph, type }) => (
+                <div key={label}>
+                  <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>{label}</label>
+                  <input type={type} placeholder={ph}
+                    style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", transition: "border-color .2s" }}
                     onFocus={(e) => (e.currentTarget.style.borderColor = R.red)}
-                    onBlur={(e) => (e.currentTarget.style.borderColor = R.border)}
+                    onBlur={(e)  => (e.currentTarget.style.borderColor = R.border)}
                   />
                 </div>
-                <button type="submit"
-                  style={{ background: R.red, color: "#fff", padding: ".9rem 1.5rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, transition: "background .2s", textAlign: "center" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#a02a20")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = R.red)}
-                >
-                  ■ Enviar mensagem →
-                </button>
-              </form>
-            </div>
+              ))}
+              <div>
+                <label style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, display: "block", marginBottom: ".4rem" }}>Sobre a gravação</label>
+                <textarea rows={3} placeholder="Tipo de vídeo, objetivo, prazo…"
+                  style={{ width: "100%", background: "rgba(20,16,10,0.9)", border: `1px solid ${R.border}`, color: R.text, padding: ".8rem 1rem", ...R.grotesk, fontSize: ".85rem", outline: "none", resize: "vertical", transition: "border-color .2s" }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = R.red)}
+                  onBlur={(e)  => (e.currentTarget.style.borderColor = R.border)}
+                />
+              </div>
+              <button type="submit"
+                style={{ background: R.red, color: "#fff", padding: ".9rem", ...R.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", border: "none", cursor: "pointer", fontWeight: 700, transition: "background .2s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#a02a20")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = R.red)}
+              >■ Enviar mensagem →</button>
+            </form>
           </div>
         </div>
-
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "80px", background: `linear-gradient(to bottom, transparent, ${R.bg})`, pointerEvents: "none" }} />
       </section>
 
-      {/* ══ FOOTER ══════════════════════════════════════════════════ */}
+      {/* ── FOOTER ───────────────────────────────────────────────── */}
       <footer style={{ borderTop: `1px solid ${R.border}`, padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", textAlign: "center", background: R.bg }}>
-        <span style={{ ...R.mono, fontSize: ".7rem", letterSpacing: ".1em", fontWeight: 700, color: R.text }}>
-          LOKAT<span style={{ color: R.red }}>.</span><span style={{ color: R.red }}>REC</span>
-        </span>
-        <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>
-          Fortaleza — CE · Brasil · Desde 2022
-        </p>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <Link href="/"
-            style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
-          >← LOKAT OS</Link>
-          <span style={{ color: R.border }}>·</span>
-          <span style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted }}>© 2026 LOKAT</span>
-        </div>
+        <span style={{ ...R.mono, fontSize: ".7rem", letterSpacing: ".1em", fontWeight: 700, color: R.text }}>LOKAT<span style={{ color: R.red }}>.</span><span style={{ color: R.red }}>REC</span></span>
+        <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted }}>Fortaleza — CE · Brasil · Desde 2022</p>
+        <Link href="/" style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: R.muted, textDecoration: "none" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
+          onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
+        >← LOKAT OS</Link>
       </footer>
     </div>
   );
