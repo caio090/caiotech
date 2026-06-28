@@ -5,7 +5,7 @@ import {
   ArrowLeft, Play, Mail, AtSign, Video,
   ChevronLeft, ChevronRight, Pause, Volume2, VolumeX,
 } from "lucide-react";
-import { getPublicRecVideos, type RecVideo } from "@/lib/rec-videos";
+import { getPublicRecVideos, getVideosFromStorage, type RecVideo } from "@/lib/rec-videos";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -469,7 +469,7 @@ export default function LokatRecPage() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // Buscar vídeos do Supabase; usa STATIC_VIDEOS como fallback
+  // Buscar vídeos: 1º tabela rec_videos, 2º storage listing, 3º STATIC_VIDEOS hardcoded
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setVideos(STATIC_VIDEOS);
@@ -477,17 +477,27 @@ export default function LokatRecPage() {
       setDataLoaded(true);
       return;
     }
-    void getPublicRecVideos().then((data) => {
-      const feedback = data.find((v) => v.is_feedback && v.is_featured) ?? data.find((v) => v.is_feedback) ?? STATIC_FEEDBACK;
-      const cards    = data.filter((v) => v.show_in_cards && !v.is_feedback);
+
+    const load = async () => {
+      // Tenta tabela primeiro
+      let data = await getPublicRecVideos().catch(() => [] as RecVideo[]);
+
+      // Tabela vazia ou não existe — lista direto do bucket
+      if (data.length === 0) {
+        data = await getVideosFromStorage().catch(() => [] as RecVideo[]);
+      }
+
+      const feedback = data.find((v) => v.is_feedback && v.is_featured)
+        ?? data.find((v) => v.is_feedback)
+        ?? (STATIC_FEEDBACK.video_url ? STATIC_FEEDBACK : null);
+      const cards = data.filter((v) => v.show_in_cards && !v.is_feedback);
+
       setFeedbackVideo(feedback);
       setVideos(cards.length > 0 ? cards : STATIC_VIDEOS);
       setDataLoaded(true);
-    }).catch(() => {
-      setVideos(STATIC_VIDEOS);
-      setFeedbackVideo(STATIC_FEEDBACK);
-      setDataLoaded(true);
-    });
+    };
+
+    void load();
   }, []);
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>

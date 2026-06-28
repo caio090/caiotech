@@ -24,6 +24,57 @@ export type RecVideoInsert = Omit<RecVideo, "id" | "created_at"> & { created_by?
 const BUCKET = "rec-videos";
 const ALLOWED = ["video/mp4", "video/webm", "video/quicktime", "video/mov"];
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function prettifyName(filename: string): string {
+  return filename
+    .replace(/\.[^.]+$/, "")          // remove extensão
+    .replace(/^rec\/\d+-/, "")         // remove pasta rec/ + timestamp
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Lista arquivos diretamente do Storage — fallback quando tabela rec_videos não existe.
+// Tenta raiz do bucket e subpasta rec/ (admin upload path).
+export async function getVideosFromStorage(): Promise<RecVideo[]> {
+  const supabase = createClient();
+  const results: RecVideo[] = [];
+
+  const paths = ["", "rec"];
+  for (const prefix of paths) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(prefix, { limit: 100, sortBy: { column: "created_at", order: "asc" } });
+    if (error || !data) continue;
+
+    for (const file of data) {
+      if (!file.name || file.name.endsWith("/") || !file.name.match(/\.(mp4|webm|mov)$/i)) continue;
+      const storagePath = prefix ? `${prefix}/${file.name}` : file.name;
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+      const lower = file.name.toLowerCase();
+      const isFeedback = lower.includes("feedback") || lower.includes("depoimento") || lower.includes("testemunho");
+      results.push({
+        id: file.id ?? storagePath,
+        title: prettifyName(file.name),
+        description: null,
+        client_name: "LOKAT.REC",
+        category: isFeedback ? "feedback" : "campanha",
+        video_url: publicUrl,
+        storage_path: storagePath,
+        thumbnail_url: null,
+        is_public: true,
+        is_featured: isFeedback,
+        is_feedback: isFeedback,
+        show_in_cards: !isFeedback,
+        sort_order: 0,
+        status: "active",
+        created_at: file.created_at ?? "",
+      });
+    }
+  }
+  return results;
+}
+
 // ── Queries ─────────────────────────────────────────────────────────────────
 
 export async function getPublicRecVideos(): Promise<RecVideo[]> {
