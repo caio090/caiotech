@@ -5,6 +5,13 @@ import {
   ArrowLeft, Play, Mail, AtSign, Video,
   ChevronLeft, ChevronRight, Pause, Volume2, VolumeX,
 } from "lucide-react";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useInView,
+} from "framer-motion";
 import { getPublicRecVideos, getVideosFromStorage, type RecVideo } from "@/lib/rec-videos";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -415,6 +422,147 @@ function FeedbackSection({ video }: { video: RecVideo | null }) {
   );
 }
 
+// ── Seção: Filme de 15 anos ───────────────────────────────────────────────────
+const FILME_YT   = "fkImA1oe_3E";
+const FILME_THUMB = `https://img.youtube.com/vi/${FILME_YT}/maxresdefault.jpg`;
+
+function FilmeSection() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const isInView    = useInView(sectionRef, { once: true, amount: 0.15 });
+  const [playing,   setPlaying] = useState(false);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+
+  const yFrame  = useSpring(useTransform(scrollYProgress, [0, 1], [80, -80]),  { stiffness: 60, damping: 20 });
+  const yText   = useSpring(useTransform(scrollYProgress, [0, 1], [50, -50]),  { stiffness: 60, damping: 20 });
+  const scale   = useSpring(useTransform(scrollYProgress, [0, 0.4], [0.88, 1]), { stiffness: 80, damping: 22 });
+  const opacity = useTransform(scrollYProgress, [0, 0.18], [0, 1]);
+
+  return (
+    <section ref={sectionRef} style={{ position: "relative", padding: "10rem 0", overflow: "hidden", background: `linear-gradient(180deg, ${R.bg} 0%, #0e0a06 50%, ${R.bg} 100%)` }}>
+      {/* Linha lateral esquerda */}
+      <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "60%", background: `linear-gradient(to bottom, transparent, #7b6ef655, transparent)`, pointerEvents: "none" }} />
+      <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.45 }} />
+
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 2rem", position: "relative", zIndex: 1 }}>
+
+        {/* Headline */}
+        <motion.div
+          style={{ y: yText, opacity }}
+          className="rec-filme-text"
+        >
+          <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".22em", textTransform: "uppercase", color: "#7b6ef6", marginBottom: ".6rem" }}>[Produção especial]</p>
+          <h2 style={{ ...R.grotesk, fontSize: "clamp(2rem,5.5vw,4rem)", fontWeight: 700, lineHeight: .96, letterSpacing: "-.03em", color: R.text, maxWidth: "620px", marginBottom: "1.2rem" }}>
+            Quinze anos<br />
+            <em style={{ fontStyle: "italic", color: "#7b6ef6" }}>filmados com roteiro</em><br />
+            e alma.
+          </h2>
+          <div style={{ height: "2px", width: "48px", background: "#7b6ef6", marginBottom: "1.4rem" }} />
+          <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.75, color: R.muted, maxWidth: "460px" }}>
+            Um filme de aniversário com roteiro, direção e edição completos. Não é só um vídeo comemorativo — é uma história contada com intenção cinematográfica.
+          </p>
+        </motion.div>
+
+        {/* Frame do vídeo com parallax */}
+        <motion.div
+          style={{ y: yFrame, scale, opacity, marginTop: "4rem", position: "relative" }}
+          initial={{ opacity: 0, y: 60 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {/* Cantos decorativos */}
+          {[
+            { top: "-.75rem", left: "-.75rem", borderTop: `2px solid #7b6ef680`, borderLeft: `2px solid #7b6ef680` },
+            { top: "-.75rem", right: "-.75rem", borderTop: `2px solid #7b6ef640`, borderRight: `2px solid #7b6ef640` },
+            { bottom: "-.75rem", left: "-.75rem", borderBottom: `2px solid #7b6ef680`, borderLeft: `2px solid #7b6ef680` },
+            { bottom: "-.75rem", right: "-.75rem", borderBottom: `2px solid #7b6ef640`, borderRight: `2px solid #7b6ef640` },
+          ].map((s, i) => (
+            <div key={i} style={{ position: "absolute", width: "22px", height: "22px", ...s, pointerEvents: "none" }} />
+          ))}
+
+          {/* Linha roxa superior */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(to right, #7b6ef6, #7b6ef640, transparent)", zIndex: 2, pointerEvents: "none" }} />
+
+          {/* Thumbnail + Play / iframe */}
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", border: `1px solid #7b6ef625`, background: "#0a0806" }}>
+            {playing ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${FILME_YT}?autoplay=1&rel=0&modestbranding=1&color=white`}
+                title="Filme de 15 Anos — LOKAT.REC"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+              />
+            ) : (
+              <motion.div
+                onClick={() => setPlaying(true)}
+                whileHover="hov"
+                style={{ position: "absolute", inset: 0, cursor: "pointer", overflow: "hidden" }}
+              >
+                {/* Thumbnail */}
+                <img
+                  src={FILME_THUMB}
+                  alt="Filme 15 anos"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+
+                {/* Overlay escuro gradiente */}
+                <motion.div
+                  variants={{ hov: { opacity: 0.5 } }}
+                  style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,8,6,0.92) 0%, rgba(10,8,6,0.45) 50%, rgba(10,8,6,0.25) 100%)", opacity: 0.65, transition: "opacity .4s" }}
+                />
+
+                {/* Texto sobre a thumbnail */}
+                <div style={{ position: "absolute", top: "1.5rem", left: "1.8rem", right: "1.8rem" }}>
+                  <span style={{ ...R.mono, fontSize: ".5rem", letterSpacing: ".22em", textTransform: "uppercase", color: "#c4baff", background: "rgba(123,110,246,0.18)", border: "1px solid #7b6ef635", padding: ".25rem .65rem", display: "inline-block" }}>
+                    Produção completa · 2024
+                  </span>
+                </div>
+
+                {/* Título na thumbnail */}
+                <div style={{ position: "absolute", bottom: "4.5rem", left: "1.8rem", right: "1.8rem" }}>
+                  <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: "#7b6ef6", marginBottom: ".4rem" }}>Filme de aniversário</p>
+                  <p style={{ ...R.grotesk, fontSize: "clamp(1.1rem,2.5vw,1.8rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, letterSpacing: "-.02em" }}>
+                    15 Anos de História.<br />Um filme com roteiro.
+                  </p>
+                </div>
+
+                {/* Botão play */}
+                <div style={{ position: "absolute", bottom: "1.5rem", left: "1.8rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <motion.div
+                    variants={{ hov: { scale: 1.12 } }}
+                    style={{ width: "56px", height: "56px", border: "2px solid #7b6ef6", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(123,110,246,0.18)", backdropFilter: "blur(6px)", transition: "background .3s" }}
+                  >
+                    <Play style={{ width: "20px", height: "20px", color: "#c4baff", marginLeft: "3px" }} strokeWidth={1.5} />
+                  </motion.div>
+                  <div>
+                    <p style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".16em", textTransform: "uppercase", color: "#7b6ef6" }}>Assistir agora</p>
+                    <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".12em", color: R.muted, marginTop: ".15rem" }}>YouTube · sem sair da página</p>
+                  </div>
+                </div>
+
+                {/* Linha roxa inferior */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(to right, #7b6ef6, #7b6ef630, transparent)" }} />
+              </motion.div>
+            )}
+          </div>
+
+          {/* Badge */}
+          <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: ".75rem" }}>
+            <div style={{ width: "8px", height: "8px", background: "#7b6ef6", borderRadius: "50%", flexShrink: 0 }} />
+            <span style={{ ...R.mono, fontSize: ".46rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
+              Filme de aniversário · 15 anos · Roteiro, direção e edição
+            </span>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 // ── Formulário de contato — envia via WhatsApp ────────────────────────────────
 function ContactForm() {
   const [nome,    setNome]    = useState("");
@@ -684,6 +832,9 @@ export default function LokatRecPage() {
 
       {/* ── FEEDBACK SANDUBÃO ─────────────────────────────────────── */}
       <FeedbackSection video={feedbackVideo} />
+
+      {/* ── FILME 15 ANOS ─────────────────────────────────────────── */}
+      <FilmeSection />
 
       {/* ── PROCESSO ──────────────────────────────────────────────── */}
       <section style={{ background: R.bg, padding: "6rem 0", position: "relative" }}>
