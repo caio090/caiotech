@@ -27,18 +27,30 @@ const SUPABASE_REC_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/rec-videos`
   : "";
 
-// Vídeos estáticos — usados enquanto a tabela rec_videos não existir no banco.
-// Substitua os filenames pelos caminhos reais do bucket Supabase Storage.
+// Monta URL pública com encoding correto (suporta espaços no nome)
+function recUrl(filename: string): string {
+  if (!SUPABASE_REC_BASE) return "";
+  return `${SUPABASE_REC_BASE}/${encodeURIComponent(filename)}`;
+}
+
+function mkv(id: string, title: string, file: string, category: string, order: number): RecVideo {
+  return { id, title, client_name: "Sandubão", category, video_url: recUrl(file), storage_path: file, thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: order, status: "active", description: null, created_at: "" };
+}
+
+// Filenames exatos do bucket rec-videos no Supabase Storage
 const STATIC_VIDEOS: RecVideo[] = [
-  { id: "s1", title: "Dia dos Solteiros",   client_name: "Sandubão",  category: "campanha",      video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-dia-solteiro.mp4`   : "", storage_path: "duh-dia-solteiro.mp4",   thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 0, status: "active", description: null, created_at: "" },
-  { id: "s2", title: "Checklist Copa",      client_name: "Sandubão",  category: "campanha",      video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-checklist-copa.mp4`  : "", storage_path: "duh-checklist-copa.mp4",  thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 1, status: "active", description: null, created_at: "" },
-  { id: "s3", title: "Gosta de Suco?",      client_name: "Sandubão",  category: "produto",       video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/duh-gosta-suco.mp4`     : "", storage_path: "duh-gosta-suco.mp4",     thumbnail_url: null, is_public: true, is_featured: false, is_feedback: false, show_in_cards: true, sort_order: 2, status: "active", description: null, created_at: "" },
+  mkv("s1", "Sandubão Vol. 1",   "duhlanche1.mp4",            "campanha", 0),
+  mkv("s2", "Sandubão Vol. 2",   "duhlache2.mp4",             "campanha", 1),
+  mkv("s3", "Sandubão Vol. 3",   "duhlanche3.mp4",            "campanha", 2),
+  mkv("s4", "Sandubão Vol. 4",   "duhlanche4.mp4",            "campanha", 3),
+  mkv("s5", "Sandubão Vol. 5",   "dulanche5.mp4",             "campanha", 4),
+  mkv("s6", "VT HP",             "VT HP II 30 SEG V2.mp4",   "institucional", 5),
 ];
 
 const STATIC_FEEDBACK: RecVideo = {
   id: "fb1", title: "Depoimento Sandubão", client_name: "Sandubão", category: "feedback",
-  video_url: SUPABASE_REC_BASE ? `${SUPABASE_REC_BASE}/feedback-duh.mp4` : "",
-  storage_path: "feedback-duh.mp4", thumbnail_url: null,
+  video_url: recUrl("feedbackduh.mp4"),
+  storage_path: "feedbackduh.mp4", thumbnail_url: null,
   is_public: true, is_featured: true, is_feedback: true, show_in_cards: false,
   sort_order: 999, status: "active", description: null, created_at: "",
 };
@@ -116,13 +128,14 @@ function VideoModal({ video, onClose }: { video: RecVideo; onClose: () => void }
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "900px", position: "relative" }}>
 
         {video.video_url ? (
-          <video ref={ref} src={video.video_url} muted={muted} loop playsInline controls={false}
-            style={{ width: "100%", display: "block", background: "#000", maxHeight: "80vh", objectFit: "contain" }} />
-        ) : (
-          <div style={{ width: "100%", aspectRatio: "16/9", background: "#1a1210", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <p style={{ ...R.mono, fontSize: ".65rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted }}>Arquivo indisponível</p>
-          </div>
-        )}
+          <video ref={ref} src={video.video_url} muted={muted} loop playsInline preload="metadata" controls={false}
+            style={{ width: "100%", display: "block", background: "#000", maxHeight: "80vh", objectFit: "contain" }}
+            onError={(e) => { (e.currentTarget.style.display = "none"); (e.currentTarget.nextElementSibling as HTMLElement | null)?.style && ((e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex"); }} />
+        ) : null}
+        {/* fallback onError ou sem url */}
+        <div style={{ width: "100%", aspectRatio: "16/9", background: "#1a1210", display: video.video_url ? "none" : "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ ...R.mono, fontSize: ".65rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted }}>Vídeo indisponível</p>
+        </div>
 
         {video.video_url && (
           <div style={{ position: "absolute", bottom: ".75rem", left: ".75rem", display: "flex", gap: ".4rem" }}>

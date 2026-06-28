@@ -50,7 +50,9 @@ export async function getVideosFromStorage(): Promise<RecVideo[]> {
     for (const file of data) {
       if (!file.name || file.name.endsWith("/") || !file.name.match(/\.(mp4|webm|mov)$/i)) continue;
       const storagePath = prefix ? `${prefix}/${file.name}` : file.name;
-      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+      // Encode cada segmento para suportar espaços e caracteres especiais
+      const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(encodedPath);
       const lower = file.name.toLowerCase();
       const isFeedback = lower.includes("feedback") || lower.includes("depoimento") || lower.includes("testemunho");
       results.push({
