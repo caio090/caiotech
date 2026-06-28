@@ -221,18 +221,7 @@ body {
   will-change: transform;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-
-  .lk-ticker-track,
-  .lk-logo-track,
-  .orbit-slow,
-  .orbit-rev,
-  .lk-drop-float,
-  .glow-pulse {
-    animation-play-state: paused;
-  }
-}
+/* prefers-reduced-motion: not applied for marquees/orbits — animations run regardless of OS setting */
 
 /* ── Motion utility classes ─────────────────────────────────── */
 @keyframes lk-reveal-up {
