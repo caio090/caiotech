@@ -1,0 +1,52 @@
+# Session Log
+
+Registro cronologico das sessoes de trabalho no Lokat OS.
+
+## 2026-06-28
+
+- Criada memoria oficial inicial para sincronizar Codex e Claude Code.
+- Arquivos de memoria adicionados em `docs/`.
+- Nenhum codigo de sistema alterado.
+- Nenhum servidor iniciado.
+- Nenhum navegador aberto.
+- Nenhum commit ou push executado.
+
+### Contexto importado da ultima sessao no Claude Code
+
+- Foi criado o Diagnostico de Marketing Local, pronto para teste em `/diagnostico-marketing`.
+- Arquivos criados:
+  - `src/app/diagnostico-marketing/page.tsx`
+  - `src/lib/marketing-diagnostic.ts`
+  - `src/app/api/marketing-diagnostics/route.ts`
+  - `docs/supabase/49-marketing-diagnostics.sql`
+- Arquivo alterado:
+  - `src/app/admin/diagnosticos/page.tsx`
+- O funil de diagnostico de marketing local tem 4 etapas.
+- Foram criadas as funcoes `calculateMarketingDiagnosticScore`, `getMarketingDiagnosticSuggestion`, `normalizeWhatsapp` e `buildWhatsappUrl`.
+- Foi criada API server-side para salvar diagnostico usando service role.
+- Foi criada notificacao/lead do diagnostico.
+- Foi adicionada a aba "Marketing Local" no admin de diagnosticos.
+- Clicar em uma linha deve abrir modal com detalhes e botao de WhatsApp.
+
+### Acoes manuais obrigatorias antes dos testes
+
+- Rodar no Supabase SQL Editor `docs/supabase/49-marketing-diagnostics.sql` antes de testar envio real.
+- Para resolver erro de cadastro de cliente no admin, rodar tambem `docs/supabase/48-admin-insert-client.sql`.
+
+### Teste esperado
+
+1. Acessar `/diagnostico-marketing`.
+2. Preencher o funil.
+3. Enviar o diagnostico.
+4. Confirmar que o envio vai para `/api/marketing-diagnostics`.
+5. Confirmar que o registro aparece em `/admin/diagnosticos` na aba Marketing Local.
+6. Clicar em uma linha e validar modal com detalhes e botao WhatsApp.
+
+### Atualizacao desta sessao
+
+- Lidos `AGENTS.md`, `docs/AI_CONTEXT.md`, `docs/HANDOFF.md`, `docs/SESSION_LOG.md`, `docs/ROADMAP.md` e `docs/DECISIONS.md`.
+- Atualizados somente `docs/HANDOFF.md` e `docs/SESSION_LOG.md` com o contexto real da ultima sessao no Claude Code.
+- Nenhum codigo, imagem ou video foi alterado.
+- Nenhum servidor foi iniciado.
+- Nenhum navegador foi aberto.
+- Nenhum commit ou push foi executado.
