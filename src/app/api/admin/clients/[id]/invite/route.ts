@@ -70,11 +70,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
     if (!client) return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
 
-    // Para client_invites usa service role se disponível (RLS mais restrita),
-    // caso contrário usa session (policy admin_all_client_invites cobre admin)
-    const inviteDb = serviceRolePresent ? createSupabaseAdminClient() : supabase;
-
-    const { data: existing, error: existingErr } = await inviteDb
+    // Usa session para client_invites: policy admin_all_client_invites cobre admin/super_admin
+    // Evita dependência de service role key que pode estar inválida no ambiente
+    const { data: existing, error: existingErr } = await supabase
       .from("client_invites")
       .select("token")
       .eq("client_id", clientId)
@@ -91,7 +89,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (existing?.token) {
       token = existing.token as string;
     } else {
-      const { data: invite, error: inviteErr } = await inviteDb
+      const { data: invite, error: inviteErr } = await supabase
         .from("client_invites")
         .insert({
           client_id: clientId,
