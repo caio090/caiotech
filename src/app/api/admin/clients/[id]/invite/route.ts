@@ -52,8 +52,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
 
     const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const admin = createSupabaseAdminClient();
-    const db = admin ?? supabase;
+    const db = serviceRolePresent ? createSupabaseAdminClient() : supabase;
 
     const { data: client, error: clientErr } = await db
       .from("clients")

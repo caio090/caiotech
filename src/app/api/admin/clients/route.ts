@@ -192,29 +192,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const serviceRoleConfigured = hasSupabaseServiceRoleKey();
-    if (!serviceRoleConfigured) {
-      console.error("[api/admin/clients POST] service role ausente", {
-        role,
-        account_type: accountType,
-        serviceRoleConfigured,
-      });
-      return NextResponse.json(
-        {
-          error: SERVICE_ROLE_MISSING_MESSAGE,
-          code: "missing_service_role",
-          role,
-          account_type: accountType,
-          serviceRoleConfigured,
-        },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json() as {
       company_name?: string; responsible_name?: string; email?: string;
       phone?: string; segment?: string; status?: string;
     };
+
+    if (!body.company_name?.trim()) {
+      return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
+    }
+
+    const requestedStatus = ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding";
+    const serviceRoleConfigured = hasSupabaseServiceRoleKey();
 
     console.info("[api/admin/clients POST] tentativa de criar cliente", {
       role,
@@ -223,123 +211,104 @@ export async function POST(req: NextRequest) {
       payload: sanitizeClientCreatePayload(body),
     });
 
-    if (!body.company_name?.trim()) {
-      return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
-    }
+    // Caminho 1: função SECURITY DEFINER (bypassa RLS, valida role internamente)
+    const sessionDb = await createServerSupabaseClient();
+    const rpcResult = await sessionDb.rpc("admin_create_client", {
+      p_company_name:     body.company_name.trim(),
+      p_responsible_name: body.responsible_name?.trim() ?? null,
+      p_email:            body.email?.trim() ?? null,
+      p_phone:            body.phone?.trim() ?? null,
+      p_segment:          body.segment?.trim() ?? null,
+      p_status:           requestedStatus ?? "onboarding",
+      p_created_by:       profile.id,
+      p_agency_id:        role !== "super_admin" ? profile.id : null,
+    });
 
-    const requestedStatus = ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding";
-    const insert: Record<string, unknown> = {
-      company_name:     body.company_name.trim(),
-      responsible_name: body.responsible_name?.trim() ?? null,
-      email:            body.email?.trim() ?? null,
-      phone:            body.phone?.trim() ?? null,
-      segment:          body.segment?.trim() ?? null,
-      status:           requestedStatus,
-    };
-
-    const db = createRequiredSupabaseAdminClient();
-    const insertWithOwnership = buildOwnershipInsert(insert, role, profile.id);
-
-    let result = await db
-      .from("clients")
-      .insert(insertWithOwnership)
-      .select("id, company_name, responsible_name, email, phone, segment, status")
-      .single();
-
-    if (result.error && isMissingColumnError(result.error)) {
-      result = await db
-        .from("clients")
-        .insert(insert)
-        .select("id, company_name, responsible_name, email, phone, segment, status")
-        .single();
-    }
-
-    if (result.error && requestedStatus === "active" && result.error.code === "23514") {
-      result = await db
-        .from("clients")
-        .insert({ ...insertWithOwnership, status: "onboarding" })
-        .select("id, company_name, responsible_name, email, phone, segment, status")
-        .single();
-
-      if (result.error && isMissingColumnError(result.error)) {
-        result = await db
-          .from("clients")
-          .insert({ ...insert, status: "onboarding" })
-          .select("id, company_name, responsible_name, email, phone, segment, status")
-          .single();
+    if (!rpcResult.error && rpcResult.data) {
+      const rows = rpcResult.data as Array<{
+        id: string; company_name: string; responsible_name: string | null;
+        email: string | null; phone: string | null; segment: string | null; status: string;
+      }>;
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (row?.id) {
+        return NextResponse.json(
+          { ...row, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false },
+          { status: 201 }
+        );
       }
     }
 
-    if (result.error && isRlsError(result.error)) {
-      console.warn("[api/admin/clients POST] service role retornou RLS; tentando fallback server-side autenticado", {
-        role,
-        account_type: accountType,
-        serviceRoleConfigured,
-        supabaseError: toSafeSupabaseError(result.error),
-      });
+    // Caminho 2: service role (bypassa RLS via chave admin)
+    if (serviceRoleConfigured) {
+      const insert: Record<string, unknown> = {
+        company_name:     body.company_name.trim(),
+        responsible_name: body.responsible_name?.trim() ?? null,
+        email:            body.email?.trim() ?? null,
+        phone:            body.phone?.trim() ?? null,
+        segment:          body.segment?.trim() ?? null,
+        status:           requestedStatus,
+      };
+      const insertWithOwnership = buildOwnershipInsert(insert, role, profile.id);
 
-      const sessionDb = await createServerSupabaseClient();
-      result = await sessionDb
+      let result = await createRequiredSupabaseAdminClient()
         .from("clients")
         .insert(insertWithOwnership)
         .select("id, company_name, responsible_name, email, phone, segment, status")
         .single();
 
       if (result.error && isMissingColumnError(result.error)) {
-        result = await sessionDb
+        result = await createRequiredSupabaseAdminClient()
           .from("clients")
           .insert(insert)
           .select("id, company_name, responsible_name, email, phone, segment, status")
           .single();
       }
 
-      if (result.error && requestedStatus === "active" && result.error.code === "23514") {
-        result = await sessionDb
-          .from("clients")
-          .insert({ ...insertWithOwnership, status: "onboarding" })
-          .select("id, company_name, responsible_name, email, phone, segment, status")
-          .single();
+      if (!result.error && result.data) {
+        return NextResponse.json(
+          { ...result.data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false },
+          { status: 201 }
+        );
+      }
 
-        if (result.error && isMissingColumnError(result.error)) {
-          result = await sessionDb
-            .from("clients")
-            .insert({ ...insert, status: "onboarding" })
-            .select("id, company_name, responsible_name, email, phone, segment, status")
-            .single();
-        }
+      if (result.error) {
+        const supabaseError = toSafeSupabaseError(result.error);
+        console.error("[api/admin/clients POST] service role também falhou", { supabaseError, rpcError: rpcResult.error });
+        return NextResponse.json(
+          {
+            error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
+            code: "CLIENT_INSERT_FAILED",
+            supabaseError,
+            role,
+            account_type: accountType,
+            serviceRoleConfigured,
+          },
+          { status: 500 }
+        );
       }
     }
 
-    if (result.error) {
-      const supabaseError = toSafeSupabaseError(result.error);
-      console.error("[api/admin/clients POST] erro ao criar cliente", {
+    // RPC falhou e service role não configurado
+    const rpcErr = rpcResult.error as SafeSupabaseError | null;
+    console.error("[api/admin/clients POST] rpc falhou e sem service role", {
+      rpcError: toSafeSupabaseError(rpcErr),
+      serviceRoleConfigured,
+    });
+    return NextResponse.json(
+      {
+        error: clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
+        code: "CLIENT_INSERT_FAILED",
+        supabaseError: toSafeSupabaseError(rpcErr),
         role,
         account_type: accountType,
         serviceRoleConfigured,
-        supabaseError,
-      });
-      return NextResponse.json(
-        {
-          error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
-          code: "CLIENT_INSERT_FAILED",
-          supabaseError,
-          role,
-          account_type: accountType,
-          serviceRoleConfigured,
-        },
-        { status: 500 }
-      );
-    }
-
-    const data = result.data;
-    return NextResponse.json({ ...data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false }, { status: 201 });
+      },
+      { status: 500 }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : undefined;
     const serviceRoleConfigured = hasSupabaseServiceRoleKey();
-    console.error("[api/admin/clients POST] erro inesperado", {
-      serviceRoleConfigured,
-      message,
-    });
+    console.error("[api/admin/clients POST] erro inesperado", { serviceRoleConfigured, message });
     return NextResponse.json({
       error: clientWriteErrorMessage(message, serviceRoleConfigured),
       code: "CLIENT_CREATE_UNEXPECTED_ERROR",
