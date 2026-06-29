@@ -11,6 +11,22 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29 - ajuste service role obrigatoria
+
+- Confirmado pelo usuario que `lokat.rec@hotmail.com` existe em `public.profiles` com `role = 'super_admin'`; portanto o erro nao era role do profile.
+- Confirmado pelas migrations que `public.current_user_role()` depende de `auth.uid()`, entao retornar `NULL` no Supabase SQL Editor pode ser esperado fora da sessao real do app.
+- Criado `docs/supabase/50-debug-current-user-and-client-create.sql` com queries de diagnostico para profiles, policies, RLS, funcao `current_user_role()` e atualizacao manual comentada para `super_admin`.
+- Ajustado `createSupabaseAdminClient()` para usar `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, sem anon key e sem sessao de usuario, lancando erro claro se faltar env.
+- Ajustado `POST /api/admin/clients` para validar usuario/profile, aceitar explicitamente `super_admin` e `admin`, e criar cliente somente via service role.
+- Removido fallback silencioso para insert com anon/session quando `SUPABASE_SERVICE_ROLE_KEY` estiver ausente.
+- Retorno de erro da API agora inclui `error`, `code`, `role`, `account_type` e `serviceRoleConfigured`, sem secrets.
+
+### Pendencias em 2026-06-29 - ajuste service role obrigatoria
+
+- Rodar `docs/supabase/50-debug-current-user-and-client-create.sql` apenas se precisar diagnosticar policies/profile no Supabase.
+- Configurar `SUPABASE_SERVICE_ROLE_KEY` na Vercel se ainda estiver ausente e fazer novo deploy via GitHub/Vercel.
+- Validar em producao a criacao de cliente em `/admin/clientes`.
+
 ### Feito em 2026-06-29
 
 - Corrigido o fluxo real de criacao de cliente em `/admin/clientes` para tratar `super_admin` explicitamente.

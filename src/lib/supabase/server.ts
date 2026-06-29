@@ -32,7 +32,14 @@ export async function createServerSupabaseClient() {
 
 export function createSupabaseAdminClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!SUPABASE_URL || !serviceRoleKey) return null;
+
+  if (!SUPABASE_URL) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL ausente no ambiente do servidor.");
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY ausente no ambiente de produção. Configure na Vercel e faça redeploy.");
+  }
 
   return createClient(SUPABASE_URL, serviceRoleKey, {
     auth: {
@@ -44,4 +51,8 @@ export function createSupabaseAdminClient() {
 
 export function hasSupabaseServiceRoleKey() {
   return Boolean(SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+export function createRequiredSupabaseAdminClient() {
+  return createSupabaseAdminClient();
 }

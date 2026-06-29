@@ -1,10 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import {
+  createServerSupabaseClient,
+  createRequiredSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth/current-profile";
 
-const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
 const SERVICE_ROLE_MISSING_MESSAGE =
-  "SUPABASE_SERVICE_ROLE_KEY ausente no ambiente do servidor. Configure na Vercel para permitir escrita administrativa.";
+  "SUPABASE_SERVICE_ROLE_KEY ausente no ambiente de produção. Configure na Vercel e faça redeploy.";
 const CLIENT_CREATE_FRIENDLY_ERROR =
   "Nao foi possivel criar o cliente. Verifique permissoes do banco ou variavel SUPABASE_SERVICE_ROLE_KEY na Vercel.";
 
@@ -142,18 +147,32 @@ export async function GET() {
 // POST /api/admin/clients — cria novo cliente
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    const profile = await getCurrentProfile();
+    if (!profile) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, account_type")
-      .eq("id", user.id)
-      .maybeSingle();
-    const role = (profile as { role?: string } | null)?.role ?? "";
+    const role = profile.role ?? "";
+    const accountType = profile.account_type ?? null;
     if (!CLIENT_MANAGER_ROLES.has(role)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    const serviceRoleConfigured = hasSupabaseServiceRoleKey();
+    if (!serviceRoleConfigured) {
+      console.error("[api/admin/clients POST] service role ausente", {
+        role,
+        account_type: accountType,
+        serviceRoleConfigured,
+      });
+      return NextResponse.json(
+        {
+          error: SERVICE_ROLE_MISSING_MESSAGE,
+          code: "missing_service_role",
+          role,
+          account_type: accountType,
+          serviceRoleConfigured,
+        },
+        { status: 500 }
+      );
     }
 
     const body = await req.json() as {
@@ -175,18 +194,8 @@ export async function POST(req: NextRequest) {
       status:           requestedStatus,
     };
 
-    const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const admin = createSupabaseAdminClient();
-    const db = admin ?? supabase;
-    const insertWithOwnership = buildOwnershipInsert(insert, role, user.id);
-
-    if (!serviceRolePresent) {
-      console.warn("[api/admin/clients POST] service role ausente; tentando fluxo normal com RLS", {
-        role,
-        account_type: (profile as { account_type?: string } | null)?.account_type ?? null,
-        serviceRolePresent,
-      });
-    }
+    const db = createRequiredSupabaseAdminClient();
+    const insertWithOwnership = buildOwnershipInsert(insert, role, profile.id);
 
     let result = await db
       .from("clients")
@@ -221,19 +230,17 @@ export async function POST(req: NextRequest) {
     if (result.error) {
       console.error("[api/admin/clients POST] erro ao criar cliente", {
         role,
-        account_type: (profile as { account_type?: string } | null)?.account_type ?? null,
-        serviceRolePresent,
+        account_type: accountType,
+        serviceRoleConfigured,
         supabaseError: result.error,
       });
       return NextResponse.json(
         {
-          error: clientWriteErrorMessage(result.error.message, serviceRolePresent),
-          technical: {
-            role,
-            serviceRolePresent,
-            code: result.error.code,
-            message: result.error.message,
-          },
+          error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
+          code: result.error.code,
+          role,
+          account_type: accountType,
+          serviceRoleConfigured,
         },
         { status: 500 }
       );

@@ -4,6 +4,14 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 
 ## 2026-06-29
 
+- Continuidade do ajuste de criacao real de clientes no admin.
+- Usuario confirmou no Supabase que `lokat.rec@hotmail.com` tem `role = 'super_admin'`, entao o erro nao era role do profile.
+- Confirmado que `public.current_user_role()` depende de `auth.uid()` e pode retornar `NULL` no SQL Editor fora da sessao real do app.
+- Criado `docs/supabase/50-debug-current-user-and-client-create.sql` para diagnosticar profile, policies, RLS e funcao `current_user_role()`.
+- Ajustado `createSupabaseAdminClient()` para exigir `SUPABASE_SERVICE_ROLE_KEY` e falhar com mensagem clara quando a env faltar.
+- Ajustado `POST /api/admin/clients` para criar cliente somente via service role depois de validar usuario/profile e role `super_admin`/`admin`.
+- Removido fallback que podia tentar insert via sessao/anon e cair em RLS.
+
 - Lidos `AGENTS.md`, `docs/HANDOFF.md`, `docs/AI_CONTEXT.md`, `docs/SESSION_LOG.md`, `docs/DECISIONS.md` e `docs/ROADMAP.md`.
 - Confirmado projeto em `C:\Users\Trabalho\Desktop\COde\lokat-os`, branch `main`.
 - Auditado erro de RLS em `/admin/clientes`: SQL 48 antigo nao contemplava `super_admin` e producao podia depender de `SUPABASE_SERVICE_ROLE_KEY`.

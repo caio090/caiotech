@@ -64,7 +64,9 @@ CREATE POLICY "clients: admin/super_admin remove" ON public.clients
 
 NOTIFY pgrst, 'reload schema';
 
--- Validacao rapida depois de rodar logado no SQL Editor:
+-- Validacao rapida:
+-- No SQL Editor, auth.uid() pode estar NULL. Se role_atual vier NULL
+-- ali, isso nao prova problema no usuario real logado pelo app.
 SELECT public.current_user_role() AS role_atual;
 
 -- Para conferir o usuario esperado, troque o e-mail:
