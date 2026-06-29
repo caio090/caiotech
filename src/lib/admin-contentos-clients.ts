@@ -1,4 +1,9 @@
-﻿import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  CLIENT_VISIBLE_STATUSES,
+  isMissingClientVisibilityColumn,
+  isVisibleClientRecord,
+} from "@/lib/client-visibility";
 
 export interface AdminContentosClient {
   id: string;
@@ -13,9 +18,17 @@ export interface AdminContentosClient {
   has_user?: boolean;
 }
 
-// Returns real clients from the clients table directly.
-// Does NOT depend on v_real_clients (which requires profiles.role=cliente).
-// Clients are business entities that exist independently of user accounts.
+type ClientRow = {
+  id: string;
+  company_name: string | null;
+  responsible_name: string | null;
+  segment: string | null;
+  status: string | null;
+  owner_id: string | null;
+  deleted_at?: string | null;
+  archived_at?: string | null;
+};
+
 export async function getAdminContentOSClients(): Promise<AdminContentosClient[]> {
   try {
     const supabase = await createServerSupabaseClient();
@@ -23,20 +36,16 @@ export async function getAdminContentOSClients(): Promise<AdminContentosClient[]
     let clientsResult = await supabase
       .from("clients")
       .select("id, company_name, responsible_name, segment, status, owner_id, deleted_at, archived_at")
-      .in("status", ["active", "onboarding"])
+      .in("status", CLIENT_VISIBLE_STATUSES)
       .is("deleted_at", null)
       .is("archived_at", null)
       .order("company_name");
 
-    if (clientsResult.error && (
-      clientsResult.error.code === "PGRST204" ||
-      clientsResult.error.message.toLowerCase().includes("could not find") ||
-      clientsResult.error.message.toLowerCase().includes("column")
-    )) {
+    if (clientsResult.error && isMissingClientVisibilityColumn(clientsResult.error)) {
       const fallbackClientsResult = await supabase
         .from("clients")
         .select("id, company_name, responsible_name, segment, status, owner_id")
-        .in("status", ["active", "onboarding"])
+        .in("status", CLIENT_VISIBLE_STATUSES)
         .order("company_name");
       clientsResult = fallbackClientsResult as typeof clientsResult;
     }
@@ -44,21 +53,22 @@ export async function getAdminContentOSClients(): Promise<AdminContentosClient[]
     const { data, error } = clientsResult;
     if (error || !data) return [];
 
-    const clientIds = (data as Array<{ id: string }>).map((c) => c.id);
+    const visibleData = (data as ClientRow[]).filter(isVisibleClientRecord);
+    const clientIds = visibleData.map((c) => c.id);
     if (clientIds.length === 0) return [];
 
-    const [assetsRes, contextsRes, olacheckRes] = await Promise.all([
+    const [assetsRes, contextsRes, olaclickRes] = await Promise.all([
       supabase.from("client_meta_assets").select("client_id, asset_type").in("client_id", clientIds),
       supabase.from("client_context").select("client_id").in("client_id", clientIds),
       supabase.from("olaclick_connections").select("client_id").eq("status", "connected").in("client_id", clientIds),
     ]);
 
-    const metaIds      = new Set<string>();
+    const metaIds = new Set<string>();
     const instagramIds = new Set<string>();
     if (!assetsRes.error) {
       for (const a of assetsRes.data ?? []) {
         const asset = a as { client_id: string; asset_type: string };
-        if (asset.asset_type === "facebook_page")      metaIds.add(asset.client_id);
+        if (asset.asset_type === "facebook_page") metaIds.add(asset.client_id);
         if (asset.asset_type === "instagram_business") instagramIds.add(asset.client_id);
       }
     }
@@ -68,59 +78,58 @@ export async function getAdminContentOSClients(): Promise<AdminContentosClient[]
       for (const c of contextsRes.data ?? []) briefIds.add((c as { client_id: string }).client_id);
     }
 
-    const olacheckIds = new Set<string>();
-    if (!olacheckRes.error) {
-      for (const o of olacheckRes.data ?? []) olacheckIds.add((o as { client_id: string }).client_id);
+    const olaclickIds = new Set<string>();
+    if (!olaclickRes.error) {
+      for (const o of olaclickRes.data ?? []) olaclickIds.add((o as { client_id: string }).client_id);
     }
 
-    return (data as Array<{
-      id: string; company_name: string | null; responsible_name: string | null;
-      segment: string | null; status: string | null; owner_id: string | null;
-    }>).map((c) => ({
-      id:               c.id,
-      company_name:     c.company_name,
+    return visibleData.map((c) => ({
+      id: c.id,
+      company_name: c.company_name,
       responsible_name: c.responsible_name,
-      segment:          c.segment,
-      status:           c.status,
-      has_meta:         metaIds.has(c.id),
-      has_instagram:    instagramIds.has(c.id),
-      has_brief:        briefIds.has(c.id),
-      has_olaclick:     olacheckIds.has(c.id),
-      has_user:         c.owner_id != null,
+      segment: c.segment,
+      status: c.status,
+      has_meta: metaIds.has(c.id),
+      has_instagram: instagramIds.has(c.id),
+      has_brief: briefIds.has(c.id),
+      has_olaclick: olaclickIds.has(c.id),
+      has_user: c.owner_id != null,
     }));
   } catch {
     return [];
   }
 }
 
-// Validates that a clientId belongs to an active real client.
 export async function validateContentOSClient(
   clientId: string,
 ): Promise<{ id: string; company_name: string | null } | null> {
   try {
     const supabase = await createServerSupabaseClient();
 
-    const { data, error } = await supabase
-      .from("v_real_clients")
-      .select("id, company_name")
-      .eq("id", clientId)
-      .maybeSingle();
-
-    // Only trust v_real_clients when it actually found the client.
-    // If data is null (no error, but empty — happens when v_real_clients still
-    // uses the profiles JOIN and the client has no role=cliente user), fall through
-    // to the direct clients table check.
-    if (!error && data !== null) return data as { id: string; company_name: string | null };
-
-    // Fallback: direct clients table — works regardless of v_real_clients definition
-    const { data: fallback } = await supabase
+    let result = await supabase
       .from("clients")
-      .select("id, company_name")
+      .select("id, company_name, status, deleted_at, archived_at")
       .eq("id", clientId)
-      .in("status", ["active", "onboarding"])
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
 
-    return fallback as { id: string; company_name: string | null } | null;
+    if (result.error && isMissingClientVisibilityColumn(result.error)) {
+      result = await supabase
+        .from("clients")
+        .select("id, company_name, status")
+        .eq("id", clientId)
+        .in("status", CLIENT_VISIBLE_STATUSES)
+        .maybeSingle();
+    }
+
+    if (!result.data || !isVisibleClientRecord(result.data)) return null;
+
+    return {
+      id: result.data.id,
+      company_name: result.data.company_name,
+    };
   } catch {
     return null;
   }

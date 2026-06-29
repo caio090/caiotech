@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isClientVisible } from "@/lib/client-visibility";
 
 // ── Modal Novo Cliente ─────────────────────────────────────────
 interface NewClientForm {
@@ -164,7 +165,7 @@ interface CreateClientApiError {
   } | null;
 }
 
-type StatusFilter = "todos" | "operacionais" | "onboarding" | "inactive";
+type StatusFilter = "todos" | "operacionais" | "onboarding";
 
 // ── Badges ─────────────────────────────────────────────────────
 function Badge({ label, color }: { label: string; color: string }) {
@@ -180,7 +181,6 @@ function ClientBadges({ c }: { c: Client }) {
     <div className="flex flex-wrap gap-1 mt-1.5">
       {c.status === "active"     && <Badge label="Ativo"      color="text-emerald-700 bg-emerald-50" />}
       {c.status === "onboarding" && <Badge label="Onboarding" color="text-blue-700 bg-blue-50" />}
-      {c.status === "inactive"   && <Badge label="Inativo"    color="text-gray-500 bg-gray-100" />}
       {c.has_meta                && <Badge label="Meta"       color="text-indigo-700 bg-indigo-50" />}
       {c.has_instagram           && <Badge label="Instagram"  color="text-pink-700 bg-pink-50" />}
       {c.has_diagnostico         && <Badge label="Diagnóstico ok" color="text-violet-700 bg-violet-50" />}
@@ -316,7 +316,7 @@ function DeleteModal({
           </div>
         </div>
         <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-xs text-red-700 leading-relaxed">
-          Conteúdos, aprovações, briefings e contexto estratégico vinculados podem ser removidos. Essa ação remove o cliente das listas ativas.
+          Apagar cliente? Ele deixara de aparecer nos modulos da plataforma.
         </div>
         <label className="flex items-start gap-3 mb-5 cursor-pointer group">
           <input
@@ -326,7 +326,7 @@ function DeleteModal({
             className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0"
           />
           <span className="text-xs text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
-            Entendo que este cliente será removido das listas ativas.
+            Entendo que este cliente deixara de aparecer nos modulos da plataforma.
           </span>
         </label>
         <div className="flex gap-2">
@@ -335,7 +335,7 @@ function DeleteModal({
           </button>
           <button onClick={onConfirm} disabled={!checked || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Confirmar exclusão
+            Apagar cliente
           </button>
         </div>
       </div>
@@ -393,7 +393,6 @@ function EditModal({
             >
               <option value="active">Ativo</option>
               <option value="onboarding">Onboarding</option>
-              <option value="inactive">Inativo</option>
             </select>
           </div>
         </div>
@@ -516,7 +515,7 @@ export default function AdminClientesPage() {
       const res = await fetch("/api/admin/clients");
       if (res.ok) {
         const data = await res.json() as { clients: Client[]; isAdmin: boolean; plan?: string };
-        setClients(data.clients);
+        setClients(data.clients.filter((client) => isClientVisible(client.status)));
         setIsAdmin(data.isAdmin);
         if (data.plan) setUserPlan(data.plan);
       }
@@ -533,9 +532,9 @@ export default function AdminClientesPage() {
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
-      if (statusFilter === "operacionais" && !["active", "onboarding"].includes(c.status ?? "")) return false;
+      if (!isClientVisible(c.status)) return false;
+      if (statusFilter === "operacionais" && !isClientVisible(c.status)) return false;
       if (statusFilter === "onboarding" && c.status !== "onboarding") return false;
-      if (statusFilter === "inactive" && c.status !== "inactive") return false;
       if (segFilter && c.segment !== segFilter) return false;
       if (metaFilter === "connected"     && !c.has_meta) return false;
       if (metaFilter === "not_connected" && c.has_meta)  return false;
@@ -620,7 +619,6 @@ export default function AdminClientesPage() {
     { value: "todos",         label: "Todos" },
     { value: "operacionais",  label: "Ativos" },
     { value: "onboarding",    label: "Onboarding" },
-    { value: "inactive",      label: "Inativos" },
   ];
 
   return (

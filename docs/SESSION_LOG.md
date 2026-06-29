@@ -4,6 +4,15 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 
 ## 2026-06-29
 
+- Corrigida a regra de exclusao/listagem de clientes: visiveis apenas `active` e `onboarding`; soft-deleted (`deleted_at`/`archived_at`) ficam invisiveis.
+- Criado helper central `src/lib/client-visibility.ts`.
+- Ajustadas listagens e seletores de clientes em admin, ContentOS, OlaClick, Kanban, Diagnosticos, Plataforma, RecOS criar e portal cliente.
+- Ajustado delete para tentar RPC `admin_delete_client` e manter fallbacks server-side de soft delete.
+- Criado `docs/supabase/52-client-delete-and-cleanup.sql` com RPC, indices, view filtrada e limpeza manual comentada.
+- Atualizado SQL 51 para nao criar cliente com status `inactive`.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+
 - Confirmado contexto de producao: service role ja configurada e rota de debug/admin test ja validou leitura de `clients` via service role.
 - Foco restante: HTTP 500 no `POST /api/admin/clients` ao criar cliente real em `/admin/clientes`.
 - Ajustado `POST /api/admin/clients` para retornar diagnostico seguro do erro Supabase (`message`, `code`, `details`, `hint`) com `code: "CLIENT_INSERT_FAILED"`, sem expor secrets.

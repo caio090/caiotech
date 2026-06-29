@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getPlanLabel, getAccountTypeLabel } from "@/lib/account-permissions";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 
 interface PlatformAccount {
   id: string;
@@ -83,13 +84,22 @@ export default async function PlataformaPage() {
   }
 
   // Fetch clients
-  const { data: allClients } = await supabase
+  let clientsResult = await supabase
     .from("clients")
-    .select("id, company_name, responsible_name, email, segment, status, account_type, created_at")
-    .not("status", "eq", "archived")
+    .select("id, company_name, responsible_name, email, segment, status, account_type, created_at, deleted_at, archived_at")
+    .in("status", CLIENT_VISIBLE_STATUSES)
+    .is("deleted_at", null)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
+  if (clientsResult.error && isMissingClientVisibilityColumn(clientsResult.error)) {
+    clientsResult = await supabase
+      .from("clients")
+      .select("id, company_name, responsible_name, email, segment, status, account_type, created_at")
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .order("created_at", { ascending: false }) as typeof clientsResult;
+  }
 
-  const clients = (allClients ?? []) as PlatformAccount[];
+  const clients = (clientsResult.data ?? []).filter(isVisibleClientRecord) as PlatformAccount[];
 
   // Fetch profiles (users da plataforma)
   const { data: allProfiles } = await supabase

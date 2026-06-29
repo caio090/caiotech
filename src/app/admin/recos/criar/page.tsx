@@ -5,6 +5,7 @@ import { ArrowLeft, Clapperboard, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 const PROJECT_TYPES = [
   { id: "comercial",    label: "Comercial",           desc: "Anúncio com narrativa" },
@@ -57,8 +58,10 @@ export default function RecosCreatePage() {
     const supabase = createClient();
     supabase
       .from("clients")
-      .select("id, company_name")
-      .eq("status", "ativo")
+      .select("id, company_name, deleted_at, archived_at")
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("company_name")
       .then(({ data }) => setClients((data as DbClient[]) ?? []));
   }, []);

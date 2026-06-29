@@ -8,6 +8,7 @@ import { ContentOSBrandChip } from "@/components/contentos-brand-chip";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
+import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 // Roles that must select an active client before using ContentOS
 const STAFF_ROLES = new Set([
@@ -83,6 +84,9 @@ export function ContentOSLayoutShell({ children }: Props) {
             .from("clients")
             .select("id, company_name")
             .eq("id", storedId)
+            .in("status", CLIENT_VISIBLE_STATUSES)
+            .is("deleted_at", null)
+            .is("archived_at", null)
             .maybeSingle();
 
           if (!clientRow) {

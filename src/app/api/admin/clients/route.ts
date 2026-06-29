@@ -5,6 +5,7 @@ import {
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-profile";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -38,8 +39,7 @@ function clientWriteErrorMessage(message?: string, serviceRolePresent = true) {
 }
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
-  const text = error?.message?.toLowerCase() ?? "";
-  return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
+  return isMissingClientVisibilityColumn(error);
 }
 
 function isRlsError(error: { message?: string } | null) {
@@ -110,7 +110,7 @@ export async function GET() {
     let clientsResult = await supabase
       .from("clients")
       .select("id, company_name, responsible_name, email, phone, segment, status, deleted_at, archived_at")
-      .in("status", ["active", "onboarding", "inactive"])
+      .in("status", CLIENT_VISIBLE_STATUSES)
       .is("deleted_at", null)
       .is("archived_at", null)
       .order("company_name");
@@ -119,7 +119,7 @@ export async function GET() {
       const fallbackClientsResult = await supabase
         .from("clients")
         .select("id, company_name, responsible_name, email, phone, segment, status")
-        .in("status", ["active", "onboarding", "inactive"])
+        .in("status", CLIENT_VISIBLE_STATUSES)
         .order("company_name");
       clientsResult = fallbackClientsResult as typeof clientsResult;
     }
@@ -166,7 +166,9 @@ export async function GET() {
       }
     }
 
-    const enriched = (clients ?? []).map((c) => ({
+    const visibleClients = (clients ?? []).filter(isVisibleClientRecord);
+
+    const enriched = visibleClients.map((c) => ({
       ...c,
       has_meta:        useAssets ? metaClientIds.has(c.id)     : false,
       has_instagram:   useAssets ? instagramClientIds.has(c.id) : false,

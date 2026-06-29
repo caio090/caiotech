@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { DbOperationalTask } from "@/lib/supabase/types";
 import { KanbanClientContent } from "./_client-content";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn } from "@/lib/client-visibility";
 
 export default async function AdminOperacionalKanbanPage() {
   let tasks: DbOperationalTask[] = [];
@@ -32,12 +33,24 @@ export default async function AdminOperacionalKanbanPage() {
           .limit(200),
         supabase
           .from("clients")
-          .select("id, company_name")
+          .select("id, company_name, deleted_at, archived_at")
+          .in("status", CLIENT_VISIBLE_STATUSES)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("company_name"),
       ]);
 
       if (!tasksRes.error && tasksRes.data)   tasks   = tasksRes.data   as DbOperationalTask[];
-      if (!clientsRes.error && clientsRes.data) clients = clientsRes.data;
+      if (!clientsRes.error && clientsRes.data) {
+        clients = clientsRes.data;
+      } else if (clientsRes.error && isMissingClientVisibilityColumn(clientsRes.error)) {
+        const fallback = await supabase
+          .from("clients")
+          .select("id, company_name")
+          .in("status", CLIENT_VISIBLE_STATUSES)
+          .order("company_name");
+        if (!fallback.error && fallback.data) clients = fallback.data;
+      }
     } catch {}
   }
 

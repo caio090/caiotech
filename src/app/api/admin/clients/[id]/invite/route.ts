@@ -5,6 +5,7 @@ import {
   createSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -54,11 +55,23 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const serviceRolePresent = hasSupabaseServiceRoleKey();
 
     // Busca o cliente sempre via session (o GET prova que admin consegue ver)
-    const { data: client, error: clientErr } = await supabase
+    let clientResult = await supabase
       .from("clients")
-      .select("id, company_name")
+      .select("id, company_name, status, deleted_at, archived_at")
       .eq("id", clientId)
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
+    if (clientResult.error && isMissingClientVisibilityColumn(clientResult.error)) {
+      clientResult = await supabase
+        .from("clients")
+        .select("id, company_name, status")
+        .eq("id", clientId)
+        .in("status", CLIENT_VISIBLE_STATUSES)
+        .maybeSingle() as typeof clientResult;
+    }
+    const { data: client, error: clientErr } = clientResult;
 
     if (clientErr) {
       console.error("[api/admin/clients/invite] erro ao buscar cliente", {
@@ -68,7 +81,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         supabaseError: clientErr,
       });
     }
-    if (!client) return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
+    if (!client || !isVisibleClientRecord(client)) {
+      return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
+    }
 
     // Usa session para client_invites: policy admin_all_client_invites cobre admin/super_admin
     // Evita dependência de service role key que pode estar inválida no ambiente

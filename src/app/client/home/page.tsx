@@ -4,6 +4,7 @@ import { ClientHomeContent } from "./_client-content";
 import type { ServerPageData, DbOnboardingProfile } from "@/lib/supabase/types";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getClientSafeSuggestions } from "@/lib/ai-suggestions";
+import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 export default async function ClientHomePage() {
   let serverData: ServerPageData | null = null;
@@ -29,7 +30,14 @@ export default async function ClientHomePage() {
       if (userId) {
         const [profileRes, clientRes] = await Promise.all([
           supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-          supabase.from("clients").select("*").eq("owner_id", userId).maybeSingle(),
+          supabase
+            .from("clients")
+            .select("*")
+            .eq("owner_id", userId)
+            .in("status", CLIENT_VISIBLE_STATUSES)
+            .is("deleted_at", null)
+            .is("archived_at", null)
+            .maybeSingle(),
         ]);
 
         console.log("[client/home] profile:", profileRes.data?.id ?? "null", profileRes.error?.code ?? "ok");
@@ -54,6 +62,9 @@ export default async function ClientHomePage() {
             .from("onboarding_profiles")
             .select("*, clients!inner(owner_id)")
             .eq("clients.owner_id", userId)
+            .in("clients.status", CLIENT_VISIBLE_STATUSES)
+            .is("clients.deleted_at", null)
+            .is("clients.archived_at", null)
             .maybeSingle();
           console.log("[client/home] onboarding (path2):", onbJoin?.id ?? "null", joinErr?.code ?? "ok");
           if (onbJoin) {

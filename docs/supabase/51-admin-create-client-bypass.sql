@@ -52,7 +52,7 @@ BEGIN
   END IF;
 
   -- Normaliza status
-  IF p_status NOT IN ('active', 'onboarding', 'inactive') THEN
+  IF p_status NOT IN ('active', 'onboarding') THEN
     v_status := 'onboarding';
   ELSE
     v_status := p_status;

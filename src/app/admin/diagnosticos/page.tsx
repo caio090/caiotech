@@ -8,6 +8,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { buildWhatsappUrl } from "@/lib/marketing-diagnostic";
+import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type StatusKey = "completo" | "parcial" | "pendente" | "aguardando_conexao" | "aguardando_leitura";
@@ -380,8 +381,10 @@ export default function AdminDiagnosticosPage() {
       // Busca clientes reais
       const { data: rawClients } = await supabase
         .from("clients")
-        .select("id, company_name, created_at")
-        .eq("status", "active")
+        .select("id, company_name, created_at, deleted_at, archived_at")
+        .in("status", CLIENT_VISIBLE_STATUSES)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .order("company_name");
 
       // Busca conexões Meta

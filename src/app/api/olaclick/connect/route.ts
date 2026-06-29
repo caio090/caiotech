@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 
 interface ConnectPayload {
   client_id: string;
@@ -40,18 +41,34 @@ export async function POST(request: NextRequest) {
 
     // Extrai apenas os últimos 4 caracteres para exibição
     const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const admin = createSupabaseAdminClient();
-    const db = admin ?? supabase;
-    const { data: client, error: clientErr } = await db
+    let db = supabase;
+    try {
+      db = createSupabaseAdminClient();
+    } catch {
+      db = supabase;
+    }
+    let clientResult = await db
       .from("clients")
-      .select("id")
+      .select("id, status, deleted_at, archived_at")
       .eq("id", client_id)
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
+    if (clientResult.error && isMissingClientVisibilityColumn(clientResult.error)) {
+      clientResult = await db
+        .from("clients")
+        .select("id, status")
+        .eq("id", client_id)
+        .in("status", CLIENT_VISIBLE_STATUSES)
+        .maybeSingle() as typeof clientResult;
+    }
+    const { data: client, error: clientErr } = clientResult;
 
     if (clientErr?.code === "42P01") {
       return NextResponse.json({ ok: false, reason: "sql_pending", message: "Tabela clients indisponivel. Rode os SQLs base no Supabase." });
     }
-    if (!client) {
+    if (!client || !isVisibleClientRecord(client)) {
       return NextResponse.json({ ok: false, reason: "client_not_found", message: "Selecione um cliente real antes de conectar o OlaClick." }, { status: 404 });
     }
 

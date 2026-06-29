@@ -11,6 +11,27 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29 - exclusao e visibilidade de clientes
+
+- Corrigida regra de visibilidade de clientes: clientes visiveis sao apenas `active` e `onboarding`.
+- Clientes com `deleted_at` ou `archived_at` preenchido nao devem aparecer nas listas, seletores e conexoes.
+- Criado helper central `src/lib/client-visibility.ts` com `CLIENT_VISIBLE_STATUSES`, status invisiveis e filtro defensivo de registro.
+- Ajustado `GET /api/admin/clients` para nao retornar `inactive`, `archived`, `deleted`, `cancelled`, `test` ou soft-deleted.
+- Ajustado `/api/admin/clients/[id]` para buscar apenas cliente visivel e para tentar RPC `admin_delete_client` antes dos fallbacks de soft delete.
+- Ajustadas listagens/selecao em Admin Clientes, Diagnosticos, Plataforma, RecOS criar, Kanban Operacional, ContentOS e OlaClick.
+- Ajustado portal/layout cliente e layout ContentOS para nao aceitar cliente apagado como ativo.
+- Criado `docs/supabase/52-client-delete-and-cleanup.sql` com colunas `deleted_at`/`archived_at`, indices, view `v_real_clients` filtrada, RPC `admin_delete_client` e bloco comentado de limpeza manual dos clientes antigos.
+- Atualizado `docs/supabase/51-admin-create-client-bypass.sql` para nao criar cliente com status `inactive`.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+
+### Pendencias em 2026-06-29 - exclusao e visibilidade de clientes
+
+- Rodar manualmente `docs/supabase/52-client-delete-and-cleanup.sql` no Supabase SQL Editor.
+- Depois testar em producao: criar Duh Lanches, confirmar aparicao nos seletores, apagar no admin, recarregar e confirmar que nao volta.
+- Se quiser limpar clientes antigos de teste, rodar primeiro o SELECT comentado no SQL 52 e so executar o UPDATE apos conferencia manual.
+- `package.json` e `package-lock.json` tem alteracoes locais de Playwright nao relacionadas a esta tarefa e nao devem ser incluidas neste commit.
+
 ### Feito em 2026-06-29 - debug do POST de clientes
 
 - Contexto validado pelo usuario: `SUPABASE_SERVICE_ROLE_KEY` ja esta disponivel em producao; `/api/debug/env-check` retornou service role configurada e `/api/debug/admin-client-test` confirmou leitura de `clients` via service role.

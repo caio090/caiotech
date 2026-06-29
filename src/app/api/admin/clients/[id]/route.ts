@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn } from "@/lib/client-visibility";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -7,8 +8,7 @@ const CLIENT_WRITE_FRIENDLY_ERROR =
   "Nao foi possivel atualizar o cliente. Verifique permissoes do banco ou variavel SUPABASE_SERVICE_ROLE_KEY na Vercel.";
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
-  const text = error?.message?.toLowerCase() ?? "";
-  return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
+  return isMissingClientVisibilityColumn(error);
 }
 
 // GET /api/admin/clients/[id] — returns company_name for breadcrumb sync
@@ -21,12 +21,25 @@ export async function GET(
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-    const { data } = await supabase
+    let clientResult = await supabase
       .from("clients")
-      .select("id, company_name")
+      .select("id, company_name, deleted_at, archived_at")
       .eq("id", id)
-      .neq("status", "archived")
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
+
+    if (clientResult.error && isMissingColumnError(clientResult.error)) {
+      clientResult = await supabase
+        .from("clients")
+        .select("id, company_name")
+        .eq("id", id)
+        .in("status", CLIENT_VISIBLE_STATUSES)
+        .maybeSingle() as typeof clientResult;
+    }
+
+    const { data } = clientResult;
     if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
     return NextResponse.json({ id: data.id, company_name: data.company_name });
   } catch {
@@ -62,8 +75,12 @@ export async function PATCH(
     }
 
     const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const admin = createSupabaseAdminClient();
-    const db = admin ?? supabase;
+    let db = supabase;
+    try {
+      db = createSupabaseAdminClient();
+    } catch {
+      db = supabase;
+    }
     const { error } = await db
       .from("clients")
       .update(update)
@@ -106,9 +123,18 @@ export async function DELETE(
     }
 
     const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const admin = createSupabaseAdminClient();
-    const db = admin ?? supabase;
+    let db = supabase;
+    try {
+      db = createSupabaseAdminClient();
+    } catch {
+      db = supabase;
+    }
     const deletedAt = new Date().toISOString();
+
+    const rpcResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
+    if (!rpcResult.error) {
+      return NextResponse.json({ ok: true });
+    }
 
     let result = await db
       .from("clients")

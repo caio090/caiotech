@@ -7,6 +7,7 @@ import { MobileBottomNav } from "@/components/mobile-nav";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { hasUnreadNotif, markNotifSeen } from "@/lib/notifications";
+import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 interface Props {
   children: React.ReactNode;
@@ -32,8 +33,11 @@ export function ClientLayoutShell({ children }: Props) {
 
         const { data: clientRow } = await supabase
           .from("clients")
-          .select("id, company_name, responsible_name")
+          .select("id, company_name, responsible_name, deleted_at, archived_at")
           .eq("owner_id", user.id)
+          .in("status", CLIENT_VISIBLE_STATUSES)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .maybeSingle();
 
         if (!clientRow || cancelled) return;
