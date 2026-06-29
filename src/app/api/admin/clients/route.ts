@@ -1,5 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+
+const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+
+function clientWriteErrorMessage(message?: string) {
+  const text = message?.toLowerCase() ?? "";
+  if (text.includes("row-level security") || text.includes("rls")) {
+    return "Nao foi possivel criar o cliente por bloqueio de permissao/RLS. Rode docs/supabase/48-admin-insert-client.sql no Supabase ou configure SUPABASE_SERVICE_ROLE_KEY.";
+  }
+  if (text.includes("violates check constraint") || text.includes("clients_status_check")) {
+    return "Nao foi possivel criar o cliente porque o status escolhido nao e aceito pelo banco. Tente novamente com status Onboarding.";
+  }
+  return message ?? "Erro ao criar cliente.";
+}
 
 // GET /api/admin/clients
 // Retorna lista de clientes reais com badges derivados de dados relacionados.
@@ -89,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
     const role = (profile as { role?: string } | null)?.role ?? "";
-    if (!["admin", "super_admin"].includes(role)) {
+    if (!CLIENT_MANAGER_ROLES.has(role)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
@@ -102,24 +115,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
     }
 
+    const requestedStatus = ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding";
     const insert: Record<string, unknown> = {
       company_name:     body.company_name.trim(),
       responsible_name: body.responsible_name?.trim() ?? null,
       email:            body.email?.trim() ?? null,
       phone:            body.phone?.trim() ?? null,
       segment:          body.segment?.trim() ?? null,
-      status:           ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding",
+      status:           requestedStatus,
     };
 
-    const { data, error } = await supabase
+    const admin = createSupabaseAdminClient() ?? supabase;
+    let result = await admin
       .from("clients")
       .insert(insert)
       .select("id, company_name, responsible_name, email, phone, segment, status")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (result.error && requestedStatus === "active" && result.error.code === "23514") {
+      result = await admin
+        .from("clients")
+        .insert({ ...insert, status: "onboarding" })
+        .select("id, company_name, responsible_name, email, phone, segment, status")
+        .single();
+    }
+
+    if (result.error) {
+      return NextResponse.json({ error: clientWriteErrorMessage(result.error.message) }, { status: 500 });
+    }
+
+    const data = result.data;
     return NextResponse.json({ ...data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : undefined;
+    return NextResponse.json({ error: clientWriteErrorMessage(message) }, { status: 500 });
   }
 }

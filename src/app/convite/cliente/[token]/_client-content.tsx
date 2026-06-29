@@ -108,7 +108,12 @@ export function ClientInviteContent({ token, invite }: Props) {
       }
 
       // Chama RPC para aceitar convite e vincular client_id ao profile
-      await supabase.rpc("accept_client_invite", { p_token: token });
+      const { error: acceptErr } = await supabase.rpc("accept_client_invite", { p_token: token });
+      if (acceptErr) {
+        setError("Nao foi possivel vincular seu acesso ao cliente. Peça um novo convite ou confirme se o SQL 42 foi rodado no Supabase.");
+        setLoading(false);
+        return;
+      }
 
       setSuccess(true);
       setTimeout(() => router.push("/client/home"), 2000);

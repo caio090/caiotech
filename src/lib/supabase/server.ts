@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from "./config";
 
@@ -25,6 +26,18 @@ export async function createServerSupabaseClient() {
           // Server Components não podem setar cookies — ignorado (middleware gerencia)
         }
       },
+    },
+  });
+}
+
+export function createSupabaseAdminClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!SUPABASE_URL || !serviceRoleKey) return null;
+
+  return createClient(SUPABASE_URL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   });
 }

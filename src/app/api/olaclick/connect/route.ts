@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
 
 interface ConnectPayload {
   client_id: string;
@@ -7,6 +7,8 @@ interface ConnectPayload {
   access_token: string;
   notes?: string;
 }
+
+const OLA_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 
 // POST /api/olaclick/connect
 // Salva token OlaClick no banco — nunca retorna token no response.
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!["admin", "agency"].includes(profile?.role ?? "")) {
+    if (!OLA_MANAGER_ROLES.has(profile?.role ?? "")) {
       return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
     }
 
@@ -37,9 +39,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Extrai apenas os últimos 4 caracteres para exibição
+    const admin = createSupabaseAdminClient() ?? supabase;
+    const { data: client, error: clientErr } = await admin
+      .from("clients")
+      .select("id")
+      .eq("id", client_id)
+      .maybeSingle();
+
+    if (clientErr?.code === "42P01") {
+      return NextResponse.json({ ok: false, reason: "sql_pending", message: "Tabela clients indisponivel. Rode os SQLs base no Supabase." });
+    }
+    if (!client) {
+      return NextResponse.json({ ok: false, reason: "client_not_found", message: "Selecione um cliente real antes de conectar o OlaClick." }, { status: 404 });
+    }
+
     const token_last_four = access_token.length >= 4 ? access_token.slice(-4) : "****";
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from("olaclick_connections")
       .insert({
         client_id,
@@ -73,14 +89,15 @@ export async function DELETE(request: NextRequest) {
     if (!user) return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-    if (!["admin", "agency"].includes(profile?.role ?? "")) {
+    if (!OLA_MANAGER_ROLES.has(profile?.role ?? "")) {
       return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
     }
 
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
 
-    const { error } = await supabase.from("olaclick_connections").delete().eq("id", id);
+    const admin = createSupabaseAdminClient() ?? supabase;
+    const { error } = await admin.from("olaclick_connections").delete().eq("id", id);
     if (error) throw error;
 
     return NextResponse.json({ ok: true });

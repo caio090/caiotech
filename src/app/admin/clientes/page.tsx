@@ -51,7 +51,7 @@ function NewClientModal({ onSave, onCancel, loading }: {
             <input
               value={form.company_name}
               onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
-              placeholder="Ex: Duh Lanches"
+              placeholder="Nome da empresa"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
             />
           </div>
@@ -93,6 +93,7 @@ function NewClientModal({ onSave, onCancel, loading }: {
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
             >
               <option value="">Selecione...</option>
+              <option value="Restaurante + Delivery">Restaurante + Delivery</option>
               {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
@@ -106,6 +107,9 @@ function NewClientModal({ onSave, onCancel, loading }: {
               <option value="onboarding">Onboarding</option>
               <option value="active">Ativo</option>
             </select>
+          </div>
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-700">
+            Depois de criar o cliente, use o botao de convite no card para gerar o link de acesso.
           </div>
         </div>
         <div className="flex gap-2">
@@ -168,11 +172,12 @@ function InviteModal({ client, onClose }: { client: Client; onClose: () => void 
   const [loading, setLoading] = useState(false);
   const [link,    setLink]    = useState<string | null>(null);
   const [error,   setError]   = useState("");
+  const [warning, setWarning] = useState("");
   const [copied,  setCopied]  = useState(false);
 
   async function handleGenerate() {
     if (!email.trim()) { setError("Informe o e-mail do cliente."); return; }
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setWarning("");
     try {
       const res = await fetch(`/api/admin/clients/${client.id}/invite`, {
         method: "POST",
@@ -180,8 +185,9 @@ function InviteModal({ client, onClose }: { client: Client; onClose: () => void 
         body: JSON.stringify({ email: email.trim() }),
       });
       if (res.ok) {
-        const data = await res.json() as { link: string };
+        const data = await res.json() as { link: string; warning?: string };
         setLink(data.link);
+        setWarning(data.warning ?? "");
       } else {
         const err = await res.json().catch(() => ({})) as { error?: string };
         setError(err.error ?? "Erro ao gerar convite.");
@@ -242,6 +248,7 @@ function InviteModal({ client, onClose }: { client: Client; onClose: () => void 
         ) : (
           <>
             <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+              {warning && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 mb-2">{warning}</p>}
               <p className="text-xs font-semibold text-emerald-700 mb-2">Link de convite gerado!</p>
               <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
                 <span className="text-xs text-gray-600 flex-1 truncate">{link}</span>
