@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+
+const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 
 // GET /api/admin/clients/[id] — returns company_name for breadcrumb sync
 export async function GET(
@@ -41,7 +43,18 @@ export async function PATCH(
       Object.entries(body).filter(([k]) => allowed.includes(k))
     );
 
-    const { error } = await supabase
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!CLIENT_MANAGER_ROLES.has(profile?.role ?? "")) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    const admin = createSupabaseAdminClient() ?? supabase;
+    const { error } = await admin
       .from("clients")
       .update(update)
       .eq("id", id);
@@ -70,16 +83,31 @@ export async function DELETE(
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.role !== "admin") {
+    if (!CLIENT_MANAGER_ROLES.has(profile?.role ?? "")) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const { error } = await supabase
+    const admin = createSupabaseAdminClient() ?? supabase;
+    let result = await admin
       .from("clients")
       .update({ status: "archived", archived_at: new Date().toISOString() })
       .eq("id", id);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (result.error && result.error.code === "23514") {
+      result = await admin
+        .from("clients")
+        .update({ status: "inactive", archived_at: new Date().toISOString() })
+        .eq("id", id);
+    }
+
+    if (result.error && result.error.code === "23514") {
+      result = await admin
+        .from("clients")
+        .update({ status: "pausado", archived_at: new Date().toISOString() })
+        .eq("id", id);
+    }
+
+    if (result.error) return NextResponse.json({ error: result.error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
 
 interface LinkPayload {
   client_id: string;
@@ -11,6 +11,8 @@ interface LinkPayload {
   picture_url?: string;
   is_primary?: boolean;
 }
+
+const META_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 
 // POST /api/meta/assets/link
 // Vincula um ativo Meta (Página ou Instagram Business) a um cliente da LOKAT OS.
@@ -38,8 +40,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
   }
 
-  if (!userRole || !["admin", "agency"].includes(userRole)) {
-    return NextResponse.json({ ok: false, reason: "forbidden", message: "Apenas admin e agency podem vincular ativos." }, { status: 403 });
+  if (!userRole || !META_MANAGER_ROLES.has(userRole)) {
+    return NextResponse.json({ ok: false, reason: "forbidden", message: "Apenas admin, super_admin e agency podem vincular ativos." }, { status: 403 });
   }
 
   let body: LinkPayload;
@@ -61,14 +63,17 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createServerSupabaseClient();
+  const admin = createSupabaseAdminClient() ?? supabase;
 
   // Confirma que a conexão Meta pertence ao usuário autenticado
-  const { data: conn, error: connError } = await supabase
+  let connQuery = admin
     .from("meta_connections")
     .select("id")
-    .eq("id", meta_connection_id)
-    .eq("connected_by", userId)
-    .maybeSingle();
+    .eq("id", meta_connection_id);
+
+  if (userRole !== "super_admin") connQuery = connQuery.eq("connected_by", userId);
+
+  const { data: conn, error: connError } = await connQuery.maybeSingle();
 
   if (connError?.code === "42P01") {
     return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 35." });
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Upsert na client_meta_assets
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("client_meta_assets")
     .upsert(
       {
@@ -122,7 +127,7 @@ export async function DELETE(request: NextRequest) {
     }
   } catch { userId = null; }
 
-  if (!userId || !userRole || !["admin", "agency"].includes(userRole)) {
+  if (!userId || !userRole || !META_MANAGER_ROLES.has(userRole)) {
     return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
   }
 
@@ -134,7 +139,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.from("client_meta_assets").delete().eq("id", assetRecordId);
+  const admin = createSupabaseAdminClient() ?? supabase;
+  const { error } = await admin.from("client_meta_assets").delete().eq("id", assetRecordId);
 
   if (error) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });

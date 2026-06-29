@@ -36,6 +36,7 @@ export async function GET() {
     const { data: clients, error } = await supabase
       .from("clients")
       .select("id, company_name, responsible_name, email, phone, segment, status")
+      .in("status", ["active", "onboarding", "inactive"])
       .order("company_name");
 
     if (error) throw error;

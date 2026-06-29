@@ -13,6 +13,16 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ### Feito
 
+- Continuidade da estabilizacao pos-feature apos commit `a7c39b8`.
+- Ajustado `/contentos/selecionar-cliente` legado para listar clientes reais via tabela `clients` para admin/equipe ContentOS, sem depender de `profiles.role='cliente'`.
+- Mantido cliente final restrito ao proprio `client_id` em `profiles.client_id` ou ao proprio `owner_id`.
+- Ajustada API `GET /api/admin/clients` para nao listar clientes arquivados/deletados/teste nas listas padrao, trazendo apenas `active`, `onboarding` e `inactive`.
+- Ajustadas rotas `PATCH` e `DELETE /api/admin/clients/[id]` para validar permissao de admin/super_admin/agency e executar escrita server-side segura.
+- Ajustado soft delete de cliente com fallback de status (`archived` -> `inactive` -> `pausado`) para suportar schemas em fases diferentes.
+- Ajustada rota `/api/meta/assets/link` para permitir `super_admin` e usar operacao server-side segura no vinculo/remocao de ativos Meta por `client_id`.
+- Validado que o Diagnostico de Marketing Local aponta para planos/servicos Lokat e WhatsApp da Lokat, sem oferecer autonomo como caminho principal.
+- Validado TypeScript com `npx tsc --noEmit`.
+- Validado build com `$env:TURBOPACK=0; npm run build`.
 - Estabilizado o fluxo de cadastro de cliente no admin para nao depender de insert direto sujeito a RLS.
 - Criado helper server-side `createSupabaseAdminClient` para operacoes sensiveis com service role quando configurada.
 - Ajustada API `POST /api/admin/clients` para validar usuario logado e permissao, inserir cliente server-side e retornar erro amigavel se RLS/SQL 48 ainda bloquear.
@@ -44,6 +54,9 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - `src/app/admin/clientes/page.tsx`
 - `src/app/convite/cliente/[token]/_client-content.tsx`
 - `src/app/api/olaclick/connect/route.ts`
+- `src/app/api/admin/clients/[id]/route.ts`
+- `src/app/api/meta/assets/link/route.ts`
+- `src/app/contentos/selecionar-cliente/page.tsx`
 
 ### Arquivos criados na sessao Claude Code
 
@@ -70,6 +83,8 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - `npx tsc --noEmit`
 - `npm run build`
 - `$env:TURBOPACK=0; npm run build`
+- `rg "validateContentOSClient|ACTIVE_CLIENT_KEY|selecionar-cliente|client=" src/app src/components src/lib -n --glob '!node_modules/**'`
+- `git diff --check`
 
 ### Acoes manuais obrigatorias
 
@@ -96,6 +111,7 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Testar em ambiente autenticado a criacao de cliente real via `/admin/clientes`.
 - Testar geracao e aceite de convite real apos SQL 42.
 - Testar conexao OlaClick por `client_id` apos SQL 39.
+- Testar vinculo Meta por `client_id` apos SQL 37.
 - Assets locais de `/rec` permanecem nao rastreados e devem ser ignorados nesta etapa.
 
 ### Proximo passo recomendado
