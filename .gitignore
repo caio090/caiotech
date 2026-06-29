@@ -45,3 +45,5 @@ public/rec/*.mp4
 dev-out*.txt
 dev-err*.txt
 dev-server.log
+
+.vercel
