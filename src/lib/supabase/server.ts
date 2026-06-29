@@ -41,3 +41,7 @@ export function createSupabaseAdminClient() {
     },
   });
 }
+
+export function hasSupabaseServiceRoleKey() {
+  return Boolean(SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}

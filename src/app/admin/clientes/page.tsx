@@ -25,6 +25,19 @@ const SEGMENTS = [
   "Tecnologia", "Educação", "Beleza", "Fitness", "Outro",
 ];
 
+const NEW_CLIENT_SEGMENTS = [
+  "Restaurante",
+  "Delivery",
+  "Restaurante + Delivery",
+  "Academia",
+  "Loja local",
+  "Material de construcao",
+  "Clinica / Estetica",
+  "Mercado / Conveniencia",
+  "Prestador de servico",
+  "Outro",
+];
+
 function NewClientModal({ onSave, onCancel, loading }: {
   onSave: (data: NewClientForm) => void;
   onCancel: () => void;
@@ -93,8 +106,7 @@ function NewClientModal({ onSave, onCancel, loading }: {
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
             >
               <option value="">Selecione...</option>
-              <option value="Restaurante + Delivery">Restaurante + Delivery</option>
-              {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              {NEW_CLIENT_SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>

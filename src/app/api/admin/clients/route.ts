@@ -1,17 +1,49 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
+const SERVICE_ROLE_MISSING_MESSAGE =
+  "SUPABASE_SERVICE_ROLE_KEY ausente no ambiente do servidor. Configure na Vercel para permitir escrita administrativa.";
+const CLIENT_CREATE_FRIENDLY_ERROR =
+  "Nao foi possivel criar o cliente. Verifique permissoes do banco ou variavel SUPABASE_SERVICE_ROLE_KEY na Vercel.";
 
-function clientWriteErrorMessage(message?: string) {
+function clientWriteErrorMessage(message?: string, serviceRolePresent = true) {
   const text = message?.toLowerCase() ?? "";
+  if (text.includes("supabase_service_role_key")) {
+    return SERVICE_ROLE_MISSING_MESSAGE;
+  }
   if (text.includes("row-level security") || text.includes("rls")) {
-    return "Nao foi possivel criar o cliente por bloqueio de permissao/RLS. Rode docs/supabase/48-admin-insert-client.sql no Supabase ou configure SUPABASE_SERVICE_ROLE_KEY.";
+    if (!serviceRolePresent) {
+      return `${CLIENT_CREATE_FRIENDLY_ERROR} ${SERVICE_ROLE_MISSING_MESSAGE}`;
+    }
+    return CLIENT_CREATE_FRIENDLY_ERROR;
   }
   if (text.includes("violates check constraint") || text.includes("clients_status_check")) {
     return "Nao foi possivel criar o cliente porque o status escolhido nao e aceito pelo banco. Tente novamente com status Onboarding.";
   }
-  return message ?? "Erro ao criar cliente.";
+  return message ?? CLIENT_CREATE_FRIENDLY_ERROR;
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  const text = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
+}
+
+function buildOwnershipInsert(
+  base: Record<string, unknown>,
+  role: string,
+  userId: string,
+) {
+  if (role === "super_admin") {
+    return { ...base, created_by: userId };
+  }
+
+  return {
+    ...base,
+    agency_id:  userId,
+    created_by: userId,
+  };
 }
 
 // GET /api/admin/clients
@@ -29,16 +61,29 @@ export async function GET() {
       .eq("id", user.id)
       .maybeSingle();
 
-    const isAdmin = profile?.role === "admin";
+    const role = (profile as { role?: string } | null)?.role ?? "";
+    const isAdmin = CLIENT_DELETE_ROLES.has(role);
     const userPlan = (profile as { plan?: string } | null)?.plan ?? null;
 
     // Busca clientes
-    const { data: clients, error } = await supabase
+    let clientsResult = await supabase
       .from("clients")
-      .select("id, company_name, responsible_name, email, phone, segment, status")
+      .select("id, company_name, responsible_name, email, phone, segment, status, deleted_at, archived_at")
       .in("status", ["active", "onboarding", "inactive"])
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("company_name");
 
+    if (clientsResult.error && isMissingColumnError(clientsResult.error)) {
+      const fallbackClientsResult = await supabase
+        .from("clients")
+        .select("id, company_name, responsible_name, email, phone, segment, status")
+        .in("status", ["active", "onboarding", "inactive"])
+        .order("company_name");
+      clientsResult = fallbackClientsResult as typeof clientsResult;
+    }
+
+    const { data: clients, error } = clientsResult;
     if (error) throw error;
 
     // Busca diagnósticos / briefs
@@ -101,7 +146,11 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, account_type")
+      .eq("id", user.id)
+      .maybeSingle();
     const role = (profile as { role?: string } | null)?.role ?? "";
     if (!CLIENT_MANAGER_ROLES.has(role)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -126,29 +175,74 @@ export async function POST(req: NextRequest) {
       status:           requestedStatus,
     };
 
-    const admin = createSupabaseAdminClient() ?? supabase;
-    let result = await admin
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
+    const insertWithOwnership = buildOwnershipInsert(insert, role, user.id);
+
+    if (!serviceRolePresent) {
+      console.warn("[api/admin/clients POST] service role ausente; tentando fluxo normal com RLS", {
+        role,
+        account_type: (profile as { account_type?: string } | null)?.account_type ?? null,
+        serviceRolePresent,
+      });
+    }
+
+    let result = await db
       .from("clients")
-      .insert(insert)
+      .insert(insertWithOwnership)
       .select("id, company_name, responsible_name, email, phone, segment, status")
       .single();
 
-    if (result.error && requestedStatus === "active" && result.error.code === "23514") {
-      result = await admin
+    if (result.error && isMissingColumnError(result.error)) {
+      result = await db
         .from("clients")
-        .insert({ ...insert, status: "onboarding" })
+        .insert(insert)
         .select("id, company_name, responsible_name, email, phone, segment, status")
         .single();
     }
 
+    if (result.error && requestedStatus === "active" && result.error.code === "23514") {
+      result = await db
+        .from("clients")
+        .insert({ ...insertWithOwnership, status: "onboarding" })
+        .select("id, company_name, responsible_name, email, phone, segment, status")
+        .single();
+
+      if (result.error && isMissingColumnError(result.error)) {
+        result = await db
+          .from("clients")
+          .insert({ ...insert, status: "onboarding" })
+          .select("id, company_name, responsible_name, email, phone, segment, status")
+          .single();
+      }
+    }
+
     if (result.error) {
-      return NextResponse.json({ error: clientWriteErrorMessage(result.error.message) }, { status: 500 });
+      console.error("[api/admin/clients POST] erro ao criar cliente", {
+        role,
+        account_type: (profile as { account_type?: string } | null)?.account_type ?? null,
+        serviceRolePresent,
+        supabaseError: result.error,
+      });
+      return NextResponse.json(
+        {
+          error: clientWriteErrorMessage(result.error.message, serviceRolePresent),
+          technical: {
+            role,
+            serviceRolePresent,
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        { status: 500 }
+      );
     }
 
     const data = result.data;
     return NextResponse.json({ ...data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : undefined;
-    return NextResponse.json({ error: clientWriteErrorMessage(message) }, { status: 500 });
+    return NextResponse.json({ error: clientWriteErrorMessage(message, hasSupabaseServiceRoleKey()) }, { status: 500 });
   }
 }

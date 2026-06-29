@@ -1,12 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
+import {
+  createServerSupabaseClient,
+  createSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+const SQL_42_MESSAGE = "Para gerar convite, rode docs/supabase/42-client-invites.sql no Supabase.";
 
 function getOrigin(hdrs: Headers) {
   const directOrigin = hdrs.get("origin");
@@ -20,15 +25,15 @@ function getOrigin(hdrs: Headers) {
 }
 
 // POST /api/admin/clients/[id]/invite
-// Gera um convite de cliente e retorna link copiável.
+// Gera um convite real de cliente e retorna link copiavel.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     const { id: clientId } = await params;
-    const body    = await req.json() as { email?: string };
-    const email   = body.email?.trim();
+    const body = await req.json() as { email?: string };
+    const email = body.email?.trim();
 
     if (!email) {
-      return NextResponse.json({ error: "E-mail é obrigatório." }, { status: 400 });
+      return NextResponse.json({ error: "E-mail e obrigatorio." }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClient();
@@ -36,21 +41,37 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
     const { data: profile } = await supabase
-      .from("profiles").select("role").eq("id", user.id).maybeSingle();
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    if (!profile || !CLIENT_MANAGER_ROLES.has(profile.role ?? "")) {
-      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+    const role = (profile as { role?: string } | null)?.role ?? "";
+    if (!CLIENT_MANAGER_ROLES.has(role)) {
+      return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
     }
 
-    const admin = createSupabaseAdminClient() ?? supabase;
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
 
-    // Verifica se o cliente existe
-    const { data: client } = await admin
-      .from("clients").select("id, company_name").eq("id", clientId).maybeSingle();
-    if (!client) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+    const { data: client, error: clientErr } = await db
+      .from("clients")
+      .select("id, company_name")
+      .eq("id", clientId)
+      .maybeSingle();
 
-    // Reutiliza convite pendente não expirado para o mesmo e-mail/cliente
-    const { data: existing } = await admin
+    if (clientErr) {
+      console.error("[api/admin/clients/invite] erro ao buscar cliente", {
+        clientId,
+        role,
+        serviceRolePresent,
+        supabaseError: clientErr,
+      });
+    }
+    if (!client) return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
+
+    const { data: existing, error: existingErr } = await db
       .from("client_invites")
       .select("token")
       .eq("client_id", clientId)
@@ -59,18 +80,21 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 
-    let token: string;
+    if (existingErr?.code === "42P01") {
+      return NextResponse.json({ error: SQL_42_MESSAGE, reason: "sql_pending" }, { status: 400 });
+    }
 
+    let token: string;
     if (existing?.token) {
       token = existing.token as string;
     } else {
-      const { data: invite, error: inviteErr } = await admin
+      const { data: invite, error: inviteErr } = await db
         .from("client_invites")
         .insert({
-          client_id:  clientId,
+          client_id: clientId,
           email,
-          role:       "cliente",
-          status:     "pending",
+          role: "cliente",
+          status: "pending",
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           created_by: user.id,
         })
@@ -78,24 +102,27 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         .single();
 
       if (inviteErr || !invite?.token) {
-        // Se client_invites não existe ainda (SQL 42 não rodado), retorna link de fallback
-        const fallbackToken = crypto.randomUUID();
-        const hdrs = await headers();
-        const origin = getOrigin(hdrs);
+        console.error("[api/admin/clients/invite] erro ao gerar convite", {
+          clientId,
+          role,
+          serviceRolePresent,
+          supabaseError: inviteErr,
+        });
+        if (inviteErr?.code === "42P01") {
+          return NextResponse.json({ error: SQL_42_MESSAGE, reason: "sql_pending" }, { status: 400 });
+        }
         return NextResponse.json({
-          link:    `${origin}/convite/cliente/${fallbackToken}`,
-          warning: "client_invites indisponivel. Rode docs/supabase/42-client-invites.sql no Supabase. Este link de fallback nao fica salvo.",
-        }, { status: 200 });
+          error: "Nao foi possivel gerar convite. Verifique permissoes do banco ou SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+        }, { status: 500 });
       }
       token = invite.token as string;
     }
 
-    const hdrs   = await headers();
+    const hdrs = await headers();
     const origin = getOrigin(hdrs);
-
-    const link = `${origin}/convite/cliente/${token}`;
-    return NextResponse.json({ link, client_id: clientId }, { status: 200 });
-  } catch {
+    return NextResponse.json({ link: `${origin}/convite/cliente/${token}`, client_id: clientId }, { status: 200 });
+  } catch (error) {
+    console.error("[api/admin/clients/invite] erro interno", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

@@ -45,11 +45,11 @@ CREATE POLICY "mktdiag_public_insert" ON public.marketing_diagnostics
 DROP POLICY IF EXISTS "mktdiag_admin_select" ON public.marketing_diagnostics;
 CREATE POLICY "mktdiag_admin_select" ON public.marketing_diagnostics
   FOR SELECT USING (
-    public.current_user_role() IN ('admin', 'operacional', 'financeiro')
+    public.current_user_role() IN ('super_admin', 'admin', 'operacional', 'financeiro')
   );
 
 DROP POLICY IF EXISTS "mktdiag_admin_update" ON public.marketing_diagnostics;
 CREATE POLICY "mktdiag_admin_update" ON public.marketing_diagnostics
   FOR UPDATE USING (
-    public.current_user_role() IN ('admin', 'operacional')
+    public.current_user_role() IN ('super_admin', 'admin', 'operacional')
   );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 
 interface ConnectPayload {
   client_id: string;
@@ -39,8 +39,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Extrai apenas os últimos 4 caracteres para exibição
-    const admin = createSupabaseAdminClient() ?? supabase;
-    const { data: client, error: clientErr } = await admin
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
+    const { data: client, error: clientErr } = await db
       .from("clients")
       .select("id")
       .eq("id", client_id)
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const token_last_four = access_token.length >= 4 ? access_token.slice(-4) : "****";
 
-    const { data, error } = await admin
+    const { data, error } = await db
       .from("olaclick_connections")
       .insert({
         client_id,
@@ -73,7 +75,19 @@ export async function POST(request: NextRequest) {
     if (error?.code === "42P01") {
       return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 39 no Supabase." });
     }
-    if (error) throw error;
+    if (error) {
+      console.error("[api/olaclick/connect] erro ao salvar conexao", {
+        role: profile?.role ?? null,
+        client_id,
+        serviceRolePresent,
+        supabaseError: error,
+      });
+      return NextResponse.json({
+        ok: false,
+        reason: "db_error",
+        message: "Nao foi possivel conectar o Cardapio Digital. Verifique permissoes do banco ou SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+      }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, id: data?.id, token_last_four });
   } catch {
@@ -96,9 +110,22 @@ export async function DELETE(request: NextRequest) {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
 
-    const admin = createSupabaseAdminClient() ?? supabase;
-    const { error } = await admin.from("olaclick_connections").delete().eq("id", id);
-    if (error) throw error;
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
+    const { error } = await db.from("olaclick_connections").delete().eq("id", id);
+    if (error) {
+      console.error("[api/olaclick/connect DELETE] erro ao remover conexao", {
+        role: profile?.role ?? null,
+        serviceRolePresent,
+        supabaseError: error,
+      });
+      return NextResponse.json({
+        ok: false,
+        reason: "db_error",
+        message: "Nao foi possivel remover a conexao. Verifique permissoes do banco ou SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+      }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

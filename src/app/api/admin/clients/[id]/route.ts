@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
+const CLIENT_WRITE_FRIENDLY_ERROR =
+  "Nao foi possivel atualizar o cliente. Verifique permissoes do banco ou variavel SUPABASE_SERVICE_ROLE_KEY na Vercel.";
+
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  const text = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
+}
 
 // GET /api/admin/clients/[id] — returns company_name for breadcrumb sync
 export async function GET(
@@ -53,13 +61,23 @@ export async function PATCH(
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const admin = createSupabaseAdminClient() ?? supabase;
-    const { error } = await admin
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
+    const { error } = await db
       .from("clients")
       .update(update)
       .eq("id", id);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) {
+      console.error("[api/admin/clients PATCH] erro ao atualizar cliente", {
+        clientId: id,
+        role: profile?.role ?? null,
+        serviceRolePresent,
+        supabaseError: error,
+      });
+      return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, technical: error }, { status: 400 });
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
@@ -83,31 +101,64 @@ export async function DELETE(
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!CLIENT_MANAGER_ROLES.has(profile?.role ?? "")) {
+    if (!CLIENT_DELETE_ROLES.has(profile?.role ?? "")) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const admin = createSupabaseAdminClient() ?? supabase;
-    let result = await admin
+    const serviceRolePresent = hasSupabaseServiceRoleKey();
+    const admin = createSupabaseAdminClient();
+    const db = admin ?? supabase;
+    const deletedAt = new Date().toISOString();
+
+    let result = await db
       .from("clients")
-      .update({ status: "archived", archived_at: new Date().toISOString() })
+      .update({ status: "archived", deleted_at: deletedAt, archived_at: deletedAt })
       .eq("id", id);
 
-    if (result.error && result.error.code === "23514") {
-      result = await admin
+    if (result.error && isMissingColumnError(result.error)) {
+      result = await db
         .from("clients")
-        .update({ status: "inactive", archived_at: new Date().toISOString() })
+        .update({ status: "archived" })
         .eq("id", id);
     }
 
     if (result.error && result.error.code === "23514") {
-      result = await admin
+      result = await db
         .from("clients")
-        .update({ status: "pausado", archived_at: new Date().toISOString() })
+        .update({ status: "inactive", deleted_at: deletedAt, archived_at: deletedAt })
         .eq("id", id);
+
+      if (result.error && isMissingColumnError(result.error)) {
+        result = await db
+          .from("clients")
+          .update({ status: "inactive" })
+          .eq("id", id);
+      }
     }
 
-    if (result.error) return NextResponse.json({ error: result.error.message }, { status: 400 });
+    if (result.error && result.error.code === "23514") {
+      result = await db
+        .from("clients")
+        .update({ status: "pausado", deleted_at: deletedAt, archived_at: deletedAt })
+        .eq("id", id);
+
+      if (result.error && isMissingColumnError(result.error)) {
+        result = await db
+          .from("clients")
+          .update({ status: "pausado" })
+          .eq("id", id);
+      }
+    }
+
+    if (result.error) {
+      console.error("[api/admin/clients DELETE] erro ao remover cliente", {
+        clientId: id,
+        role: profile?.role ?? null,
+        serviceRolePresent,
+        supabaseError: result.error,
+      });
+      return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, technical: result.error }, { status: 400 });
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });

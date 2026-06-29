@@ -53,13 +53,13 @@ CREATE POLICY "admin_all_olaclick"
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('admin', 'agency')
+      WHERE p.id = auth.uid() AND p.role IN ('super_admin', 'admin', 'agency')
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('admin', 'agency')
+      WHERE p.id = auth.uid() AND p.role IN ('super_admin', 'admin', 'agency')
     )
   );
 

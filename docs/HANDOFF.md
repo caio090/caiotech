@@ -11,6 +11,66 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29
+
+- Corrigido o fluxo real de criacao de cliente em `/admin/clientes` para tratar `super_admin` explicitamente.
+- Ajustada API `POST /api/admin/clients` para validar sessao/role, usar service role quando disponivel, tentar fallback seguro com RLS e retornar diagnostico amigavel/tecnico sem vazar secrets.
+- Adicionado diagnostico de `SUPABASE_SERVICE_ROLE_KEY` ausente no backend.
+- Ajustadas rotas `PATCH` e `DELETE /api/admin/clients/[id]` para usar escrita server-side, registrar erros tecnicos e fazer soft delete com fallback para schemas em fases diferentes.
+- Corrigida a rota de convite de cliente para nao gerar link falso quando `client_invites`/SQL 42 nao existe; agora mostra mensagem clara para rodar `docs/supabase/42-client-invites.sql`.
+- Ajustado modal de novo cliente com lista de segmentos solicitada.
+- Ajustada listagem de clientes do admin e do ContentOS para filtrar `deleted_at`/`archived_at` quando essas colunas existirem.
+- Atualizado `docs/supabase/48-admin-insert-client.sql` com policies idempotentes para `super_admin`, `admin` e equipe operacional.
+- Atualizado `docs/supabase/39-olaclick-connections.sql` para permitir `super_admin`.
+- Atualizado `docs/supabase/49-marketing-diagnostics.sql` para permitir `super_admin` na leitura/atualizacao do diagnostico.
+- Validado TypeScript com `npx tsc --noEmit`.
+- Validado build com `$env:TURBOPACK=0; npm run build`.
+
+### Arquivos alterados em 2026-06-29
+
+- `src/lib/supabase/server.ts`
+- `src/app/api/admin/clients/route.ts`
+- `src/app/api/admin/clients/[id]/route.ts`
+- `src/app/api/admin/clients/[id]/invite/route.ts`
+- `src/app/admin/clientes/page.tsx`
+- `src/lib/admin-contentos-clients.ts`
+- `src/app/api/olaclick/connect/route.ts`
+- `docs/supabase/48-admin-insert-client.sql`
+- `docs/supabase/39-olaclick-connections.sql`
+- `docs/supabase/49-marketing-diagnostics.sql`
+- `docs/HANDOFF.md`
+- `docs/SESSION_LOG.md`
+
+### Comandos executados em 2026-06-29
+
+- `Get-Content AGENTS.md`
+- `Get-Content docs/HANDOFF.md`
+- `Get-Content docs/AI_CONTEXT.md`
+- `Get-Content docs/SESSION_LOG.md`
+- `Get-Content docs/DECISIONS.md`
+- `Get-Content docs/ROADMAP.md`
+- `git status --short --branch`
+- `git branch --show-current`
+- `git log --oneline -8`
+- `npx tsc --noEmit`
+- `$env:TURBOPACK=0; npm run build`
+
+### Pendencias em 2026-06-29
+
+- Conferir na Vercel se `SUPABASE_SERVICE_ROLE_KEY` esta configurada.
+- Rodar no Supabase os SQLs atualizados antes do teste real: `docs/supabase/48-admin-insert-client.sql`, `docs/supabase/42-client-invites.sql`, `docs/supabase/39-olaclick-connections.sql` e `docs/supabase/49-marketing-diagnostics.sql`.
+- Testar autenticado em producao o fluxo: criar cliente, gerar convite, aceitar convite, selecionar no ContentOS, conectar OlaClick/Cardapio Digital, apagar cliente teste.
+- Assets locais de `/rec` continuam nao rastreados e devem permanecer fora deste commit.
+
+### Proximo passo recomendado em 2026-06-29
+
+- Fazer commit/push desta correcao e aguardar deploy automatico da Vercel via GitHub.
+
+### Instrucoes para o proximo agente
+
+- Se `/admin/clientes` ainda mostrar RLS apos o deploy, primeiro confirmar se o SQL 48 atualizado foi rodado e se `SUPABASE_SERVICE_ROLE_KEY` existe na Vercel.
+- Nao commitar `docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/` ou `rec-videos/`.
+
 ### Feito
 
 - Continuidade da estabilizacao pos-feature apos commit `a7c39b8`.

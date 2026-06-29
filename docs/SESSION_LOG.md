@@ -2,6 +2,20 @@
 
 Registro cronologico das sessoes de trabalho no Lokat OS.
 
+## 2026-06-29
+
+- Lidos `AGENTS.md`, `docs/HANDOFF.md`, `docs/AI_CONTEXT.md`, `docs/SESSION_LOG.md`, `docs/DECISIONS.md` e `docs/ROADMAP.md`.
+- Confirmado projeto em `C:\Users\Trabalho\Desktop\COde\lokat-os`, branch `main`.
+- Auditado erro de RLS em `/admin/clientes`: SQL 48 antigo nao contemplava `super_admin` e producao podia depender de `SUPABASE_SERVICE_ROLE_KEY`.
+- Corrigida API de clientes para escrita server-side com service role quando disponivel, fallback seguro com RLS e mensagens claras quando service role/RLS falhar.
+- Atualizado SQL 48 com policies idempotentes para `super_admin`, `admin` e equipe operacional.
+- Corrigida geracao de convite para exigir SQL 42 real, sem link de fallback invalido.
+- Ajustadas permissoes de `super_admin` em SQL 39 (OlaClick) e SQL 49 (Diagnostico Marketing Local).
+- Ajustada listagem do admin/ContentOS para respeitar soft delete quando `deleted_at`/`archived_at` existirem.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK=0; npm run build`.
+- Diretórios locais de midia (`docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/`, `rec-videos/`) foram preservados e nao alterados.
+
 ## 2026-06-28
 
 - Criada memoria oficial inicial para sincronizar Codex e Claude Code.

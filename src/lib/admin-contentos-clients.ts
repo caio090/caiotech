@@ -20,12 +20,28 @@ export async function getAdminContentOSClients(): Promise<AdminContentosClient[]
   try {
     const supabase = await createServerSupabaseClient();
 
-    const { data, error } = await supabase
+    let clientsResult = await supabase
       .from("clients")
-      .select("id, company_name, responsible_name, segment, status, owner_id")
+      .select("id, company_name, responsible_name, segment, status, owner_id, deleted_at, archived_at")
       .in("status", ["active", "onboarding"])
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("company_name");
 
+    if (clientsResult.error && (
+      clientsResult.error.code === "PGRST204" ||
+      clientsResult.error.message.toLowerCase().includes("could not find") ||
+      clientsResult.error.message.toLowerCase().includes("column")
+    )) {
+      const fallbackClientsResult = await supabase
+        .from("clients")
+        .select("id, company_name, responsible_name, segment, status, owner_id")
+        .in("status", ["active", "onboarding"])
+        .order("company_name");
+      clientsResult = fallbackClientsResult as typeof clientsResult;
+    }
+
+    const { data, error } = clientsResult;
     if (error || !data) return [];
 
     const clientIds = (data as Array<{ id: string }>).map((c) => c.id);
