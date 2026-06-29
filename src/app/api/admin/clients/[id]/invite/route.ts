@@ -52,9 +52,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
 
     const serviceRolePresent = hasSupabaseServiceRoleKey();
-    const db = serviceRolePresent ? createSupabaseAdminClient() : supabase;
 
-    const { data: client, error: clientErr } = await db
+    // Busca o cliente sempre via session (o GET prova que admin consegue ver)
+    const { data: client, error: clientErr } = await supabase
       .from("clients")
       .select("id, company_name")
       .eq("id", clientId)
@@ -70,7 +70,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
     if (!client) return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
 
-    const { data: existing, error: existingErr } = await db
+    // Para client_invites usa service role se disponível (RLS mais restrita),
+    // caso contrário usa session (policy admin_all_client_invites cobre admin)
+    const inviteDb = serviceRolePresent ? createSupabaseAdminClient() : supabase;
+
+    const { data: existing, error: existingErr } = await inviteDb
       .from("client_invites")
       .select("token")
       .eq("client_id", clientId)
@@ -87,7 +91,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (existing?.token) {
       token = existing.token as string;
     } else {
-      const { data: invite, error: inviteErr } = await db
+      const { data: invite, error: inviteErr } = await inviteDb
         .from("client_invites")
         .insert({
           client_id: clientId,
