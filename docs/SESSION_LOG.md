@@ -12,6 +12,9 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Validado `npx tsc --noEmit`.
 - Validado `$env:TURBOPACK='0'; npm run build`.
 - Diretórios locais de midia (`docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/`, `rec-videos/`) permanecem preservados e fora do commit.
+- Usuario testou em producao e a tela retornou o erro real: `new row violates row-level security policy for table "clients"`.
+- Ajustado `POST /api/admin/clients` para fazer fallback server-side autenticado quando o insert via admin client retornar RLS, mantendo a escrita fora do browser e permitindo que `auth.uid()` alimente `public.current_user_role()`.
+- Validado novamente `npx tsc --noEmit`.
 
 - Criada rota temporaria segura `GET /api/debug/env-check` para diagnosticar variaveis Supabase no runtime de producao sem expor secrets.
 - Liberada `/api/debug/env-check` no proxy para permitir diagnostico sem sessao autenticada.

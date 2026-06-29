@@ -23,6 +23,15 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Validado `npx tsc --noEmit`.
 - Validado `$env:TURBOPACK='0'; npm run build`.
 
+### Feito em 2026-06-29 - fallback RLS no create client
+
+- Usuario testou em producao e o erro real apareceu na tela: `new row violates row-level security policy for table "clients"`.
+- Diagnostico: a env de service role existe e consegue ler `clients`, mas o insert feito pelo client admin nao esta bypassando RLS em producao. Sem `auth.uid()` na chamada service role, a policy baseada em `public.current_user_role()` nao consegue validar o usuario.
+- Ajustado `POST /api/admin/clients` para, quando o insert via admin client retornar RLS, tentar um fallback server-side usando `createServerSupabaseClient()` com a sessao autenticada do admin.
+- O fallback continua acontecendo no servidor, nao no browser, e preserva validacao previa de `super_admin`/`admin`.
+- Mantidos os mesmos fallbacks de coluna ausente e status `active` -> `onboarding`.
+- Validado `npx tsc --noEmit`.
+
 ### Arquivos alterados em 2026-06-29 - debug do POST de clientes
 
 - `src/app/api/admin/clients/route.ts`

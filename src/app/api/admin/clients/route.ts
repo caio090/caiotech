@@ -42,6 +42,11 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
   return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
 }
 
+function isRlsError(error: { message?: string } | null) {
+  const text = error?.message?.toLowerCase() ?? "";
+  return text.includes("row-level security") || text.includes("rls");
+}
+
 function toSafeSupabaseError(error: SafeSupabaseError | null): SafeSupabaseError | null {
   if (!error) return null;
   return {
@@ -262,6 +267,46 @@ export async function POST(req: NextRequest) {
           .insert({ ...insert, status: "onboarding" })
           .select("id, company_name, responsible_name, email, phone, segment, status")
           .single();
+      }
+    }
+
+    if (result.error && isRlsError(result.error)) {
+      console.warn("[api/admin/clients POST] service role retornou RLS; tentando fallback server-side autenticado", {
+        role,
+        account_type: accountType,
+        serviceRoleConfigured,
+        supabaseError: toSafeSupabaseError(result.error),
+      });
+
+      const sessionDb = await createServerSupabaseClient();
+      result = await sessionDb
+        .from("clients")
+        .insert(insertWithOwnership)
+        .select("id, company_name, responsible_name, email, phone, segment, status")
+        .single();
+
+      if (result.error && isMissingColumnError(result.error)) {
+        result = await sessionDb
+          .from("clients")
+          .insert(insert)
+          .select("id, company_name, responsible_name, email, phone, segment, status")
+          .single();
+      }
+
+      if (result.error && requestedStatus === "active" && result.error.code === "23514") {
+        result = await sessionDb
+          .from("clients")
+          .insert({ ...insertWithOwnership, status: "onboarding" })
+          .select("id, company_name, responsible_name, email, phone, segment, status")
+          .single();
+
+        if (result.error && isMissingColumnError(result.error)) {
+          result = await sessionDb
+            .from("clients")
+            .insert({ ...insert, status: "onboarding" })
+            .select("id, company_name, responsible_name, email, phone, segment, status")
+            .single();
+        }
       }
     }
 
