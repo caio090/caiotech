@@ -16,6 +16,7 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Criada rota temporaria e segura `GET /api/debug/env-check` para validar em producao se o runtime que serve `www.lokat.com.br` enxerga as variaveis Supabase.
 - A rota retorna somente booleanos para `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`, alem de `NODE_ENV`, `VERCEL_ENV` e `projectHint`.
 - Nenhum valor, prefixo ou trecho de secret e retornado ou logado.
+- Liberada a rota `/api/debug/env-check` no `src/proxy.ts` para evitar redirect para `/login` em producao.
 - Reforcada a regra de deploy: publicar somente via `git push origin main` no repo `caiotech`; nao usar `vercel --prod` como padrao e nao criar projeto Vercel novo.
 
 ### Pendencias em 2026-06-29 - debug seguro de env em producao

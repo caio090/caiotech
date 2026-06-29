@@ -5,6 +5,7 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 ## 2026-06-29
 
 - Criada rota temporaria segura `GET /api/debug/env-check` para diagnosticar variaveis Supabase no runtime de producao sem expor secrets.
+- Liberada `/api/debug/env-check` no proxy para permitir diagnostico sem sessao autenticada.
 - Registrada regra operacional: producao oficial e o projeto Vercel `caiotech` conectado ao dominio `www.lokat.com.br`; deploy somente via GitHub `main`.
 - Nenhuma tela, layout, `/rec` ou ContentOS foi alterado nesta rodada.
 
