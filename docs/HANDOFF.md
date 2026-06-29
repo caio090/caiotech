@@ -11,6 +11,19 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29 - debug seguro de env em producao
+
+- Criada rota temporaria e segura `GET /api/debug/env-check` para validar em producao se o runtime que serve `www.lokat.com.br` enxerga as variaveis Supabase.
+- A rota retorna somente booleanos para `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`, alem de `NODE_ENV`, `VERCEL_ENV` e `projectHint`.
+- Nenhum valor, prefixo ou trecho de secret e retornado ou logado.
+- Reforcada a regra de deploy: publicar somente via `git push origin main` no repo `caiotech`; nao usar `vercel --prod` como padrao e nao criar projeto Vercel novo.
+
+### Pendencias em 2026-06-29 - debug seguro de env em producao
+
+- Apos deploy automatico, testar `https://www.lokat.com.br/api/debug/env-check`.
+- Resultado esperado: `"supabaseServiceRoleConfigured": true`.
+- Se vier `false`, configurar `SUPABASE_SERVICE_ROLE_KEY` no projeto Vercel correto: `caiotech` -> Settings -> Environment Variables, depois redeploy do ultimo Production.
+
 ### Feito em 2026-06-29 - ajuste service role obrigatoria
 
 - Confirmado pelo usuario que `lokat.rec@hotmail.com` existe em `public.profiles` com `role = 'super_admin'`; portanto o erro nao era role do profile.
