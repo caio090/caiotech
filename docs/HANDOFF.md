@@ -11,6 +11,44 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29 - debug do POST de clientes
+
+- Contexto validado pelo usuario: `SUPABASE_SERVICE_ROLE_KEY` ja esta disponivel em producao; `/api/debug/env-check` retornou service role configurada e `/api/debug/admin-client-test` confirmou leitura de `clients` via service role.
+- O erro restante em `/admin/clientes` esta concentrado no `POST /api/admin/clients`, que retorna HTTP 500 ao tentar criar cliente real.
+- Ajustado `POST /api/admin/clients` para logar diagnostico seguro do insert: role, `account_type`, `serviceRoleConfigured` e payload sanitizado sem dados sensiveis.
+- Ajustado retorno de erro do insert para `code: "CLIENT_INSERT_FAILED"` com `supabaseError.message`, `code`, `details` e `hint`, sem stack trace e sem secrets.
+- Ajustado tratamento de erro inesperado do `POST` para retornar `code: "CLIENT_CREATE_UNEXPECTED_ERROR"` e logar somente mensagem segura.
+- Ajustado `/admin/clientes` para nao mostrar mensagem falsa sobre `SUPABASE_SERVICE_ROLE_KEY` quando a env esta OK; agora mostra mensagem especifica por `code` e, se existir, "Detalhe tecnico" com a mensagem do Supabase.
+- Nao foram alterados `/rec`, landing, ContentOS ou assets locais.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+
+### Arquivos alterados em 2026-06-29 - debug do POST de clientes
+
+- `src/app/api/admin/clients/route.ts`
+- `src/app/admin/clientes/page.tsx`
+- `docs/HANDOFF.md`
+- `docs/SESSION_LOG.md`
+
+### Comandos executados em 2026-06-29 - debug do POST de clientes
+
+- `git status --short --branch`
+- `git branch --show-current`
+- `git log --oneline -5`
+- `npx tsc --noEmit`
+- `$env:TURBOPACK='0'; npm run build`
+
+### Pendencias em 2026-06-29 - debug do POST de clientes
+
+- Apos deploy automatico, testar novamente `/admin/clientes` criando o cliente Duh Lanches.
+- Se ainda retornar erro, copiar o `supabaseError.message/code/details/hint` retornado pelo `POST /api/admin/clients` ou consultar os logs da Vercel do projeto `caiotech`.
+- So criar `docs/supabase/51-fix-clients-create-schema.sql` se o erro real indicar constraint/schema incompatível.
+- Manter `docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/` e `rec-videos/` fora do commit nesta etapa.
+
+### Proximo passo recomendado em 2026-06-29 - debug do POST de clientes
+
+- Fazer push para `origin/main`, aguardar deploy automatico da Vercel no projeto `caiotech` e testar o cadastro real em `https://www.lokat.com.br/admin/clientes`.
+
 ### Feito em 2026-06-29 - debug seguro de env em producao
 
 - Criada rota temporaria e segura `GET /api/debug/env-check` para validar em producao se o runtime que serve `www.lokat.com.br` enxerga as variaveis Supabase.

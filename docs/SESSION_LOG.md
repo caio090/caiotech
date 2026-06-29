@@ -4,6 +4,15 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 
 ## 2026-06-29
 
+- Confirmado contexto de producao: service role ja configurada e rota de debug/admin test ja validou leitura de `clients` via service role.
+- Foco restante: HTTP 500 no `POST /api/admin/clients` ao criar cliente real em `/admin/clientes`.
+- Ajustado `POST /api/admin/clients` para retornar diagnostico seguro do erro Supabase (`message`, `code`, `details`, `hint`) com `code: "CLIENT_INSERT_FAILED"`, sem expor secrets.
+- Ajustado log server-side do `POST` para incluir somente role, `account_type`, `serviceRoleConfigured` e payload sanitizado.
+- Ajustada tela `/admin/clientes` para remover mensagem falsa/generica sobre service role quando a env esta OK e mostrar detalhe tecnico retornado pela API.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+- Diretórios locais de midia (`docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/`, `rec-videos/`) permanecem preservados e fora do commit.
+
 - Criada rota temporaria segura `GET /api/debug/env-check` para diagnosticar variaveis Supabase no runtime de producao sem expor secrets.
 - Liberada `/api/debug/env-check` no proxy para permitir diagnostico sem sessao autenticada.
 - Registrada regra operacional: producao oficial e o projeto Vercel `caiotech` conectado ao dominio `www.lokat.com.br`; deploy somente via GitHub `main`.

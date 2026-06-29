@@ -11,7 +11,14 @@ const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
 const SERVICE_ROLE_MISSING_MESSAGE =
   "SUPABASE_SERVICE_ROLE_KEY ausente no ambiente de produção. Configure na Vercel e faça redeploy.";
 const CLIENT_CREATE_FRIENDLY_ERROR =
-  "Nao foi possivel criar o cliente. Verifique permissoes do banco ou variavel SUPABASE_SERVICE_ROLE_KEY na Vercel.";
+  "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
+
+interface SafeSupabaseError {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}
 
 function clientWriteErrorMessage(message?: string, serviceRolePresent = true) {
   const text = message?.toLowerCase() ?? "";
@@ -33,6 +40,30 @@ function clientWriteErrorMessage(message?: string, serviceRolePresent = true) {
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
   const text = error?.message?.toLowerCase() ?? "";
   return error?.code === "PGRST204" || text.includes("could not find") || text.includes("column");
+}
+
+function toSafeSupabaseError(error: SafeSupabaseError | null): SafeSupabaseError | null {
+  if (!error) return null;
+  return {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  };
+}
+
+function sanitizeClientCreatePayload(body: {
+  company_name?: string; responsible_name?: string; email?: string;
+  phone?: string; segment?: string; status?: string;
+}) {
+  return {
+    hasCompanyName: Boolean(body.company_name?.trim()),
+    hasResponsibleName: Boolean(body.responsible_name?.trim()),
+    hasEmail: Boolean(body.email?.trim()),
+    hasPhone: Boolean(body.phone?.trim()),
+    segment: body.segment?.trim() || null,
+    status: body.status || null,
+  };
 }
 
 function buildOwnershipInsert(
@@ -180,6 +211,13 @@ export async function POST(req: NextRequest) {
       phone?: string; segment?: string; status?: string;
     };
 
+    console.info("[api/admin/clients POST] tentativa de criar cliente", {
+      role,
+      account_type: accountType,
+      serviceRoleConfigured,
+      payload: sanitizeClientCreatePayload(body),
+    });
+
     if (!body.company_name?.trim()) {
       return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
     }
@@ -228,16 +266,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (result.error) {
+      const supabaseError = toSafeSupabaseError(result.error);
       console.error("[api/admin/clients POST] erro ao criar cliente", {
         role,
         account_type: accountType,
         serviceRoleConfigured,
-        supabaseError: result.error,
+        supabaseError,
       });
       return NextResponse.json(
         {
           error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
-          code: result.error.code,
+          code: "CLIENT_INSERT_FAILED",
+          supabaseError,
           role,
           account_type: accountType,
           serviceRoleConfigured,
@@ -250,6 +290,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : undefined;
-    return NextResponse.json({ error: clientWriteErrorMessage(message, hasSupabaseServiceRoleKey()) }, { status: 500 });
+    const serviceRoleConfigured = hasSupabaseServiceRoleKey();
+    console.error("[api/admin/clients POST] erro inesperado", {
+      serviceRoleConfigured,
+      message,
+    });
+    return NextResponse.json({
+      error: clientWriteErrorMessage(message, serviceRoleConfigured),
+      code: "CLIENT_CREATE_UNEXPECTED_ERROR",
+      serviceRoleConfigured,
+    }, { status: 500 });
   }
 }

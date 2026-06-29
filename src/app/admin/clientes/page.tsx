@@ -153,6 +153,17 @@ interface Client {
   has_brief?: boolean;
 }
 
+interface CreateClientApiError {
+  error?: string;
+  code?: string;
+  supabaseError?: {
+    message?: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+}
+
 type StatusFilter = "todos" | "operacionais" | "onboarding" | "inactive";
 
 // ── Badges ─────────────────────────────────────────────────────
@@ -559,8 +570,17 @@ export default function AdminClientesPage() {
         flash(`Cliente "${created.company_name}" criado com sucesso.`);
         setCreatingClient(false);
       } else {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        flash(err.error ?? "Erro ao criar cliente.");
+        const err = await res.json().catch(() => ({})) as CreateClientApiError;
+        let message = err.error ?? "Erro ao criar cliente.";
+        if (err.code === "MISSING_SERVICE_ROLE" || err.code === "missing_service_role") {
+          message = "Configuracao do servidor ausente. Verifique SUPABASE_SERVICE_ROLE_KEY na Vercel.";
+        } else if (err.code === "CLIENT_INSERT_FAILED") {
+          message = "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
+        }
+        if (err.supabaseError?.message) {
+          message += ` Detalhe tecnico: ${err.supabaseError.message}`;
+        }
+        flash(message);
       }
     } catch { flash("Erro de conexão."); }
     finally { setActionLoading(false); }
