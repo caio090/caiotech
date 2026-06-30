@@ -293,7 +293,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Caminho 2: service role (bypassa RLS via chave admin)
-    if (serviceRoleConfigured && !isRpcUnavailable(rpcResult.error)) {
+    // Tenta SEMPRE que service role estiver configurado, independente do motivo
+    // da falha da RPC — inclusive quando SQL 51 ainda não foi rodado.
+    if (serviceRoleConfigured) {
       const insert: Record<string, unknown> = {
         company_name:     body.company_name.trim(),
         responsible_name: body.responsible_name?.trim() ?? null,
@@ -349,14 +351,16 @@ export async function POST(req: NextRequest) {
     }
 
     const rpcErr = rpcResult.error as SafeSupabaseError | null;
-    console.error("[api/admin/clients POST] criacao bloqueada antes de fallback", {
+    console.error("[api/admin/clients POST] criacao bloqueada — service role ausente e rpc falhou", {
       role,
       account_type: accountType,
       rpcError: toSafeSupabaseError(rpcErr),
       serviceRoleConfigured,
     });
     return buildClientCreateError({
-      error: isRpcUnavailable(rpcErr) ? RPC_MISSING_MESSAGE : clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
+      error: isRpcUnavailable(rpcErr)
+        ? `${RPC_MISSING_MESSAGE} Configure também SUPABASE_SERVICE_ROLE_KEY na Vercel para habilitar fallback.`
+        : clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
       code: isRpcUnavailable(rpcErr) ? "ADMIN_CREATE_CLIENT_RPC_UNAVAILABLE" : "CLIENT_INSERT_FAILED",
       step: "rpc_admin_create_client",
       role,

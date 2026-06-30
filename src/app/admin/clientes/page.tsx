@@ -27,16 +27,15 @@ const SEGMENTS = [
 ];
 
 const NEW_CLIENT_SEGMENTS = [
+  "Academia",
   "Restaurante",
   "Delivery",
   "Restaurante + Delivery",
-  "Academia",
   "Loja local",
   "Material de construção",
   "Clínica / Estética",
   "Mercado / Conveniência",
   "Prestador de serviço",
-  "Agência / Produtora",
   "Outro",
 ];
 
