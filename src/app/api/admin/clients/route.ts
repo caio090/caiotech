@@ -13,6 +13,8 @@ const SERVICE_ROLE_MISSING_MESSAGE =
   "SUPABASE_SERVICE_ROLE_KEY ausente no ambiente de produção. Configure na Vercel e faça redeploy.";
 const CLIENT_CREATE_FRIENDLY_ERROR =
   "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
+const RPC_MISSING_MESSAGE =
+  "RPC admin_create_client indisponivel ou com assinatura diferente. Rode docs/supabase/51-admin-create-client-bypass.sql no Supabase.";
 
 interface SafeSupabaseError {
   message?: string;
@@ -47,6 +49,16 @@ function isRlsError(error: { message?: string } | null) {
   return text.includes("row-level security") || text.includes("rls");
 }
 
+function isRpcUnavailable(error: { code?: string; message?: string } | null) {
+  const text = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "PGRST202" ||
+    text.includes("could not find the function") ||
+    text.includes("schema cache") ||
+    text.includes("function public.admin_create_client")
+  );
+}
+
 function toSafeSupabaseError(error: SafeSupabaseError | null): SafeSupabaseError | null {
   if (!error) return null;
   return {
@@ -55,6 +67,36 @@ function toSafeSupabaseError(error: SafeSupabaseError | null): SafeSupabaseError
     details: error.details,
     hint: error.hint,
   };
+}
+
+function buildClientCreateError(params: {
+  error: string;
+  code: string;
+  step: string;
+  status?: number;
+  role?: string | null;
+  accountType?: string | null;
+  serviceRoleConfigured: boolean;
+  usedRpc: boolean;
+  usedServiceRole: boolean;
+  supabaseError?: SafeSupabaseError | null;
+}) {
+  return NextResponse.json(
+    {
+      error: params.error,
+      code: params.code,
+      step: params.step,
+      role: params.role ?? null,
+      account_type: params.accountType ?? null,
+      serviceRoleConfigured: params.serviceRoleConfigured,
+      usedRpc: params.usedRpc,
+      usedServiceRole: params.usedServiceRole,
+      supabaseCode: params.supabaseError?.code ?? null,
+      supabaseMessage: params.supabaseError?.message ?? null,
+      supabaseError: toSafeSupabaseError(params.supabaseError ?? null),
+    },
+    { status: params.status ?? 500 }
+  );
 }
 
 function sanitizeClientCreatePayload(body: {
@@ -176,7 +218,7 @@ export async function GET() {
       has_brief:       briefIds.has(c.id),
     }));
 
-    return NextResponse.json({ clients: enriched, isAdmin, plan: userPlan });
+    return NextResponse.json({ clients: enriched, isAdmin, role, plan: userPlan });
   } catch {
     return NextResponse.json({ clients: [], isAdmin: false });
   }
@@ -234,14 +276,24 @@ export async function POST(req: NextRequest) {
       const row = Array.isArray(rows) ? rows[0] : rows;
       if (row?.id) {
         return NextResponse.json(
-          { ...row, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false },
+          { ...row, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false, usedRpc: true, usedServiceRole: false },
           { status: 201 }
         );
       }
     }
 
+    const rpcError = toSafeSupabaseError(rpcResult.error as SafeSupabaseError | null);
+    if (rpcResult.error) {
+      console.error("[api/admin/clients POST] rpc admin_create_client falhou", {
+        role,
+        account_type: accountType,
+        serviceRoleConfigured,
+        rpcError,
+      });
+    }
+
     // Caminho 2: service role (bypassa RLS via chave admin)
-    if (serviceRoleConfigured) {
+    if (serviceRoleConfigured && !isRpcUnavailable(rpcResult.error)) {
       const insert: Record<string, unknown> = {
         company_name:     body.company_name.trim(),
         responsible_name: body.responsible_name?.trim() ?? null,
@@ -268,53 +320,64 @@ export async function POST(req: NextRequest) {
 
       if (!result.error && result.data) {
         return NextResponse.json(
-          { ...result.data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false },
+          { ...result.data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false, usedRpc: false, usedServiceRole: true },
           { status: 201 }
         );
       }
 
       if (result.error) {
         const supabaseError = toSafeSupabaseError(result.error);
-        console.error("[api/admin/clients POST] service role também falhou", { supabaseError, rpcError: rpcResult.error });
-        return NextResponse.json(
-          {
-            error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
-            code: "CLIENT_INSERT_FAILED",
-            supabaseError,
-            role,
-            account_type: accountType,
-            serviceRoleConfigured,
-          },
-          { status: 500 }
-        );
+        console.error("[api/admin/clients POST] service role tambem falhou", {
+          role,
+          account_type: accountType,
+          serviceRoleConfigured,
+          serviceRoleError: supabaseError,
+          rpcError,
+        });
+        return buildClientCreateError({
+          error: clientWriteErrorMessage(result.error.message, serviceRoleConfigured),
+          code: isRlsError(result.error) ? "CLIENT_RLS_BLOCKED" : "CLIENT_INSERT_FAILED",
+          step: "service_role_insert",
+          role,
+          accountType,
+          serviceRoleConfigured,
+          usedRpc: false,
+          usedServiceRole: true,
+          supabaseError,
+        });
       }
     }
 
-    // RPC falhou e service role não configurado
     const rpcErr = rpcResult.error as SafeSupabaseError | null;
-    console.error("[api/admin/clients POST] rpc falhou e sem service role", {
+    console.error("[api/admin/clients POST] criacao bloqueada antes de fallback", {
+      role,
+      account_type: accountType,
       rpcError: toSafeSupabaseError(rpcErr),
       serviceRoleConfigured,
     });
-    return NextResponse.json(
-      {
-        error: clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
-        code: "CLIENT_INSERT_FAILED",
-        supabaseError: toSafeSupabaseError(rpcErr),
-        role,
-        account_type: accountType,
-        serviceRoleConfigured,
-      },
-      { status: 500 }
-    );
+    return buildClientCreateError({
+      error: isRpcUnavailable(rpcErr) ? RPC_MISSING_MESSAGE : clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
+      code: isRpcUnavailable(rpcErr) ? "ADMIN_CREATE_CLIENT_RPC_UNAVAILABLE" : "CLIENT_INSERT_FAILED",
+      step: "rpc_admin_create_client",
+      role,
+      accountType,
+      serviceRoleConfigured,
+      usedRpc: true,
+      usedServiceRole: false,
+      supabaseError: toSafeSupabaseError(rpcErr),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : undefined;
     const serviceRoleConfigured = hasSupabaseServiceRoleKey();
     console.error("[api/admin/clients POST] erro inesperado", { serviceRoleConfigured, message });
-    return NextResponse.json({
+    return buildClientCreateError({
       error: clientWriteErrorMessage(message, serviceRoleConfigured),
       code: "CLIENT_CREATE_UNEXPECTED_ERROR",
+      step: "unexpected",
       serviceRoleConfigured,
-    }, { status: 500 });
+      usedRpc: false,
+      usedServiceRole: false,
+      supabaseError: message ? { message } : null,
+    });
   }
 }

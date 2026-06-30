@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import {
   Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
   Edit2, Trash2, Loader2, Building2, User, Tag, Filter,
-  Mail, Copy, ExternalLink, TrendingUp,
+  Mail, Copy, ExternalLink, TrendingUp, Archive, CheckSquare,
 } from "lucide-react";
 import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -32,10 +32,11 @@ const NEW_CLIENT_SEGMENTS = [
   "Restaurante + Delivery",
   "Academia",
   "Loja local",
-  "Material de construcao",
-  "Clinica / Estetica",
-  "Mercado / Conveniencia",
-  "Prestador de servico",
+  "Material de construção",
+  "Clínica / Estética",
+  "Mercado / Conveniência",
+  "Prestador de serviço",
+  "Agência / Produtora",
   "Outro",
 ];
 
@@ -154,9 +155,25 @@ interface Client {
   has_brief?: boolean;
 }
 
+type DeleteMode = "archive" | "hard";
+
+interface DeleteModalState {
+  mode: DeleteMode;
+  clients: Client[];
+}
+
+interface CleanupCandidate extends Client {
+  deleted_at: string | null;
+  archived_at: string | null;
+  created_at: string | null;
+  reason: string | null;
+}
+
 interface CreateClientApiError {
   error?: string;
   code?: string;
+  step?: string;
+  supabaseMessage?: string | null;
   supabaseError?: {
     message?: string;
     code?: string;
@@ -296,46 +313,68 @@ function InviteModal({ client, onClose }: { client: Client; onClose: () => void 
 
 // ── Modal Excluir ──────────────────────────────────────────────
 function DeleteModal({
-  client, onConfirm, onCancel, loading,
+  state, onConfirm, onCancel, loading,
 }: {
-  client: Client; onConfirm: () => void; onCancel: () => void; loading: boolean;
+  state: DeleteModalState; onConfirm: () => void; onCancel: () => void; loading: boolean;
 }) {
   const [checked, setChecked] = useState(false);
-  const name = client.company_name ?? "";
+  const [typed, setTyped] = useState("");
+  const firstName = state.clients[0]?.company_name ?? "";
+  const isHard = state.mode === "hard";
+  const isBulk = state.clients.length > 1;
+  const validHard = typed.trim() === "APAGAR" || (!isBulk && typed.trim() === firstName);
+  const canConfirm = isHard ? validHard : checked;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
       <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-md w-full shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Trash2 className="w-5 h-5 text-red-500" />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isHard ? "bg-red-50" : "bg-amber-50"}`}>
+            {isHard ? <Trash2 className="w-5 h-5 text-red-500" /> : <Archive className="w-5 h-5 text-amber-500" />}
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Excluir cliente?</p>
-            <p className="text-xs text-gray-400 truncate max-w-[220px]">{name}</p>
+            <p className="text-sm font-bold text-gray-900">{isHard ? "Apagar definitivamente?" : "Arquivar cliente?"}</p>
+            <p className="text-xs text-gray-400 truncate max-w-[220px]">
+              {isBulk ? `${state.clients.length} clientes selecionados` : firstName}
+            </p>
           </div>
         </div>
-        <div className="p-3 bg-red-50 border border-red-100 rounded-xl mb-4 text-xs text-red-700 leading-relaxed">
-          Apagar cliente? Ele deixara de aparecer nos modulos da plataforma.
+        <div className={`p-3 rounded-xl mb-4 text-xs leading-relaxed ${isHard ? "bg-red-50 border border-red-100 text-red-700" : "bg-amber-50 border border-amber-100 text-amber-700"}`}>
+          {isHard
+            ? "Isso remove o cliente e vínculos relacionados do banco. Essa ação não deve ser usada em cliente real sem backup."
+            : "Ele sairá das listas e seletores, mas os dados ficam preservados."}
         </div>
-        <label className="flex items-start gap-3 mb-5 cursor-pointer group">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => setChecked(e.target.checked)}
-            className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0"
-          />
-          <span className="text-xs text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
-            Entendo que este cliente deixara de aparecer nos modulos da plataforma.
-          </span>
-        </label>
+        {isHard ? (
+          <div className="mb-5">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Digite {isBulk ? "APAGAR" : `o nome "${firstName}" ou APAGAR`} para confirmar
+            </label>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+            />
+          </div>
+        ) : (
+          <label className="flex items-start gap-3 mb-5 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => setChecked(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-amber-600 cursor-pointer flex-shrink-0"
+            />
+            <span className="text-xs text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
+              Entendo que estes clientes sairão das listas e seletores.
+            </span>
+          </label>
+        )}
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
             Cancelar
           </button>
-          <button onClick={onConfirm} disabled={!checked || loading} className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          <button onClick={onConfirm} disabled={!canConfirm || loading} className={`flex-1 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isHard ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}>
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Apagar cliente
+            {isHard ? "Apagar definitivamente" : "Arquivar"}
           </button>
         </div>
       </div>
@@ -344,6 +383,91 @@ function DeleteModal({
 }
 
 // ── Modal Editar ───────────────────────────────────────────────
+function CleanupModal({
+  candidates,
+  selectedIds,
+  loading,
+  canHardDelete,
+  onToggle,
+  onRefresh,
+  onArchive,
+  onHardDelete,
+  onCancel,
+}: {
+  candidates: CleanupCandidate[];
+  selectedIds: Set<string>;
+  loading: boolean;
+  canHardDelete: boolean;
+  onToggle: (id: string) => void;
+  onRefresh: () => void;
+  onArchive: () => void;
+  onHardDelete: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-3xl w-full shadow-2xl max-h-[88vh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Limpeza de clientes</p>
+            <p className="text-xs text-gray-400 mt-1">Revise os candidatos antes de arquivar ou apagar. Nenhum cliente é selecionado automaticamente.</p>
+          </div>
+          <button onClick={onCancel} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button onClick={onRefresh} disabled={loading} className="px-3 py-2 text-xs font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {loading ? "Carregando..." : "Atualizar relatório"}
+          </button>
+          <span className="text-xs text-gray-400">{selectedIds.size} selecionados</span>
+          <button onClick={onArchive} disabled={selectedIds.size === 0 || loading} className="px-3 py-2 text-xs font-semibold rounded-xl bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40">
+            Arquivar selecionados
+          </button>
+          {canHardDelete && (
+            <button onClick={onHardDelete} disabled={selectedIds.size === 0 || loading} className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40">
+              Apagar definitivamente
+            </button>
+          )}
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando candidatos...
+          </div>
+        )}
+
+        {!loading && candidates.length === 0 && (
+          <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+            Nenhum candidato retornado pela limpeza.
+          </div>
+        )}
+
+        {!loading && candidates.length > 0 && (
+          <div className="space-y-2">
+            {candidates.map((candidate) => (
+              <label key={candidate.id} className="flex items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(candidate.id)}
+                  onChange={() => onToggle(candidate.id)}
+                  className="mt-1 w-4 h-4 accent-indigo-600"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{candidate.company_name ?? "Sem nome"}</p>
+                  <p className="text-xs text-gray-400 truncate">{candidate.email ?? "Sem e-mail"} · {candidate.status ?? "sem status"}</p>
+                  <p className="text-xs text-amber-700 mt-1">{candidate.reason ?? "Revisar manualmente"}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EditModal({
   client, onSave, onCancel, loading,
 }: {
@@ -411,13 +535,45 @@ function EditModal({
 }
 
 // ── Card de cliente ────────────────────────────────────────────
-function ClientCard({ c, onEdit, onDelete, onInvite, isAdmin }: { c: Client; onEdit: (c: Client) => void; onDelete: (c: Client) => void; onInvite: (c: Client) => void; isAdmin: boolean }) {
+function ClientCard({
+  c,
+  onEdit,
+  onArchive,
+  onHardDelete,
+  onInvite,
+  isAdmin,
+  canHardDelete,
+  selectionMode,
+  selected,
+  onToggleSelect,
+}: {
+  c: Client;
+  onEdit: (c: Client) => void;
+  onArchive: (c: Client) => void;
+  onHardDelete: (c: Client) => void;
+  onInvite: (c: Client) => void;
+  isAdmin: boolean;
+  canHardDelete: boolean;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
   const initials = (c.company_name ?? c.responsible_name ?? "?")
     .split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
+    <div className={`bg-white rounded-2xl border p-5 hover:shadow-sm transition-shadow ${selected ? "border-indigo-300 ring-2 ring-indigo-100" : "border-gray-100"}`}>
       <div className="flex items-start gap-3 mb-3">
+        {selectionMode && (
+          <button
+            type="button"
+            onClick={() => onToggleSelect(c.id)}
+            aria-label={selected ? "Remover da seleção" : "Selecionar cliente"}
+            className={`w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 ${selected ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-gray-200 text-gray-400"}`}
+          >
+            {selected && <CheckSquare className="w-4 h-4" />}
+          </button>
+        )}
         <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold text-indigo-700">
           {initials}
         </div>
@@ -426,17 +582,24 @@ function ClientCard({ c, onEdit, onDelete, onInvite, isAdmin }: { c: Client; onE
           <p className="text-xs text-gray-400 truncate">{c.segment ?? "Sem segmento"}</p>
           <ClientBadges c={c} />
         </div>
-        <div className="flex gap-1 flex-shrink-0">
-          <button onClick={() => onInvite(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Convidar cliente">
-            <Mail className="w-3.5 h-3.5" />
+        <div className="flex flex-wrap gap-1 flex-shrink-0 justify-end max-w-[180px]">
+          <button onClick={() => onInvite(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Gerar convite">
+            <Mail className="w-3.5 h-3.5" /> Convite
           </button>
-          <button onClick={() => onEdit(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Editar">
-            <Edit2 className="w-3.5 h-3.5" />
+          <button onClick={() => onEdit(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Editar cliente">
+            <Edit2 className="w-3.5 h-3.5" /> Editar
           </button>
           {isAdmin && (
-            <button onClick={() => onDelete(c)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Excluir">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <>
+              <button onClick={() => onArchive(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Arquivar cliente">
+                <Archive className="w-3.5 h-3.5" /> Arquivar
+              </button>
+              {canHardDelete && (
+                <button onClick={() => onHardDelete(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors" title="Apagar definitivamente">
+                  <Trash2 className="w-3.5 h-3.5" /> Apagar
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -495,6 +658,7 @@ export default function AdminClientesPage() {
   const [clients,       setClients]       = useState<Client[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [isAdmin,       setIsAdmin]       = useState(false);
+  const [userRole,      setUserRole]      = useState("");
   const [userPlan,      setUserPlan]      = useState<string | null>(null);
   const [actionMsg,     setActionMsg]     = useState<string | null>(null);
   const [search,        setSearch]        = useState("");
@@ -504,19 +668,26 @@ export default function AdminClientesPage() {
   const [diagFilter,    setDiagFilter]    = useState<"todos" | "ok" | "pending">("todos");
   const [showFilters,   setShowFilters]   = useState(false);
   const [editingClient,  setEditingClient]  = useState<Client | null>(null);
-  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [deleteModal,    setDeleteModal]    = useState<DeleteModalState | null>(null);
   const [creatingClient, setCreatingClient] = useState(false);
   const [invitingClient, setInvitingClient] = useState<Client | null>(null);
   const [actionLoading,  setActionLoading]  = useState(false);
+  const [selectionMode,  setSelectionMode]  = useState(false);
+  const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+  const [cleanupOpen,    setCleanupOpen]    = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupCandidates, setCleanupCandidates] = useState<CleanupCandidate[]>([]);
+  const [selectedCleanupIds, setSelectedCleanupIds] = useState<Set<string>>(new Set());
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
     try {
       const res = await fetch("/api/admin/clients");
       if (res.ok) {
-        const data = await res.json() as { clients: Client[]; isAdmin: boolean; plan?: string };
+        const data = await res.json() as { clients: Client[]; isAdmin: boolean; role?: string; plan?: string };
         setClients(data.clients.filter((client) => isClientVisible(client.status)));
         setIsAdmin(data.isAdmin);
+        setUserRole(data.role ?? "");
         if (data.plan) setUserPlan(data.plan);
       }
     } catch { /* estado vazio */ }
@@ -550,6 +721,16 @@ export default function AdminClientesPage() {
     });
   }, [clients, search, statusFilter, segFilter, metaFilter, diagFilter]);
 
+  const canHardDelete = userRole === "super_admin";
+  const selectedClients = useMemo(
+    () => clients.filter((client) => selectedClientIds.has(client.id)),
+    [clients, selectedClientIds],
+  );
+  const selectedCleanupClients = useMemo(
+    () => cleanupCandidates.filter((client) => selectedCleanupIds.has(client.id)),
+    [cleanupCandidates, selectedCleanupIds],
+  );
+
   const flash = (msg: string) => {
     setActionMsg(msg);
     setTimeout(() => setActionMsg(null), 3000);
@@ -573,11 +754,19 @@ export default function AdminClientesPage() {
         let message = err.error ?? "Erro ao criar cliente.";
         if (err.code === "MISSING_SERVICE_ROLE" || err.code === "missing_service_role") {
           message = "Configuracao do servidor ausente. Verifique SUPABASE_SERVICE_ROLE_KEY na Vercel.";
+        } else if (err.code === "ADMIN_CREATE_CLIENT_RPC_UNAVAILABLE") {
+          message = err.error ?? "Rode docs/supabase/51-admin-create-client-bypass.sql no Supabase.";
+        } else if (err.code === "CLIENT_RLS_BLOCKED") {
+          message = "Nao foi possivel criar o cliente por RLS no passo server-side. Confira SQL 51 e service role.";
         } else if (err.code === "CLIENT_INSERT_FAILED") {
-          message = "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
+          message = err.error ?? "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
         }
-        if (err.supabaseError?.message) {
-          message += ` Detalhe tecnico: ${err.supabaseError.message}`;
+        const technical = err.supabaseMessage ?? err.supabaseError?.message;
+        if (technical) {
+          message += ` Detalhe tecnico: ${technical}`;
+        }
+        if (err.step) {
+          message += ` Step: ${err.step}.`;
         }
         flash(message);
       }
@@ -602,17 +791,84 @@ export default function AdminClientesPage() {
     finally { setActionLoading(false); setEditingClient(null); }
   };
 
+  const toggleClientSelection = (id: string) => {
+    setSelectedClientIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCleanupSelection = (id: string) => {
+    setSelectedCleanupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const cancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedClientIds(new Set());
+  };
+
+  const loadCleanupCandidates = async () => {
+    setCleanupLoading(true);
+    try {
+      const res = await fetch("/api/admin/clients/cleanup");
+      const data = await res.json().catch(() => ({})) as { candidates?: CleanupCandidate[]; error?: string };
+      if (res.ok) {
+        setCleanupCandidates(data.candidates ?? []);
+        setSelectedCleanupIds(new Set());
+      } else {
+        flash(data.error ?? "Nao foi possivel carregar limpeza.");
+      }
+    } catch {
+      flash("Erro de conexao ao carregar limpeza.");
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const openCleanup = () => {
+    setCleanupOpen(true);
+    void loadCleanupCandidates();
+  };
+
   const handleDelete = async () => {
-    if (!deletingClient) return;
+    if (!deleteModal) return;
+    const targets = deleteModal.clients;
+    if (targets.length === 0) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/admin/clients/${deletingClient.id}`, { method: "DELETE" });
+      const res = targets.length === 1
+        ? await fetch(`/api/admin/clients/${targets[0].id}${deleteModal.mode === "hard" ? "?mode=hard" : ""}`, { method: "DELETE" })
+        : await fetch("/api/admin/clients/bulk-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientIds: targets.map((client) => client.id), mode: deleteModal.mode }),
+          });
       if (res.ok) {
-        setClients((prev) => prev.filter((c) => c.id !== deletingClient.id));
-        flash("Cliente excluído.");
-      } else { flash("Erro ao excluir. Verifique as permissões."); }
-    } catch { flash("Erro de conexão."); }
-    finally { setActionLoading(false); setDeletingClient(null); }
+        const removedIds = new Set(targets.map((client) => client.id));
+        setClients((prev) => prev.filter((client) => !removedIds.has(client.id)));
+        setCleanupCandidates((prev) => prev.filter((client) => !removedIds.has(client.id)));
+        setSelectedClientIds(new Set());
+        setSelectedCleanupIds(new Set());
+        setSelectionMode(false);
+        flash(deleteModal.mode === "hard" ? "Cliente apagado definitivamente." : "Cliente arquivado.");
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string; technical?: { message?: string } };
+        const detail = err.technical?.message ? ` Detalhe tecnico: ${err.technical.message}` : "";
+        flash(`${err.error ?? "Erro ao processar cliente."}${detail}`);
+      }
+    } catch {
+      flash("Erro de conexao.");
+    } finally {
+      setActionLoading(false);
+      setDeleteModal(null);
+    }
   };
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
@@ -624,6 +880,24 @@ export default function AdminClientesPage() {
   return (
     <div>
       <PageHeader title="Clientes" description={loading ? "Carregando..." : `${filtered.length} de ${clients.length} clientes`}>
+        {isAdmin && (
+          <button
+            onClick={() => setSelectionMode(true)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <CheckSquare className="w-4 h-4" />
+            Selecionar clientes
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={openCleanup}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <Archive className="w-4 h-4" />
+            Limpeza
+          </button>
+        )}
         <button
           onClick={() => setCreatingClient(true)}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
@@ -636,6 +910,31 @@ export default function AdminClientesPage() {
       {actionMsg && (
         <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">
           {actionMsg}
+        </div>
+      )}
+
+      {selectionMode && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-3">
+          <span className="text-sm font-semibold text-indigo-700">{selectedClientIds.size} selecionados</span>
+          <button
+            onClick={() => setDeleteModal({ mode: "archive", clients: selectedClients })}
+            disabled={selectedClientIds.size === 0}
+            className="px-3 py-2 text-xs font-semibold rounded-xl bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40"
+          >
+            Arquivar
+          </button>
+          {canHardDelete && (
+            <button
+              onClick={() => setDeleteModal({ mode: "hard", clients: selectedClients })}
+              disabled={selectedClientIds.size === 0}
+              className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
+            >
+              Apagar definitivamente
+            </button>
+          )}
+          <button onClick={cancelSelection} className="px-3 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
+            Cancelar sele��o
+          </button>
         </div>
       )}
 
@@ -751,7 +1050,19 @@ export default function AdminClientesPage() {
       {!loading && filtered.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((c) => (
-            <ClientCard key={c.id} c={c} isAdmin={isAdmin} onEdit={setEditingClient} onDelete={setDeletingClient} onInvite={setInvitingClient} />
+            <ClientCard
+              key={c.id}
+              c={c}
+              isAdmin={isAdmin}
+              canHardDelete={canHardDelete}
+              selectionMode={selectionMode}
+              selected={selectedClientIds.has(c.id)}
+              onToggleSelect={toggleClientSelection}
+              onEdit={setEditingClient}
+              onArchive={(client) => setDeleteModal({ mode: "archive", clients: [client] })}
+              onHardDelete={(client) => setDeleteModal({ mode: "hard", clients: [client] })}
+              onInvite={setInvitingClient}
+            />
           ))}
         </div>
       )}
@@ -770,7 +1081,20 @@ export default function AdminClientesPage() {
       {creatingClient && <NewClientModal onSave={handleCreateClient} onCancel={() => setCreatingClient(false)} loading={actionLoading} />}
       {invitingClient && <InviteModal client={invitingClient} onClose={() => setInvitingClient(null)} />}
       {editingClient  && <EditModal  client={editingClient}  onSave={handleSaveEdit} onCancel={() => setEditingClient(null)}  loading={actionLoading} />}
-      {deletingClient && <DeleteModal client={deletingClient} onConfirm={handleDelete} onCancel={() => setDeletingClient(null)} loading={actionLoading} />}
+      {cleanupOpen && (
+        <CleanupModal
+          candidates={cleanupCandidates}
+          selectedIds={selectedCleanupIds}
+          loading={cleanupLoading || actionLoading}
+          canHardDelete={canHardDelete}
+          onToggle={toggleCleanupSelection}
+          onRefresh={loadCleanupCandidates}
+          onArchive={() => setDeleteModal({ mode: "archive", clients: selectedCleanupClients })}
+          onHardDelete={() => setDeleteModal({ mode: "hard", clients: selectedCleanupClients })}
+          onCancel={() => setCleanupOpen(false)}
+        />
+      )}
+      {deleteModal && <DeleteModal state={deleteModal} onConfirm={handleDelete} onCancel={() => setDeleteModal(null)} loading={actionLoading} />}
     </div>
   );
 }

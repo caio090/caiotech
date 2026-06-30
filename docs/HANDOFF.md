@@ -11,6 +11,76 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 ## Ultima sessao
 
+### Feito em 2026-06-29 - criacao e limpeza admin de clientes
+
+- Ajustado `POST /api/admin/clients` para retornar diagnostico seguro e rastreavel de criacao: `step`, `role`, `account_type`, `serviceRoleConfigured`, `usedRpc`, `usedServiceRole`, `supabaseCode` e `supabaseMessage`.
+- Confirmado no codigo que a criacao tenta primeiro a RPC `admin_create_client` com os parametros do SQL 51.
+- Se a RPC `admin_create_client` estiver ausente ou com assinatura divergente, a API retorna erro claro apontando `docs/supabase/51-admin-create-client-bypass.sql` em vez de mascarar como RLS generico.
+- Mantido fallback server-side por service role somente quando a RPC existe/falha por outro motivo e `SUPABASE_SERVICE_ROLE_KEY` esta configurada; nao ha insert pelo browser.
+- Ajustado `DELETE /api/admin/clients/[id]` para aceitar `mode=archive` por padrao e `mode=hard` apenas para `super_admin`.
+- Criada rota `POST /api/admin/clients/bulk-delete` para arquivar ou apagar definitivamente clientes selecionados usando RPCs do SQL 53.
+- Criada rota `GET /api/admin/clients/cleanup` para listar candidatos de limpeza via RPC, sem apagar nada automaticamente.
+- Criado `docs/supabase/53-client-admin-cleanup-tools.sql` com:
+  - `admin_list_clients_for_cleanup()`
+  - `admin_archive_clients(p_client_ids uuid[])`
+  - `admin_hard_delete_clients(p_client_ids uuid[])`
+  - exemplos comentados de uso manual.
+- Ajustada tela `/admin/clientes`:
+  - segmentos do modal de novo cliente atualizados;
+  - botao "Selecionar clientes";
+  - barra com contagem e acoes "Arquivar", "Apagar definitivamente" e "Cancelar selecao";
+  - card com acoes textuais "Convite", "Editar", "Arquivar" e "Apagar";
+  - modal de arquivar com texto de preservacao;
+  - modal de hard delete exigindo nome do cliente ou `APAGAR`;
+  - botao/painel "Limpeza" para consultar candidatos, sem pre-selecionar Duh Lanches ou qualquer outro cliente.
+- Revalidado que `package.json` e `package-lock.json` nao tem diff.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+- Validado `git diff --check`.
+
+### Arquivos alterados em 2026-06-29 - criacao e limpeza admin de clientes
+
+- `src/app/api/admin/clients/route.ts`
+- `src/app/api/admin/clients/[id]/route.ts`
+- `src/app/api/admin/clients/bulk-delete/route.ts`
+- `src/app/api/admin/clients/cleanup/route.ts`
+- `src/app/admin/clientes/page.tsx`
+- `docs/supabase/53-client-admin-cleanup-tools.sql`
+- `docs/HANDOFF.md`
+- `docs/SESSION_LOG.md`
+
+### Comandos executados em 2026-06-29 - criacao e limpeza admin de clientes
+
+- `git diff -- package.json package-lock.json`
+- `git status --short --branch`
+- `git branch --show-current`
+- `git log --oneline -5`
+- `Get-Content AGENTS.md`
+- `Get-Content docs/HANDOFF.md`
+- `Get-Content docs/AI_CONTEXT.md`
+- `Get-Content docs/SESSION_LOG.md`
+- `Get-Content docs/DECISIONS.md`
+- `Get-Content docs/ROADMAP.md`
+- `npx tsc --noEmit`
+- `$env:TURBOPACK='0'; npm run build`
+- `git diff --check`
+
+### Pendencias em 2026-06-29 - criacao e limpeza admin de clientes
+
+- Rodar manualmente no Supabase SQL Editor: `docs/supabase/53-client-admin-cleanup-tools.sql`.
+- Depois do deploy, testar em producao:
+  1. criar cliente em `/admin/clientes`;
+  2. conferir resposta de erro com `step` se ainda houver falha;
+  3. arquivar um cliente teste;
+  4. abrir "Limpeza", conferir o relatorio antes de selecionar;
+  5. testar hard delete apenas com cliente teste e backup/conferencia manual.
+- Nao apagar nem pre-selecionar Duh Lanches.
+- Manter `docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/` e `rec-videos/` fora do commit.
+
+### Proximo passo recomendado em 2026-06-29 - criacao e limpeza admin de clientes
+
+- Fazer commit/push para disparar deploy automatico no Vercel `caiotech`; depois rodar SQL 53 no Supabase e testar `/admin/clientes` em producao.
+
 ### Feito em 2026-06-29 - exclusao e visibilidade de clientes
 
 - Corrigida regra de visibilidade de clientes: clientes visiveis sao apenas `active` e `onboarding`.

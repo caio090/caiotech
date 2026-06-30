@@ -11,6 +11,21 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
   return isMissingClientVisibilityColumn(error);
 }
 
+function isRpcMissing(error: { code?: string; message?: string } | null) {
+  const text = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST202" || text.includes("could not find the function") || text.includes("schema cache");
+}
+
+function safeDbError(error: { code?: string; message?: string; details?: string; hint?: string } | null) {
+  if (!error) return null;
+  return {
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+  };
+}
+
 // GET /api/admin/clients/[id] — returns company_name for breadcrumb sync
 export async function GET(
   _req: Request,
@@ -103,11 +118,12 @@ export async function PATCH(
 
 // DELETE /api/admin/clients/[id]
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
+    const mode = new URL(req.url).searchParams.get("mode") === "hard" ? "hard" : "archive";
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -122,6 +138,33 @@ export async function DELETE(
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
+    if (mode === "hard") {
+      if (profile?.role !== "super_admin") {
+        return NextResponse.json({ error: "Apenas super_admin pode apagar definitivamente clientes." }, { status: 403 });
+      }
+
+      const hardResult = await supabase.rpc("admin_hard_delete_clients", { p_client_ids: [id] });
+      if (hardResult.error) {
+        console.error("[api/admin/clients DELETE] erro no hard delete rpc", {
+          clientId: id,
+          role: profile?.role ?? null,
+          supabaseError: safeDbError(hardResult.error),
+        });
+        return NextResponse.json(
+          {
+            error: isRpcMissing(hardResult.error)
+              ? "SQL 53 ausente. Rode docs/supabase/53-client-admin-cleanup-tools.sql no Supabase antes do hard delete."
+              : "Nao foi possivel apagar definitivamente o cliente.",
+            code: isRpcMissing(hardResult.error) ? "SQL_53_REQUIRED" : "CLIENT_HARD_DELETE_FAILED",
+            technical: safeDbError(hardResult.error),
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({ ok: true, mode: "hard", affected: hardResult.data ?? 0 });
+    }
+
     const serviceRolePresent = hasSupabaseServiceRoleKey();
     let db = supabase;
     try {
@@ -131,9 +174,14 @@ export async function DELETE(
     }
     const deletedAt = new Date().toISOString();
 
+    const archiveResult = await supabase.rpc("admin_archive_clients", { p_client_ids: [id] });
+    if (!archiveResult.error) {
+      return NextResponse.json({ ok: true, mode: "archive", affected: archiveResult.data ?? 0 });
+    }
+
     const rpcResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
     if (!rpcResult.error) {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, mode: "archive" });
     }
 
     let result = await db

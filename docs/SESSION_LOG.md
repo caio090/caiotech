@@ -4,6 +4,19 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 
 ## 2026-06-29
 
+- Verificado que `package.json` e `package-lock.json` nao tinham diff antes da nova alteracao.
+- Corrigido `POST /api/admin/clients` para priorizar a RPC `admin_create_client`, detectar RPC ausente/assinatura divergente e retornar diagnostico seguro com `step`, role, service role e erro Supabase sem vazar secrets.
+- Mantido o fallback por service role apenas server-side; a tela `/admin/clientes` continua chamando somente `POST /api/admin/clients`.
+- Ajustado `DELETE /api/admin/clients/[id]` para arquivar por padrao e permitir hard delete via `?mode=hard` somente para `super_admin`.
+- Criadas rotas `POST /api/admin/clients/bulk-delete` e `GET /api/admin/clients/cleanup`.
+- Criado `docs/supabase/53-client-admin-cleanup-tools.sql` com RPCs de listagem de candidatos, arquivamento em massa e hard delete controlado.
+- Atualizada a tela `/admin/clientes` com segmentos revisados, modo "Selecionar clientes", acoes em massa, botoes textuais nos cards e painel "Limpeza".
+- O painel de limpeza nao pre-seleciona nenhum cliente; Duh Lanches deve ser preservado e revisado manualmente.
+- Pastas locais de midia (`docs/imagens-hero/`, `docs/videosweb-lokat-os/`, `imagens-hero/`, `rec-videos/`) permanecem nao rastreadas e fora do commit.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+- Validado `git diff --check`.
+
 - Corrigida a regra de exclusao/listagem de clientes: visiveis apenas `active` e `onboarding`; soft-deleted (`deleted_at`/`archived_at`) ficam invisiveis.
 - Criado helper central `src/lib/client-visibility.ts`.
 - Ajustadas listagens e seletores de clientes em admin, ContentOS, OlaClick, Kanban, Diagnosticos, Plataforma, RecOS criar e portal cliente.
