@@ -1,11 +1,10 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { resolveCurrentClient } from "@/lib/client/resolve-client";
 import { ClientHomeContent } from "./_client-content";
 import type { ServerPageData, DbOnboardingProfile, DbProfile, DbClient } from "@/lib/supabase/types";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getClientSafeSuggestions } from "@/lib/ai-suggestions";
-import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 export default async function ClientHomePage() {
   let serverData: ServerPageData | null = null;
@@ -15,34 +14,26 @@ export default async function ClientHomePage() {
     try {
       const resolved = await resolveCurrentClient();
 
-      if (resolved?.userId) {
-        const supabase = await createServerSupabaseClient();
+      console.log("[client/home] resolve source:", resolved?.source, "clientId:", resolved?.clientId);
 
+      if (resolved?.userId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const clientData = resolved.client as any;
         let onboarding: DbOnboardingProfile | null = null;
 
         if (clientData?.id) {
-          const { data: onb } = await supabase
-            .from("onboarding_profiles")
-            .select("*")
-            .eq("client_id", clientData.id)
-            .maybeSingle();
-          onboarding = onb ?? null;
-        }
+          // Usa admin client para onboarding_profiles (RLS pode bloquear role 'client')
+          const dbQuery = hasSupabaseServiceRoleKey()
+            ? createSupabaseAdminClient()
+            : null;
 
-        // Fallback onboarding via owner_id (clientes antigos com owner_id)
-        if (!onboarding) {
-          const { data: onbJoin } = await supabase
-            .from("onboarding_profiles")
-            .select("*, clients!inner(owner_id)")
-            .eq("clients.owner_id", resolved.userId)
-            .in("clients.status", CLIENT_VISIBLE_STATUSES)
-            .is("clients.deleted_at", null)
-            .is("clients.archived_at", null)
-            .maybeSingle();
-          if (onbJoin) {
-            onboarding = onbJoin as unknown as DbOnboardingProfile;
+          if (dbQuery) {
+            const { data: onb } = await dbQuery
+              .from("onboarding_profiles")
+              .select("*")
+              .eq("client_id", clientData.id)
+              .maybeSingle();
+            onboarding = (onb as DbOnboardingProfile) ?? null;
           }
         }
 
@@ -52,13 +43,16 @@ export default async function ClientHomePage() {
           onboarding,
         };
 
-        if (clientData?.id) {
-          suggestions = await getClientSafeSuggestions(supabase, clientData.id);
+        if (clientData?.id && hasSupabaseServiceRoleKey()) {
+          try {
+            const adminDb = createSupabaseAdminClient();
+            suggestions = await getClientSafeSuggestions(adminDb as Parameters<typeof getClientSafeSuggestions>[0], clientData.id);
+          } catch { /* suggestions não críticas */ }
         }
 
-        console.log("[client/home] resolved:", {
-          clientId:  resolved.clientId,
-          hasClient: !!resolved.client,
+        console.log("[client/home] serverData:", {
+          source:    resolved.source,
+          client:    clientData?.company_name ?? null,
           hasOnb:    !!onboarding,
         });
       }
