@@ -9,6 +9,7 @@ export type ResolveSource =
   | "client_user_access"
   | "invite_accepted_by"
   | "invite_email"
+  | "invite_email_pending_claimed"
   | "client_email"
   | "not_found";
 
@@ -23,34 +24,37 @@ export interface ResolvedClient {
 }
 
 export interface ResolveDebug {
-  hasUser:           boolean;
-  hasAdminKey:       boolean;
-  userEmail:         string | undefined;
-  profileFound:      boolean;
-  profileClientId:   string | null;
-  triedSources:      string[];
-  selectedSource:    string;
-  selectedClientId:  string | null;
-  selectedClientName: string | null;
-  errors:            string[];
+  hasUser:              boolean;
+  hasAdminKey:          boolean;
+  userEmail:            string | undefined;
+  profileFound:         boolean;
+  profileCreated:       boolean;
+  profileClientId:      string | null;
+  triedSources:         string[];
+  selectedSource:       string;
+  selectedClientId:     string | null;
+  selectedClientName:   string | null;
+  inviteClaimedId:      string | null;
+  profileRepairedWith:  string | null;
+  errors:               string[];
 }
 
 /**
  * Resolve o cliente vinculado ao usuário autenticado.
  *
  * FLUXO:
- * 1. Autentica usuário com createServerSupabaseClient (cookies) — NÃO usa admin para auth
+ * 1. Autentica usuário com createServerSupabaseClient (cookies)
  * 2. Usa createSupabaseAdminClient (service role) para TODAS as queries de banco
- *    → bypassa RLS completamente (policy de clients só permite admin/equipe, não 'client')
+ *    → bypassa RLS completamente
  *
  * FALLBACKS EM ORDEM:
  *   A. profiles.client_id
  *   B. client_user_access.user_id
  *   C. client_invites.accepted_by = user.id
- *   D. client_invites.email = user.email
- *   E. clients.email ilike user.email (sem filtro archived para garantir match)
- *
- * Ao encontrar via B-E, repara profiles.client_id para aceleração futura.
+ *   D. client_invites.email ilike user.email  (aceita pending e accepted)
+ *      → auto-claim do invite se pending
+ *      → upsert profile com client_id
+ *   E. clients.email ilike user.email
  */
 export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
   const debug: ResolveDebug = {
@@ -58,16 +62,19 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
     hasAdminKey: false,
     userEmail: undefined,
     profileFound: false,
+    profileCreated: false,
     profileClientId: null,
     triedSources: [],
     selectedSource: "not_found",
     selectedClientId: null,
     selectedClientName: null,
+    inviteClaimedId: null,
+    profileRepairedWith: null,
     errors: [],
   };
 
   // ── Auth: usa cookie client apenas para validar sessão ────────
-  let user: { id: string; email?: string } | null = null;
+  let user: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
   try {
     const sessionClient = await createServerSupabaseClient();
     const { data, error } = await sessionClient.auth.getUser();
@@ -75,14 +82,10 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
     user = data?.user ?? null;
   } catch (e) {
     debug.errors.push(`auth init: ${String(e)}`);
-    console.error("[resolve-client] auth error:", e);
     return null;
   }
 
-  if (!user) {
-    console.log("[resolve-client] no user");
-    return null;
-  }
+  if (!user) return null;
 
   debug.hasUser    = true;
   debug.hasAdminKey = hasSupabaseServiceRoleKey();
@@ -93,19 +96,16 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
 
   console.log("[resolve-client] user:", userId, "email:", userEmail, "adminKey:", debug.hasAdminKey);
 
-  // ── Admin client: service role bypassa RLS ────────────────────
-  // Se não houver service role, as queries de clients falharão por RLS.
-  // Logamos o aviso mas continuamos (pode funcionar se RLS for permissiva).
-  let db: ReturnType<typeof createSupabaseAdminClient>;
+  // ── Admin client ──────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let db: any;
   try {
     db = createSupabaseAdminClient();
   } catch (e) {
-    debug.errors.push(`admin client: ${String(e)}`);
-    console.error("[resolve-client] admin client failed:", e);
-    // Fallback para session client — pode falhar em RLS
+    debug.errors.push(`admin client init: ${String(e)}`);
+    console.error("[resolve-client] admin client failed — falling back to session client:", e);
     const sessionClient = await createServerSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    db = sessionClient as any;
+    db = sessionClient;
   }
 
   // ── A. profiles.client_id ─────────────────────────────────────
@@ -133,9 +133,6 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
         .maybeSingle();
       if (c) {
         const cl = c as Record<string, unknown>;
-        debug.selectedSource   = "profile_client_id";
-        debug.selectedClientId = cl.id as string;
-        debug.selectedClientName = cl.company_name as string ?? null;
         console.log("[resolve-client] source=profile_client_id client:", cl.company_name);
         return build(userId, user.email, profile, cl, debug.profileClientId, "profile_client_id", debug);
       }
@@ -147,47 +144,44 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
   // ── B. client_user_access ─────────────────────────────────────
   debug.triedSources.push("client_user_access");
   try {
-    const { data: acc } = await db
+    const { data: accRows } = await db
       .from("client_user_access")
       .select("client_id")
       .eq("user_id", userId)
-      .maybeSingle();
-    const accId = (acc as { client_id: string } | null)?.client_id ?? null;
+      .limit(1);
+    const accId = (accRows as { client_id: string }[] | null)?.[0]?.client_id ?? null;
     if (accId) {
-      const { data: c } = await db
-        .from("clients").select("*").eq("id", accId).maybeSingle();
+      const { data: c } = await db.from("clients").select("*").eq("id", accId).maybeSingle();
       if (c) {
-        await repairProfile(db, userId, accId);
+        await upsertProfile(db, userId, user, accId, debug);
         const cl = c as Record<string, unknown>;
         console.log("[resolve-client] source=client_user_access client:", cl.company_name);
         return build(userId, user.email, profile, cl, accId, "client_user_access", debug);
       }
     }
   } catch {
-    // tabela não existe — normal
+    // tabela pode não existir — normal
   }
 
   // ── C. client_invites.accepted_by ────────────────────────────
   debug.triedSources.push("invite_accepted_by");
   try {
-    const { data: inv, error: invErr } = await db
+    const { data: invRows, error: invErr } = await db
       .from("client_invites")
-      .select("client_id")
+      .select("id, client_id")
       .eq("accepted_by", userId)
       .eq("status", "accepted")
-      .order("accepted_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
     if (invErr) debug.errors.push(`invite_accepted_by: ${invErr.message}`);
-    const invId = (inv as { client_id: string } | null)?.client_id ?? null;
-    if (invId) {
-      const { data: c } = await db
-        .from("clients").select("*").eq("id", invId).maybeSingle();
+    const inv = (invRows as { id: string; client_id: string }[] | null)?.[0] ?? null;
+    if (inv?.client_id) {
+      const { data: c } = await db.from("clients").select("*").eq("id", inv.client_id).maybeSingle();
       if (c) {
-        await repairProfile(db, userId, invId);
+        await upsertProfile(db, userId, user, inv.client_id, debug);
         const cl = c as Record<string, unknown>;
         console.log("[resolve-client] source=invite_accepted_by client:", cl.company_name);
-        return build(userId, user.email, profile, cl, invId, "invite_accepted_by", debug);
+        return build(userId, user.email, profile, cl, inv.client_id, "invite_accepted_by", debug);
       }
     }
   } catch (e) {
@@ -199,40 +193,92 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
     return build(userId, user.email, profile, null, null, "not_found", debug);
   }
 
-  // ── D. client_invites.email ───────────────────────────────────
+  // ── D. client_invites.email ilike user.email ──────────────────
+  // Aceita status 'accepted' e 'pending'.
+  // Se pending: auto-claim (marca como aceito + upsert profile + upsert access).
   debug.triedSources.push("invite_email");
   try {
-    const { data: inv, error: invErr } = await db
-      .from("client_invites")
-      .select("client_id")
-      .eq("email", user.email!)          // usa email original (sem lowercase)
-      .in("status", ["accepted", "pending"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (invErr) debug.errors.push(`invite_email: ${invErr.message}`);
-    const invId = (inv as { client_id: string } | null)?.client_id ?? null;
-    if (invId) {
-      // Não filtra deleted/archived: se o convite existe, o cliente existe
+    const emailsToTry = Array.from(new Set([user.email, userEmail].filter(Boolean))) as string[];
+    let bestInvite: { id: string; client_id: string; status: string } | null = null;
+
+    for (const tryEmail of emailsToTry) {
+      const { data: invRows, error: invErr } = await db
+        .from("client_invites")
+        .select("id, client_id, status")
+        .ilike("email", tryEmail)
+        .in("status", ["accepted", "pending"])
+        .order("status")          // 'accepted' antes de 'pending' alfabeticamente
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (invErr) {
+        debug.errors.push(`invite_email(${tryEmail}): ${invErr.message}`);
+        continue;
+      }
+
+      const rows = (invRows ?? []) as { id: string; client_id: string; status: string }[];
+      const accepted = rows.find(r => r.status === "accepted");
+      const pending  = rows.find(r => r.status === "pending");
+      bestInvite = accepted ?? pending ?? null;
+
+      if (bestInvite) break;
+    }
+
+    if (bestInvite?.client_id) {
+      const invId = bestInvite.client_id;
+      // Busca cliente sem filtro de status — apenas não apagado e não arquivado
       const { data: c } = await db
-        .from("clients").select("*").eq("id", invId).maybeSingle();
+        .from("clients")
+        .select("*")
+        .eq("id", invId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
+        .maybeSingle();
+
       if (c) {
-        await repairProfile(db, userId, invId);
         const cl = c as Record<string, unknown>;
-        console.log("[resolve-client] source=invite_email client:", cl.company_name);
-        return build(userId, user.email, profile, cl, invId, "invite_email", debug);
+        const isPending = bestInvite.status === "pending";
+
+        // Auto-claim invite pendente
+        if (isPending) {
+          try {
+            await db
+              .from("client_invites")
+              .update({ status: "accepted", accepted_by: userId, accepted_at: new Date().toISOString() })
+              .eq("id", bestInvite.id);
+            debug.inviteClaimedId = bestInvite.id;
+            console.log("[resolve-client] auto-claimed pending invite:", bestInvite.id);
+          } catch (e) {
+            debug.errors.push(`auto-claim invite: ${String(e)}`);
+          }
+        }
+
+        // Upsert profile com client_id e role=client
+        await upsertProfile(db, userId, user, invId, debug);
+
+        // Upsert client_user_access (best-effort)
+        try {
+          await db.from("client_user_access").upsert(
+            { user_id: userId, client_id: invId, status: "active" },
+            { onConflict: "user_id,client_id", ignoreDuplicates: true }
+          );
+        } catch { /* tabela pode não existir */ }
+
+        const source: ResolveSource = isPending ? "invite_email_pending_claimed" : "invite_email";
+        console.log(`[resolve-client] source=${source} client:`, cl.company_name);
+        return build(userId, user.email, profile, cl, invId, source, debug);
+      } else {
+        debug.errors.push(`client not found for invite client_id: ${invId}`);
       }
     }
   } catch (e) {
     debug.errors.push(`invite_email: ${String(e)}`);
   }
 
-  // ── E. clients.email ─────────────────────────────────────────
-  // Tenta com email original e, se falhar, com lowercase.
-  // Não filtra archived/deleted: usuário convidado deve ver seu cliente mesmo arquivado.
+  // ── E. clients.email ilike user.email ────────────────────────
   debug.triedSources.push("client_email");
-  const emailsToTry = Array.from(new Set([user.email, userEmail].filter(Boolean))) as string[];
-  for (const tryEmail of emailsToTry) {
+  const emailsToTryE = Array.from(new Set([user.email, userEmail].filter(Boolean))) as string[];
+  for (const tryEmail of emailsToTryE) {
     try {
       const { data: rows, error: rowErr } = await db
         .from("clients")
@@ -240,29 +286,24 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
         .ilike("email", tryEmail)
         .order("created_at", { ascending: false });
 
-      if (rowErr) {
-        debug.errors.push(`client_email(${tryEmail}): ${rowErr.message}`);
-        continue;
-      }
+      if (rowErr) { debug.errors.push(`client_email(${tryEmail}): ${rowErr.message}`); continue; }
 
       const list = (rows ?? []) as Record<string, unknown>[];
       console.log("[resolve-client] client_email matches:", list.length, "for", tryEmail);
-
       if (list.length === 0) continue;
 
-      // Prioriza: not archived/deleted → onboarding → active → mais recente
       const active = list.filter(c => !c.deleted_at && !c.archived_at);
       const preferred = [
         ...active.filter(c => c.status === "onboarding"),
         ...active.filter(c => c.status === "active"),
         ...active,
-        ...list,  // fallback: incluindo arquivados
+        ...list,
       ][0];
 
       if (preferred) {
         const foundId = preferred.id as string;
-        await repairProfile(db, userId, foundId);
-        console.log("[resolve-client] source=client_email client:", preferred.company_name, "email:", tryEmail);
+        await upsertProfile(db, userId, user, foundId, debug);
+        console.log("[resolve-client] source=client_email client:", preferred.company_name);
         return build(userId, user.email, profile, preferred, foundId, "client_email", debug);
       }
     } catch (e) {
@@ -289,19 +330,38 @@ function build(
   return { userId, userEmail, profile, client, clientId, source, debug };
 }
 
-async function repairProfile(
+/**
+ * Upsert profile com client_id e role='client'.
+ * Se profile não existe, cria um mínimo com name derivado do email.
+ */
+async function upsertProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   userId: string,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
   clientId: string,
+  debug: ResolveDebug,
 ) {
   try {
-    await db
-      .from("profiles")
-      .update({ client_id: clientId, role: "client" })
-      .eq("id", userId)
-      .is("client_id", null);
-  } catch {
-    // melhor esforço
+    const emailStr = user.email ?? "";
+    const nameFallback = (user.user_metadata?.["name"] as string)
+      ?? (user.user_metadata?.["full_name"] as string)
+      ?? (emailStr.split("@")[0] ?? "");
+
+    await db.from("profiles").upsert(
+      {
+        id:        userId,
+        email:     emailStr,
+        name:      nameFallback || emailStr,
+        role:      "client",
+        client_id: clientId,
+      },
+      { onConflict: "id" }
+    );
+
+    debug.profileRepairedWith = clientId;
+    console.log("[resolve-client] upsert profile client_id:", clientId);
+  } catch (e) {
+    debug.errors.push(`upsert profile: ${String(e)}`);
   }
 }

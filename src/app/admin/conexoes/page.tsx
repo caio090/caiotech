@@ -146,7 +146,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 // ── Modal OlaClick ─────────────────────────────────────────────
-type ClientOption = { id: string; company_name: string };
+type ClientOption = { id: string; company_name: string; email?: string | null };
 
 function OlaClickModal({ onClose, onSaved, clients }: {
   onClose: () => void;
@@ -218,9 +218,14 @@ function OlaClickModal({ onClose, onSaved, clients }: {
                 className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 bg-white"
               >
                 <option value="">Selecione o cliente…</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.company_name}</option>
-                ))}
+                {clients.map((c) => {
+                  // Detecta duplicatas pelo nome para exibir e-mail + id curto
+                  const hasDup = clients.filter(x => x.company_name === c.company_name).length > 1;
+                  const label = hasDup
+                    ? `${c.company_name} · ${c.email ?? "sem email"} · ${c.id.slice(0, 8)}`
+                    : c.company_name;
+                  return <option key={c.id} value={c.id}>{label}</option>;
+                })}
               </select>
             ) : (
               <p className="text-xs text-gray-400 italic">Nenhum cliente cadastrado.</p>

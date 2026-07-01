@@ -102,7 +102,7 @@ export function ClientHomeContent({ serverData }: Props) {
   const brandName = onb?.brand_name
     ?? cli?.company_name
     ?? (useMock ? localOnboarding.marca?.nome : null)
-    ?? (useMock ? "Minha Marca" : (isFetching ? "..." : "Sua empresa"));
+    ?? (useMock ? "Minha Marca" : (isFetching ? "..." : "Nenhuma empresa vinculada"));
 
   const firstName = serverData?.profile?.name?.split(" ")[0]
     ?? (useMock ? localOnboarding.cliente?.nome?.split(" ")[0] : null)

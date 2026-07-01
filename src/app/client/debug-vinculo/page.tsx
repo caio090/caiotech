@@ -12,15 +12,13 @@ export default async function DebugVinculoPage() {
   const { data: { user } } = await sessionClient.auth.getUser();
   if (!user) redirect("/login");
 
-  // Resolver completo
-  const resolved = await resolveCurrentClient();
-
-  // Diagnóstico extra com admin client
+  // Diagnóstico extra com admin client (antes de rodar o resolver)
   let profileRaw: Record<string, unknown> | null = null;
   let clientsByEmail: Record<string, unknown>[] = [];
   let invitesByEmail: Record<string, unknown>[] = [];
   let invitesByUserId: Record<string, unknown>[] = [];
-  let adminError: string | null = null;
+  let clientByInviteId: Record<string, unknown> | null = null;
+  let adminQueryError: string | null = null;
   const hasAdmin = hasSupabaseServiceRoleKey();
 
   if (hasAdmin) {
@@ -36,14 +34,15 @@ export default async function DebugVinculoPage() {
         .from("clients")
         .select("id, company_name, email, status, deleted_at, archived_at")
         .ilike("email", user.email ?? "");
-      if (beErr) adminError = beErr.message;
+      if (beErr) adminQueryError = (adminQueryError ?? "") + " clients.email:" + beErr.message;
       clientsByEmail = (byEmail ?? []) as Record<string, unknown>[];
 
-      const { data: invEmail } = await admin
+      const { data: invEmail, error: ieErr } = await admin
         .from("client_invites")
         .select("id, client_id, email, status, accepted_by, accepted_at, created_at")
         .ilike("email", user.email ?? "")
         .limit(10);
+      if (ieErr) adminQueryError = (adminQueryError ?? "") + " invites.email:" + ieErr.message;
       invitesByEmail = (invEmail ?? []) as Record<string, unknown>[];
 
       const { data: invUser } = await admin
@@ -52,26 +51,26 @@ export default async function DebugVinculoPage() {
         .eq("accepted_by", user.id)
         .limit(10);
       invitesByUserId = (invUser ?? []) as Record<string, unknown>[];
+
+      // Se existe convite por email, tentar buscar o cliente pelo client_id do convite
+      const firstInvite = invitesByEmail[0] as { client_id?: string } | undefined;
+      if (firstInvite?.client_id) {
+        const { data: clientByInv } = await admin
+          .from("clients")
+          .select("id, company_name, email, status, deleted_at, archived_at")
+          .eq("id", firstInvite.client_id)
+          .maybeSingle();
+        clientByInviteId = (clientByInv as Record<string, unknown>) ?? null;
+      }
     } catch (e) {
-      adminError = String(e);
+      adminQueryError = String(e);
     }
   }
 
-  const diag = {
-    user: { id: user.id, email: user.email },
-    hasAdminKey: hasAdmin,
-    adminQueryError: adminError,
-    profileFromAdmin: profileRaw,
-    clientsByEmailMatch: clientsByEmail,
-    invitesByEmailMatch: invitesByEmail,
-    invitesByUserIdMatch: invitesByUserId,
-    resolverResult: {
-      source: resolved?.source ?? "null (resolver returned null)",
-      clientId: resolved?.clientId ?? null,
-      clientName: (resolved?.client as Record<string, unknown> | null)?.company_name ?? null,
-      debug: resolved?.debug ?? null,
-    },
-  };
+  // Rodar resolver depois do diagnóstico inicial
+  const resolved = await resolveCurrentClient();
+
+  const debug = resolved?.debug;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
@@ -87,38 +86,50 @@ export default async function DebugVinculoPage() {
           <Row label="hasAdminKey" value={String(hasAdmin)} highlight={!hasAdmin} />
         </Section>
 
-        <Section title="profiles (via admin)">
+        <Section title="profiles (via admin — ANTES do resolver)">
           {profileRaw ? (
             Object.entries(profileRaw).map(([k, v]) => (
-              <Row key={k} label={k} value={String(v ?? "(null)")} highlight={k === "client_id" && !v} />
+              <Row key={k} label={k} value={v != null ? String(v) : "(null)"} highlight={k === "client_id" && !v} />
             ))
           ) : (
-            <Row label="status" value="perfil não encontrado" highlight />
+            <Row label="status" value="perfil NÃO encontrado" highlight />
           )}
         </Section>
 
-        <Section title={`clients WHERE email ilike '${user.email}' (${clientsByEmail.length} resultado(s))`}>
-          {clientsByEmail.length === 0 ? (
-            <Row label="resultado" value="NENHUM — o campo clients.email pode estar vazio ou diferente" highlight />
+        <Section title={`client_invites WHERE email ilike '${user.email}' (${invitesByEmail.length} resultado(s))`}>
+          {invitesByEmail.length === 0 ? (
+            <Row label="resultado" value="nenhum convite pelo email" highlight />
           ) : (
-            clientsByEmail.map((c, i) => (
+            invitesByEmail.map((inv, i) => (
               <div key={i} className="mb-2 border-b border-gray-100 pb-2">
-                {Object.entries(c).map(([k, v]) => (
-                  <Row key={k} label={k} value={String(v ?? "(null)")} highlight={k === "email" && !v} />
+                {Object.entries(inv).map(([k, v]) => (
+                  <Row key={k} label={k} value={v != null ? String(v) : "(null)"} highlight={k === "status" && v === "pending"} />
                 ))}
               </div>
             ))
           )}
         </Section>
 
-        <Section title={`client_invites WHERE email ilike '${user.email}' (${invitesByEmail.length} resultado(s))`}>
-          {invitesByEmail.length === 0 ? (
-            <Row label="resultado" value="nenhum convite pelo email" />
+        <Section title="Cliente via client_id do convite">
+          {clientByInviteId ? (
+            Object.entries(clientByInviteId).map(([k, v]) => (
+              <Row key={k} label={k} value={v != null ? String(v) : "(null)"} highlight={k === "deleted_at" && !!v} />
+            ))
+          ) : invitesByEmail.length > 0 ? (
+            <Row label="resultado" value="CLIENTE NÃO ENCONTRADO pelo client_id do convite" highlight />
           ) : (
-            invitesByEmail.map((inv, i) => (
+            <Row label="resultado" value="sem convite para buscar" />
+          )}
+        </Section>
+
+        <Section title={`clients WHERE email ilike '${user.email}' (${clientsByEmail.length} resultado(s))`}>
+          {clientsByEmail.length === 0 ? (
+            <Row label="resultado" value="0 resultados — campo clients.email pode estar vazio" highlight />
+          ) : (
+            clientsByEmail.map((c, i) => (
               <div key={i} className="mb-2 border-b border-gray-100 pb-2">
-                {Object.entries(inv).map(([k, v]) => (
-                  <Row key={k} label={k} value={String(v ?? "(null)")} />
+                {Object.entries(c).map(([k, v]) => (
+                  <Row key={k} label={k} value={v != null ? String(v) : "(null)"} />
                 ))}
               </div>
             ))
@@ -132,36 +143,53 @@ export default async function DebugVinculoPage() {
             invitesByUserId.map((inv, i) => (
               <div key={i} className="mb-2 border-b border-gray-100 pb-2">
                 {Object.entries(inv).map(([k, v]) => (
-                  <Row key={k} label={k} value={String(v ?? "(null)")} />
+                  <Row key={k} label={k} value={v != null ? String(v) : "(null)"} />
                 ))}
               </div>
             ))
           )}
         </Section>
 
-        <Section title="Resultado do resolver">
-          <Row label="source" value={diag.resolverResult.source} highlight={diag.resolverResult.source === "not_found"} />
-          <Row label="clientId" value={diag.resolverResult.clientId ?? "(null)"} highlight={!diag.resolverResult.clientId} />
-          <Row label="clientName" value={String(diag.resolverResult.clientName ?? "(null)")} highlight={!diag.resolverResult.clientName} />
+        <Section title="Resultado do resolver (APÓS auto-claim se aplicável)">
+          <Row label="source" value={resolved?.source ?? "(null — resolver retornou null)"} highlight={!resolved || resolved.source === "not_found"} />
+          <Row label="clientId" value={resolved?.clientId ?? "(null)"} highlight={!resolved?.clientId} />
+          <Row label="clientName" value={String((resolved?.client as Record<string, unknown> | null)?.company_name ?? "(null)")} highlight={!resolved?.client} />
+          {debug && (
+            <>
+              <Row label="inviteClaimedId" value={debug.inviteClaimedId ?? "(não houve auto-claim)"} />
+              <Row label="profileRepairedWith" value={debug.profileRepairedWith ?? "(não reparado)"} highlight={!debug.profileRepairedWith && resolved?.source !== "profile_client_id"} />
+              <Row label="profileCreated" value={String(debug.profileCreated)} />
+              <Row label="triedSources" value={JSON.stringify(debug.triedSources)} />
+              <Row label="errors" value={debug.errors.length === 0 ? "(nenhum)" : JSON.stringify(debug.errors)} highlight={debug.errors.length > 0} />
+            </>
+          )}
         </Section>
 
-        {diag.resolverResult.debug && (
-          <Section title="debug.triedSources + errors">
-            <Row label="triedSources" value={JSON.stringify((diag.resolverResult.debug as unknown as { triedSources: string[] }).triedSources)} />
-            <Row label="errors" value={JSON.stringify((diag.resolverResult.debug as unknown as { errors: string[] }).errors)} highlight={(diag.resolverResult.debug as unknown as { errors: string[] }).errors.length > 0} />
-          </Section>
-        )}
-
-        {adminError && (
+        {adminQueryError && (
           <Section title="Erro nas queries admin">
-            <Row label="error" value={adminError} highlight />
+            <Row label="error" value={adminQueryError} highlight />
           </Section>
         )}
 
         <details className="mt-4">
           <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600">JSON completo</summary>
           <pre className="mt-2 text-[11px] bg-gray-900 text-green-400 p-4 rounded-xl overflow-auto">
-            {JSON.stringify(diag, null, 2)}
+            {JSON.stringify({
+              user: { id: user.id, email: user.email },
+              hasAdminKey: hasAdmin,
+              adminQueryError,
+              profileFromAdmin: profileRaw,
+              clientsByEmailMatch: clientsByEmail,
+              invitesByEmailMatch: invitesByEmail,
+              clientByInviteId,
+              invitesByUserIdMatch: invitesByUserId,
+              resolverResult: {
+                source: resolved?.source,
+                clientId: resolved?.clientId,
+                clientName: (resolved?.client as Record<string, unknown> | null)?.company_name ?? null,
+                debug: resolved?.debug,
+              },
+            }, null, 2)}
           </pre>
         </details>
       </div>
@@ -183,8 +211,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex gap-2 text-xs">
-      <span className="font-mono text-gray-400 w-40 flex-shrink-0">{label}</span>
-      <span className={`font-mono ${highlight ? "text-red-600 font-semibold" : "text-gray-800"}`}>
+      <span className="font-mono text-gray-400 w-44 flex-shrink-0">{label}</span>
+      <span className={`font-mono break-all ${highlight ? "text-red-600 font-semibold" : "text-gray-800"}`}>
         {value}
       </span>
     </div>
