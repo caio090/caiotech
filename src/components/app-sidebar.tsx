@@ -12,7 +12,7 @@ import {
   CreditCard, FileSignature, Receipt, AlertTriangle,
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
-  ScrollText, Palette, Video, MousePointerClick, Link2, Upload,
+  ScrollText, Palette, Video, MousePointerClick, Link2, Upload, SlidersHorizontal,
 } from "lucide-react";
 
 export type SidebarVariant = "admin" | "client" | "contentos" | "growth" | "financeiro" | "academy" | "operacional";
@@ -28,6 +28,7 @@ export const configs: Record<SidebarVariant, {
     logoColor: "bg-indigo-600",
     title: "LOKAT OS",
     nav: [
+      { href: "/admin/inicio",       label: "Início",       icon: Home },
       { href: "/admin/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
       { href: "/admin/contentos",    label: "ContentOS",    icon: Sparkles },
       { href: "/admin/recos",        label: "RecOS",        icon: Video },
@@ -57,8 +58,9 @@ export const configs: Record<SidebarVariant, {
       { href: "/client/resultados",   label: "Resultados",   icon: TrendingUp },
       { href: "/client/financeiro",   label: "Financeiro",   icon: Wallet },
       { href: "/client/arquivos",     label: "Arquivos",     icon: Archive },
-      { href: "/client/solicitacoes", label: "Solicitações", icon: MessageSquare },
-      { href: "/client/suporte",      label: "Suporte",      icon: HelpCircle },
+      { href: "/client/solicitacoes",  label: "Solicitações", icon: MessageSquare },
+      { href: "/client/suporte",       label: "Suporte",      icon: HelpCircle },
+      { href: "/client/configuracoes", label: "Configurações",icon: SlidersHorizontal },
     ],
   },
   contentos: {

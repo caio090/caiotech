@@ -411,17 +411,9 @@ function TrashModal({
   onCancel: () => void;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
 
   const handleHardDelete = (item: TrashItem) => {
-    if (confirmId === item.id && typed.trim() === "APAGAR") {
-      onHardDelete(item);
-      setConfirmId(null);
-      setTyped("");
-    } else {
-      setConfirmId(item.id);
-      setTyped("");
-    }
+    setConfirmId((prev) => prev === item.id ? null : item.id);
   };
 
   const fmtDate = (d: string | null) => {
@@ -492,24 +484,31 @@ function TrashModal({
                         disabled={loading}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-40 transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        {confirmId === item.id ? "Confirmar" : "Apagar"}
+                        <Trash2 className="w-3.5 h-3.5" /> Apagar
                       </button>
                     )}
                   </div>
                 </div>
                 {confirmId === item.id && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      autoFocus
-                      value={typed}
-                      onChange={(e) => setTyped(e.target.value)}
-                      placeholder='Digite "APAGAR" para confirmar'
-                      className="flex-1 border border-red-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-red-400"
-                    />
+                  <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl space-y-2">
+                    <p className="text-xs text-red-700 font-medium">Esta ação é irreversível. O cliente e seus vínculos serão apagados definitivamente.</p>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id={`confirm-trash-${item.id}`}
+                        className="mt-0.5 w-4 h-4 accent-red-600 flex-shrink-0 cursor-pointer"
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            onHardDelete(item);
+                            setConfirmId(null);
+                          }
+                        }}
+                      />
+                      <span className="text-xs text-red-800">Confirmo que quero apagar este cliente definitivamente.</span>
+                    </label>
                     <button
-                      onClick={() => { setConfirmId(null); setTyped(""); }}
-                      className="text-xs text-gray-400 hover:text-gray-600 px-2"
+                      onClick={() => setConfirmId(null)}
+                      className="text-[11px] text-gray-400 hover:text-gray-600"
                     >
                       Cancelar
                     </button>

@@ -175,11 +175,11 @@ export default function AdminRelatoriosPage() {
           color="bg-emerald-50 text-emerald-600"
           fonte="OlaClick · API de vendas · Relatório manual"
           status="em_preparacao"
-          cta={{ label: "Conectar fonte comercial", href: "/admin/conexoes" }}
+          cta={{ label: "Ver relatório de faturamento", href: "/admin/relatorios/faturamento" }}
           items={[
-            { label: "Faturamento mensal",          ready: false },
-            { label: "Ticket médio",                ready: false },
-            { label: "Produto mais vendido",        ready: false },
+            { label: "Faturamento mensal",          ready: true  },
+            { label: "Ticket médio",                ready: true  },
+            { label: "Produto mais vendido",        ready: true  },
             { label: "Produto parado",              ready: false },
             { label: "Taxa de recorrência",         ready: false },
           ]}
