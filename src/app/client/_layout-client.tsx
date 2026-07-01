@@ -52,7 +52,6 @@ export function ClientLayoutShell({ children }: Props) {
               .from("clients")
               .select("id, company_name, responsible_name, deleted_at, archived_at")
               .eq("id", profileRow.client_id)
-              .in("status", CLIENT_VISIBLE_STATUSES)
               .is("deleted_at", null)
               .is("archived_at", null)
               .maybeSingle();

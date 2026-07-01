@@ -50,11 +50,28 @@ export default function ClientConfiguracoes() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: clientRow } = await supabase
+        let { data: clientRow } = await supabase
           .from("clients")
           .select("company_name, responsible_name, email, segment, status")
           .eq("owner_id", user.id)
           .maybeSingle();
+
+        // Fallback: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
+        if (!clientRow) {
+          const { data: profileRow } = await supabase
+            .from("profiles")
+            .select("client_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profileRow?.client_id) {
+            const { data: clientByProfile } = await supabase
+              .from("clients")
+              .select("company_name, responsible_name, email, segment, status")
+              .eq("id", profileRow.client_id)
+              .maybeSingle();
+            clientRow = clientByProfile ?? null;
+          }
+        }
 
         if (clientRow) {
           setProfile({

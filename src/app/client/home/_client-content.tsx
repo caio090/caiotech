@@ -117,17 +117,18 @@ export function ClientHomeContent({ serverData }: Props) {
 
   const isRealData = !!(onb || cli);
 
-  // Só usa localStorage quando há certeza de que não há dados reais
-  // (isFetching=false e isRealData=false, ou Supabase não configurado)
-  const useMock = !isSupabaseConfigured || (!isFetching && !isRealData);
+  // Mock só em ambiente sem Supabase. Com Supabase configurado e usuário logado,
+  // nunca inventar dados — se não houver client, mostrar empty state honesto.
+  const useMock = !isSupabaseConfigured;
 
   const brandName = onb?.brand_name
     ?? cli?.company_name
     ?? (useMock ? localOnboarding.marca?.nome : null)
-    ?? (useMock ? "Minha Marca" : "...");
+    ?? (useMock ? "Minha Marca" : (isFetching ? "..." : "Sua empresa"));
 
   const firstName = serverData?.profile?.name?.split(" ")[0]
     ?? (useMock ? localOnboarding.cliente?.nome?.split(" ")[0] : null)
+    ?? (isFetching ? "..." : null)
     ?? brandName;
 
   const segmento  = onb?.segment ?? (useMock ? localOnboarding.marca?.segmento : null);

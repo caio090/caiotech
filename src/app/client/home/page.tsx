@@ -41,13 +41,14 @@ export default async function ClientHomePage() {
         ]);
 
         // Caminho alternativo: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
+        // Não filtra por status: o cliente pode ter status "inactive" mas o usuário convidado
+        // deve ver seus dados independentemente.
         let clientRes = clientByOwnerRes;
         if (!clientRes.data && profileRes.data?.client_id) {
           clientRes = await supabase
             .from("clients")
             .select("*")
             .eq("id", profileRes.data.client_id)
-            .in("status", CLIENT_VISIBLE_STATUSES)
             .is("deleted_at", null)
             .is("archived_at", null)
             .maybeSingle() as typeof clientRes;
