@@ -9,6 +9,33 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Branch principal observada: `main`
 - Regra: preservar mudancas locais existentes e nao alterar codigo sem plano aprovado.
 
+### Ultima sessao — 2026-07-01 — fix portal cliente via convite pendente
+
+**Causa raiz identificada:**
+- `dulanche@hotmail.com.br` nao tem profile no Supabase (nao existia em `public.profiles`).
+- Nao tem client_id no profile, nao tem accepted_by no convite.
+- `clients.email` estava vazio para Duh Lanches — step E nunca achava.
+- Existe 1 `client_invites` com email `dulanche@hotmail.com.br`, `status = pending`, `client_id = 8062a63b-0292-4764-ba02-403c33f638fd`.
+
+**Fix aplicado:**
+- `src/lib/client/resolve-client.ts`: step D agora usa `.ilike()` para email, aceita `status pending` e `accepted`, auto-claim de convite pendente (UPDATE status=accepted, accepted_by, accepted_at), upsert profile com `client_id` e `role=client`, upsert `client_user_access`. Novo source: `invite_email_pending_claimed`.
+- `src/app/client/home/_client-content.tsx`: fallback `Sua empresa` substituido por `Nenhuma empresa vinculada`.
+- `src/app/client/debug-vinculo/page.tsx`: mostra cliente encontrado via client_id do convite, `inviteClaimedId`, `profileRepairedWith`.
+- `src/app/admin/conexoes/page.tsx`: dropdown OlaClick mostra nome + email + id curto quando ha clientes com mesmo nome.
+
+**Commits:**
+- `d20b4f4` — admin inicio, video-background, smart-start-input, debug-vinculo (inicial)
+- `32b4203` — fix resolver + auto-claim convite pendente + OlaClick dropdown
+
+**Pendencias:**
+- Testar em producao logando como dulanche@hotmail.com.br em /client/home.
+- Verificar /client/debug-vinculo: deve mostrar `source=invite_email_pending_claimed`, `inviteClaimedId` preenchido.
+- Apos primeiro login bem-sucedido, na segunda visita `source` deve ser `profile_client_id` (perfil foi reparado).
+- OlaClick: verificar se Duh Lanches aparece com dois itens disambiguados no dropdown.
+- Meta: card de ativos Meta mostra "Instagram Business desvinculado" — investigar client_meta_assets e fluxo de vinculo de ativo a cliente. Nao foi corrigido nesta sessao.
+- Objetivo 5 (Meta ativos) NAO concluido — requer investigacao visual da pagina /admin/conexoes.
+- Nao rodar SQL manual adicional — os campos necessarios ja existem (client_invites tem status, accepted_by, accepted_at).
+
 ## Ultima sessao
 
 ### Feito em 2026-06-29 - criacao e limpeza admin de clientes

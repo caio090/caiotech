@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
 
 // GET /api/meta/assets
 // Lista ativos Meta da conta conectada + vínculo com clientes, se existir.
@@ -66,14 +66,19 @@ export async function GET() {
   } catch { /* continua com pages vazio */ }
 
   // Busca vínculos existentes na client_meta_assets
+  // Usa admin client para bypassar RLS (policy de client_meta_assets pode bloquear session client)
   let links: Array<{
     id: string; client_id: string; asset_type: string; asset_id: string;
     asset_name: string | null; is_primary: boolean;
     client_name: string | null;
   }> = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let adminOrSession: any = supabase;
+  try { adminOrSession = createSupabaseAdminClient(); } catch { /* usa session */ }
+
   try {
-    const { data: linkData, error: linkError } = await supabase
+    const { data: linkData, error: linkError } = await adminOrSession
       .from("client_meta_assets")
       .select("id, client_id, asset_type, asset_id, asset_name, is_primary, clients(company_name)")
       .eq("meta_connection_id", connectionId);

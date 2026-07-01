@@ -75,9 +75,17 @@ export default async function DebugVinculoPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <h1 className="text-lg font-bold text-gray-900 mb-1">Debug — Vínculo do Cliente</h1>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-gray-500 mb-2">
         Página temporária de diagnóstico. Não exibida no menu. Sem tokens ou chaves.
       </p>
+
+      {/* Aviso de sessão — garante que o diagnóstico é para o usuário correto */}
+      <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <p className="text-sm font-bold text-blue-900">Sessão atual: {user.email}</p>
+        <p className="text-xs text-blue-700 mt-0.5">
+          Todo o diagnóstico abaixo é para este e-mail. Se precisar testar outro usuário, saia e entre com a conta correta.
+        </p>
+      </div>
 
       <div className="space-y-4">
         <Section title="Usuário autenticado">
