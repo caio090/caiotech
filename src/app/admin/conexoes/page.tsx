@@ -76,6 +76,17 @@ type AccountsResponse = {
   total_instagram?: number;
 } | null;
 
+type AssetLink = { id: string; client_id: string; client_name: string | null };
+type AssetsResponse = {
+  ok: boolean;
+  connection_id?: string;
+  assets?: Array<{
+    id: string; name: string; picture_url: string | null;
+    link: AssetLink | null;
+    instagram: { id: string; name: string | null; username: string | null; picture_url: string | null; link: AssetLink | null } | null;
+  }>;
+} | null;
+
 // ── Helpers visuais ────────────────────────────────────────────
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return ok ? (
@@ -367,14 +378,21 @@ function ConexoesContent() {
   const [olaConnected, setOlaConnected] = useState(false);
   const [olaClients,   setOlaClients]   = useState<ClientOption[]>([]);
 
-  // Carrega lista de clientes quando modal OlaClick é aberto
+  const [assets,        setAssets]        = useState<AssetsResponse>(null);
+  const [linkingKey,    setLinkingKey]    = useState<string | null>(null); // "fb:{pageId}" ou "ig:{igId}"
+  const [linkClientId,  setLinkClientId]  = useState("");
+  const [linkSaving,    setLinkSaving]    = useState(false);
+  const [linkError,     setLinkError]     = useState("");
+
+  // Carrega lista de clientes quando modal OlaClick é aberto OU Meta está conectada
   useEffect(() => {
-    if (!showOlaModal || olaClients.length > 0) return;
+    if (olaClients.length > 0) return;
+    if (!showOlaModal && !insights?.ok) return;
     void fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((d: { clients?: ClientOption[] }) => setOlaClients(d.clients ?? []))
       .catch(() => undefined);
-  }, [showOlaModal, olaClients.length]);
+  }, [showOlaModal, insights?.ok, olaClients.length]);
 
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
@@ -407,7 +425,12 @@ function ConexoesContent() {
   const checkAccounts = useCallback(async () => {
     setAccountsLoading(true);
     try {
-      setAccounts(await fetch("/api/meta/accounts").then((r) => r.json()) as AccountsResponse);
+      const [acct, assetData] = await Promise.all([
+        fetch("/api/meta/accounts").then((r) => r.json()) as Promise<AccountsResponse>,
+        fetch("/api/meta/assets").then((r) => r.json()) as Promise<AssetsResponse>,
+      ]);
+      setAccounts(acct);
+      setAssets(assetData);
       setAccountsTested(true);
     } catch { setAccountsTested(true); }
     finally { setAccountsLoading(false); }
@@ -473,6 +496,35 @@ function ConexoesContent() {
 
   const REDIRECT_URI = "https://www.lokat.com.br/api/meta/callback";
   const isLoading = metaLoading || insightsLoading;
+
+  async function linkAsset(assetType: "facebook_page" | "instagram_business", assetId: string, assetName: string | null) {
+    if (!linkClientId || !assets?.connection_id) return;
+    setLinkSaving(true);
+    setLinkError("");
+    try {
+      const r = await fetch("/api/meta/assets/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: linkClientId,
+          meta_connection_id: assets.connection_id,
+          asset_type: assetType,
+          asset_id: assetId,
+          asset_name: assetName ?? undefined,
+          is_primary: true,
+        }),
+      });
+      const d = await r.json() as { ok: boolean; reason?: string; message?: string };
+      if (d.ok) {
+        setLinkingKey(null);
+        setLinkClientId("");
+        void checkAccounts();
+      } else {
+        setLinkError(d.message ?? "Erro ao vincular ativo.");
+      }
+    } catch { setLinkError("Erro de rede. Tente novamente."); }
+    finally { setLinkSaving(false); }
+  }
 
   return (
     <div>
@@ -675,34 +727,89 @@ function ConexoesContent() {
                     )}
                     {/* Páginas Facebook */}
                     {(accounts.pages ?? []).length > 0 ? (
-                      (accounts.pages ?? []).map((page) => (
-                        <div key={page.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            {page.picture_url
-                              ? <img src={page.picture_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-                              : <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0"><Globe className="w-3.5 h-3.5 text-blue-600" /></div>
-                            }
-                            <div>
-                              <p className="text-xs font-semibold text-blue-800">{page.name}</p>
-                              <p className="text-[10px] text-blue-500">Pagina Facebook · ID {page.id}</p>
-                            </div>
-                          </div>
-                          {page.instagram && (
-                            <div className="flex items-center gap-2 mt-1.5 pl-8">
-                              {page.instagram.picture_url
-                                ? <img src={page.instagram.picture_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                                : <div className="w-5 h-5 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0"><AtSign className="w-3 h-3 text-pink-500" /></div>
-                              }
-                              <div>
-                                <p className="text-[11px] font-medium text-gray-700">
-                                  {page.instagram.username ? `@${page.instagram.username}` : page.instagram.name ?? "Instagram Business"}
-                                </p>
-                                <p className="text-[10px] text-gray-400">Instagram Business vinculado</p>
+                      (accounts.pages ?? []).map((page) => {
+                        const assetInfo = assets?.assets?.find((a) => a.id === page.id);
+                        const fbLink = assetInfo?.link ?? null;
+                        const igLink = page.instagram ? (assetInfo?.instagram?.link ?? null) : null;
+                        const fbKey = `fb:${page.id}`;
+                        const igKey = `ig:${page.instagram?.id ?? ""}`;
+                        return (
+                          <div key={page.id} className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2">
+                                {page.picture_url
+                                  ? <img src={page.picture_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                                  : <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0"><Globe className="w-3.5 h-3.5 text-blue-600" /></div>
+                                }
+                                <div>
+                                  <p className="text-xs font-semibold text-blue-800">{page.name}</p>
+                                  <p className="text-[10px] text-blue-500">Pagina Facebook · ID {page.id}</p>
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0">
+                                {fbLink
+                                  ? <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />{fbLink.client_name ?? "Vinculado"}</span>
+                                  : <button onClick={() => { setLinkingKey(fbKey === linkingKey ? null : fbKey); setLinkClientId(""); setLinkError(""); }} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded-full transition-colors"><Link2 className="w-3 h-3" />Vincular</button>
+                                }
                               </div>
                             </div>
-                          )}
-                        </div>
-                      ))
+                            {linkingKey === fbKey && (
+                              <div className="mt-2 ml-8 space-y-1.5">
+                                <select value={linkClientId} onChange={(e) => setLinkClientId(e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:border-blue-400">
+                                  <option value="">Selecione o cliente…</option>
+                                  {olaClients.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+                                </select>
+                                {linkError && <p className="text-[10px] text-red-600">{linkError}</p>}
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => void linkAsset("facebook_page", page.id, page.name)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
+                                    {linkSaving ? "Salvando…" : "Salvar"}
+                                  </button>
+                                  <button onClick={() => { setLinkingKey(null); setLinkError(""); }} className="text-[10px] px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Cancelar</button>
+                                </div>
+                              </div>
+                            )}
+                            {page.instagram && (
+                              <div className="mt-1.5 pl-8">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    {page.instagram.picture_url
+                                      ? <img src={page.instagram.picture_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                                      : <div className="w-5 h-5 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0"><AtSign className="w-3 h-3 text-pink-500" /></div>
+                                    }
+                                    <div>
+                                      <p className="text-[11px] font-medium text-gray-700">
+                                        {page.instagram.username ? `@${page.instagram.username}` : page.instagram.name ?? "Instagram Business"}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400">Instagram Business</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex-shrink-0">
+                                    {igLink
+                                      ? <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />{igLink.client_name ?? "Vinculado"}</span>
+                                      : <button onClick={() => { setLinkingKey(igKey === linkingKey ? null : igKey); setLinkClientId(""); setLinkError(""); }} className="inline-flex items-center gap-1 text-[10px] text-pink-600 hover:text-pink-800 bg-white border border-pink-200 px-2 py-0.5 rounded-full transition-colors"><Link2 className="w-3 h-3" />Vincular</button>
+                                    }
+                                  </div>
+                                </div>
+                                {linkingKey === igKey && (
+                                  <div className="mt-2 space-y-1.5">
+                                    <select value={linkClientId} onChange={(e) => setLinkClientId(e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:border-pink-400">
+                                      <option value="">Selecione o cliente…</option>
+                                      {olaClients.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+                                    </select>
+                                    {linkError && <p className="text-[10px] text-red-600">{linkError}</p>}
+                                    <div className="flex gap-1.5">
+                                      <button onClick={() => void linkAsset("instagram_business", page.instagram!.id, page.instagram!.username ?? page.instagram!.name)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-pink-500 text-white rounded-lg disabled:opacity-50 hover:bg-pink-600 transition-colors">
+                                        {linkSaving ? "Salvando…" : "Salvar"}
+                                      </button>
+                                      <button onClick={() => { setLinkingKey(null); setLinkError(""); }} className="text-[10px] px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Cancelar</button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     ) : null}
                   </div>
                 )}

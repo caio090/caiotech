@@ -47,29 +47,42 @@ export async function POST(request: NextRequest) {
     } catch {
       db = supabase;
     }
-    let clientResult = await db
-      .from("clients")
-      .select("id, status, deleted_at, archived_at")
-      .eq("id", client_id)
-      .in("status", CLIENT_VISIBLE_STATUSES)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-    if (clientResult.error && isMissingClientVisibilityColumn(clientResult.error)) {
-      clientResult = await db
+    const runClientQuery = async (qdb: typeof db) => {
+      let r = await qdb
         .from("clients")
-        .select("id, status")
+        .select("id, status, deleted_at, archived_at")
         .eq("id", client_id)
         .in("status", CLIENT_VISIBLE_STATUSES)
-        .maybeSingle() as typeof clientResult;
+        .is("deleted_at", null)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (r.error && isMissingClientVisibilityColumn(r.error)) {
+        r = await qdb
+          .from("clients")
+          .select("id, status")
+          .eq("id", client_id)
+          .in("status", CLIENT_VISIBLE_STATUSES)
+          .maybeSingle() as typeof r;
+      }
+      return r;
+    };
+
+    let clientResult = await runClientQuery(db);
+    // Se admin client falhou por outro motivo (key errada, permissão), tenta session client
+    if (clientResult.error && db !== supabase) {
+      clientResult = await runClientQuery(supabase);
     }
     const { data: client, error: clientErr } = clientResult;
 
     if (clientErr?.code === "42P01") {
       return NextResponse.json({ ok: false, reason: "sql_pending", message: "Tabela clients indisponivel. Rode os SQLs base no Supabase." });
     }
+    if (clientErr) {
+      console.error("[api/olaclick/connect] erro ao buscar cliente", { client_id, supabaseError: clientErr });
+      return NextResponse.json({ ok: false, reason: "db_error", message: `Erro ao verificar cliente: ${clientErr.message}` }, { status: 500 });
+    }
     if (!client || !isVisibleClientRecord(client)) {
-      return NextResponse.json({ ok: false, reason: "client_not_found", message: "Selecione um cliente real antes de conectar o OlaClick." }, { status: 404 });
+      return NextResponse.json({ ok: false, reason: "client_not_found", message: "Cliente não encontrado ou inativo. Verifique se o cliente tem status ativo e não está arquivado." }, { status: 404 });
     }
 
     const token_last_four = access_token.length >= 4 ? access_token.slice(-4) : "****";
