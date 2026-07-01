@@ -40,9 +40,8 @@ export default async function ClientHomePage() {
             .maybeSingle(),
         ]);
 
-        // Caminho alternativo: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
-        // Não filtra por status: o cliente pode ter status "inactive" mas o usuário convidado
-        // deve ver seus dados independentemente.
+        // Caminho 2: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
+        // Não filtra por status: status "inactive" não deve bloquear acesso do convidado.
         let clientRes = clientByOwnerRes;
         if (!clientRes.data && profileRes.data?.client_id) {
           clientRes = await supabase
@@ -52,6 +51,38 @@ export default async function ClientHomePage() {
             .is("deleted_at", null)
             .is("archived_at", null)
             .maybeSingle() as typeof clientRes;
+        }
+
+        // Caminho 3: convite aceito — client_invites.accepted_by = userId
+        // Fallback para quando profiles.client_id ficou null (ex: RPC sem sessão ativa).
+        // Também repara o profiles.client_id para visitas futuras.
+        if (!clientRes.data) {
+          const { data: inviteRow } = await supabase
+            .from("client_invites")
+            .select("client_id")
+            .eq("accepted_by", userId)
+            .eq("status", "accepted")
+            .order("accepted_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (inviteRow?.client_id) {
+            clientRes = await supabase
+              .from("clients")
+              .select("*")
+              .eq("id", inviteRow.client_id)
+              .is("deleted_at", null)
+              .is("archived_at", null)
+              .maybeSingle() as typeof clientRes;
+
+            // Auto-repara profiles.client_id para que próximas visitas usem caminho 2
+            if (clientRes.data) {
+              await supabase
+                .from("profiles")
+                .update({ client_id: inviteRow.client_id, role: "client" })
+                .eq("id", userId);
+            }
+          }
         }
 
         let onboarding = null;

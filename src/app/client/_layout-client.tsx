@@ -40,7 +40,7 @@ export function ClientLayoutShell({ children }: Props) {
           .is("archived_at", null)
           .maybeSingle();
 
-        // Caminho alternativo: cliente convidado — profiles.client_id
+        // Caminho 2: profiles.client_id
         if (!clientRow) {
           const { data: profileRow } = await supabase
             .from("profiles")
@@ -56,6 +56,28 @@ export function ClientLayoutShell({ children }: Props) {
               .is("archived_at", null)
               .maybeSingle();
             clientRow = clientByProfile ?? null;
+          }
+        }
+
+        // Caminho 3: convite aceito
+        if (!clientRow) {
+          const { data: inviteRow } = await supabase
+            .from("client_invites")
+            .select("client_id")
+            .eq("accepted_by", user.id)
+            .eq("status", "accepted")
+            .order("accepted_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (inviteRow?.client_id) {
+            const { data: clientByInvite } = await supabase
+              .from("clients")
+              .select("id, company_name, responsible_name, deleted_at, archived_at")
+              .eq("id", inviteRow.client_id)
+              .is("deleted_at", null)
+              .is("archived_at", null)
+              .maybeSingle();
+            clientRow = clientByInvite ?? null;
           }
         }
 

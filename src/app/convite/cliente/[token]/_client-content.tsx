@@ -84,33 +84,37 @@ export function ClientInviteContent({ token, invite }: Props) {
     try {
       const supabase = createClient();
 
-      // Tenta criar conta nova; se já existe, loga
-      const { error: signUpErr } = await supabase.auth.signUp({
+      // Tenta criar conta; ignora erro de "já existe" (Supabase pode retornar
+      // sucesso falso quando email confirmation está ativo para evitar enumeration).
+      await supabase.auth.signUp({
         email:    form.email.trim(),
         password: form.password,
-        options: {
-          data: { invite_token: token, invite_type: "client" },
-        },
+        options: { data: { invite_token: token, invite_type: "client" } },
       });
 
-      if (signUpErr && !signUpErr.message.includes("already")) {
-        setError(signUpErr.message);
+      // Sempre faz signIn explícito para garantir sessão com JWT válido antes
+      // de chamar o RPC. Sem isso, auth.uid() = null e o vínculo não é gravado.
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      });
+      if (loginErr) {
+        const msg = loginErr.message?.toLowerCase() ?? "";
+        if (msg.includes("confirm") || msg.includes("verif")) {
+          setError("Conta criada! Confirme seu e-mail para ativar o acesso.");
+        } else if (msg.includes("invalid") || msg.includes("credentials")) {
+          setError("Senha incorreta. Se já tem conta, use a senha cadastrada.");
+        } else {
+          setError(loginErr.message ?? "Erro ao autenticar. Tente novamente.");
+        }
         setLoading(false);
         return;
       }
 
-      // Se já existe, faz login
-      if (signUpErr?.message.includes("already")) {
-        const { error: loginErr } = await supabase.auth.signInWithPassword({
-          email: form.email.trim(), password: form.password,
-        });
-        if (loginErr) { setError(loginErr.message); setLoading(false); return; }
-      }
-
-      // Chama RPC para aceitar convite e vincular client_id ao profile
+      // Com sessão ativa, aceita o convite e vincula client_id ao profile
       const { error: acceptErr } = await supabase.rpc("accept_client_invite", { p_token: token });
       if (acceptErr) {
-        setError("Nao foi possivel vincular seu acesso ao cliente. Peça um novo convite ou confirme se o SQL 42 foi rodado no Supabase.");
+        setError("Não foi possível vincular o acesso ao cliente. Peça um novo convite ou confirme se o SQL 56 foi rodado no Supabase.");
         setLoading(false);
         return;
       }

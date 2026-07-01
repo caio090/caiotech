@@ -56,7 +56,7 @@ export default function ClientConfiguracoes() {
           .eq("owner_id", user.id)
           .maybeSingle();
 
-        // Fallback: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
+        // Caminho 2: profiles.client_id (set pelo accept_client_invite RPC)
         if (!clientRow) {
           const { data: profileRow } = await supabase
             .from("profiles")
@@ -70,6 +70,32 @@ export default function ClientConfiguracoes() {
               .eq("id", profileRow.client_id)
               .maybeSingle();
             clientRow = clientByProfile ?? null;
+          }
+        }
+
+        // Caminho 3: convite aceito (fallback quando profiles.client_id é null)
+        if (!clientRow) {
+          const { data: inviteRow } = await supabase
+            .from("client_invites")
+            .select("client_id")
+            .eq("accepted_by", user.id)
+            .eq("status", "accepted")
+            .order("accepted_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (inviteRow?.client_id) {
+            const { data: clientByInvite } = await supabase
+              .from("clients")
+              .select("company_name, responsible_name, email, segment, status")
+              .eq("id", inviteRow.client_id)
+              .maybeSingle();
+            clientRow = clientByInvite ?? null;
+            if (clientRow) {
+              await supabase
+                .from("profiles")
+                .update({ client_id: inviteRow.client_id, role: "client" })
+                .eq("id", user.id);
+            }
           }
         }
 
