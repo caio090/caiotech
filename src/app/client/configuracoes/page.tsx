@@ -50,72 +50,26 @@ export default function ClientConfiguracoes() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        let { data: clientRow } = await supabase
-          .from("clients")
-          .select("company_name, responsible_name, email, segment, status")
-          .eq("owner_id", user.id)
-          .maybeSingle();
+        // RPC get_my_client_id cobre todos os caminhos (profiles, invites, email)
+        const { data: clientId } = await supabase.rpc("get_my_client_id");
 
-        // Caminho 2: profiles.client_id (set pelo accept_client_invite RPC)
-        if (!clientRow) {
-          const { data: profileRow } = await supabase
-            .from("profiles")
-            .select("client_id")
-            .eq("id", user.id)
+        let clientRow: { company_name: string | null; responsible_name: string | null; email: string | null; segment: string | null; status: string | null } | null = null;
+        if (clientId) {
+          const { data } = await supabase
+            .from("clients")
+            .select("company_name, responsible_name, email, segment, status")
+            .eq("id", clientId as string)
             .maybeSingle();
-          if (profileRow?.client_id) {
-            const { data: clientByProfile } = await supabase
-              .from("clients")
-              .select("company_name, responsible_name, email, segment, status")
-              .eq("id", profileRow.client_id)
-              .maybeSingle();
-            clientRow = clientByProfile ?? null;
-          }
+          clientRow = data ?? null;
         }
 
-        // Caminho 3: convite aceito (fallback quando profiles.client_id é null)
-        if (!clientRow) {
-          const { data: inviteRow } = await supabase
-            .from("client_invites")
-            .select("client_id")
-            .eq("accepted_by", user.id)
-            .eq("status", "accepted")
-            .order("accepted_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (inviteRow?.client_id) {
-            const { data: clientByInvite } = await supabase
-              .from("clients")
-              .select("company_name, responsible_name, email, segment, status")
-              .eq("id", inviteRow.client_id)
-              .maybeSingle();
-            clientRow = clientByInvite ?? null;
-            if (clientRow) {
-              await supabase
-                .from("profiles")
-                .update({ client_id: inviteRow.client_id, role: "client" })
-                .eq("id", user.id);
-            }
-          }
-        }
-
-        if (clientRow) {
-          setProfile({
-            company_name:     clientRow.company_name     ?? null,
-            responsible_name: clientRow.responsible_name ?? null,
-            email:            clientRow.email            ?? user.email ?? null,
-            segment:          clientRow.segment          ?? null,
-            status:           clientRow.status           ?? null,
-          });
-        } else {
-          setProfile({
-            company_name:     null,
-            responsible_name: null,
-            email:            user.email ?? null,
-            segment:          null,
-            status:           null,
-          });
-        }
+        setProfile({
+          company_name:     clientRow?.company_name     ?? null,
+          responsible_name: clientRow?.responsible_name ?? null,
+          email:            clientRow?.email            ?? user.email ?? null,
+          segment:          clientRow?.segment          ?? null,
+          status:           clientRow?.status           ?? null,
+        });
       } catch { /* silent */ }
       finally { setLoadingProfile(false); }
     }

@@ -7,7 +7,6 @@ import { MobileBottomNav } from "@/components/mobile-nav";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { hasUnreadNotif, markNotifSeen } from "@/lib/notifications";
-import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
 
 interface Props {
   children: React.ReactNode;
@@ -31,54 +30,19 @@ export function ClientLayoutShell({ children }: Props) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
 
-        let { data: clientRow } = await supabase
-          .from("clients")
-          .select("id, company_name, responsible_name, deleted_at, archived_at")
-          .eq("owner_id", user.id)
-          .in("status", CLIENT_VISIBLE_STATUSES)
-          .is("deleted_at", null)
-          .is("archived_at", null)
-          .maybeSingle();
+        // RPC get_my_client_id cobre todos os caminhos (profiles, invites, email)
+        const { data: clientId } = await supabase.rpc("get_my_client_id");
 
-        // Caminho 2: profiles.client_id
-        if (!clientRow) {
-          const { data: profileRow } = await supabase
-            .from("profiles")
-            .select("client_id")
-            .eq("id", user.id)
+        let clientRow: { id: string; company_name: string | null; responsible_name: string | null; deleted_at: string | null; archived_at: string | null } | null = null;
+        if (clientId) {
+          const { data } = await supabase
+            .from("clients")
+            .select("id, company_name, responsible_name, deleted_at, archived_at")
+            .eq("id", clientId as string)
+            .is("deleted_at", null)
+            .is("archived_at", null)
             .maybeSingle();
-          if (profileRow?.client_id) {
-            const { data: clientByProfile } = await supabase
-              .from("clients")
-              .select("id, company_name, responsible_name, deleted_at, archived_at")
-              .eq("id", profileRow.client_id)
-              .is("deleted_at", null)
-              .is("archived_at", null)
-              .maybeSingle();
-            clientRow = clientByProfile ?? null;
-          }
-        }
-
-        // Caminho 3: convite aceito
-        if (!clientRow) {
-          const { data: inviteRow } = await supabase
-            .from("client_invites")
-            .select("client_id")
-            .eq("accepted_by", user.id)
-            .eq("status", "accepted")
-            .order("accepted_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (inviteRow?.client_id) {
-            const { data: clientByInvite } = await supabase
-              .from("clients")
-              .select("id, company_name, responsible_name, deleted_at, archived_at")
-              .eq("id", inviteRow.client_id)
-              .is("deleted_at", null)
-              .is("archived_at", null)
-              .maybeSingle();
-            clientRow = clientByInvite ?? null;
-          }
+          clientRow = data ?? null;
         }
 
         if (!clientRow || cancelled) return;

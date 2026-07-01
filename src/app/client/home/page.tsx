@@ -1,7 +1,8 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveCurrentClient } from "@/lib/client/resolve-client";
 import { ClientHomeContent } from "./_client-content";
-import type { ServerPageData, DbOnboardingProfile } from "@/lib/supabase/types";
+import type { ServerPageData, DbOnboardingProfile, DbProfile, DbClient } from "@/lib/supabase/types";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getClientSafeSuggestions } from "@/lib/ai-suggestions";
 import { CLIENT_VISIBLE_STATUSES } from "@/lib/client-visibility";
@@ -12,126 +13,57 @@ export default async function ClientHomePage() {
 
   if (isSupabaseConfigured) {
     try {
-      const supabase = await createServerSupabaseClient();
+      const resolved = await resolveCurrentClient();
 
-      // getUser() valida o JWT com o servidor Supabase; getSession() lê só do cookie.
-      // Tentamos ambos para cobrir casos onde o token ainda não foi renovado nesta request.
-      let userId: string | null = null;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        userId = user.id;
-      } else {
-        const { data: { session } } = await supabase.auth.getSession();
-        userId = session?.user?.id ?? null;
-      }
+      if (resolved?.userId) {
+        const supabase = await createServerSupabaseClient();
 
-      console.log("[client/home] userId:", userId ?? "null — serverData ficará null");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clientData = resolved.client as any;
+        let onboarding: DbOnboardingProfile | null = null;
 
-      if (userId) {
-        const [profileRes, clientByOwnerRes] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-          supabase
-            .from("clients")
-            .select("*")
-            .eq("owner_id", userId)
-            .in("status", CLIENT_VISIBLE_STATUSES)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .maybeSingle(),
-        ]);
-
-        // Caminho 2: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
-        // Não filtra por status: status "inactive" não deve bloquear acesso do convidado.
-        let clientRes = clientByOwnerRes;
-        if (!clientRes.data && profileRes.data?.client_id) {
-          clientRes = await supabase
-            .from("clients")
-            .select("*")
-            .eq("id", profileRes.data.client_id)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .maybeSingle() as typeof clientRes;
-        }
-
-        // Caminho 3: convite aceito — client_invites.accepted_by = userId
-        // Fallback para quando profiles.client_id ficou null (ex: RPC sem sessão ativa).
-        // Também repara o profiles.client_id para visitas futuras.
-        if (!clientRes.data) {
-          const { data: inviteRow } = await supabase
-            .from("client_invites")
-            .select("client_id")
-            .eq("accepted_by", userId)
-            .eq("status", "accepted")
-            .order("accepted_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (inviteRow?.client_id) {
-            clientRes = await supabase
-              .from("clients")
-              .select("*")
-              .eq("id", inviteRow.client_id)
-              .is("deleted_at", null)
-              .is("archived_at", null)
-              .maybeSingle() as typeof clientRes;
-
-            // Auto-repara profiles.client_id para que próximas visitas usem caminho 2
-            if (clientRes.data) {
-              await supabase
-                .from("profiles")
-                .update({ client_id: inviteRow.client_id, role: "client" })
-                .eq("id", userId);
-            }
-          }
-        }
-
-        let onboarding = null;
-
-        // Caminho 1: busca direta via client_id
-        if (clientRes.data?.id) {
-          const { data: onb, error: onbErr } = await supabase
+        if (clientData?.id) {
+          const { data: onb } = await supabase
             .from("onboarding_profiles")
             .select("*")
-            .eq("client_id", clientRes.data.id)
+            .eq("client_id", clientData.id)
             .maybeSingle();
-          console.log("[client/home] onboarding (path1):", onb?.id ?? "null", onbErr?.code ?? "ok");
           onboarding = onb ?? null;
         }
 
-        // Caminho 2: join com clients
+        // Fallback onboarding via owner_id (clientes antigos com owner_id)
         if (!onboarding) {
-          const { data: onbJoin, error: joinErr } = await supabase
+          const { data: onbJoin } = await supabase
             .from("onboarding_profiles")
             .select("*, clients!inner(owner_id)")
-            .eq("clients.owner_id", userId)
+            .eq("clients.owner_id", resolved.userId)
             .in("clients.status", CLIENT_VISIBLE_STATUSES)
             .is("clients.deleted_at", null)
             .is("clients.archived_at", null)
             .maybeSingle();
-          console.log("[client/home] onboarding (path2):", onbJoin?.id ?? "null", joinErr?.code ?? "ok");
           if (onbJoin) {
             onboarding = onbJoin as unknown as DbOnboardingProfile;
           }
         }
 
         serverData = {
-          profile:    profileRes.data,
-          client:     clientRes.data,
+          profile:    resolved.profile as DbProfile | null,
+          client:     resolved.client as DbClient | null,
           onboarding,
         };
 
-        if (clientRes.data?.id) {
-          suggestions = await getClientSafeSuggestions(supabase, clientRes.data.id);
+        if (clientData?.id) {
+          suggestions = await getClientSafeSuggestions(supabase, clientData.id);
         }
 
-        console.log("[client/home] serverData:", {
-          profile: !!serverData.profile,
-          client:  !!serverData.client,
-          onboarding: !!serverData.onboarding,
+        console.log("[client/home] resolved:", {
+          clientId:  resolved.clientId,
+          hasClient: !!resolved.client,
+          hasOnb:    !!onboarding,
         });
       }
     } catch (e) {
-      console.error("[client/home] Supabase fetch error:", e);
+      console.error("[client/home] error:", e);
     }
   }
 

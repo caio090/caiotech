@@ -59,71 +59,34 @@ export function ClientHomeContent({ serverData }: Props) {
           return;
         }
 
-        console.log("[client/home] browser fetch: user", user.id);
+        // RPC get_my_client_id cobre 5 caminhos (profiles → invites → email)
+        // e repara profiles.client_id automaticamente para visitas futuras.
+        const { data: clientId } = await supabase.rpc("get_my_client_id");
 
-        let { data: clientRow } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("owner_id", user.id)
-          .maybeSingle();
-
-        // Caminho 2: profiles.client_id
-        if (!clientRow) {
-          const { data: profileRow } = await supabase
-            .from("profiles")
-            .select("client_id")
-            .eq("id", user.id)
+        let clientRow: DbClient | null = null;
+        if (clientId) {
+          const { data } = await supabase
+            .from("clients")
+            .select("*")
+            .eq("id", clientId as string)
+            .is("deleted_at", null)
+            .is("archived_at", null)
             .maybeSingle();
-          if (profileRow?.client_id) {
-            const { data: clientByProfile } = await supabase
-              .from("clients")
-              .select("*")
-              .eq("id", profileRow.client_id)
-              .maybeSingle();
-            clientRow = clientByProfile ?? null;
-          }
-        }
-
-        // Caminho 3: convite aceito (fallback quando profiles.client_id é null)
-        if (!clientRow) {
-          const { data: inviteRow } = await supabase
-            .from("client_invites")
-            .select("client_id")
-            .eq("accepted_by", user.id)
-            .eq("status", "accepted")
-            .order("accepted_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (inviteRow?.client_id) {
-            const { data: clientByInvite } = await supabase
-              .from("clients")
-              .select("*")
-              .eq("id", inviteRow.client_id)
-              .maybeSingle();
-            clientRow = clientByInvite ?? null;
-            if (clientRow) {
-              // Repara profiles.client_id para próximas visitas
-              await supabase
-                .from("profiles")
-                .update({ client_id: inviteRow.client_id, role: "client" })
-                .eq("id", user.id);
-            }
-          }
+          clientRow = (data as DbClient) ?? null;
         }
 
         let onboardingRow: DbOnboardingProfile | null = null;
         if (clientRow?.id) {
-          const { data: onbRow, error: oErr } = await supabase
+          const { data: onbRow } = await supabase
             .from("onboarding_profiles")
             .select("*")
             .eq("client_id", clientRow.id)
             .maybeSingle();
-          console.log("[client/home] browser fetch: onboarding", onbRow?.id ?? "null", oErr?.code ?? "ok");
-          onboardingRow = onbRow ?? null;
+          onboardingRow = (onbRow as DbOnboardingProfile) ?? null;
         }
 
         if (!cancelled) {
-          setClientSideData({ client: clientRow ?? null, onboarding: onboardingRow });
+          setClientSideData({ client: clientRow, onboarding: onboardingRow });
           setIsFetching(false);
         }
       } catch (e) {
@@ -188,6 +151,12 @@ export function ClientHomeContent({ serverData }: Props) {
         <div className="mb-4 flex items-center gap-2">
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
             ✓ Dados reais do Supabase
+          </span>
+        </div>
+      ) : isSupabaseConfigured ? (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-[10px] font-bold text-gray-500 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            Sem empresa vinculada
           </span>
         </div>
       ) : (
