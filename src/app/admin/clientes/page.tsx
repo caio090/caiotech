@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import {
   Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
   Edit2, Trash2, Loader2, Building2, User, Tag, Filter,
-  Mail, Copy, ExternalLink, TrendingUp, Archive, CheckSquare,
+  Mail, Copy, ExternalLink, TrendingUp, Archive, CheckSquare, RotateCcw,
 } from "lucide-react";
 import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -381,6 +381,149 @@ function DeleteModal({
   );
 }
 
+// ── Modal Lixeira ──────────────────────────────────────────────
+interface TrashItem {
+  id: string;
+  company_name: string | null;
+  responsible_name: string | null;
+  email: string | null;
+  segment: string | null;
+  status: string | null;
+  deleted_at: string | null;
+  archived_at: string | null;
+}
+
+function TrashModal({
+  items,
+  loading,
+  canHardDelete,
+  onRestore,
+  onHardDelete,
+  onRefresh,
+  onCancel,
+}: {
+  items: TrashItem[];
+  loading: boolean;
+  canHardDelete: boolean;
+  onRestore: (item: TrashItem) => void;
+  onHardDelete: (item: TrashItem) => void;
+  onRefresh: () => void;
+  onCancel: () => void;
+}) {
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+
+  const handleHardDelete = (item: TrashItem) => {
+    if (confirmId === item.id && typed.trim() === "APAGAR") {
+      onHardDelete(item);
+      setConfirmId(null);
+      setTyped("");
+    } else {
+      setConfirmId(item.id);
+      setTyped("");
+    }
+  };
+
+  const fmtDate = (d: string | null) => {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-3xl w-full shadow-2xl max-h-[88vh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Lixeira / Arquivados</p>
+            <p className="text-xs text-gray-400 mt-1">Clientes ocultos das listas. Restaure ou apague definitivamente.</p>
+          </div>
+          <button onClick={onCancel} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button onClick={onRefresh} disabled={loading} className="px-3 py-2 text-xs font-semibold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {loading ? "Carregando..." : "Atualizar"}
+          </button>
+          <span className="text-xs text-gray-400">{items.length} {items.length === 1 ? "cliente" : "clientes"}</span>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando lixeira...
+          </div>
+        )}
+
+        {!loading && items.length === 0 && (
+          <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+            Nenhum cliente arquivado ou deletado.
+          </div>
+        )}
+
+        {!loading && items.length > 0 && (
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div key={item.id} className="rounded-xl border border-gray-100 p-3 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{item.company_name ?? "Sem nome"}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {item.responsible_name ?? "—"} · {item.email ?? "Sem e-mail"}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {item.segment ?? "Sem segmento"} ·{" "}
+                      <span className="text-amber-600 font-medium">{item.status ?? "sem status"}</span>
+                      {item.archived_at && ` · Arquivado em ${fmtDate(item.archived_at)}`}
+                      {!item.archived_at && item.deleted_at && ` · Deletado em ${fmtDate(item.deleted_at)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => onRestore(item)}
+                      disabled={loading}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 transition-colors"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Restaurar
+                    </button>
+                    {canHardDelete && (
+                      <button
+                        onClick={() => handleHardDelete(item)}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-40 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {confirmId === item.id ? "Confirmar" : "Apagar"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {confirmId === item.id && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      autoFocus
+                      value={typed}
+                      onChange={(e) => setTyped(e.target.value)}
+                      placeholder='Digite "APAGAR" para confirmar'
+                      className="flex-1 border border-red-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-red-400"
+                    />
+                    <button
+                      onClick={() => { setConfirmId(null); setTyped(""); }}
+                      className="text-xs text-gray-400 hover:text-gray-600 px-2"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Modal Editar ───────────────────────────────────────────────
 function CleanupModal({
   candidates,
@@ -677,6 +820,9 @@ export default function AdminClientesPage() {
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [cleanupCandidates, setCleanupCandidates] = useState<CleanupCandidate[]>([]);
   const [selectedCleanupIds, setSelectedCleanupIds] = useState<Set<string>>(new Set());
+  const [trashOpen,    setTrashOpen]    = useState(false);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashItems,   setTrashItems]   = useState<TrashItem[]>([]);
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
@@ -836,6 +982,65 @@ export default function AdminClientesPage() {
     void loadCleanupCandidates();
   };
 
+  const loadTrashItems = async () => {
+    setTrashLoading(true);
+    try {
+      const res = await fetch("/api/admin/clients/trash");
+      const data = await res.json().catch(() => ({})) as { clients?: TrashItem[]; error?: string };
+      if (res.ok) {
+        setTrashItems(data.clients ?? []);
+      } else {
+        flash(data.error ?? "Nao foi possivel carregar a lixeira.");
+      }
+    } catch {
+      flash("Erro de conexao ao carregar lixeira.");
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const openTrash = () => {
+    setTrashOpen(true);
+    void loadTrashItems();
+  };
+
+  const handleRestoreClient = async (item: TrashItem) => {
+    setTrashLoading(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${item.id}/restore`, { method: "POST" });
+      if (res.ok) {
+        setTrashItems((prev) => prev.filter((t) => t.id !== item.id));
+        flash(`"${item.company_name ?? "Cliente"}" restaurado.`);
+        void fetchClients();
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        flash(err.error ?? "Erro ao restaurar cliente.");
+      }
+    } catch {
+      flash("Erro de conexao.");
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleHardDeleteFromTrash = async (item: TrashItem) => {
+    setTrashLoading(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${item.id}/hard-delete`, { method: "DELETE" });
+      if (res.ok) {
+        setTrashItems((prev) => prev.filter((t) => t.id !== item.id));
+        flash(`"${item.company_name ?? "Cliente"}" apagado definitivamente.`);
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        flash(err.error ?? "Erro ao apagar cliente.");
+      }
+    } catch {
+      flash("Erro de conexao.");
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteModal) return;
     const targets = deleteModal.clients;
@@ -895,6 +1100,15 @@ export default function AdminClientesPage() {
           >
             <Archive className="w-4 h-4" />
             Limpeza
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={openTrash}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Lixeira
           </button>
         )}
         <button
@@ -1094,6 +1308,17 @@ export default function AdminClientesPage() {
         />
       )}
       {deleteModal && <DeleteModal state={deleteModal} onConfirm={handleDelete} onCancel={() => setDeleteModal(null)} loading={actionLoading} />}
+      {trashOpen && (
+        <TrashModal
+          items={trashItems}
+          loading={trashLoading}
+          canHardDelete={canHardDelete}
+          onRestore={handleRestoreClient}
+          onHardDelete={handleHardDeleteFromTrash}
+          onRefresh={loadTrashItems}
+          onCancel={() => setTrashOpen(false)}
+        />
+      )}
     </div>
   );
 }
