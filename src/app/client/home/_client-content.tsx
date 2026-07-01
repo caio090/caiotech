@@ -52,31 +52,19 @@ export function ClientHomeContent({ serverData }: Props) {
     let cancelled = false;
     async function fetchDirect() {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) {
+        // Chama API server-side que usa service role — não depende de RLS do browser
+        const res = await fetch("/api/client/current");
+        if (!res.ok || cancelled) {
           if (!cancelled) setIsFetching(false);
           return;
         }
 
-        // RPC get_my_client_id cobre 5 caminhos (profiles → invites → email)
-        // e repara profiles.client_id automaticamente para visitas futuras.
-        const { data: clientId } = await supabase.rpc("get_my_client_id");
-
-        let clientRow: DbClient | null = null;
-        if (clientId) {
-          const { data } = await supabase
-            .from("clients")
-            .select("*")
-            .eq("id", clientId as string)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .maybeSingle();
-          clientRow = (data as DbClient) ?? null;
-        }
+        const json = await res.json() as { client: DbClient | null; clientId: string | null };
+        const clientRow = json.client ?? null;
 
         let onboardingRow: DbOnboardingProfile | null = null;
         if (clientRow?.id) {
+          const supabase = createClient();
           const { data: onbRow } = await supabase
             .from("onboarding_profiles")
             .select("*")

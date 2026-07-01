@@ -50,18 +50,10 @@ export default function ClientConfiguracoes() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // RPC get_my_client_id cobre todos os caminhos (profiles, invites, email)
-        const { data: clientId } = await supabase.rpc("get_my_client_id");
-
-        let clientRow: { company_name: string | null; responsible_name: string | null; email: string | null; segment: string | null; status: string | null } | null = null;
-        if (clientId) {
-          const { data } = await supabase
-            .from("clients")
-            .select("company_name, responsible_name, email, segment, status")
-            .eq("id", clientId as string)
-            .maybeSingle();
-          clientRow = data ?? null;
-        }
+        // API server-side usa service role — bypassa RLS de clients
+        const res = await fetch("/api/client/current");
+        const json = res.ok ? (await res.json() as { client: { company_name?: string | null; responsible_name?: string | null; email?: string | null; segment?: string | null; status?: string | null } | null }) : { client: null };
+        const clientRow = json.client ?? null;
 
         setProfile({
           company_name:     clientRow?.company_name     ?? null,

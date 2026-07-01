@@ -26,24 +26,15 @@ export function ClientLayoutShell({ children }: Props) {
 
     async function fetchData() {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) return;
+        // API server-side usa service role — bypassa RLS de clients
+        const res = await fetch("/api/client/current");
+        if (!res.ok || cancelled) return;
 
-        // RPC get_my_client_id cobre todos os caminhos (profiles, invites, email)
-        const { data: clientId } = await supabase.rpc("get_my_client_id");
-
-        let clientRow: { id: string; company_name: string | null; responsible_name: string | null; deleted_at: string | null; archived_at: string | null } | null = null;
-        if (clientId) {
-          const { data } = await supabase
-            .from("clients")
-            .select("id, company_name, responsible_name, deleted_at, archived_at")
-            .eq("id", clientId as string)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .maybeSingle();
-          clientRow = data ?? null;
-        }
+        const json = await res.json() as {
+          client: { id: string; company_name: string | null; responsible_name: string | null } | null;
+          clientId: string | null;
+        };
+        const clientRow = json.client ?? null;
 
         if (!clientRow || cancelled) return;
 
@@ -58,6 +49,7 @@ export function ClientLayoutShell({ children }: Props) {
         setCompanyName(name);
         setInitials(ini);
 
+        const supabase = createClient();
         const { count } = await supabase
           .from("approvals")
           .select("id", { count: "exact", head: true })
