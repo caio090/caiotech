@@ -13,6 +13,7 @@ import { LokatVoicePanel } from "@/components/lokat-voice-panel";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
+import { cn } from "@/lib/utils";
 
 // ── Admin notification helpers ────────────────────────────────
 const ADMIN_SEEN_KEY = "lokat_admin_notif_seen_count";
@@ -55,6 +56,19 @@ export function AdminLayoutShell({ children }: Props) {
 
   const isOnContentosPage = pathname.startsWith("/admin/contentos");
   const isSelectingClient = pathname === "/admin/contentos/selecionar-cliente";
+  const isInicioPage      = pathname === "/admin/inicio";
+
+  // Efeito "spotlight" — luz suave seguindo o mouse, só na tela Início
+  const spotlightRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isInicioPage) return;
+    function handleMove(e: MouseEvent) {
+      spotlightRef.current?.style.setProperty("--spot-x", `${e.clientX}px`);
+      spotlightRef.current?.style.setProperty("--spot-y", `${e.clientY}px`);
+    }
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, [isInicioPage]);
 
   // Fetch user name
   useEffect(() => {
@@ -223,7 +237,15 @@ export function AdminLayoutShell({ children }: Props) {
   const badges = pendingTeamCount > 0 ? { "/admin/equipe": pendingTeamCount } : undefined;
 
   return (
-    <div className="lk-dark flex h-screen overflow-hidden bg-gray-50">
+    <div ref={spotlightRef} className={cn("lk-dark flex h-screen overflow-hidden bg-gray-50 relative", isInicioPage && "lk-spotlight")}>
+      {isInicioPage && (
+        <div
+          className="pointer-events-none fixed inset-0 z-40 transition-opacity duration-300"
+          style={{
+            background: "radial-gradient(600px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(165,148,249,0.10), transparent 70%)",
+          }}
+        />
+      )}
       <div className="hidden md:flex">
         <AppSidebar
           variant="admin"
@@ -231,11 +253,20 @@ export function AdminLayoutShell({ children }: Props) {
           userRole="Admin"
           onSignOut={handleSignOut}
           badges={badges}
+          transparent={isInicioPage}
         />
       </div>
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 w-48 md:w-72">
+        <header className={cn(
+          "h-14 flex items-center justify-between px-4 md:px-6 flex-shrink-0 transition-colors",
+          isInicioPage
+            ? "bg-black/20 backdrop-blur-md border-b border-white/10"
+            : "bg-white border-b border-gray-100"
+        )}>
+          <div className={cn(
+            "flex items-center gap-2 rounded-xl px-3 py-2 w-48 md:w-72 transition-colors",
+            isInicioPage ? "bg-white/10 border border-white/15" : "bg-gray-50 border border-gray-200"
+          )}>
             <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
             <input
               placeholder="Buscar..."

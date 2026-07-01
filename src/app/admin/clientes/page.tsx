@@ -686,6 +686,7 @@ function ClientCard({
   canHardDelete,
   selectionMode,
   selected,
+  isDuplicate,
   onToggleSelect,
 }: {
   c: Client;
@@ -697,13 +698,14 @@ function ClientCard({
   canHardDelete: boolean;
   selectionMode: boolean;
   selected: boolean;
+  isDuplicate?: boolean;
   onToggleSelect: (id: string) => void;
 }) {
   const initials = (c.company_name ?? c.responsible_name ?? "?")
     .split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 
   return (
-    <div className={`bg-white rounded-2xl border p-5 hover:shadow-sm transition-shadow ${selected ? "border-indigo-300 ring-2 ring-indigo-100" : "border-gray-100"}`}>
+    <div className={`bg-white rounded-2xl border p-5 hover:shadow-sm transition-shadow ${selected ? "border-indigo-300 ring-2 ring-indigo-100" : isDuplicate ? "border-amber-200" : "border-gray-100"}`}>
       <div className="flex items-start gap-3 mb-3">
         {selectionMode && (
           <button
@@ -719,7 +721,14 @@ function ClientCard({
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate">{c.company_name ?? "Sem nome"}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-sm font-bold text-gray-900 truncate">{c.company_name ?? "Sem nome"}</p>
+            {isDuplicate && (
+              <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0" title="Possível duplicata — verifique e arquive o registro antigo na Lixeira">
+                ⚠ Duplicata
+              </span>
+            )}
+          </div>
           <p className="text-xs text-gray-400 truncate">{c.segment ?? "Sem segmento"}</p>
           <ClientBadges c={c} />
         </div>
@@ -843,6 +852,22 @@ export default function AdminClientesPage() {
   const segments = useMemo(() => {
     const set = new Set(clients.map((c) => c.segment).filter(Boolean));
     return [...set].sort() as string[];
+  }, [clients]);
+
+  // IDs de clientes com possível duplicata (mesmo nome normalizado)
+  const duplicateIds = useMemo(() => {
+    const norm = (s: string | null) => (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    const nameCount = new Map<string, string[]>();
+    for (const c of clients) {
+      const key = norm(c.company_name);
+      if (!key) continue;
+      nameCount.set(key, [...(nameCount.get(key) ?? []), c.id]);
+    }
+    const ids = new Set<string>();
+    for (const group of nameCount.values()) {
+      if (group.length > 1) group.forEach((id) => ids.add(id));
+    }
+    return ids;
   }, [clients]);
 
   const filtered = useMemo(() => {
@@ -1269,6 +1294,7 @@ export default function AdminClientesPage() {
               canHardDelete={canHardDelete}
               selectionMode={selectionMode}
               selected={selectedClientIds.has(c.id)}
+              isDuplicate={duplicateIds.has(c.id)}
               onToggleSelect={toggleClientSelection}
               onEdit={setEditingClient}
               onArchive={(client) => setDeleteModal({ mode: "archive", clients: [client] })}

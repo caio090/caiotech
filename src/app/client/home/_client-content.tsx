@@ -61,12 +61,28 @@ export function ClientHomeContent({ serverData }: Props) {
 
         console.log("[client/home] browser fetch: user", user.id);
 
-        const { data: clientRow, error: cErr } = await supabase
+        let { data: clientRow } = await supabase
           .from("clients")
           .select("*")
           .eq("owner_id", user.id)
           .maybeSingle();
-        console.log("[client/home] browser fetch: client", clientRow?.id ?? "null", cErr?.code ?? "ok");
+
+        // Caminho alternativo: cliente convidado — profiles.client_id
+        if (!clientRow) {
+          const { data: profileRow } = await supabase
+            .from("profiles")
+            .select("client_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profileRow?.client_id) {
+            const { data: clientByProfile } = await supabase
+              .from("clients")
+              .select("*")
+              .eq("id", profileRow.client_id)
+              .maybeSingle();
+            clientRow = clientByProfile ?? null;
+          }
+        }
 
         let onboardingRow: DbOnboardingProfile | null = null;
         if (clientRow?.id) {

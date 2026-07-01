@@ -31,7 +31,7 @@ export function ClientLayoutShell({ children }: Props) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
 
-        const { data: clientRow } = await supabase
+        let { data: clientRow } = await supabase
           .from("clients")
           .select("id, company_name, responsible_name, deleted_at, archived_at")
           .eq("owner_id", user.id)
@@ -39,6 +39,26 @@ export function ClientLayoutShell({ children }: Props) {
           .is("deleted_at", null)
           .is("archived_at", null)
           .maybeSingle();
+
+        // Caminho alternativo: cliente convidado — profiles.client_id
+        if (!clientRow) {
+          const { data: profileRow } = await supabase
+            .from("profiles")
+            .select("client_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profileRow?.client_id) {
+            const { data: clientByProfile } = await supabase
+              .from("clients")
+              .select("id, company_name, responsible_name, deleted_at, archived_at")
+              .eq("id", profileRow.client_id)
+              .in("status", CLIENT_VISIBLE_STATUSES)
+              .is("deleted_at", null)
+              .is("archived_at", null)
+              .maybeSingle();
+            clientRow = clientByProfile ?? null;
+          }
+        }
 
         if (!clientRow || cancelled) return;
 

@@ -28,7 +28,7 @@ export default async function ClientHomePage() {
       console.log("[client/home] userId:", userId ?? "null — serverData ficará null");
 
       if (userId) {
-        const [profileRes, clientRes] = await Promise.all([
+        const [profileRes, clientByOwnerRes] = await Promise.all([
           supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
           supabase
             .from("clients")
@@ -40,8 +40,18 @@ export default async function ClientHomePage() {
             .maybeSingle(),
         ]);
 
-        console.log("[client/home] profile:", profileRes.data?.id ?? "null", profileRes.error?.code ?? "ok");
-        console.log("[client/home] client:", clientRes.data?.id ?? "null", clientRes.error?.code ?? "ok");
+        // Caminho alternativo: cliente convidado — profiles.client_id (set pelo accept_client_invite RPC)
+        let clientRes = clientByOwnerRes;
+        if (!clientRes.data && profileRes.data?.client_id) {
+          clientRes = await supabase
+            .from("clients")
+            .select("*")
+            .eq("id", profileRes.data.client_id)
+            .in("status", CLIENT_VISIBLE_STATUSES)
+            .is("deleted_at", null)
+            .is("archived_at", null)
+            .maybeSingle() as typeof clientRes;
+        }
 
         let onboarding = null;
 
