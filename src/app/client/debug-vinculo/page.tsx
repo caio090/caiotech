@@ -15,9 +15,9 @@ export default async function DebugVinculoPage() {
   // Diagnóstico extra com admin client (antes de rodar o resolver)
   let profileRaw: Record<string, unknown> | null = null;
   let clientsByEmail: Record<string, unknown>[] = [];
-  let invitesByEmail: Record<string, unknown>[] = [];
+  // Convites enriquecidos com client_exists
+  let invitesByEmail: (Record<string, unknown> & { client_exists: boolean; client_name: string | null })[] = [];
   let invitesByUserId: Record<string, unknown>[] = [];
-  let clientByInviteId: Record<string, unknown> | null = null;
   let adminQueryError: string | null = null;
   const hasAdmin = hasSupabaseServiceRoleKey();
 
@@ -41,9 +41,28 @@ export default async function DebugVinculoPage() {
         .from("client_invites")
         .select("id, client_id, email, status, accepted_by, accepted_at, created_at")
         .ilike("email", user.email ?? "")
+        .order("created_at", { ascending: false })
         .limit(10);
       if (ieErr) adminQueryError = (adminQueryError ?? "") + " invites.email:" + ieErr.message;
-      invitesByEmail = (invEmail ?? []) as Record<string, unknown>[];
+
+      // Para cada convite, verificar se o client_id aponta para um cliente real
+      const rawInvites = (invEmail ?? []) as (Record<string, unknown> & { client_id?: string })[];
+      invitesByEmail = await Promise.all(
+        rawInvites.map(async (inv) => {
+          if (!inv.client_id) return { ...inv, client_exists: false, client_name: null };
+          const { data: cli } = await admin
+            .from("clients")
+            .select("id, company_name, deleted_at, archived_at")
+            .eq("id", inv.client_id)
+            .maybeSingle();
+          const exists = !!cli && !cli.deleted_at && !cli.archived_at;
+          return {
+            ...inv,
+            client_exists: exists,
+            client_name: (cli as Record<string, unknown> | null)?.company_name as string ?? null,
+          };
+        })
+      );
 
       const { data: invUser } = await admin
         .from("client_invites")
@@ -51,17 +70,6 @@ export default async function DebugVinculoPage() {
         .eq("accepted_by", user.id)
         .limit(10);
       invitesByUserId = (invUser ?? []) as Record<string, unknown>[];
-
-      // Se existe convite por email, tentar buscar o cliente pelo client_id do convite
-      const firstInvite = invitesByEmail[0] as { client_id?: string } | undefined;
-      if (firstInvite?.client_id) {
-        const { data: clientByInv } = await admin
-          .from("clients")
-          .select("id, company_name, email, status, deleted_at, archived_at")
-          .eq("id", firstInvite.client_id)
-          .maybeSingle();
-        clientByInviteId = (clientByInv as Record<string, unknown>) ?? null;
-      }
     } catch (e) {
       adminQueryError = String(e);
     }
@@ -106,27 +114,29 @@ export default async function DebugVinculoPage() {
 
         <Section title={`client_invites WHERE email ilike '${user.email}' (${invitesByEmail.length} resultado(s))`}>
           {invitesByEmail.length === 0 ? (
-            <Row label="resultado" value="nenhum convite pelo email" highlight />
+            <Row label="resultado" value="nenhum convite pelo email — gerar novo convite em /admin/clientes" highlight />
           ) : (
-            invitesByEmail.map((inv, i) => (
-              <div key={i} className="mb-2 border-b border-gray-100 pb-2">
-                {Object.entries(inv).map(([k, v]) => (
-                  <Row key={k} label={k} value={v != null ? String(v) : "(null)"} highlight={k === "status" && v === "pending"} />
-                ))}
-              </div>
-            ))
-          )}
-        </Section>
-
-        <Section title="Cliente via client_id do convite">
-          {clientByInviteId ? (
-            Object.entries(clientByInviteId).map(([k, v]) => (
-              <Row key={k} label={k} value={v != null ? String(v) : "(null)"} highlight={k === "deleted_at" && !!v} />
-            ))
-          ) : invitesByEmail.length > 0 ? (
-            <Row label="resultado" value="CLIENTE NÃO ENCONTRADO pelo client_id do convite" highlight />
-          ) : (
-            <Row label="resultado" value="sem convite para buscar" />
+            invitesByEmail.map((inv, i) => {
+              const isOrphan = !inv.client_exists;
+              return (
+                <div key={i} className={`mb-3 pb-3 border-b border-gray-100 ${isOrphan ? "bg-red-50 rounded-lg p-2" : ""}`}>
+                  {isOrphan && (
+                    <p className="text-xs font-bold text-red-700 mb-1">
+                      ⚠ Convite ÓRFÃO — aponta para cliente que não existe mais.
+                      O resolver vai pular este convite. Gere um novo em /admin/clientes.
+                    </p>
+                  )}
+                  <Row label="id" value={String(inv.id ?? "(null)")} />
+                  <Row label="client_id" value={String(inv.client_id ?? "(null)")} />
+                  <Row label="client_exists" value={String(inv.client_exists)} highlight={!inv.client_exists} />
+                  <Row label="client_name" value={inv.client_name ?? "(null — cliente não encontrado)"} highlight={!inv.client_name} />
+                  <Row label="status" value={String(inv.status ?? "(null)")} highlight={inv.status === "pending" && !inv.client_exists} />
+                  <Row label="accepted_by" value={String(inv.accepted_by ?? "(null)")} />
+                  <Row label="accepted_at" value={String(inv.accepted_at ?? "(null)")} />
+                  <Row label="created_at" value={String(inv.created_at ?? "(null)")} />
+                </div>
+              );
+            })
           )}
         </Section>
 
@@ -189,7 +199,6 @@ export default async function DebugVinculoPage() {
               profileFromAdmin: profileRaw,
               clientsByEmailMatch: clientsByEmail,
               invitesByEmailMatch: invitesByEmail,
-              clientByInviteId,
               invitesByUserIdMatch: invitesByUserId,
               resolverResult: {
                 source: resolved?.source,

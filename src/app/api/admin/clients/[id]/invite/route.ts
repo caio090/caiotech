@@ -86,10 +86,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
 
     // Usa session para client_invites: policy admin_all_client_invites cobre admin/super_admin
-    // Evita dependência de service role key que pode estar inválida no ambiente
+    // 1. Busca convite pendente válido: mesmo email + mesmo client_id + não expirado
     const { data: existing, error: existingErr } = await supabase
       .from("client_invites")
-      .select("token")
+      .select("id, token")
       .eq("client_id", clientId)
       .eq("email", email)
       .eq("status", "pending")
@@ -98,6 +98,34 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     if (existingErr?.code === "42P01") {
       return NextResponse.json({ error: SQL_42_MESSAGE, reason: "sql_pending" }, { status: 400 });
+    }
+
+    // 2. Expirar convites pendentes órfãos do mesmo email mas apontando para
+    //    client_id diferente. Evita que o resolver reutilize convite inválido.
+    try {
+      const adminDb = hasSupabaseServiceRoleKey()
+        ? createSupabaseAdminClient()
+        : supabase;
+
+      // Busca outros convites pendentes para o mesmo email, com client_id diferente
+      const { data: others } = await adminDb
+        .from("client_invites")
+        .select("id")
+        .ilike("email", email)
+        .eq("status", "pending")
+        .neq("client_id", clientId);
+
+      if (others && others.length > 0) {
+        const otherIds = (others as { id: string }[]).map(r => r.id);
+        await adminDb
+          .from("client_invites")
+          .update({ status: "expired" })
+          .in("id", otherIds);
+        console.log("[api/clients/invite] expired orphan invites:", otherIds.length, "for email:", email);
+      }
+    } catch (e) {
+      // Não crítico — não impede a geração do novo convite
+      console.warn("[api/clients/invite] ao expirar convites antigos:", String(e));
     }
 
     let token: string;

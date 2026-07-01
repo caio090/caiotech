@@ -195,11 +195,12 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
 
   // ── D. client_invites.email ilike user.email ──────────────────
   // Aceita status 'accepted' e 'pending'.
-  // Se pending: auto-claim (marca como aceito + upsert profile + upsert access).
+  // Itera TODOS os convites encontrados — pula convites órfãos (client_id inválido).
+  // Se pending e cliente válido: auto-claim + upsert profile + upsert access.
   debug.triedSources.push("invite_email");
   try {
     const emailsToTry = Array.from(new Set([user.email, userEmail].filter(Boolean))) as string[];
-    let bestInvite: { id: string; client_id: string; status: string } | null = null;
+    let allInvites: { id: string; client_id: string; status: string }[] = [];
 
     for (const tryEmail of emailsToTry) {
       const { data: invRows, error: invErr } = await db
@@ -207,9 +208,9 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
         .select("id, client_id, status")
         .ilike("email", tryEmail)
         .in("status", ["accepted", "pending"])
-        .order("status")          // 'accepted' antes de 'pending' alfabeticamente
+        .order("status")          // 'accepted' antes de 'pending' (alfa)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(10);
 
       if (invErr) {
         debug.errors.push(`invite_email(${tryEmail}): ${invErr.message}`);
@@ -217,59 +218,66 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
       }
 
       const rows = (invRows ?? []) as { id: string; client_id: string; status: string }[];
-      const accepted = rows.find(r => r.status === "accepted");
-      const pending  = rows.find(r => r.status === "pending");
-      bestInvite = accepted ?? pending ?? null;
-
-      if (bestInvite) break;
+      if (rows.length > 0) { allInvites = rows; break; }
     }
 
-    if (bestInvite?.client_id) {
-      const invId = bestInvite.client_id;
-      // Busca cliente sem filtro de status — apenas não apagado e não arquivado
+    // Prioridade: accepted primeiro, depois pending — mais recente dentro de cada grupo
+    const sortedInvites = [
+      ...allInvites.filter(r => r.status === "accepted"),
+      ...allInvites.filter(r => r.status === "pending"),
+    ];
+
+    for (const inv of sortedInvites) {
+      if (!inv.client_id) continue;
+
+      // Valida que o cliente do convite ainda existe (convites órfãos são pulados)
       const { data: c } = await db
         .from("clients")
         .select("*")
-        .eq("id", invId)
+        .eq("id", inv.client_id)
         .is("deleted_at", null)
         .is("archived_at", null)
         .maybeSingle();
 
-      if (c) {
-        const cl = c as Record<string, unknown>;
-        const isPending = bestInvite.status === "pending";
-
-        // Auto-claim invite pendente
-        if (isPending) {
-          try {
-            await db
-              .from("client_invites")
-              .update({ status: "accepted", accepted_by: userId, accepted_at: new Date().toISOString() })
-              .eq("id", bestInvite.id);
-            debug.inviteClaimedId = bestInvite.id;
-            console.log("[resolve-client] auto-claimed pending invite:", bestInvite.id);
-          } catch (e) {
-            debug.errors.push(`auto-claim invite: ${String(e)}`);
-          }
-        }
-
-        // Upsert profile com client_id e role=client
-        await upsertProfile(db, userId, user, invId, debug);
-
-        // Upsert client_user_access (best-effort)
-        try {
-          await db.from("client_user_access").upsert(
-            { user_id: userId, client_id: invId, status: "active" },
-            { onConflict: "user_id,client_id", ignoreDuplicates: true }
-          );
-        } catch { /* tabela pode não existir */ }
-
-        const source: ResolveSource = isPending ? "invite_email_pending_claimed" : "invite_email";
-        console.log(`[resolve-client] source=${source} client:`, cl.company_name);
-        return build(userId, user.email, profile, cl, invId, source, debug);
-      } else {
-        debug.errors.push(`client not found for invite client_id: ${invId}`);
+      if (!c) {
+        debug.errors.push(`orphan_invite_client_id: invite ${inv.id} → client ${inv.client_id} not found`);
+        console.log("[resolve-client] orphan invite skipped:", inv.id, "→", inv.client_id);
+        continue; // tenta próximo convite
       }
+
+      const cl = c as Record<string, unknown>;
+      const isPending = inv.status === "pending";
+
+      // Auto-claim invite pendente com cliente válido
+      if (isPending) {
+        try {
+          await db
+            .from("client_invites")
+            .update({ status: "accepted", accepted_by: userId, accepted_at: new Date().toISOString() })
+            .eq("id", inv.id);
+          debug.inviteClaimedId = inv.id;
+          console.log("[resolve-client] auto-claimed pending invite:", inv.id);
+        } catch (e) {
+          debug.errors.push(`auto-claim invite: ${String(e)}`);
+        }
+      }
+
+      await upsertProfile(db, userId, user, inv.client_id, debug);
+
+      try {
+        await db.from("client_user_access").upsert(
+          { user_id: userId, client_id: inv.client_id, status: "active" },
+          { onConflict: "user_id,client_id", ignoreDuplicates: true }
+        );
+      } catch { /* tabela pode não existir */ }
+
+      const source: ResolveSource = isPending ? "invite_email_pending_claimed" : "invite_email";
+      console.log(`[resolve-client] source=${source} client:`, cl.company_name);
+      return build(userId, user.email, profile, cl, inv.client_id, source, debug);
+    }
+
+    if (allInvites.length > 0 && sortedInvites.length > 0) {
+      debug.errors.push(`all ${sortedInvites.length} invite(s) were orphan — no valid client found`);
     }
   } catch (e) {
     debug.errors.push(`invite_email: ${String(e)}`);
