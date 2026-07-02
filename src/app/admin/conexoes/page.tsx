@@ -528,8 +528,13 @@ function ConexoesContent() {
   const REDIRECT_URI = "https://www.lokat.com.br/api/meta/callback";
   const isLoading = metaLoading || insightsLoading;
 
-  async function linkAsset(assetType: "facebook_page" | "instagram_business", assetId: string, assetName: string | null) {
-    if (!linkClientId || !assets?.connection_id) return;
+  async function linkAsset(
+    assetType: "facebook_page" | "instagram_business",
+    assetId: string,
+    assetName: string | null,
+    assetUsername?: string | null,
+  ) {
+    if (!linkClientId) return;
     setLinkSaving(true);
     setLinkError("");
     try {
@@ -537,12 +542,13 @@ function ConexoesContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id: linkClientId,
-          meta_connection_id: assets.connection_id,
-          asset_type: assetType,
-          asset_id: assetId,
-          asset_name: assetName ?? undefined,
-          is_primary: true,
+          client_id:          linkClientId,
+          meta_connection_id: assets?.connection_id ?? undefined,
+          asset_type:         assetType,
+          asset_id:           assetId,
+          asset_name:         assetName    ?? undefined,
+          username:           assetUsername ?? undefined,
+          is_primary:         true,
         }),
       });
       const d = await r.json() as { ok: boolean; reason?: string; message?: string };
@@ -792,7 +798,7 @@ function ConexoesContent() {
                                 </select>
                                 {linkError && <p className="text-[10px] text-red-600">{linkError}</p>}
                                 <div className="flex gap-1.5">
-                                  <button onClick={() => void linkAsset("facebook_page", page.id, page.name)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
+                                  <button onClick={() => void linkAsset("facebook_page", page.id, page.name, null)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-blue-500 text-white rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
                                     {linkSaving ? "Salvando…" : "Salvar"}
                                   </button>
                                   <button onClick={() => { setLinkingKey(null); setLinkError(""); }} className="text-[10px] px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Cancelar</button>
@@ -829,7 +835,7 @@ function ConexoesContent() {
                                     </select>
                                     {linkError && <p className="text-[10px] text-red-600">{linkError}</p>}
                                     <div className="flex gap-1.5">
-                                      <button onClick={() => void linkAsset("instagram_business", page.instagram!.id, page.instagram!.username ?? page.instagram!.name)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-pink-500 text-white rounded-lg disabled:opacity-50 hover:bg-pink-600 transition-colors">
+                                      <button onClick={() => void linkAsset("instagram_business", page.instagram!.id, page.instagram!.name, page.instagram!.username)} disabled={linkSaving || !linkClientId} className="text-[10px] px-3 py-1 bg-pink-500 text-white rounded-lg disabled:opacity-50 hover:bg-pink-600 transition-colors">
                                         {linkSaving ? "Salvando…" : "Salvar"}
                                       </button>
                                       <button onClick={() => { setLinkingKey(null); setLinkError(""); }} className="text-[10px] px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Cancelar</button>
