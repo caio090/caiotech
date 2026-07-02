@@ -39,6 +39,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/projetos",     label: "Projetos",     icon: FolderOpen },
       { href: "/admin/diagnosticos", label: "Diagnósticos", icon: BarChart3 },
       { href: "/admin/relatorios",   label: "Relatórios",   icon: FileText },
+      { href: "/admin/fontes-dados", label: "Fontes de Dados", icon: Upload },
       { href: "/admin/financeiro",   label: "Financeiro",   icon: DollarSign },
       { href: "/admin/equipe",       label: "Equipe",       icon: UsersRound },
       { href: "/admin/conexoes",     label: "Conexoes",     icon: Link2 },
