@@ -9,6 +9,57 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Branch principal observada: `main`
 - Regra: preservar mudancas locais existentes e nao alterar codigo sem plano aprovado.
 
+### Ultima sessao — 2026-07-02 — fix OlaClick connect + Meta vinculation
+
+**Causa raiz OlaClick "Selecione um cliente real":**
+- `POST /api/olaclick/connect` usava admin client (service role) para validar client_id.
+- Se a SUPABASE_SERVICE_ROLE_KEY estava errada/ausente no ambiente, a query retornava erro
+  nao tratado e caia no bloco `!client` → mensagem enganosa.
+- SQL 39 ja tinha RLS que permite super_admin/admin/agency via session JWT, mas o codigo
+  nao usava session client.
+
+**Fix OlaClick:**
+- Connect route agora usa SESSION CLIENT por padrao para client lookup E para insert.
+- Admin client so e tentado como fallback se session client retornar erro de permissao.
+- Mensagem diferenciada: db_error / client_not_found / sql_pending.
+
+**Causa raiz "Meta nao vinculada a este cliente":**
+- SQL 37 nao incluia `super_admin` nas RLS policies de `client_meta_assets`.
+- Usuario super_admin nao conseguia INSERT nem SELECT via session client.
+- Link route chamava `createSupabaseAdminClient()` sem try-catch: exception nao capturada
+  se SUPABASE_SERVICE_ROLE_KEY ausente.
+
+**Fix Meta:**
+- SQL 59 criado: atualiza policies de client_meta_assets incluindo super_admin em todas as
+  operacoes (SELECT/INSERT/UPDATE/DELETE).
+- Link route: try-catch em createSupabaseAdminClient(); session client primeiro, admin como
+  fallback.
+
+**UI de vinculation (commit e9eb3f7, sessao anterior):**
+- Botoes "Vincular" em cada card de Pagina/Instagram em /admin/conexoes.
+- Dropdown de cliente + Salvar/Cancelar inline.
+
+**Onde fica salvo:**
+- Conexao OlaClick: tabela `olaclick_connections`, coluna `client_id`
+- Vinculo Meta: tabela `client_meta_assets`, coluna `client_id`
+
+**Commits:**
+- `e9eb3f7` — OlaClick retry logic + Meta vinculation UI (nao tinha sido pushed antes)
+- `8ef2aad` — fix definitivo: session client first, SQL 59, link route resiliente
+
+**SQL MANUAL OBRIGATORIO no Supabase (em ordem):**
+1. `docs/supabase/39-olaclick-connections.sql` — se nao rodado ainda
+2. `docs/supabase/37-client-meta-assets.sql` — se nao rodado ainda
+3. `docs/supabase/59-fix-connections-client-linking.sql` — OBRIGATORIO (fix RLS super_admin)
+
+**Pendencias:**
+- Rodar os SQLs acima no Supabase SQL Editor.
+- Testar conectar OlaClick em /admin/conexoes com Duh Lanches selecionado.
+- Testar vincular @duh.lanches ao cliente Duh Lanches via botao "Vincular".
+- Depois checar /admin/contentos/insights?client=<id> — deve mostrar "Meta conectada".
+- Checar /admin/relatorios/faturamento — deve mostrar conexao OlaClick ativa.
+- Portal cliente (dulanche@hotmail.com.br): ainda pendente, nao prioritario.
+
 ### Ultima sessao — 2026-07-01 — fix portal cliente via convite pendente
 
 **Causa raiz identificada:**
