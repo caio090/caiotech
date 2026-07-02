@@ -21,16 +21,18 @@ interface ClientOption { id: string; company_name: string }
 
 interface DigitalMenuStatus {
   ok: boolean;
+  connected?: boolean;
   configured?: boolean;
   reason?: string;
   message?: string;
   connection?: {
     id: string;
-    provider?: string | null;       // 'olaclick' | 'anotaai' | ...
+    provider?: string | null;
     connection_name?: string | null;
     token_last_four?: string | null;
     last_sync_at?: string | null;
     client_id?: string | null;
+    has_api_base_url?: boolean;
   } | null;
 }
 
@@ -38,6 +40,9 @@ interface OrdersResult {
   ok: boolean;
   configured?: boolean;
   reason?: string;
+  code?: string;
+  connectionFound?: boolean;
+  provider?: string;
   message?: string;
   data?: unknown;
 }
@@ -81,16 +86,17 @@ function StatCard({ icon: Icon, label, value, color = "bg-indigo-50 text-indigo-
 }
 
 export default function FaturamentoPage() {
-  const [clients,       setClients]       = useState<ClientOption[]>([]);
-  const [clientId,      setClientId]      = useState("");
-  const [period,        setPeriod]        = useState<PeriodKey>("7dias");
-  const [status,        setStatus]        = useState<DigitalMenuStatus | null>(null);
-  const [report,        setReport]        = useState<ReportData | null>(null);
-  const [loading,       setLoading]       = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState(false);
-  const [error,         setError]         = useState<string | null>(null);
-  const [lastSync,      setLastSync]      = useState<string | null>(null);
-  const [envStatus,     setEnvStatus]     = useState<{ hasBaseUrl: boolean } | null>(null);
+  const [clients,        setClients]        = useState<ClientOption[]>([]);
+  const [clientId,       setClientId]       = useState("");
+  const [period,         setPeriod]         = useState<PeriodKey>("7dias");
+  const [status,         setStatus]         = useState<DigitalMenuStatus | null>(null);
+  const [report,         setReport]         = useState<ReportData | null>(null);
+  const [loading,        setLoading]        = useState(false);
+  const [loadingStatus,  setLoadingStatus]  = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [missingBaseUrl, setMissingBaseUrl] = useState(false);
+  const [lastSync,       setLastSync]       = useState<string | null>(null);
+  const [envStatus,      setEnvStatus]      = useState<{ hasBaseUrl: boolean } | null>(null);
 
   // Carrega env-status ao montar
   useEffect(() => {
@@ -139,6 +145,7 @@ export default function FaturamentoPage() {
     setLoading(true);
     setError(null);
     setReport(null);
+    setMissingBaseUrl(false);
 
     try {
       const r = await fetch(`/api/olaclick/orders?client_id=${clientId}&period=${period}`);
@@ -147,17 +154,25 @@ export default function FaturamentoPage() {
       if (!d.ok) {
         if (d.reason === "sql_pending") {
           setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase.");
-        } else if (d.reason === "not_connected") {
-          setError("Cliente sem conexão Cardápio Digital ativa. Conecte em Conexões > Cardápio Digital.");
-        } else if (d.reason === "base_url_missing" || d.reason === "env_missing" || d.configured === false) {
-          setError("URL da API do provedor não configurada para este cliente. Edite a conexão em /admin/conexoes e preencha o campo 'URL da API do provedor'.");
-        } else if (d.reason === "api_error") {
+        } else if (
+          d.reason === "base_url_missing" ||
+          d.code === "missing_provider_base_url" ||
+          d.reason === "env_missing" ||
+          d.configured === false
+        ) {
+          // Conexão existe mas URL do provedor não está configurada
+          setError(null);
+          setMissingBaseUrl(true);
+        } else if (d.reason === "not_connected" || d.code === "no_digital_menu_connection") {
+          setError("Cliente sem conexão Cardápio Digital ativa. Conecte em Conexões → Cardápio Digital.");
+        } else if (d.reason === "api_error" || d.code === "provider_api_error") {
           setError("Não foi possível buscar dados do Cardápio Digital. Verifique token, cliente e endpoint.");
         } else {
-          setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital. Verifique token, cliente e endpoint.");
+          setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital.");
         }
         return;
       }
+      setMissingBaseUrl(false);
 
       // A API retorna dados brutos do provedor — parsear conforme endpoint real
       // Por ora, exibe o que vier disponível
@@ -263,13 +278,13 @@ export default function FaturamentoPage() {
         )}
       </div>
 
-      {/* Aviso de URL da API não configurada — orienta /admin/conexoes, não Vercel */}
-      {isConnected && envStatus && !envStatus.hasBaseUrl && (
+      {/* Aviso: conexão encontrada mas URL do provedor ausente */}
+      {(missingBaseUrl || (isConnected && status?.connection?.has_api_base_url === false)) && (
         <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
             <div className="space-y-1">
-              <p className="font-semibold text-amber-800">Integração conectada, mas URL da API não configurada</p>
+              <p className="font-semibold text-amber-800">Conexão salva — falta configurar a URL do provedor</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">Token: salvo ✓</span>
                 <span className="text-[10px] bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded-full">URL da API: ausente ✗</span>
