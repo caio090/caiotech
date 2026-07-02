@@ -27,6 +27,19 @@ interface ReportUpload {
   created_at: string | null;
 }
 
+const REPORT_SOURCES = [
+  { value: "digital_menu",    label: "Cardápio Digital"    },
+  { value: "pdv",             label: "PDV / Caixa"         },
+  { value: "manual_sheet",    label: "Planilha manual"     },
+  { value: "print",           label: "Print / Captura"     },
+  { value: "pdf",             label: "PDF"                 },
+  { value: "crm",             label: "CRM"                 },
+  { value: "external_system", label: "Sistema externo"     },
+  { value: "other",           label: "Outro"               },
+] as const;
+
+type ReportSourceValue = typeof REPORT_SOURCES[number]["value"];
+
 // Tipos de relatório suportados — genéricos para qualquer nicho
 const REPORT_TYPES = [
   { value: "revenue",       label: "Faturamento / Receita"   },
@@ -84,6 +97,7 @@ function UploadModal({ clients, onClose, onSaved }: {
 }) {
   const [clientId,     setClientId]     = useState("");
   const [reportType,   setReportType]   = useState<ReportTypeValue>("general");
+  const [reportSource, setReportSource] = useState<ReportSourceValue>("other");
   const [periodStart,  setPeriodStart]  = useState("");
   const [periodEnd,    setPeriodEnd]    = useState("");
   const [fileName,     setFileName]     = useState("");
@@ -101,13 +115,14 @@ function UploadModal({ clients, onClose, onSaved }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id:    clientId,
-          report_type:  reportType,
-          period_start: periodStart || null,
-          period_end:   periodEnd   || null,
-          file_name:    fileName,
-          file_type:    fileType,
-          notes:        notes || null,
+          client_id:     clientId,
+          report_type:   reportType,
+          report_source: reportSource,
+          period_start:  periodStart || null,
+          period_end:    periodEnd   || null,
+          file_name:     fileName,
+          file_type:     fileType,
+          notes:         notes || null,
           // file_url: vazio por enquanto — upload real para Storage será implementado
         }),
       });
@@ -161,6 +176,18 @@ function UploadModal({ clients, onClose, onSaved }: {
               className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-indigo-400 bg-white"
             >
               {REPORT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+
+          {/* Fonte do relatório */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Fonte do relatório</label>
+            <select
+              value={reportSource}
+              onChange={(e) => setReportSource(e.target.value as ReportSourceValue)}
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-indigo-400 bg-white"
+            >
+              {REPORT_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
 

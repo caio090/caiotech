@@ -32,4 +32,19 @@ export interface DigitalMenuOrdersRaw {
   raw: unknown;
 }
 
+export interface DigitalMenuProviderCapabilities {
+  /** O provedor expõe endpoint de pedidos */
+  orders: boolean;
+  /** O provedor expõe endpoint de cardápio */
+  menu: boolean;
+  /** O provedor suporta webhooks de eventos */
+  webhooks: boolean;
+  /** Faturamento total calculado a partir dos pedidos (derivado) */
+  revenue: "derived_from_orders" | false;
+  /** Produtos mais vendidos derivados de itens dos pedidos */
+  topItems: "derived_from_order_items" | false;
+  /** Ticket médio derivado de faturamento / total de pedidos */
+  averageTicket: "derived_from_orders" | false;
+}
+
 export const BASE_URL_MISSING_REASON = "base_url_missing" as const;

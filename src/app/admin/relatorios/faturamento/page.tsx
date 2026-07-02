@@ -8,12 +8,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-type PeriodKey = "hoje" | "7dias" | "30dias" | "mes_atual";
+type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
 const PERIODS: { value: PeriodKey; label: string }[] = [
-  { value: "hoje",      label: "Hoje"         },
-  { value: "7dias",     label: "Últimos 7 dias"},
+  { value: "hoje",      label: "Hoje"          },
+  { value: "7dias",     label: "Últimos 7 dias" },
+  { value: "15dias",    label: "Últimos 15 dias"},
   { value: "30dias",    label: "Últimos 30 dias"},
-  { value: "mes_atual", label: "Mês atual"     },
+  { value: "mes_atual", label: "Mês atual"      },
 ];
 
 interface ClientOption { id: string; company_name: string }

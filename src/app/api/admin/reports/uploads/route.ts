@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
     let body: {
       client_id: string;
       report_type?: string;
+      report_source?: string;
       period_start?: string;
       period_end?: string;
       file_name?: string;
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
       client_id:        body.client_id,
       data_source_id:   body.data_source_id ?? null,
       report_type:      body.report_type ?? "general",
+      report_source:    body.report_source ?? null,
       period_start:     body.period_start ?? null,
       period_end:       body.period_end ?? null,
       file_name:        body.file_name ?? null,
