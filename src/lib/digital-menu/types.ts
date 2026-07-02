@@ -19,8 +19,14 @@ export interface DigitalMenuAdapter {
   /** nome exibido ao usuário */
   provider_name: string;
   /**
+   * URL base padrão do provider, usada quando conn.api_base_url está vazio
+   * e não há variável de ambiente de fallback.
+   * Se definida, o provider sempre terá URL disponível.
+   */
+  defaultBaseUrl?: string;
+  /**
    * Resolve a URL base da API para esta conexão.
-   * Prioridade: api_base_url da conexão → preset interno → null
+   * Prioridade: conn.api_base_url → env global → defaultBaseUrl → null
    */
   resolveBaseUrl(conn: Pick<DigitalMenuConnection, "api_base_url">): string | null;
   /** Mensagem quando URL ausente — aponta para /admin/conexoes, não Vercel */

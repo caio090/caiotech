@@ -170,6 +170,7 @@ type DigitalMenuConnectionRow = {
   client_email: string | null;
   connection_name: string;
   token_last_four: string | null;
+  api_base_url: string | null;
   status: string;
   last_sync_at: string | null;
   created_at: string | null;
@@ -425,6 +426,184 @@ function DigitalMenuModal({ onClose, onSaved, clients }: {
   );
 }
 
+// ── Modal de edição de conexão existente ───────────────────────
+const OLACLICK_DEFAULT_BASE_URL = "https://public-api.olaclick.app";
+
+function DigitalMenuEditModal({ conn, onClose, onSaved }: {
+  conn: DigitalMenuConnectionRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [connName,    setConnName]    = useState(conn.connection_name);
+  const [token,       setToken]       = useState("");
+  const [apiBaseUrl,  setApiBaseUrl]  = useState(conn.api_base_url ?? "");
+  const [notes,       setNotes]       = useState(conn.notes ?? "");
+  const [showToken,   setShowToken]   = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState("");
+
+  async function handleSave() {
+    if (!connName.trim()) { setError("Nome da conexão é obrigatório."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const body: Record<string, unknown> = {
+        connection_name: connName.trim(),
+        notes:           notes.trim() || null,
+        api_base_url:    apiBaseUrl.trim() || null,
+      };
+      if (token.trim()) body["access_token"] = token.trim();
+
+      const r = await fetch(`/api/olaclick/connections/${conn.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      const d = await r.json() as { ok: boolean; reason?: string; message?: string };
+      if (d.ok) { onSaved(); }
+      else { setError(d.message ?? "Erro ao atualizar conexão."); }
+    } catch { setError("Erro de rede. Tente novamente."); }
+    finally { setSaving(false); }
+  }
+
+  const providerName = conn.provider === "olaclick" ? "OlaClick" : conn.provider;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center">
+              <UtensilsCrossed className="w-4 h-4 text-orange-500" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Gerenciar Conexão</p>
+              <p className="text-[10px] text-gray-400">{conn.client_name ?? "Cliente"} · {providerName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Info readonly */}
+          <div className="p-3 bg-gray-50 rounded-xl space-y-1 text-xs text-gray-600">
+            <p><span className="font-semibold text-gray-700">Cliente:</span> {conn.client_name ?? "—"}</p>
+            <p><span className="font-semibold text-gray-700">Provedor:</span> {providerName}</p>
+            <p><span className="font-semibold text-gray-700">Token atual:</span> <span className="font-mono">…{conn.token_last_four ?? "****"}</span></p>
+          </div>
+
+          {/* Nome da conexão */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Nome da conexão <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={connName}
+              onChange={(e) => setConnName(e.target.value)}
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
+            />
+          </div>
+
+          {/* Token — opcional */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Novo token / API Key</label>
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Preencha apenas se quiser substituir o token"
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 pr-10 outline-none focus:border-orange-400 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" /> Deixe vazio para manter o token atual.
+            </p>
+          </div>
+
+          {/* Configurações avançadas */}
+          <div className="border border-gray-100 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <span className="text-xs font-semibold text-gray-700">Configurações avançadas</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </button>
+            {showAdvanced && (
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">URL da API do provedor</label>
+                  <input
+                    type="url"
+                    value={apiBaseUrl}
+                    onChange={(e) => setApiBaseUrl(e.target.value)}
+                    placeholder={`Padrão do provider: ${OLACLICK_DEFAULT_BASE_URL}`}
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 font-mono"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {conn.api_base_url
+                      ? <><span className="text-orange-600 font-medium">URL personalizada:</span> {conn.api_base_url}</>
+                      : <>Usando padrão do provider OlaClick: <span className="font-mono">{OLACLICK_DEFAULT_BASE_URL}</span></>
+                    }
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Deixe vazio para usar o padrão do provider.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Observações */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Observações internas</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notas sobre essa conexão..."
+              rows={2}
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-orange-400"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
+              <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-200 text-xs font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving || !connName.trim()}
+              className="flex-1 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              {saving ? "Salvando..." : "Salvar alterações"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────
 function ConexoesContent() {
   const searchParams = useSearchParams();
@@ -452,6 +631,7 @@ function ConexoesContent() {
   const [accountsTested,  setAccountsTested]  = useState(false);
 
   const [showOlaModal,   setShowOlaModal]   = useState(false);
+  const [editingConn,   setEditingConn]    = useState<DigitalMenuConnectionRow | null>(null);
   const [olaClients,     setOlaClients]     = useState<ClientOption[]>([]);
   const [olaConnections, setOlaConnections] = useState<DigitalMenuConnectionRow[]>([]);
   const [olaLoading,     setOlaLoading]     = useState(false);
@@ -1318,23 +1498,19 @@ function ConexoesContent() {
               {/* Lista de conexões existentes */}
               {hasConns && (
                 <div className="mb-4 space-y-2">
-                  {/* Alerta se OLACLICK_API_BASE_URL ausente */}
-                  {olaEnv && !olaEnv.hasBaseUrl && (
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
-                      <div>
-                        <p className="font-semibold">URL da API do provedor não configurada</p>
-                        <p className="mt-0.5 text-amber-600">
-                          Edite a conexão e preencha o campo <strong>URL da API do provedor</strong> em Configurações avançadas para habilitar faturamento e pedidos.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  {/* Info: OlaClick sempre tem URL padrão */}
+                  <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700">
+                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-500" />
+                    <p>
+                      URL da API configurada automaticamente via preset do provider OlaClick.
+                      Clique em <strong>Gerenciar</strong> para usar uma URL personalizada ou atualizar o token.
+                    </p>
+                  </div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conexões ativas</p>
                   {olaConnections.map((conn) => (
                     <div key={conn.id} className="p-3 bg-orange-50 border border-orange-100 rounded-xl">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-orange-800">
                             {conn.client_name ?? "Cliente desconhecido"}
                           </p>
@@ -1346,10 +1522,25 @@ function ConexoesContent() {
                             {conn.connection_name}
                             {conn.token_last_four && <span className="font-mono ml-1 opacity-60">…{conn.token_last_four}</span>}
                           </p>
+                          {/* URL da API */}
+                          <p className="text-[10px] mt-1">
+                            {conn.api_base_url
+                              ? <span className="text-orange-600">URL personalizada ✓</span>
+                              : <span className="text-emerald-600">URL padrão do provider ✓</span>
+                            }
+                          </p>
                         </div>
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                          <CheckCircle2 className="w-2.5 h-2.5" /> Ativo
-                        </span>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Ativo
+                          </span>
+                          <button
+                            onClick={() => setEditingConn(conn)}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-600 hover:text-orange-800 bg-white border border-orange-100 hover:border-orange-200 px-2 py-0.5 rounded-full transition-colors"
+                          >
+                            Gerenciar
+                          </button>
+                        </div>
                       </div>
                       {conn.created_at && (
                         <p className="text-[10px] text-orange-500 mt-1">
@@ -1427,12 +1618,21 @@ function ConexoesContent() {
 
       </div>
 
-      {/* Modal OlaClick */}
+      {/* Modal nova conexão */}
       {showOlaModal && (
         <DigitalMenuModal
           onClose={() => setShowOlaModal(false)}
           onSaved={() => { setShowOlaModal(false); void loadOlaConnections(); }}
           clients={olaClients}
+        />
+      )}
+
+      {/* Modal editar conexão existente */}
+      {editingConn && (
+        <DigitalMenuEditModal
+          conn={editingConn}
+          onClose={() => setEditingConn(null)}
+          onSaved={() => { setEditingConn(null); void loadOlaConnections(); }}
         />
       )}
     </div>

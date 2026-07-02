@@ -174,18 +174,22 @@ export default function FaturamentoPage() {
       }
       setMissingBaseUrl(false);
 
-      // A API retorna dados brutos do provedor — parsear conforme endpoint real
-      // Por ora, exibe o que vier disponível
-      const raw = d.data as Record<string, unknown> | null | undefined;
+      // A rota /api/olaclick/orders já parseia e normaliza os dados.
+      // data contém: faturamento_total, total_pedidos, ticket_medio,
+      //              pedidos_por_status, produtos_mais_vendidos, raw
+      const parsed = d.data as {
+        faturamento_total:     number | null;
+        total_pedidos:         number | null;
+        ticket_medio:          number | null;
+        pedidos_por_status:    Record<string, number> | null;
+        produtos_mais_vendidos: { name: string; qty: number }[] | null;
+      } | null | undefined;
       setReport({
-        faturamento_total:    typeof raw?.total_amount === "number" ? raw.total_amount : null,
-        total_pedidos:        typeof raw?.total_orders === "number" ? raw.total_orders : null,
-        ticket_medio:         (typeof raw?.total_amount === "number" && typeof raw?.total_orders === "number" && raw.total_orders > 0)
-                                ? raw.total_amount / raw.total_orders : null,
-        pedidos_por_status:   (raw?.orders_by_status && typeof raw.orders_by_status === "object")
-                                ? raw.orders_by_status as Record<string, number> : null,
-        produtos_mais_vendidos: Array.isArray(raw?.top_products)
-                                ? (raw.top_products as { name: string; qty: number }[]).slice(0, 5) : null,
+        faturamento_total:     parsed?.faturamento_total    ?? null,
+        total_pedidos:         parsed?.total_pedidos        ?? null,
+        ticket_medio:          parsed?.ticket_medio         ?? null,
+        pedidos_por_status:    parsed?.pedidos_por_status   ?? null,
+        produtos_mais_vendidos: parsed?.produtos_mais_vendidos ?? null,
       });
       setLastSync(new Date().toISOString());
     } catch {
@@ -262,7 +266,13 @@ export default function FaturamentoPage() {
               {status.connection?.provider && <span className="ml-1 text-emerald-600 font-medium uppercase text-[10px]">· {status.connection.provider}</span>}
               {status.connection?.connection_name && <span> · {status.connection.connection_name}</span>}
               {status.connection?.token_last_four && <span className="font-mono ml-1">…{status.connection.token_last_four}</span>}
-              {lastSync && <span className="ml-2 text-emerald-600">· Última sync: {fmtDate(lastSync)}</span>}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">Token: salvo ✓</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                  {status.connection?.has_api_base_url ? "URL personalizada ✓" : "URL padrão do provider ✓"}
+                </span>
+              </div>
+              {lastSync && <span className="text-emerald-600 text-[10px] mt-0.5 block">Última sync: {fmtDate(lastSync)}</span>}
             </div>
           </>
         ) : (
@@ -278,8 +288,8 @@ export default function FaturamentoPage() {
         )}
       </div>
 
-      {/* Aviso: conexão encontrada mas URL do provedor ausente */}
-      {(missingBaseUrl || (isConnected && status?.connection?.has_api_base_url === false)) && (
+      {/* Aviso: conexão encontrada mas URL do provedor ausente (não deve aparecer para OlaClick) */}
+      {missingBaseUrl && (
         <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />

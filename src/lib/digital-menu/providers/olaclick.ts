@@ -1,23 +1,32 @@
 import type { DigitalMenuAdapter, DigitalMenuProviderCapabilities } from "../types";
 
+// URL base oficial da API pública OlaClick.
+// Fonte: painel OlaClick → API Keys → View documentation → OlaClick Public API
+const OLACLICK_DEFAULT_BASE_URL = "https://public-api.olaclick.app";
+
 // Adapter para o provedor OlaClick.
-// OLACLICK_API_BASE_URL é fallback global opcional — não é requisito por cliente.
-// Prioridade: api_base_url da conexão (salva no banco) → env global → null
+// Ordem de resolução da URL:
+//   1. conn.api_base_url — configurada por cliente na conexão
+//   2. process.env.OLACLICK_API_BASE_URL — fallback global legado/opcional
+//   3. OLACLICK_DEFAULT_BASE_URL — preset interno (https://public-api.olaclick.app)
+//
+// Como o preset existe, conexões OlaClick nunca ficam sem URL.
 export const OlaClickAdapter: DigitalMenuAdapter = {
-  provider_slug: "olaclick",
-  provider_name: "OlaClick",
+  provider_slug:  "olaclick",
+  provider_name:  "OlaClick",
+  defaultBaseUrl: OLACLICK_DEFAULT_BASE_URL,
 
   resolveBaseUrl(conn) {
     const fromConn = conn.api_base_url?.trim();
     if (fromConn) return fromConn;
     const fromEnv = process.env.OLACLICK_API_BASE_URL?.trim();
     if (fromEnv) return fromEnv;
-    return null;
+    return OLACLICK_DEFAULT_BASE_URL;
   },
 
   missingBaseUrlMessage:
-    "URL da API do provedor não configurada para este cliente. " +
-    "Edite a conexão em /admin/conexoes → Cardápio Digital e preencha o campo 'URL da API do provedor'.",
+    "URL da API do provedor não configurada. " +
+    "Edite a conexão em /admin/conexoes → Cardápio Digital.",
 };
 
 export const OlaClickCapabilities: DigitalMenuProviderCapabilities = {

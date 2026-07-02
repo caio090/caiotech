@@ -21,7 +21,7 @@ export async function GET() {
     // Fallback para service role se sessão for bloqueada por RLS
     let result = await supabase
       .from("olaclick_connections")
-      .select("id, client_id, provider, connection_name, token_last_four, status, scopes, last_sync_at, created_at, notes, clients(company_name, email)")
+      .select("id, client_id, provider, connection_name, token_last_four, api_base_url, status, scopes, last_sync_at, created_at, notes, clients(company_name, email)")
       .eq("status", "connected")
       .order("created_at", { ascending: false });
 
@@ -37,7 +37,7 @@ export async function GET() {
         const adminDb = createSupabaseAdminClient();
         const r = await adminDb
           .from("olaclick_connections")
-          .select("id, client_id, provider, connection_name, token_last_four, status, scopes, last_sync_at, created_at, notes, clients(company_name, email)")
+          .select("id, client_id, provider, connection_name, token_last_four, api_base_url, status, scopes, last_sync_at, created_at, notes, clients(company_name, email)")
           .eq("status", "connected")
           .order("created_at", { ascending: false });
         if (!r.error) result = r as unknown as typeof result;
@@ -63,6 +63,7 @@ export async function GET() {
         client_email:    client?.email ?? null,
         connection_name: row.connection_name as string,
         token_last_four: row.token_last_four as string | null,
+        api_base_url:    (row.api_base_url as string | null) ?? null,
         status:          row.status as string,
         scopes:          row.scopes as string[] | null,
         last_sync_at:    row.last_sync_at as string | null,
