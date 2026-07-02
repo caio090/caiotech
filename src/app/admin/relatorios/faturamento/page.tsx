@@ -88,6 +88,15 @@ export default function FaturamentoPage() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [error,         setError]         = useState<string | null>(null);
   const [lastSync,      setLastSync]      = useState<string | null>(null);
+  const [envStatus,     setEnvStatus]     = useState<{ hasBaseUrl: boolean } | null>(null);
+
+  // Carrega env-status ao montar
+  useEffect(() => {
+    void fetch("/api/olaclick/env-status")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; hasBaseUrl?: boolean }) => { if (d.ok) setEnvStatus({ hasBaseUrl: d.hasBaseUrl ?? false }); })
+      .catch(() => undefined);
+  }, []);
 
   // Carrega lista de clientes
   useEffect(() => {
@@ -250,6 +259,25 @@ export default function FaturamentoPage() {
           </>
         )}
       </div>
+
+      {/* Diagnóstico de env (OLACLICK_API_BASE_URL ausente) */}
+      {isConnected && envStatus && !envStatus.hasBaseUrl && (
+        <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+            <div className="space-y-1">
+              <p className="font-semibold text-amber-800">Integração conectada, mas API não configurada</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">Token: salvo ✓</span>
+                <span className="text-[10px] bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded-full">API Base URL: ausente ✗</span>
+              </div>
+              <p className="mt-1 text-amber-600">
+                Adicione <code className="font-mono bg-amber-100 px-1 rounded">OLACLICK_API_BASE_URL</code> na Vercel → Settings → Environment Variables e faça redeploy. Sem ela, a sincronização de pedidos e faturamento não funciona.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Erro */}
       {error && (

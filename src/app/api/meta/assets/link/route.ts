@@ -149,8 +149,18 @@ export async function POST(request: NextRequest) {
       if (connErr?.code === "42P01") {
         return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 35 no Supabase." });
       }
-      if (!connRow) {
-        return NextResponse.json({ ok: false, reason: "connection_not_found", message: "Conexão Meta não encontrada." }, { status: 404 });
+      // Se há erro de DB (não-42P01): não bloqueia — o upsert tentará com adminDb
+      // Se não há erro e não há linha: conexão realmente não existe
+      if (!connErr && !connRow) {
+        return NextResponse.json({
+          ok: false, reason: "connection_not_found",
+          message: "Conexão Meta não encontrada.",
+          debug: {
+            stage: "verify_meta_connection",
+            meta_connection_id_received: !!meta_connection_id,
+            hasAdminDb: true,
+          },
+        }, { status: 404 });
       }
     }
     // Se sem service role, não bloqueia — policy do SQL 60 já inclui super_admin via session

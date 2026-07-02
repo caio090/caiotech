@@ -156,8 +156,21 @@ function formatDate(iso: string | null | undefined): string {
   } catch { return "—"; }
 }
 
-// ── Modal OlaClick ─────────────────────────────────────────────
+// ── Tipos OlaClick ─────────────────────────────────────────────
 type ClientOption = { id: string; company_name: string; email?: string | null };
+
+type OlaConnectionRow = {
+  id: string;
+  client_id: string;
+  client_name: string | null;
+  client_email: string | null;
+  connection_name: string;
+  token_last_four: string | null;
+  status: string;
+  last_sync_at: string | null;
+  created_at: string | null;
+  notes: string | null;
+};
 
 function OlaClickModal({ onClose, onSaved, clients }: {
   onClose: () => void;
@@ -184,7 +197,7 @@ function OlaClickModal({ onClose, onSaved, clients }: {
         body: JSON.stringify({ client_id: clientId, connection_name: connName, access_token: token, notes }),
       });
       const d = await r.json() as { ok: boolean; reason?: string; message?: string };
-      if (d.ok) { onSaved(); onClose(); }
+      if (d.ok) { onSaved(); }
       else if (d.reason === "sql_pending") { setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase."); }
       else { setError(d.message ?? "Erro ao salvar conexão."); }
     } catch { setError("Erro de rede. Tente novamente."); }
@@ -374,15 +387,33 @@ function ConexoesContent() {
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsTested,  setAccountsTested]  = useState(false);
 
-  const [showOlaModal, setShowOlaModal] = useState(false);
-  const [olaConnected, setOlaConnected] = useState(false);
-  const [olaClients,   setOlaClients]   = useState<ClientOption[]>([]);
+  const [showOlaModal,   setShowOlaModal]   = useState(false);
+  const [olaClients,     setOlaClients]     = useState<ClientOption[]>([]);
+  const [olaConnections, setOlaConnections] = useState<OlaConnectionRow[]>([]);
+  const [olaLoading,     setOlaLoading]     = useState(false);
+  const [olaEnv,         setOlaEnv]         = useState<{ hasBaseUrl: boolean } | null>(null);
 
   const [assets,        setAssets]        = useState<AssetsResponse>(null);
   const [linkingKey,    setLinkingKey]    = useState<string | null>(null); // "fb:{pageId}" ou "ig:{igId}"
   const [linkClientId,  setLinkClientId]  = useState("");
   const [linkSaving,    setLinkSaving]    = useState(false);
   const [linkError,     setLinkError]     = useState("");
+
+  // Carrega conexões OlaClick do banco no mount
+  const loadOlaConnections = useCallback(async () => {
+    setOlaLoading(true);
+    try {
+      const [connRes, envRes] = await Promise.all([
+        fetch("/api/olaclick/connections").then((r) => r.json()) as Promise<{ ok: boolean; connections?: OlaConnectionRow[] }>,
+        fetch("/api/olaclick/env-status").then((r) => r.json()) as Promise<{ ok: boolean; hasBaseUrl?: boolean }>,
+      ]);
+      if (connRes.ok) setOlaConnections(connRes.connections ?? []);
+      if (envRes.ok) setOlaEnv({ hasBaseUrl: envRes.hasBaseUrl ?? false });
+    } catch { /* silent */ }
+    finally { setOlaLoading(false); }
+  }, []);
+
+  useEffect(() => { void loadOlaConnections(); }, [loadOlaConnections]);
 
   // Carrega lista de clientes quando modal OlaClick é aberto OU Meta está conectada
   useEffect(() => {
@@ -1169,76 +1200,119 @@ function ConexoesContent() {
         </div>
 
         {/* ══ Cardápio Digital / OlaClick ═════════════════════ */}
-        <div className={`bg-white rounded-2xl border p-5 ${olaConnected ? "border-orange-100" : "border-gray-100"}`}>
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${olaConnected ? "bg-orange-50" : "bg-gray-50"}`}>
-                <UtensilsCrossed className={`w-5 h-5 ${olaConnected ? "text-orange-500" : "text-gray-400"}`} strokeWidth={1.5} />
+        {(() => {
+          const hasConns = olaConnections.length > 0;
+          return (
+            <div className={`bg-white rounded-2xl border p-5 ${hasConns ? "border-orange-100" : "border-gray-100"}`}>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${hasConns ? "bg-orange-50" : "bg-gray-50"}`}>
+                    <UtensilsCrossed className={`w-5 h-5 ${hasConns ? "text-orange-500" : "text-gray-400"}`} strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Cardápio Digital</p>
+                    <p className="text-xs text-gray-400">OlaClick · Pedidos, produtos e faturamento</p>
+                  </div>
+                </div>
+                {olaLoading
+                  ? <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Verificando…</span>
+                  : hasConns
+                    ? <StatusBadge ok={true} label={`${olaConnections.length} conexão${olaConnections.length > 1 ? "ões" : ""}`} />
+                    : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
+                }
               </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Cardápio Digital</p>
-                <p className="text-xs text-gray-400">OlaClick · Pedidos, produtos e faturamento</p>
+
+              <div className="space-y-1 mb-4 text-xs text-gray-500">
+                <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Cardápio, categorias e produtos</p>
+                <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Pedidos e faturamento do período</p>
+                <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Clientes recorrentes e frequência</p>
+                <p className="flex items-center gap-1.5 text-gray-300"><ChevronRight className="w-3 h-3" />Publicação no cardápio · em breve</p>
               </div>
-            </div>
-            {olaConnected
-              ? <StatusBadge ok={true} label="Conectado" />
-              : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
-            }
-          </div>
 
-          <div className="space-y-1 mb-4 text-xs text-gray-500">
-            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Cardápio, categorias e produtos</p>
-            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Pedidos e faturamento do período</p>
-            <p className="flex items-center gap-1.5"><ChevronRight className="w-3 h-3 text-orange-400" />Clientes recorrentes e frequência</p>
-            <p className="flex items-center gap-1.5 text-gray-300"><ChevronRight className="w-3 h-3" />Publicação no cardápio · em breve</p>
-          </div>
-
-          {/* Grid de status funcionalidades */}
-          <div className="grid grid-cols-3 gap-2 mb-4 pt-3 border-t border-gray-50">
-            {[
-              { label: "Cardápio",   ok: olaConnected },
-              { label: "Pedidos",    ok: false, soon: true },
-              { label: "Faturamento", ok: false, soon: true },
-            ].map(({ label, ok, soon }) => (
-              <div key={label} className="p-2.5 bg-gray-50 rounded-xl">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-                <p className={`text-xs font-medium ${ok ? "text-emerald-600" : "text-gray-400"}`}>
-                  {ok ? "Disponível" : soon ? "Em breve" : "Conectar"}
-                </p>
+              {/* Grid de status */}
+              <div className="grid grid-cols-3 gap-2 mb-4 pt-3 border-t border-gray-50">
+                {[
+                  { label: "Cardápio",    ok: hasConns },
+                  { label: "Pedidos",     ok: false, soon: true },
+                  { label: "Faturamento", ok: false, soon: true },
+                ].map(({ label, ok, soon }) => (
+                  <div key={label} className="p-2.5 bg-gray-50 rounded-xl">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+                    <p className={`text-xs font-medium ${ok ? "text-emerald-600" : "text-gray-400"}`}>
+                      {ok ? "Disponível" : soon ? "Em breve" : "Conectar"}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            {!olaConnected && (
-              <button
-                onClick={() => setShowOlaModal(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-xl transition-colors"
-              >
-                <Link2 className="w-3.5 h-3.5" /> Conectar Cardápio Digital
-              </button>
-            )}
-            {olaConnected && (
-              <>
-                <button className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition-colors">
-                  <RefreshCw className="w-3.5 h-3.5" /> Sincronizar
-                </button>
+              {/* Lista de conexões existentes */}
+              {hasConns && (
+                <div className="mb-4 space-y-2">
+                  {/* Alerta se OLACLICK_API_BASE_URL ausente */}
+                  {olaEnv && !olaEnv.hasBaseUrl && (
+                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+                      <div>
+                        <p className="font-semibold">Integração conectada, mas sincronização indisponível</p>
+                        <p className="mt-0.5 text-amber-600">
+                          Adicione <code className="font-mono bg-amber-100 px-1 rounded">OLACLICK_API_BASE_URL</code> na Vercel e faça redeploy para habilitar faturamento e pedidos.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conexões ativas</p>
+                  {olaConnections.map((conn) => (
+                    <div key={conn.id} className="p-3 bg-orange-50 border border-orange-100 rounded-xl">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-orange-800">
+                            {conn.client_name ?? "Cliente desconhecido"}
+                          </p>
+                          {conn.client_email && (
+                            <p className="text-[10px] text-orange-600">{conn.client_email}</p>
+                          )}
+                          <p className="text-[10px] text-orange-700 mt-0.5">
+                            {conn.connection_name}
+                            {conn.token_last_four && <span className="font-mono ml-1 opacity-60">…{conn.token_last_four}</span>}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Ativo
+                        </span>
+                      </div>
+                      {conn.created_at && (
+                        <p className="text-[10px] text-orange-500 mt-1">
+                          Conectado em {formatDate(conn.created_at)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setShowOlaModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100 px-3 py-1.5 rounded-xl transition-colors"
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors ${
+                    hasConns
+                      ? "text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100"
+                      : "text-white bg-orange-500 hover:bg-orange-600"
+                  }`}
                 >
-                  <Info className="w-3.5 h-3.5" /> Gerenciar
+                  <Link2 className="w-3.5 h-3.5" /> {hasConns ? "Adicionar conexão" : "Conectar Cardápio Digital"}
                 </button>
                 <button
-                  onClick={() => setOlaConnected(false)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 px-3 py-1.5 rounded-xl transition-colors"
+                  onClick={() => void loadOlaConnections()}
+                  disabled={olaLoading}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50"
                 >
-                  <Link2Off className="w-3.5 h-3.5" /> Desconectar
+                  {olaLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Atualizar
                 </button>
-              </>
-            )}
-          </div>
-        </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Separador: Clínica ──────────────────────────────── */}
         <div className="pt-2">
@@ -1286,7 +1360,7 @@ function ConexoesContent() {
       {showOlaModal && (
         <OlaClickModal
           onClose={() => setShowOlaModal(false)}
-          onSaved={() => setOlaConnected(true)}
+          onSaved={() => { setShowOlaModal(false); void loadOlaConnections(); }}
           clients={olaClients}
         />
       )}
