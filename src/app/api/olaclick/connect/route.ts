@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
-import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
+import {
+  createServerSupabaseClient,
+  createSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
+import {
+  CLIENT_VISIBLE_STATUSES,
+  isMissingClientVisibilityColumn,
+  isVisibleClientRecord,
+} from "@/lib/client-visibility";
 
 interface ConnectPayload {
   client_id: string;
@@ -11,15 +19,26 @@ interface ConnectPayload {
 
 const OLA_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 
+function isRpcUnavailable(err: { code?: string; message?: string } | null) {
+  if (!err) return false;
+  const msg = err.message?.toLowerCase() ?? "";
+  return (
+    err.code === "PGRST202" ||
+    msg.includes("could not find the function") ||
+    msg.includes("function public.admin_upsert_olaclick_connection")
+  );
+}
+
 // POST /api/olaclick/connect
-// Salva token OlaClick no banco — nunca retorna token no response.
-// Usa session client por padrão (RLS do SQL 39 inclui super_admin/admin/agency).
-// Admin client só é usado como fallback se sessão falhar.
+// Salva token OlaClick — nunca retorna token no response.
+// Ordem: 1) RPC SECURITY DEFINER  2) service role  3) session client
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -33,24 +52,75 @@ export async function POST(request: NextRequest) {
 
     let body: ConnectPayload;
     try { body = await request.json() as ConnectPayload; }
-    catch { return NextResponse.json({ ok: false, reason: "invalid_body" }, { status: 400 }); }
+    catch {
+      return NextResponse.json({ ok: false, reason: "invalid_body" }, { status: 400 });
+    }
 
     const { client_id, connection_name, access_token, notes } = body;
 
     if (!client_id || !connection_name || !access_token) {
       return NextResponse.json({
-        ok: false,
-        reason: "missing_fields",
+        ok: false, reason: "missing_fields",
         message: "client_id, connection_name e access_token são obrigatórios.",
       }, { status: 400 });
     }
 
-    // ── Valida client_id ─────────────────────────────────────
-    // Usa session client primeiro (RLS permite super_admin/admin/agency).
-    // Fallback para admin client somente se session client retornar erro de permissão.
+    // ── Etapa 1: RPC SECURITY DEFINER (bypassa RLS sem precisar de service role) ──
+    {
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "admin_upsert_olaclick_connection",
+        {
+          p_client_id:       client_id,
+          p_connection_name: connection_name,
+          p_access_token:    access_token,
+          p_notes:           notes ?? null,
+        }
+      );
+
+      if (!rpcError) {
+        const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+        return NextResponse.json({
+          ok: true,
+          id:             row?.id,
+          token_last_four: row?.token_last_four,
+          via:            "rpc",
+        });
+      }
+
+      // Se RPC não existe ainda (SQL 60 não rodado), usa fallback
+      if (isRpcUnavailable(rpcError)) {
+        console.warn("[api/olaclick/connect] RPC indisponivel, usando fallback direto");
+      } else if (rpcError.code === "P0001") {
+        return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
+      } else if (rpcError.code === "P0002") {
+        return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+      } else if (rpcError.code === "P0003") {
+        return NextResponse.json({
+          ok: false, reason: "client_not_found",
+          message: "Cliente não encontrado no banco.",
+        }, { status: 404 });
+      } else if (rpcError.code === "P0004") {
+        return NextResponse.json({
+          ok: false, reason: "client_not_active",
+          message: "Cliente encontrado mas não está ativo ou em onboarding.",
+        }, { status: 404 });
+      } else {
+        // Erro inesperado na RPC — loga sem expor token
+        console.error("[api/olaclick/connect] erro na RPC", {
+          stage: "rpc_admin_upsert_olaclick_connection",
+          client_id,
+          supabaseErrorCode: rpcError.code,
+          supabaseErrorMessage: rpcError.message,
+        });
+        // Continua para fallback direto
+      }
+    }
+
+    // ── Etapa 2: Fallback — valida client e insere diretamente ──
     const serviceRolePresent = hasSupabaseServiceRoleKey();
 
-    const runClientQuery = async (db: Awaited<ReturnType<typeof createServerSupabaseClient>>) => {
+    // Valida cliente — session client primeiro, admin como fallback
+    const runClientQuery = async (db: typeof supabase) => {
       let r = await db
         .from("clients")
         .select("id, status, deleted_at, archived_at")
@@ -60,7 +130,6 @@ export async function POST(request: NextRequest) {
         .is("archived_at", null)
         .maybeSingle();
       if (r.error && isMissingClientVisibilityColumn(r.error)) {
-        // Coluna deleted_at/archived_at não existe ainda — usa query sem essas colunas
         r = await db
           .from("clients")
           .select("id, status")
@@ -72,82 +141,110 @@ export async function POST(request: NextRequest) {
     };
 
     let clientResult = await runClientQuery(supabase);
-
-    // Se session client falhou (não é "nenhum resultado"), tenta admin client
     if (clientResult.error && serviceRolePresent) {
       try {
         const adminDb = createSupabaseAdminClient();
-        const adminResult = await runClientQuery(adminDb as unknown as Awaited<ReturnType<typeof createServerSupabaseClient>>);
-        if (!adminResult.error) clientResult = adminResult;
-      } catch { /* usa resultado da session */ }
+        const r = await runClientQuery(adminDb as unknown as typeof supabase);
+        if (!r.error) clientResult = r;
+      } catch { /* mantém resultado da sessão */ }
     }
 
     const { data: client, error: clientErr } = clientResult;
-
     if (clientErr?.code === "42P01") {
       return NextResponse.json({
-        ok: false,
-        reason: "sql_pending",
+        ok: false, reason: "sql_pending",
         message: "Tabela clients indisponível. Rode os SQLs base no Supabase.",
       });
     }
     if (clientErr) {
-      console.error("[api/olaclick/connect] erro ao buscar cliente", { client_id, supabaseError: clientErr });
+      console.error("[api/olaclick/connect] erro ao buscar cliente", {
+        stage: "client_lookup",
+        client_id,
+        supabaseErrorCode: clientErr.code,
+        supabaseErrorMessage: clientErr.message,
+      });
       return NextResponse.json({
-        ok: false,
-        reason: "db_error",
-        message: `Erro ao verificar cliente: ${clientErr.message}`,
+        ok: false, reason: "db_error",
+        message: `Erro ao verificar cliente (${clientErr.code}): ${clientErr.message}`,
       }, { status: 500 });
     }
     if (!client || !isVisibleClientRecord(client)) {
       return NextResponse.json({
-        ok: false,
-        reason: "client_not_found",
-        message: "Cliente não encontrado no banco. Confirme se o cliente tem status ativo e não está arquivado.",
+        ok: false, reason: "client_not_found",
+        message: "Cliente não encontrado ou inativo. Confirme status ativo/onboarding.",
       }, { status: 404 });
     }
 
-    // ── Salva conexão OlaClick ───────────────────────────────
     const token_last_four = access_token.length >= 4 ? access_token.slice(-4) : "****";
 
-    // Usa session client para o insert (RLS admin_all_olaclick permite super_admin/admin/agency).
-    const { data, error } = await supabase
+    // Insere na tabela — tenta session client (SQL 59/60 permitem super_admin),
+    // depois service role como fallback
+    const insertPayload = {
+      client_id,
+      connection_name,
+      access_token,
+      token_last_four,
+      notes:      notes ?? null,
+      created_by: user.id,
+      status:     "connected",
+      scopes:     ["menu:read", "orders:read", "clients:read", "companies:read"],
+    } as const;
+
+    let insertResult = await supabase
       .from("olaclick_connections")
-      .insert({
-        client_id,
-        connection_name,
-        access_token,
-        token_last_four,
-        notes:      notes ?? null,
-        created_by: user.id,
-        status:     "connected",
-        scopes:     ["menu:read", "orders:read", "clients:read", "companies:read"],
-      })
+      .insert(insertPayload)
       .select("id, connection_name, token_last_four, status")
       .single();
 
-    if (error?.code === "42P01") {
+    // Se session bloqueou por RLS, tenta service role
+    if (insertResult.error && serviceRolePresent) {
+      try {
+        const adminDb = createSupabaseAdminClient();
+        insertResult = await adminDb
+          .from("olaclick_connections")
+          .insert(insertPayload)
+          .select("id, connection_name, token_last_four, status")
+          .single() as typeof insertResult;
+      } catch { /* mantém erro original */ }
+    }
+
+    const { data: insertData, error: insertError } = insertResult;
+
+    if (insertError?.code === "42P01") {
       return NextResponse.json({
-        ok: false,
-        reason: "sql_pending",
-        message: "Rode o SQL 39 no Supabase para criar a tabela olaclick_connections.",
+        ok: false, reason: "sql_pending",
+        message: "Tabela olaclick_connections não existe. Rode o SQL 39 no Supabase.",
       });
     }
-    if (error) {
+    if (insertError) {
       console.error("[api/olaclick/connect] erro ao salvar conexao", {
-        role: profile?.role ?? null,
+        stage: "insert_olaclick_connections",
+        table: "olaclick_connections",
         client_id,
+        role: profile?.role ?? null,
         serviceRolePresent,
-        supabaseError: error,
+        supabaseErrorCode: insertError.code,
+        supabaseErrorMessage: insertError.message,
       });
       return NextResponse.json({
         ok: false,
         reason: "db_error",
-        message: "Não foi possível salvar a conexão. Verifique permissões do banco (SQL 39) ou SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+        stage: "insert_olaclick_connections",
+        table: "olaclick_connections",
+        supabaseErrorCode:    insertError.code,
+        supabaseErrorMessage: insertError.message,
+        message:
+          "Não foi possível salvar a conexão. " +
+          "Rode o SQL 60 no Supabase para corrigir permissões e criar as RPCs.",
       }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, id: data?.id, token_last_four });
+    return NextResponse.json({
+      ok: true,
+      id:             insertData?.id,
+      token_last_four: insertData?.token_last_four,
+      via:            "direct",
+    });
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
@@ -168,9 +265,7 @@ export async function DELETE(request: NextRequest) {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
 
-    // Usa session client (RLS permite); admin client como fallback
-    let error = (await supabase.from("olaclick_connections").delete().eq("id", id)).error;
-
+    let { error } = await supabase.from("olaclick_connections").delete().eq("id", id);
     if (error && hasSupabaseServiceRoleKey()) {
       try {
         const adminDb = createSupabaseAdminClient();
@@ -179,15 +274,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (error) {
-      console.error("[api/olaclick/connect DELETE] erro ao remover conexao", {
-        role: profile?.role ?? null,
-        supabaseError: error,
-      });
-      return NextResponse.json({
-        ok: false,
-        reason: "db_error",
-        message: "Não foi possível remover a conexão.",
-      }, { status: 500 });
+      return NextResponse.json({ ok: false, reason: "db_error", message: "Não foi possível remover a conexão." }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
