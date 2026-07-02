@@ -177,14 +177,16 @@ function OlaClickModal({ onClose, onSaved, clients }: {
   onSaved: () => void;
   clients: ClientOption[];
 }) {
-  const [clientId,   setClientId]   = useState("");
-  const [connName,   setConnName]   = useState("");
-  const [token,      setToken]      = useState("");
-  const [notes,      setNotes]      = useState("");
-  const [showToken,  setShowToken]  = useState(false);
-  const [showSteps,  setShowSteps]  = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [error,      setError]      = useState("");
+  const [clientId,    setClientId]    = useState("");
+  const [connName,    setConnName]    = useState("");
+  const [token,       setToken]       = useState("");
+  const [apiBaseUrl,  setApiBaseUrl]  = useState("");
+  const [notes,       setNotes]       = useState("");
+  const [showToken,   setShowToken]   = useState(false);
+  const [showSteps,   setShowSteps]   = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState("");
 
   async function handleSave() {
     if (!clientId || !connName || !token) { setError("Preencha todos os campos obrigatórios."); return; }
@@ -194,7 +196,13 @@ function OlaClickModal({ onClose, onSaved, clients }: {
       const r = await fetch("/api/olaclick/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId, connection_name: connName, access_token: token, notes }),
+        body: JSON.stringify({
+          client_id:      clientId,
+          connection_name: connName,
+          access_token:   token,
+          api_base_url:   apiBaseUrl.trim() || undefined,
+          notes,
+        }),
       });
       const d = await r.json() as { ok: boolean; reason?: string; message?: string };
       if (d.ok) { onSaved(); }
@@ -290,6 +298,35 @@ function OlaClickModal({ onClose, onSaved, clients }: {
             <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
               <Lock className="w-2.5 h-2.5" />Token salvo criptografado. Não aparece em tela após salvar.
             </p>
+          </div>
+
+          {/* URL da API — campo avançado opcional */}
+          <div className="border border-gray-100 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <span className="text-xs font-semibold text-gray-700">Configurações avançadas</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </button>
+            {showAdvanced && (
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">URL da API do provedor</label>
+                  <input
+                    type="url"
+                    value={apiBaseUrl}
+                    onChange={(e) => setApiBaseUrl(e.target.value)}
+                    placeholder="Use apenas se o provedor exigir uma URL específica"
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 font-mono"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Para OlaClick deixe em branco. Necessário apenas se o provedor tiver uma URL personalizada.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Observações */}

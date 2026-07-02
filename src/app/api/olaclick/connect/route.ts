@@ -14,6 +14,7 @@ interface ConnectPayload {
   client_id: string;
   connection_name: string;
   access_token: string;
+  api_base_url?: string;
   notes?: string;
 }
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, reason: "invalid_body" }, { status: 400 });
     }
 
-    const { client_id, connection_name, access_token, notes } = body;
+    const { client_id, connection_name, access_token, api_base_url, notes } = body;
 
     if (!client_id || !connection_name || !access_token) {
       return NextResponse.json({
@@ -65,7 +66,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Etapa 1: RPC SECURITY DEFINER (bypassa RLS sem precisar de service role) ──
+    const cleanBaseUrl = api_base_url?.trim() || null;
+
+    // ── Etapa 1: RPC SECURITY DEFINER ──
     {
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         "admin_upsert_olaclick_connection",
@@ -74,6 +77,7 @@ export async function POST(request: NextRequest) {
           p_connection_name: connection_name,
           p_access_token:    access_token,
           p_notes:           notes ?? null,
+          p_api_base_url:    cleanBaseUrl,
         }
       );
 
@@ -81,13 +85,12 @@ export async function POST(request: NextRequest) {
         const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
         return NextResponse.json({
           ok: true,
-          id:             row?.id,
+          id:              row?.id,
           token_last_four: row?.token_last_four,
-          via:            "rpc",
+          via:             "rpc",
         });
       }
 
-      // Se RPC não existe ainda (SQL 60 não rodado), usa fallback
       if (isRpcUnavailable(rpcError)) {
         console.warn("[api/olaclick/connect] RPC indisponivel, usando fallback direto");
       } else if (rpcError.code === "P0001") {
@@ -105,21 +108,18 @@ export async function POST(request: NextRequest) {
           message: "Cliente encontrado mas não está ativo ou em onboarding.",
         }, { status: 404 });
       } else {
-        // Erro inesperado na RPC — loga sem expor token
         console.error("[api/olaclick/connect] erro na RPC", {
           stage: "rpc_admin_upsert_olaclick_connection",
           client_id,
           supabaseErrorCode: rpcError.code,
           supabaseErrorMessage: rpcError.message,
         });
-        // Continua para fallback direto
       }
     }
 
-    // ── Etapa 2: Fallback — valida client e insere diretamente ──
+    // ── Etapa 2: Fallback direto ──
     const serviceRolePresent = hasSupabaseServiceRoleKey();
 
-    // Valida cliente — session client primeiro, admin como fallback
     const runClientQuery = async (db: typeof supabase) => {
       let r = await db
         .from("clients")
@@ -177,17 +177,16 @@ export async function POST(request: NextRequest) {
 
     const token_last_four = access_token.length >= 4 ? access_token.slice(-4) : "****";
 
-    // Insere na tabela — tenta session client (SQL 59/60 permitem super_admin),
-    // depois service role como fallback
     const insertPayload = {
       client_id,
       connection_name,
       access_token,
       token_last_four,
-      notes:      notes ?? null,
-      created_by: user.id,
-      status:     "connected",
-      scopes:     ["menu:read", "orders:read", "clients:read", "companies:read"],
+      api_base_url:  cleanBaseUrl,
+      notes:         notes ?? null,
+      created_by:    user.id,
+      status:        "connected",
+      scopes:        ["menu:read", "orders:read", "clients:read", "companies:read"],
     } as const;
 
     let insertResult = await supabase
@@ -196,7 +195,6 @@ export async function POST(request: NextRequest) {
       .select("id, connection_name, token_last_four, status")
       .single();
 
-    // Se session bloqueou por RLS, tenta service role
     if (insertResult.error && serviceRolePresent) {
       try {
         const adminDb = createSupabaseAdminClient();
@@ -241,9 +239,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      id:             insertData?.id,
+      id:              insertData?.id,
       token_last_four: insertData?.token_last_four,
-      via:            "direct",
+      via:             "direct",
     });
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });

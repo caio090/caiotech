@@ -147,8 +147,8 @@ export default function FaturamentoPage() {
           setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase.");
         } else if (d.reason === "not_connected") {
           setError("Cliente sem conexão OláClick ativa. Conecte em Conexões > Cardápio Digital.");
-        } else if (d.reason === "env_missing" || d.configured === false) {
-          setError("OLACLICK_API_BASE_URL não configurada no servidor. Configure na Vercel e faça redeploy.");
+        } else if (d.reason === "base_url_missing" || d.reason === "env_missing" || d.configured === false) {
+          setError("URL da API do provedor não configurada para este cliente. Edite a conexão em /admin/conexoes e preencha o campo 'URL da API do provedor'.");
         } else if (d.reason === "api_error") {
           setError("Não foi possível buscar dados do OláClick. Verifique token, cliente e endpoint.");
         } else {
@@ -260,19 +260,21 @@ export default function FaturamentoPage() {
         )}
       </div>
 
-      {/* Diagnóstico de env (OLACLICK_API_BASE_URL ausente) */}
+      {/* Aviso de URL da API não configurada — orienta /admin/conexoes, não Vercel */}
       {isConnected && envStatus && !envStatus.hasBaseUrl && (
         <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
             <div className="space-y-1">
-              <p className="font-semibold text-amber-800">Integração conectada, mas API não configurada</p>
+              <p className="font-semibold text-amber-800">Integração conectada, mas URL da API não configurada</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">Token: salvo ✓</span>
-                <span className="text-[10px] bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded-full">API Base URL: ausente ✗</span>
+                <span className="text-[10px] bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded-full">URL da API: ausente ✗</span>
               </div>
               <p className="mt-1 text-amber-600">
-                Adicione <code className="font-mono bg-amber-100 px-1 rounded">OLACLICK_API_BASE_URL</code> na Vercel → Settings → Environment Variables e faça redeploy. Sem ela, a sincronização de pedidos e faturamento não funciona.
+                Edite a conexão em{" "}
+                <Link href="/admin/conexoes" className="underline font-bold">Conexões → Cardápio Digital</Link>
+                {" "}e preencha o campo <strong>URL da API do provedor</strong>.
               </p>
             </div>
           </div>

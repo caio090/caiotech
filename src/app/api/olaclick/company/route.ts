@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveOlaClickBaseUrl, OLACLICK_BASE_URL_MISSING_RESPONSE } from "@/lib/olaclick";
 
 // GET /api/olaclick/company?client_id=...
 // Retorna dados da empresa no OlaClick — nunca expõe access_token.
-// Se OLACLICK_API_BASE_URL não configurada, retorna estrutura preparada.
 export async function GET(request: NextRequest) {
-  const baseUrl  = process.env.OLACLICK_API_BASE_URL?.trim();
   const clientId = new URL(request.url).searchParams.get("client_id");
-
   if (!clientId) return NextResponse.json({ ok: false, reason: "missing_client_id" }, { status: 400 });
-
-  if (!baseUrl) {
-    return NextResponse.json({
-      ok:         false,
-      configured: false,
-      reason:     "env_missing",
-      message:    "OLACLICK_API_BASE_URL não configurada.",
-    });
-  }
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -26,13 +15,16 @@ export async function GET(request: NextRequest) {
 
     const { data: conn, error } = await supabase
       .from("olaclick_connections")
-      .select("access_token")
+      .select("access_token, api_base_url")
       .eq("client_id", clientId)
       .eq("status", "connected")
       .maybeSingle();
 
     if (error?.code === "42P01") return NextResponse.json({ ok: false, reason: "sql_pending" });
     if (!conn) return NextResponse.json({ ok: false, reason: "not_connected" });
+
+    const baseUrl = resolveOlaClickBaseUrl(conn);
+    if (!baseUrl) return NextResponse.json(OLACLICK_BASE_URL_MISSING_RESPONSE);
 
     const r = await fetch(`${baseUrl}/companies`, {
       headers: { Authorization: `Bearer ${conn.access_token}` },
