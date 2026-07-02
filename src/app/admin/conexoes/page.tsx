@@ -156,12 +156,16 @@ function formatDate(iso: string | null | undefined): string {
   } catch { return "—"; }
 }
 
-// ── Tipos OlaClick ─────────────────────────────────────────────
+// ── Tipos Cardápio Digital ──────────────────────────────────────
 type ClientOption = { id: string; company_name: string; email?: string | null };
 
-type OlaConnectionRow = {
+// Representa uma conexão de provedor de Cardápio Digital.
+// Tabela: olaclick_connections (provider_slug = 'olaclick' por padrão).
+// No futuro pode vir de digital_menu_connections para outros provedores.
+type DigitalMenuConnectionRow = {
   id: string;
   client_id: string;
+  provider: string;          // 'olaclick' | 'anotaai' | ...
   client_name: string | null;
   client_email: string | null;
   connection_name: string;
@@ -172,11 +176,18 @@ type OlaConnectionRow = {
   notes: string | null;
 };
 
-function OlaClickModal({ onClose, onSaved, clients }: {
+// Provedores disponíveis de Cardápio Digital
+const DIGITAL_MENU_PROVIDERS = [
+  { slug: "olaclick", name: "OlaClick" },
+  // futuros: { slug: "anotaai", name: "Anota AI" }, { slug: "deliverydireto", name: "Delivery Direto" }
+] as const;
+
+function DigitalMenuModal({ onClose, onSaved, clients }: {
   onClose: () => void;
   onSaved: () => void;
   clients: ClientOption[];
 }) {
+  const [providerSlug, setProviderSlug] = useState<string>(DIGITAL_MENU_PROVIDERS[0].slug);
   const [clientId,    setClientId]    = useState("");
   const [connName,    setConnName]    = useState("");
   const [token,       setToken]       = useState("");
@@ -188,6 +199,8 @@ function OlaClickModal({ onClose, onSaved, clients }: {
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState("");
 
+  const selectedProvider = DIGITAL_MENU_PROVIDERS.find((p) => p.slug === providerSlug) ?? DIGITAL_MENU_PROVIDERS[0];
+
   async function handleSave() {
     if (!clientId || !connName || !token) { setError("Preencha todos os campos obrigatórios."); return; }
     setSaving(true);
@@ -197,10 +210,10 @@ function OlaClickModal({ onClose, onSaved, clients }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id:      clientId,
+          client_id:       clientId,
           connection_name: connName,
-          access_token:   token,
-          api_base_url:   apiBaseUrl.trim() || undefined,
+          access_token:    token,
+          api_base_url:    apiBaseUrl.trim() || undefined,
           notes,
         }),
       });
@@ -223,7 +236,7 @@ function OlaClickModal({ onClose, onSaved, clients }: {
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900">Conectar Cardápio Digital</p>
-              <p className="text-[10px] text-gray-400">via OlaClick</p>
+              <p className="text-[10px] text-gray-400">via {selectedProvider.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -238,6 +251,20 @@ function OlaClickModal({ onClose, onSaved, clients }: {
             <p className="text-[10px] text-amber-700">
               Se o token apareceu em print ou conversa, revogue e gere outro no OlaClick antes de conectar.
             </p>
+          </div>
+
+          {/* Provedor */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Provedor <span className="text-red-500">*</span></label>
+            <select
+              value={providerSlug}
+              onChange={(e) => setProviderSlug(e.target.value)}
+              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 bg-white"
+            >
+              {DIGITAL_MENU_PROVIDERS.map((p) => (
+                <option key={p.slug} value={p.slug}>{p.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Cliente */}
@@ -278,13 +305,13 @@ function OlaClickModal({ onClose, onSaved, clients }: {
 
           {/* Token */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Token OlaClick <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Token / API Key — {selectedProvider.name} <span className="text-red-500">*</span></label>
             <div className="relative">
               <input
                 type={showToken ? "text" : "password"}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Cole o token gerado no OlaClick"
+                placeholder={`Cole o token gerado no ${selectedProvider.name}`}
                 className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 pr-10 outline-none focus:border-orange-400 font-mono"
               />
               <button
@@ -347,7 +374,7 @@ function OlaClickModal({ onClose, onSaved, clients }: {
               onClick={() => setShowSteps((v) => !v)}
               className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
             >
-              <span className="text-xs font-semibold text-gray-700">Como gerar token no OlaClick</span>
+              <span className="text-xs font-semibold text-gray-700">Como gerar token no {selectedProvider.name}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showSteps ? "rotate-180" : ""}`} />
             </button>
             {showSteps && (
@@ -426,7 +453,7 @@ function ConexoesContent() {
 
   const [showOlaModal,   setShowOlaModal]   = useState(false);
   const [olaClients,     setOlaClients]     = useState<ClientOption[]>([]);
-  const [olaConnections, setOlaConnections] = useState<OlaConnectionRow[]>([]);
+  const [olaConnections, setOlaConnections] = useState<DigitalMenuConnectionRow[]>([]);
   const [olaLoading,     setOlaLoading]     = useState(false);
   const [olaEnv,         setOlaEnv]         = useState<{ hasBaseUrl: boolean } | null>(null);
 
@@ -441,7 +468,7 @@ function ConexoesContent() {
     setOlaLoading(true);
     try {
       const [connRes, envRes] = await Promise.all([
-        fetch("/api/olaclick/connections").then((r) => r.json()) as Promise<{ ok: boolean; connections?: OlaConnectionRow[] }>,
+        fetch("/api/olaclick/connections").then((r) => r.json()) as Promise<{ ok: boolean; connections?: DigitalMenuConnectionRow[] }>,
         fetch("/api/olaclick/env-status").then((r) => r.json()) as Promise<{ ok: boolean; hasBaseUrl?: boolean }>,
       ]);
       if (connRes.ok) setOlaConnections(connRes.connections ?? []);
@@ -1254,7 +1281,7 @@ function ConexoesContent() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-800">Cardápio Digital</p>
-                    <p className="text-xs text-gray-400">OlaClick · Pedidos, produtos e faturamento</p>
+                    <p className="text-xs text-gray-400">OlaClick e outros · Pedidos, produtos e faturamento</p>
                   </div>
                 </div>
                 {olaLoading
@@ -1296,9 +1323,9 @@ function ConexoesContent() {
                     <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
                       <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
                       <div>
-                        <p className="font-semibold">Integração conectada, mas sincronização indisponível</p>
+                        <p className="font-semibold">URL da API do provedor não configurada</p>
                         <p className="mt-0.5 text-amber-600">
-                          Adicione <code className="font-mono bg-amber-100 px-1 rounded">OLACLICK_API_BASE_URL</code> na Vercel e faça redeploy para habilitar faturamento e pedidos.
+                          Edite a conexão e preencha o campo <strong>URL da API do provedor</strong> em Configurações avançadas para habilitar faturamento e pedidos.
                         </p>
                       </div>
                     </div>
@@ -1315,6 +1342,7 @@ function ConexoesContent() {
                             <p className="text-[10px] text-orange-600">{conn.client_email}</p>
                           )}
                           <p className="text-[10px] text-orange-700 mt-0.5">
+                            <span className="font-semibold uppercase tracking-wide text-orange-500 mr-1">{conn.provider ?? "olaclick"}</span>
                             {conn.connection_name}
                             {conn.token_last_four && <span className="font-mono ml-1 opacity-60">…{conn.token_last_four}</span>}
                           </p>
@@ -1401,7 +1429,7 @@ function ConexoesContent() {
 
       {/* Modal OlaClick */}
       {showOlaModal && (
-        <OlaClickModal
+        <DigitalMenuModal
           onClose={() => setShowOlaModal(false)}
           onSaved={() => { setShowOlaModal(false); void loadOlaConnections(); }}
           clients={olaClients}

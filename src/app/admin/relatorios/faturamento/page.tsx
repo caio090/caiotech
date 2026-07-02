@@ -18,13 +18,14 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 
 interface ClientOption { id: string; company_name: string }
 
-interface OlaClickStatus {
+interface DigitalMenuStatus {
   ok: boolean;
   configured?: boolean;
   reason?: string;
   message?: string;
   connection?: {
     id: string;
+    provider?: string | null;       // 'olaclick' | 'anotaai' | ...
     connection_name?: string | null;
     token_last_four?: string | null;
     last_sync_at?: string | null;
@@ -82,7 +83,7 @@ export default function FaturamentoPage() {
   const [clients,       setClients]       = useState<ClientOption[]>([]);
   const [clientId,      setClientId]      = useState("");
   const [period,        setPeriod]        = useState<PeriodKey>("7dias");
-  const [status,        setStatus]        = useState<OlaClickStatus | null>(null);
+  const [status,        setStatus]        = useState<DigitalMenuStatus | null>(null);
   const [report,        setReport]        = useState<ReportData | null>(null);
   const [loading,       setLoading]       = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -111,14 +112,14 @@ export default function FaturamentoPage() {
     })();
   }, []);
 
-  // Carrega status da conexão OláClick
+  // Carrega status da conexão de Cardápio Digital
   const loadStatus = useCallback(async (cid: string) => {
     if (!cid) return;
     setLoadingStatus(true);
     setStatus(null);
     try {
       const r = await fetch(`/api/olaclick/status?client_id=${cid}`);
-      const d = await r.json() as OlaClickStatus;
+      const d = await r.json() as DigitalMenuStatus;
       setStatus(d);
     } catch {
       setStatus({ ok: false, reason: "error", message: "Não foi possível verificar o status da conexão." });
@@ -146,18 +147,18 @@ export default function FaturamentoPage() {
         if (d.reason === "sql_pending") {
           setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase.");
         } else if (d.reason === "not_connected") {
-          setError("Cliente sem conexão OláClick ativa. Conecte em Conexões > Cardápio Digital.");
+          setError("Cliente sem conexão Cardápio Digital ativa. Conecte em Conexões > Cardápio Digital.");
         } else if (d.reason === "base_url_missing" || d.reason === "env_missing" || d.configured === false) {
           setError("URL da API do provedor não configurada para este cliente. Edite a conexão em /admin/conexoes e preencha o campo 'URL da API do provedor'.");
         } else if (d.reason === "api_error") {
-          setError("Não foi possível buscar dados do OláClick. Verifique token, cliente e endpoint.");
+          setError("Não foi possível buscar dados do Cardápio Digital. Verifique token, cliente e endpoint.");
         } else {
-          setError(d.message ?? "Não foi possível buscar dados do OláClick. Verifique token, cliente e endpoint.");
+          setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital. Verifique token, cliente e endpoint.");
         }
         return;
       }
 
-      // A API retorna dados brutos do OláClick — parsear conforme endpoint real
+      // A API retorna dados brutos do provedor — parsear conforme endpoint real
       // Por ora, exibe o que vier disponível
       const raw = d.data as Record<string, unknown> | null | undefined;
       setReport({
@@ -185,7 +186,7 @@ export default function FaturamentoPage() {
     <div>
       <PageHeader
         title="Faturamento"
-        description="Relatório comercial via OláClick"
+        description="Relatório de faturamento — Cardápio Digital"
       >
         <button
           onClick={() => void loadReport()}
@@ -236,12 +237,13 @@ export default function FaturamentoPage() {
                         "bg-amber-50 border-amber-100 text-amber-700"
       }`}>
         {loadingStatus ? (
-          <><Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" /> Verificando conexão OláClick…</>
+          <><Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" /> Verificando conexão Cardápio Digital…</>
         ) : isConnected ? (
           <>
             <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold">Conectado</span>
+              <span className="font-semibold">Cardápio Digital conectado</span>
+              {status.connection?.provider && <span className="ml-1 text-emerald-600 font-medium uppercase text-[10px]">· {status.connection.provider}</span>}
               {status.connection?.connection_name && <span> · {status.connection.connection_name}</span>}
               {status.connection?.token_last_four && <span className="font-mono ml-1">…{status.connection.token_last_four}</span>}
               {lastSync && <span className="ml-2 text-emerald-600">· Última sync: {fmtDate(lastSync)}</span>}
@@ -252,7 +254,7 @@ export default function FaturamentoPage() {
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold">
-                {selectedClient ? `${selectedClient.company_name} sem conexão OláClick.` : "Selecione um cliente."}
+                {selectedClient ? `${selectedClient.company_name} sem conexão Cardápio Digital.` : "Selecione um cliente."}
               </span>{" "}
               <Link href="/admin/conexoes" className="underline font-bold">Conectar em Conexões →</Link>
             </div>
@@ -307,9 +309,9 @@ export default function FaturamentoPage() {
       {!isConnected && !loadingStatus && !error && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 text-center">
           <Link2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-gray-600 mb-1">Sem conexão OláClick</p>
+          <p className="text-sm font-semibold text-gray-600 mb-1">Sem conexão Cardápio Digital</p>
           <p className="text-xs text-gray-400 mb-4">
-            Conecte o cliente ao OláClick para ver o faturamento real.
+            Conecte o cliente ao Cardápio Digital para ver o faturamento real.
           </p>
           <Link href="/admin/conexoes" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
             <Link2 className="w-4 h-4" /> Ir para Conexões
@@ -320,7 +322,7 @@ export default function FaturamentoPage() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin" /> Buscando dados do OláClick…
+          <Loader2 className="w-5 h-5 animate-spin" /> Buscando dados do Cardápio Digital…
         </div>
       )}
 
