@@ -442,6 +442,16 @@ function DigitalMenuEditModal({ conn, onClose, onSaved }: {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState("");
+  const [testing,     setTesting]     = useState(false);
+  const [testResult,  setTestResult]  = useState<{
+    ok: boolean;
+    message?: string;
+    reason?: string;
+    code?: string;
+    httpStatus?: number | null;
+    providerErrorMessage?: string | null;
+    endpoint?: string;
+  } | null>(null);
 
   async function handleSave() {
     if (!connName.trim()) { setError("Nome da conexão é obrigatório."); return; }
@@ -468,6 +478,25 @@ function DigitalMenuEditModal({ conn, onClose, onSaved }: {
   }
 
   const providerName = conn.provider === "olaclick" ? "OlaClick" : conn.provider;
+
+  async function handleTest() {
+    setTesting(true);
+    setTestResult(null);
+    setError("");
+    try {
+      const r = await fetch("/api/olaclick/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: conn.client_id }),
+      });
+      const d = await r.json() as typeof testResult;
+      setTestResult(d);
+    } catch {
+      setTestResult({ ok: false, reason: "network_error", message: "Erro de rede ao testar conexão." });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -575,6 +604,30 @@ function DigitalMenuEditModal({ conn, onClose, onSaved }: {
               rows={2}
               className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-orange-400"
             />
+          </div>
+
+          {/* Testar conexão */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => void handleTest()}
+              disabled={testing || saving}
+              className="w-full py-2.5 border border-orange-200 text-orange-700 text-xs font-medium rounded-xl hover:bg-orange-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              {testing ? "Testando..." : "Testar conexão"}
+            </button>
+
+            {testResult && (
+              <div className={`mt-2 p-3 rounded-xl text-xs space-y-0.5 ${testResult.ok ? "bg-emerald-50 border border-emerald-100 text-emerald-700" : "bg-red-50 border border-red-100 text-red-700"}`}>
+                <p className="font-semibold">{testResult.ok ? "✓ Conexão funcionando" : `✗ ${testResult.message ?? "Falha na conexão"}`}</p>
+                {!testResult.ok && testResult.endpoint   && <p className="text-[10px] text-gray-500">Endpoint: {testResult.endpoint}</p>}
+                {!testResult.ok && testResult.httpStatus != null && <p className="text-[10px] text-gray-500">HTTP Status: {testResult.httpStatus ?? "—"}</p>}
+                {!testResult.ok && testResult.providerErrorMessage && (
+                  <p className="text-[10px] text-gray-500 font-mono break-all">{testResult.providerErrorMessage}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (

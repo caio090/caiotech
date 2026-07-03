@@ -43,6 +43,10 @@ interface OrdersResult {
   code?: string;
   connectionFound?: boolean;
   provider?: string;
+  baseUrlResolved?: boolean;
+  endpoint?: string;
+  httpStatus?: number | null;
+  providerErrorMessage?: string | null;
   message?: string;
   data?: unknown;
 }
@@ -94,6 +98,7 @@ export default function FaturamentoPage() {
   const [loading,        setLoading]        = useState(false);
   const [loadingStatus,  setLoadingStatus]  = useState(false);
   const [error,          setError]          = useState<string | null>(null);
+  const [apiDiag,        setApiDiag]        = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
   const [missingBaseUrl, setMissingBaseUrl] = useState(false);
   const [lastSync,       setLastSync]       = useState<string | null>(null);
   const [envStatus,      setEnvStatus]      = useState<{ hasBaseUrl: boolean } | null>(null);
@@ -146,12 +151,21 @@ export default function FaturamentoPage() {
     setError(null);
     setReport(null);
     setMissingBaseUrl(false);
+    setApiDiag(null);
 
     try {
       const r = await fetch(`/api/olaclick/orders?client_id=${clientId}&period=${period}`);
       const d = await r.json() as OrdersResult;
 
       if (!d.ok) {
+        const diag = {
+          provider: d.provider,
+          endpoint: d.endpoint,
+          httpStatus: d.httpStatus,
+          providerErrorMessage: d.providerErrorMessage,
+          period,
+        };
+
         if (d.reason === "sql_pending") {
           setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase.");
         } else if (
@@ -160,15 +174,31 @@ export default function FaturamentoPage() {
           d.reason === "env_missing" ||
           d.configured === false
         ) {
-          // Conexão existe mas URL do provedor não está configurada
           setError(null);
           setMissingBaseUrl(true);
         } else if (d.reason === "not_connected" || d.code === "no_digital_menu_connection") {
           setError("Cliente sem conexão Cardápio Digital ativa. Conecte em Conexões → Cardápio Digital.");
-        } else if (d.reason === "api_error" || d.code === "provider_api_error") {
-          setError("Não foi possível buscar dados do Cardápio Digital. Verifique token, cliente e endpoint.");
+        } else if (d.reason === "token_invalid" || d.code === "provider_unauthorized") {
+          setError("A API recusou a chave do provider. Verifique o token/API Key da conexão em Gerenciar.");
+          setApiDiag(diag);
+        } else if (d.reason === "forbidden" || d.code === "provider_forbidden") {
+          setError("A API respondeu sem permissão para consultar pedidos.");
+          setApiDiag(diag);
+        } else if (d.reason === "endpoint_not_found" || d.code === "provider_endpoint_not_found") {
+          setError("Endpoint de pedidos não encontrado. Verifique o adapter OlaClick.");
+          setApiDiag(diag);
+        } else if (d.reason === "bad_params" || d.code === "provider_bad_request") {
+          setError("A API recusou os filtros do período. Ajuste os parâmetros enviados.");
+          setApiDiag(diag);
+        } else if (d.reason === "network_error" || d.code === "provider_network_error") {
+          setError("Não foi possível conectar à API OlaClick a partir do servidor.");
+          setApiDiag(diag);
+        } else if (d.reason === "unexpected_response" || d.code === "provider_unexpected_response") {
+          setError("A API respondeu, mas em formato diferente do esperado.");
+          setApiDiag(diag);
         } else {
           setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital.");
+          if (d.provider || d.endpoint || d.httpStatus != null) setApiDiag(diag);
         }
         return;
       }
@@ -311,9 +341,22 @@ export default function FaturamentoPage() {
 
       {/* Erro */}
       {error && (
-        <div className="mb-5 flex items-start gap-2 p-3.5 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
+        <div className="mb-2 flex items-start gap-2 p-3.5 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           {error}
+        </div>
+      )}
+
+      {/* Diagnóstico técnico seguro — só aparece quando há falha na API do provedor */}
+      {apiDiag && (
+        <div className="mb-5 p-3 rounded-xl bg-gray-50 border border-gray-200 text-[11px] text-gray-500 space-y-0.5">
+          {apiDiag.provider    && <p><span className="font-semibold text-gray-600">Provider:</span> {apiDiag.provider}</p>}
+          {apiDiag.endpoint    && <p><span className="font-semibold text-gray-600">Endpoint:</span> {apiDiag.endpoint}</p>}
+          {apiDiag.httpStatus  != null && <p><span className="font-semibold text-gray-600">HTTP Status:</span> {apiDiag.httpStatus ?? "—"}</p>}
+          {apiDiag.period      && <p><span className="font-semibold text-gray-600">Período:</span> {apiDiag.period}</p>}
+          {apiDiag.providerErrorMessage && (
+            <p><span className="font-semibold text-gray-600">Resposta do provider:</span> <span className="font-mono break-all">{apiDiag.providerErrorMessage}</span></p>
+          )}
         </div>
       )}
 

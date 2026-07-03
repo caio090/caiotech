@@ -33,13 +33,23 @@ function resolveDateRange(period: PeriodKey): { start: string; end: string } {
  * Classifica erros HTTP da API do provedor para mensagens amigáveis.
  * Nunca expõe token ou segredo.
  */
-function classifyProviderError(httpStatus: number): { code: string; message: string } {
-  if (httpStatus === 401) return { code: "invalid_token",   message: "Token inválido ou expirado. Reconecte o cliente em Conexões → Cardápio Digital." };
-  if (httpStatus === 403) return { code: "permission_denied", message: "Token sem permissão para leitura de pedidos. Verifique as permissões no painel OlaClick." };
-  if (httpStatus === 404) return { code: "endpoint_not_found", message: "Endpoint de pedidos não encontrado na API do provedor." };
-  if (httpStatus === 429) return { code: "rate_limited",    message: "Limite de requisições atingido. Tente novamente em alguns minutos." };
-  if (httpStatus >= 500)  return { code: "provider_error",  message: `Erro interno do provedor (HTTP ${httpStatus}). Tente novamente em instantes.` };
-  return { code: "api_error", message: `Erro ao consultar API do provedor (HTTP ${httpStatus}).` };
+function classifyProviderError(httpStatus: number): { code: string; reason: string; message: string } {
+  if (httpStatus === 401) return { code: "provider_unauthorized",      reason: "token_invalid",      message: "A API recusou a chave do provider. Verifique o token/API Key da conexão." };
+  if (httpStatus === 403) return { code: "provider_forbidden",         reason: "forbidden",          message: "A API respondeu sem permissão para consultar pedidos." };
+  if (httpStatus === 404) return { code: "provider_endpoint_not_found",reason: "endpoint_not_found", message: "Endpoint de pedidos não encontrado. Verifique o adapter OlaClick." };
+  if (httpStatus === 422 || httpStatus === 400) return { code: "provider_bad_request", reason: "bad_params", message: "A API recusou os filtros do período. Ajuste os parâmetros enviados." };
+  if (httpStatus === 429) return { code: "provider_rate_limited",      reason: "rate_limited",       message: "Limite de requisições atingido. Tente novamente em alguns minutos." };
+  if (httpStatus >= 500)  return { code: "provider_server_error",      reason: "provider_error",     message: `Erro interno do provedor (HTTP ${httpStatus}). Tente novamente em instantes.` };
+  return { code: "provider_api_error", reason: "unknown", message: `Erro ao consultar API do provedor (HTTP ${httpStatus}).` };
+}
+
+/** Extrai trecho seguro do corpo de erro do provedor — sem token, sem secrets. */
+async function safeProviderBody(response: Response): Promise<string | null> {
+  try {
+    const text = await response.text();
+    // Trunca em 300 chars e remove qualquer coisa que pareça token (>30 chars alfanum contínuos)
+    return text.slice(0, 300).replace(/[A-Za-z0-9_\-]{31,}/g, "[REDACTED]");
+  } catch { return null; }
 }
 
 // GET /api/olaclick/orders?client_id=...&period=7dias
@@ -87,6 +97,7 @@ export async function GET(request: NextRequest) {
     // Prioridade: conn.api_base_url → env global → preset OlaClick
     // Para OlaClick, sempre retorna URL (nunca null).
     const baseUrl = resolveOlaClickBaseUrl({ api_base_url: conn.api_base_url });
+    const ENDPOINT = "/v1/orders";
 
     if (!baseUrl) {
       return NextResponse.json({
@@ -95,18 +106,17 @@ export async function GET(request: NextRequest) {
         code:            "missing_provider_base_url",
         connectionFound: true,
         provider:        conn.provider,
-        message:
-          "Conexão Cardápio Digital encontrada. " +
-          "Falta configurar a URL da API do provedor em Conexões → Cardápio Digital.",
-        stage:       "resolve_base_url",
-        hasApiBaseUrl: false,
+        baseUrlResolved: false,
+        endpoint:        ENDPOINT,
+        message:         "Conexão Cardápio Digital encontrada. Falta configurar a URL da API do provedor em Conexões → Cardápio Digital.",
+        stage:           "resolve_base_url",
       });
     }
 
     // ── Chama API pública OlaClick: GET /v1/orders ────────────────
     // Auth: x-api-key (conforme documentação OlaClick Public API)
     // Nunca loga nem retorna conn.access_token.
-    const url = new URL(`${baseUrl}/v1/orders`);
+    const url = new URL(`${baseUrl}${ENDPOINT}`);
     url.searchParams.set("start_date", start);
     url.searchParams.set("end_date",   end);
 
@@ -119,27 +129,36 @@ export async function GET(request: NextRequest) {
         },
         signal: AbortSignal.timeout(10000),
       });
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "unknown";
       return NextResponse.json({
         ok:              false,
         reason:          "network_error",
         code:            "provider_network_error",
         connectionFound: true,
         provider:        conn.provider,
-        message:         "Não foi possível conectar à API do provedor. Verifique conexão e tente novamente.",
+        baseUrlResolved: true,
+        endpoint:        ENDPOINT,
+        httpStatus:      null,
+        providerErrorMessage: errMsg.slice(0, 200).replace(/[A-Za-z0-9_\-]{31,}/g, "[REDACTED]"),
+        message:         "Não foi possível conectar à API OlaClick a partir do servidor.",
         stage:           "provider_api_call",
       });
     }
 
     if (!providerResponse.ok) {
-      const { code, message } = classifyProviderError(providerResponse.status);
+      const { code, reason, message } = classifyProviderError(providerResponse.status);
+      const providerBody = await safeProviderBody(providerResponse);
       return NextResponse.json({
         ok:              false,
-        reason:          "api_error",
+        reason,
         code,
         connectionFound: true,
         provider:        conn.provider,
+        baseUrlResolved: true,
+        endpoint:        ENDPOINT,
         httpStatus:      providerResponse.status,
+        providerErrorMessage: providerBody,
         message,
         stage:           "provider_api_call",
       });
@@ -151,23 +170,45 @@ export async function GET(request: NextRequest) {
     } catch {
       return NextResponse.json({
         ok:              false,
-        reason:          "parse_error",
-        code:            "provider_response_parse_error",
+        reason:          "unexpected_response",
+        code:            "provider_unexpected_response",
         connectionFound: true,
         provider:        conn.provider,
-        message:         "A API do provedor retornou formato inesperado.",
+        baseUrlResolved: true,
+        endpoint:        ENDPOINT,
+        httpStatus:      providerResponse.status,
+        message:         "A API respondeu, mas em formato diferente do esperado.",
         stage:           "parse_response",
       });
     }
 
     // ── Parseia métricas de forma resiliente ─────────────────────
     // A estrutura exata da resposta OlaClick /v1/orders pode variar.
+    // Aceita: array direto | { orders } | { data } | { results } | { items }
     // Extrai o que estiver disponível; não inventa dados ausentes.
     const raw = rawJson as Record<string, unknown> | null;
-    const items = Array.isArray(raw?.orders)  ? (raw!.orders as Record<string, unknown>[])
-                : Array.isArray(raw?.data)    ? (raw!.data   as Record<string, unknown>[])
-                : Array.isArray(rawJson)      ? (rawJson     as Record<string, unknown>[])
+    const items = Array.isArray(raw?.orders)  ? (raw!.orders  as Record<string, unknown>[])
+                : Array.isArray(raw?.data)    ? (raw!.data    as Record<string, unknown>[])
+                : Array.isArray(raw?.results) ? (raw!.results as Record<string, unknown>[])
+                : Array.isArray(raw?.items)   ? (raw!.items   as Record<string, unknown>[])
+                : Array.isArray(rawJson)      ? (rawJson      as Record<string, unknown>[])
                 : null;
+
+    // Resposta com formato desconhecido (não é array nem objeto com chave conhecida)
+    if (items === null && (rawJson === null || typeof rawJson !== "object")) {
+      return NextResponse.json({
+        ok:              false,
+        reason:          "unexpected_response",
+        code:            "provider_unexpected_response",
+        connectionFound: true,
+        provider:        conn.provider,
+        baseUrlResolved: true,
+        endpoint:        ENDPOINT,
+        httpStatus:      providerResponse.status,
+        message:         "A API respondeu, mas em formato diferente do esperado.",
+        stage:           "parse_metrics",
+      });
+    }
 
     let faturamento_total: number | null    = null;
     let total_pedidos:     number | null    = null;
@@ -226,11 +267,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const noOrders = total_pedidos === 0 || total_pedidos === null;
+
     return NextResponse.json({
       ok:         true,
       period:     safePeriod,
       date_range: { start, end },
       provider:   conn.provider,
+      baseUrlResolved: true,
+      endpoint:   ENDPOINT,
+      message:    noOrders ? "Nenhum pedido encontrado no período." : undefined,
       data: {
         faturamento_total,
         total_pedidos,
