@@ -13,6 +13,18 @@ async function safeBody(response: Response): Promise<string | null> {
   } catch { return null; }
 }
 
+/**
+ * Sanitiza valor de header HTTP — remove aspas curvas Unicode e outros chars inválidos.
+ * Nunca altera o token no banco, apenas em memória antes do fetch.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return value.trim().replace(/[""''«»]/g, "").replace(/[^\x00-\xFF]/g, "");
+}
+
+function isValidHeaderValue(value: string): boolean {
+  return value.length > 0 && /^[\x20-\x7E\x80-\xFF]+$/.test(value);
+}
+
 // POST /api/olaclick/test
 // Testa conexão OlaClick para um client_id usando o endpoint correto da API.
 // Auth: x-api-key (OlaClick Public API). Nunca retorna access_token.
@@ -58,22 +70,43 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Chama GET /v1/orders com período de hoje (mínimo) ───────
-    // Auth: x-api-key conforme OlaClick Public API docs
-    const today = new Date().toISOString().split("T")[0];
+    // ── Sanitiza token antes de usar como header ─────────────────
+    // Remove aspas curvas Unicode que causam erro ByteString no Node fetch.
+    // Não altera o banco — apenas sanitiza em memória.
+    const safeToken = sanitizeHeaderValue(conn.access_token);
+    if (!isValidHeaderValue(safeToken)) {
+      return NextResponse.json({
+        ok: false,
+        reason: "token_has_invalid_characters",
+        code: "invalid_header_value",
+        provider: conn.provider,
+        baseUrlResolved: true,
+        endpoint: ENDPOINT,
+        httpStatus: null,
+        message: "A chave do provider contém caracteres inválidos para envio no header. Atualize o token/API Key da conexão em Gerenciar.",
+      });
+    }
+
+    // ── Chama GET /v1/orders com últimos 7 dias ──────────────────
+    // Query params obrigatórios: filter[start_date] e filter[end_date] em YYYY-MM-DD.
+    // Auth: x-api-key conforme OlaClick Public API docs.
+    const now   = new Date();
+    const end   = now.toISOString().split("T")[0];
+    const startD = new Date(now); startD.setDate(startD.getDate() - 6);
+    const start = startD.toISOString().split("T")[0];
+
     const url = new URL(`${baseUrl}${ENDPOINT}`);
-    url.searchParams.set("start_date", today);
-    url.searchParams.set("end_date",   today);
+    url.searchParams.set("filter[start_date]", start);
+    url.searchParams.set("filter[end_date]",   end);
 
     let response: Response;
     try {
       response = await fetch(url.toString(), {
-        headers: { "x-api-key": conn.access_token, "Accept": "application/json" },
+        headers: { "x-api-key": safeToken, "accept": "application/json" },
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown";
-      // Marca conexão com erro de rede
       await supabase.from("olaclick_connections")
         .update({ status: "error", last_error: "Erro de rede: " + msg.slice(0, 100) })
         .eq("id", conn.id);
@@ -114,7 +147,7 @@ export async function POST(request: NextRequest) {
       401: { code: "provider_unauthorized",       reason: "token_invalid",      message: "A API recusou a chave do provider. Verifique o token/API Key da conexão." },
       403: { code: "provider_forbidden",          reason: "forbidden",          message: "A API respondeu sem permissão para consultar pedidos." },
       404: { code: "provider_endpoint_not_found", reason: "endpoint_not_found", message: "Endpoint de pedidos não encontrado. Verifique o adapter OlaClick." },
-      422: { code: "provider_bad_request",        reason: "bad_params",         message: "A API recusou os filtros do período." },
+      422: { code: "provider_bad_request",        reason: "bad_params",         message: "A API recusou os filtros do período. Ajustamos o formato para filter[start_date] e filter[end_date]. Tente novamente." },
       429: { code: "provider_rate_limited",       reason: "rate_limited",       message: "Limite de requisições atingido. Tente novamente em alguns minutos." },
     };
     const cls = reasons[httpStatus] ?? (httpStatus >= 500

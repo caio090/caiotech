@@ -64,6 +64,11 @@ function fmtBRL(v: number | null) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function fmtCount(v: number | null) {
+  if (v === null) return "—";
+  return String(v);
+}
+
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
   try {
@@ -187,8 +192,11 @@ export default function FaturamentoPage() {
         } else if (d.reason === "endpoint_not_found" || d.code === "provider_endpoint_not_found") {
           setError("Endpoint de pedidos não encontrado. Verifique o adapter OlaClick.");
           setApiDiag(diag);
+        } else if (d.reason === "token_has_invalid_characters" || d.code === "invalid_header_value") {
+          setError("A chave do provider contém caracteres inválidos. Atualize o token em Gerenciar → Cardápio Digital.");
+          setApiDiag(diag);
         } else if (d.reason === "bad_params" || d.code === "provider_bad_request") {
-          setError("A API recusou os filtros do período. Ajuste os parâmetros enviados.");
+          setError(d.message ?? "A API recusou os filtros do período. Tente novamente.");
           setApiDiag(diag);
         } else if (d.reason === "network_error" || d.code === "provider_network_error") {
           setError("Não foi possível conectar à API OlaClick a partir do servidor.");
@@ -398,10 +406,16 @@ export default function FaturamentoPage() {
       {/* Report cards */}
       {report && !loading && (
         <div className="space-y-5">
+          {report.total_pedidos === 0 && (
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+              <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
+              Nenhum pedido encontrado no período selecionado.
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard icon={DollarSign}   label="Faturamento total" value={fmtBRL(report.faturamento_total)}  color="bg-emerald-50 text-emerald-600" />
-            <StatCard icon={ShoppingCart} label="Total de pedidos"  value={report.total_pedidos !== null ? String(report.total_pedidos) : "—"} color="bg-blue-50 text-blue-600" />
-            <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)}       color="bg-violet-50 text-violet-600" />
+            <StatCard icon={DollarSign}   label="Faturamento total" value={fmtBRL(report.faturamento_total)}   color="bg-emerald-50 text-emerald-600" />
+            <StatCard icon={ShoppingCart} label="Total de pedidos"  value={fmtCount(report.total_pedidos)}    color="bg-blue-50 text-blue-600" />
+            <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)}        color="bg-violet-50 text-violet-600" />
           </div>
 
           {report.pedidos_por_status && Object.keys(report.pedidos_por_status).length > 0 && (

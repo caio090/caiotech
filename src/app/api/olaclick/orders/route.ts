@@ -37,7 +37,7 @@ function classifyProviderError(httpStatus: number): { code: string; reason: stri
   if (httpStatus === 401) return { code: "provider_unauthorized",      reason: "token_invalid",      message: "A API recusou a chave do provider. Verifique o token/API Key da conexão." };
   if (httpStatus === 403) return { code: "provider_forbidden",         reason: "forbidden",          message: "A API respondeu sem permissão para consultar pedidos." };
   if (httpStatus === 404) return { code: "provider_endpoint_not_found",reason: "endpoint_not_found", message: "Endpoint de pedidos não encontrado. Verifique o adapter OlaClick." };
-  if (httpStatus === 422 || httpStatus === 400) return { code: "provider_bad_request", reason: "bad_params", message: "A API recusou os filtros do período. Ajuste os parâmetros enviados." };
+  if (httpStatus === 422 || httpStatus === 400) return { code: "provider_bad_request", reason: "bad_params", message: "A API recusou os filtros do período. Ajustamos o formato para filter[start_date] e filter[end_date]. Tente novamente." };
   if (httpStatus === 429) return { code: "provider_rate_limited",      reason: "rate_limited",       message: "Limite de requisições atingido. Tente novamente em alguns minutos." };
   if (httpStatus >= 500)  return { code: "provider_server_error",      reason: "provider_error",     message: `Erro interno do provedor (HTTP ${httpStatus}). Tente novamente em instantes.` };
   return { code: "provider_api_error", reason: "unknown", message: `Erro ao consultar API do provedor (HTTP ${httpStatus}).` };
@@ -47,9 +47,25 @@ function classifyProviderError(httpStatus: number): { code: string; reason: stri
 async function safeProviderBody(response: Response): Promise<string | null> {
   try {
     const text = await response.text();
-    // Trunca em 300 chars e remove qualquer coisa que pareça token (>30 chars alfanum contínuos)
     return text.slice(0, 300).replace(/[A-Za-z0-9_\-]{31,}/g, "[REDACTED]");
   } catch { return null; }
+}
+
+/**
+ * Sanitiza valor de header HTTP para garantir ByteString válido (apenas chars 0–255).
+ * Remove aspas curvas Unicode (" " ' ') que podem ser coladas por engano junto ao token.
+ * Nunca modifica nem retorna o token — usado apenas na chamada fetch em memória.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return value
+    .trim()
+    .replace(/[“”‘’«»]/g, "") // aspas curvas/angulares
+    .replace(/[^\x00-\xFF]/g, "");                          // remove qualquer não-latin1
+}
+
+/** Verifica se o valor sanitizado é seguro para usar como header HTTP. */
+function isValidHeaderValue(value: string): boolean {
+  return value.length > 0 && /^[\x20-\x7E\x80-\xFF]+$/.test(value);
 }
 
 // GET /api/olaclick/orders?client_id=...&period=7dias
@@ -113,19 +129,39 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // ── Sanitiza token antes de enviar como header ───────────────
+    // O token salvo no banco pode conter aspas curvas Unicode coladas por engano.
+    // Sanitizamos em memória — não alteramos o banco.
+    const safeToken = sanitizeHeaderValue(conn.access_token);
+    if (!isValidHeaderValue(safeToken)) {
+      return NextResponse.json({
+        ok:              false,
+        reason:          "token_has_invalid_characters",
+        code:            "invalid_header_value",
+        connectionFound: true,
+        provider:        conn.provider,
+        baseUrlResolved: true,
+        endpoint:        ENDPOINT,
+        httpStatus:      null,
+        message:         "A chave do provider contém caracteres inválidos para envio no header. Atualize o token/API Key da conexão em Gerenciar.",
+        stage:           "sanitize_token",
+      });
+    }
+
     // ── Chama API pública OlaClick: GET /v1/orders ────────────────
     // Auth: x-api-key (conforme documentação OlaClick Public API)
+    // Query params obrigatórios: filter[start_date] e filter[end_date] em YYYY-MM-DD.
     // Nunca loga nem retorna conn.access_token.
     const url = new URL(`${baseUrl}${ENDPOINT}`);
-    url.searchParams.set("start_date", start);
-    url.searchParams.set("end_date",   end);
+    url.searchParams.set("filter[start_date]", start);
+    url.searchParams.set("filter[end_date]",   end);
 
     let providerResponse: Response;
     try {
       providerResponse = await fetch(url.toString(), {
         headers: {
-          "x-api-key": conn.access_token,
-          "Accept":    "application/json",
+          "x-api-key": safeToken,
+          "accept":    "application/json",
         },
         signal: AbortSignal.timeout(10000),
       });
@@ -224,9 +260,9 @@ export async function GET(request: NextRequest) {
         const v = order["total_price"] ?? order["total_amount"] ?? order["total"] ?? order["price"];
         return sum + (typeof v === "number" ? v : 0);
       }, 0);
-      faturamento_total = totalRevenue > 0 ? totalRevenue : null;
+      faturamento_total = totalRevenue; // 0 é resultado real válido, não null
 
-      if (faturamento_total !== null && total_pedidos > 0) {
+      if (total_pedidos > 0) {
         ticket_medio = faturamento_total / total_pedidos;
       }
 
@@ -267,7 +303,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const noOrders = total_pedidos === 0 || total_pedidos === null;
+    const noOrders = total_pedidos === 0;
 
     return NextResponse.json({
       ok:         true,
