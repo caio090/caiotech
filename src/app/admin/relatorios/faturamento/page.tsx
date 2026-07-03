@@ -4,17 +4,19 @@ import { PageHeader } from "@/components/page-header";
 import {
   ShoppingCart, RefreshCw, Loader2, AlertCircle, CheckCircle2,
   TrendingUp, DollarSign, Clock, Building2, CalendarDays,
-  Link2, ChevronDown,
+  Link2, ChevronDown, ChevronRight, Info, BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 
+// ── Tipos ──────────────────────────────────────────────────────────────────────
+
 type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
 const PERIODS: { value: PeriodKey; label: string }[] = [
-  { value: "hoje",      label: "Hoje"          },
-  { value: "7dias",     label: "Últimos 7 dias" },
-  { value: "15dias",    label: "Últimos 15 dias"},
-  { value: "30dias",    label: "Últimos 30 dias"},
-  { value: "mes_atual", label: "Mês atual"      },
+  { value: "hoje",      label: "Hoje"           },
+  { value: "7dias",     label: "Últimos 7 dias"  },
+  { value: "15dias",    label: "Últimos 15 dias" },
+  { value: "30dias",    label: "Últimos 30 dias" },
+  { value: "mes_atual", label: "Mês atual"       },
 ];
 
 interface ClientOption { id: string; company_name: string }
@@ -22,64 +24,91 @@ interface ClientOption { id: string; company_name: string }
 interface DigitalMenuStatus {
   ok: boolean;
   connected?: boolean;
-  configured?: boolean;
   reason?: string;
   message?: string;
   connection?: {
-    id: string;
-    provider?: string | null;
-    connection_name?: string | null;
-    token_last_four?: string | null;
-    last_sync_at?: string | null;
-    client_id?: string | null;
-    has_api_base_url?: boolean;
+    id: string; provider?: string | null; connection_name?: string | null;
+    token_last_four?: string | null; last_sync_at?: string | null;
+    client_id?: string | null; has_api_base_url?: boolean;
   } | null;
+}
+
+interface PaginationInfo {
+  used: boolean; pagesFetched: number; totalReturned: number;
+  providerTotal: number | null; limitDetected: number | null; hasMore: boolean;
+}
+
+interface DebugShape {
+  topLevelType: string; topLevelKeys: string[]; listKeyUsed: string;
+  totalReturned: number; firstOrderKeys: string[]; firstItemKeys: string[];
+  paginationKeys: string[]; hasPagination: boolean;
+  detectedLimit: number | null; hasNextPage: boolean | null;
 }
 
 interface OrdersResult {
   ok: boolean;
-  configured?: boolean;
-  reason?: string;
-  code?: string;
-  connectionFound?: boolean;
-  provider?: string;
-  baseUrlResolved?: boolean;
-  endpoint?: string;
-  httpStatus?: number | null;
-  providerErrorMessage?: string | null;
-  message?: string;
-  data?: unknown;
+  reason?: string; code?: string; message?: string;
+  connectionFound?: boolean; provider?: string;
+  baseUrlResolved?: boolean; endpoint?: string;
+  httpStatus?: number | null; providerErrorMessage?: string | null;
+  snapshotWarning?: string | null;
+  pagination?: PaginationInfo;
+  debugShape?: DebugShape;
+  data?: {
+    faturamento_total:      number | null;
+    total_pedidos:          number | null;
+    ticket_medio:           number | null;
+    pedidos_por_status:     Record<string, number> | null;
+    produtos_mais_vendidos: { name: string; qty: number }[] | null;
+    topItemsUnavailable:    boolean;
+    topItemsReason:         string | null;
+    melhores_dias:          { date: string; revenue: number; orders: number }[] | null;
+    pedidos_recentes:       { id: string; date: string | null; status: string; total: number }[];
+  };
 }
 
 interface ReportData {
-  faturamento_total: number | null;
-  total_pedidos: number | null;
-  ticket_medio: number | null;
-  pedidos_por_status: Record<string, number> | null;
+  faturamento_total:      number;
+  total_pedidos:          number;
+  ticket_medio:           number | null;
+  pedidos_por_status:     Record<string, number> | null;
   produtos_mais_vendidos: { name: string; qty: number }[] | null;
+  topItemsUnavailable:    boolean;
+  topItemsReason:         string | null;
+  melhores_dias:          { date: string; revenue: number; orders: number }[] | null;
+  pedidos_recentes:       { id: string; date: string | null; status: string; total: number }[];
+  pagination?:            PaginationInfo;
+  debugShape?:            DebugShape;
+  snapshotWarning?:       string | null;
 }
+
+// ── Formatters ─────────────────────────────────────────────────────────────────
 
 function fmtBRL(v: number | null) {
   if (v === null) return "—";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-
 function fmtCount(v: number | null) {
   if (v === null) return "—";
   return String(v);
 }
-
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
-      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-    });
+    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch { return "—"; }
 }
+function fmtDay(ymd: string) {
+  try {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  } catch { return ymd; }
+}
 
-function StatCard({ icon: Icon, label, value, color = "bg-indigo-50 text-indigo-600" }: {
-  icon: React.ElementType; label: string; value: string; color?: string;
+// ── Sub-componentes ────────────────────────────────────────────────────────────
+
+function StatCard({ icon: Icon, label, value, sub, color = "bg-indigo-50 text-indigo-600" }: {
+  icon: React.ElementType; label: string; value: string; sub?: string; color?: string;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-start gap-4">
@@ -89,32 +118,58 @@ function StatCard({ icon: Icon, label, value, color = "bg-indigo-50 text-indigo-
       <div>
         <p className="text-xs text-gray-400 font-medium">{label}</p>
         <p className="text-xl font-black text-gray-900 mt-0.5">{value}</p>
+        {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
       </div>
     </div>
   );
 }
 
-export default function FaturamentoPage() {
-  const [clients,        setClients]        = useState<ClientOption[]>([]);
-  const [clientId,       setClientId]       = useState("");
-  const [period,         setPeriod]         = useState<PeriodKey>("7dias");
-  const [status,         setStatus]         = useState<DigitalMenuStatus | null>(null);
-  const [report,         setReport]         = useState<ReportData | null>(null);
-  const [loading,        setLoading]        = useState(false);
-  const [loadingStatus,  setLoadingStatus]  = useState(false);
-  const [error,          setError]          = useState<string | null>(null);
-  const [apiDiag,        setApiDiag]        = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
-  const [missingBaseUrl, setMissingBaseUrl] = useState(false);
-  const [lastSync,       setLastSync]       = useState<string | null>(null);
-  const [envStatus,      setEnvStatus]      = useState<{ hasBaseUrl: boolean } | null>(null);
+function SectionCard({ title, icon: Icon, children }: {
+  title: string; icon: React.ElementType; children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Icon className="w-4 h-4 text-gray-400" />
+        <p className="text-sm font-bold text-gray-900">{title}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
 
-  // Carrega env-status ao montar
-  useEffect(() => {
-    void fetch("/api/olaclick/env-status")
-      .then((r) => r.json())
-      .then((d: { ok: boolean; hasBaseUrl?: boolean }) => { if (d.ok) setEnvStatus({ hasBaseUrl: d.hasBaseUrl ?? false }); })
-      .catch(() => undefined);
-  }, []);
+function StatusBadge({ label }: { label: string }) {
+  const colors: Record<string, string> = {
+    PREPARING:   "bg-amber-50  text-amber-700  border-amber-100",
+    READY:       "bg-blue-50   text-blue-700   border-blue-100",
+    DELIVERING:  "bg-indigo-50 text-indigo-700 border-indigo-100",
+    DELIVERED:   "bg-emerald-50 text-emerald-700 border-emerald-100",
+    CANCELLED:   "bg-red-50    text-red-700    border-red-100",
+    CANCELED:    "bg-red-50    text-red-700    border-red-100",
+  };
+  const cls = colors[label.toUpperCase()] ?? "bg-gray-50 text-gray-600 border-gray-100";
+  return (
+    <span className={`inline-block text-[10px] font-semibold border px-1.5 py-0.5 rounded-full ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+// ── Componente principal ───────────────────────────────────────────────────────
+
+export default function FaturamentoPage() {
+  const [clients,       setClients]       = useState<ClientOption[]>([]);
+  const [clientId,      setClientId]      = useState("");
+  const [period,        setPeriod]        = useState<PeriodKey>("7dias");
+  const [status,        setStatus]        = useState<DigitalMenuStatus | null>(null);
+  const [report,        setReport]        = useState<ReportData | null>(null);
+  const [loading,       setLoading]       = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+  const [apiDiag,       setApiDiag]       = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
+  const [missingBaseUrl,setMissingBaseUrl]= useState(false);
+  const [lastSync,      setLastSync]      = useState<string | null>(null);
+  const [showDiag,      setShowDiag]      = useState(false);
 
   // Carrega lista de clientes
   useEffect(() => {
@@ -129,7 +184,7 @@ export default function FaturamentoPage() {
     })();
   }, []);
 
-  // Carrega status da conexão de Cardápio Digital
+  // Carrega status da conexão
   const loadStatus = useCallback(async (cid: string) => {
     if (!cid) return;
     setLoadingStatus(true);
@@ -149,7 +204,7 @@ export default function FaturamentoPage() {
     if (clientId) void loadStatus(clientId);
   }, [clientId, loadStatus]);
 
-  // Carrega pedidos/faturamento
+  // Carrega relatório
   const loadReport = useCallback(async () => {
     if (!clientId) return;
     setLoading(true);
@@ -163,47 +218,27 @@ export default function FaturamentoPage() {
       const d = await r.json() as OrdersResult;
 
       if (!d.ok) {
-        const diag = {
-          provider: d.provider,
-          endpoint: d.endpoint,
-          httpStatus: d.httpStatus,
-          providerErrorMessage: d.providerErrorMessage,
-          period,
-        };
-
+        const diag = { provider: d.provider, endpoint: d.endpoint, httpStatus: d.httpStatus, providerErrorMessage: d.providerErrorMessage, period };
         if (d.reason === "sql_pending") {
           setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase.");
-        } else if (
-          d.reason === "base_url_missing" ||
-          d.code === "missing_provider_base_url" ||
-          d.reason === "env_missing" ||
-          d.configured === false
-        ) {
-          setError(null);
+        } else if (d.reason === "base_url_missing" || d.code === "missing_provider_base_url") {
           setMissingBaseUrl(true);
         } else if (d.reason === "not_connected" || d.code === "no_digital_menu_connection") {
           setError("Cliente sem conexão Cardápio Digital ativa. Conecte em Conexões → Cardápio Digital.");
         } else if (d.reason === "token_invalid" || d.code === "provider_unauthorized") {
-          setError("A API recusou a chave do provider. Verifique o token/API Key da conexão em Gerenciar.");
-          setApiDiag(diag);
+          setError("A API recusou a chave do provider. Verifique o token/API Key da conexão em Gerenciar."); setApiDiag(diag);
         } else if (d.reason === "forbidden" || d.code === "provider_forbidden") {
-          setError("A API respondeu sem permissão para consultar pedidos.");
-          setApiDiag(diag);
+          setError("A API respondeu sem permissão para consultar pedidos."); setApiDiag(diag);
         } else if (d.reason === "endpoint_not_found" || d.code === "provider_endpoint_not_found") {
-          setError("Endpoint de pedidos não encontrado. Verifique o adapter OlaClick.");
-          setApiDiag(diag);
+          setError("Endpoint de pedidos não encontrado. Verifique o adapter OlaClick."); setApiDiag(diag);
         } else if (d.reason === "token_has_invalid_characters" || d.code === "invalid_header_value") {
-          setError("A chave do provider contém caracteres inválidos. Atualize o token em Gerenciar → Cardápio Digital.");
-          setApiDiag(diag);
+          setError("A chave do provider contém caracteres inválidos. Atualize o token em Gerenciar → Cardápio Digital."); setApiDiag(diag);
         } else if (d.reason === "bad_params" || d.code === "provider_bad_request") {
-          setError(d.message ?? "A API recusou os filtros do período. Tente novamente.");
-          setApiDiag(diag);
+          setError(d.message ?? "A API recusou os filtros do período. Tente novamente."); setApiDiag(diag);
         } else if (d.reason === "network_error" || d.code === "provider_network_error") {
-          setError("Não foi possível conectar à API OlaClick a partir do servidor.");
-          setApiDiag(diag);
+          setError("Não foi possível conectar à API OlaClick a partir do servidor."); setApiDiag(diag);
         } else if (d.reason === "unexpected_response" || d.code === "provider_unexpected_response") {
-          setError("A API respondeu, mas em formato diferente do esperado.");
-          setApiDiag(diag);
+          setError("A API respondeu, mas em formato diferente do esperado."); setApiDiag(diag);
         } else {
           setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital.");
           if (d.provider || d.endpoint || d.httpStatus != null) setApiDiag(diag);
@@ -212,22 +247,20 @@ export default function FaturamentoPage() {
       }
       setMissingBaseUrl(false);
 
-      // A rota /api/olaclick/orders já parseia e normaliza os dados.
-      // data contém: faturamento_total, total_pedidos, ticket_medio,
-      //              pedidos_por_status, produtos_mais_vendidos, raw
-      const parsed = d.data as {
-        faturamento_total:     number | null;
-        total_pedidos:         number | null;
-        ticket_medio:          number | null;
-        pedidos_por_status:    Record<string, number> | null;
-        produtos_mais_vendidos: { name: string; qty: number }[] | null;
-      } | null | undefined;
+      const parsed = d.data;
       setReport({
-        faturamento_total:     parsed?.faturamento_total    ?? null,
-        total_pedidos:         parsed?.total_pedidos        ?? null,
-        ticket_medio:          parsed?.ticket_medio         ?? null,
-        pedidos_por_status:    parsed?.pedidos_por_status   ?? null,
+        faturamento_total:      parsed?.faturamento_total      ?? 0,
+        total_pedidos:          parsed?.total_pedidos          ?? 0,
+        ticket_medio:           parsed?.ticket_medio           ?? null,
+        pedidos_por_status:     parsed?.pedidos_por_status     ?? null,
         produtos_mais_vendidos: parsed?.produtos_mais_vendidos ?? null,
+        topItemsUnavailable:    parsed?.topItemsUnavailable    ?? false,
+        topItemsReason:         parsed?.topItemsReason         ?? null,
+        melhores_dias:          parsed?.melhores_dias          ?? null,
+        pedidos_recentes:       parsed?.pedidos_recentes       ?? [],
+        pagination:             d.pagination,
+        debugShape:             d.debugShape,
+        snapshotWarning:        d.snapshotWarning,
       });
       setLastSync(new Date().toISOString());
     } catch {
@@ -238,14 +271,19 @@ export default function FaturamentoPage() {
   }, [clientId, period]);
 
   const selectedClient = clients.find((c) => c.id === clientId);
-  const isConnected = status?.ok && status?.connection;
+  const isConnected    = status?.ok && status?.connection;
+
+  // Aviso de período idêntico — se 50 pedidos e sem paginação detectada
+  const samePeriodsWarning = report
+    && report.total_pedidos > 0
+    && report.pagination
+    && !report.pagination.used
+    && report.pagination.limitDetected !== null
+    && report.total_pedidos === report.pagination.limitDetected;
 
   return (
     <div>
-      <PageHeader
-        title="Faturamento"
-        description="Relatório de faturamento — Cardápio Digital"
-      >
+      <PageHeader title="Faturamento" description="Relatório de faturamento — Cardápio Digital">
         <button
           onClick={() => void loadReport()}
           disabled={loading || !isConnected}
@@ -258,30 +296,19 @@ export default function FaturamentoPage() {
 
       {/* Seletores */}
       <div className="mb-5 flex flex-wrap gap-3">
-        {/* Cliente */}
         <div className="relative">
           <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <select
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="pl-8 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300 appearance-none"
-          >
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)}
+            className="pl-8 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300 appearance-none">
             {clients.length === 0 && <option value="">Sem clientes</option>}
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.company_name}</option>
-            ))}
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
         </div>
-
-        {/* Período */}
         <div className="relative">
           <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as PeriodKey)}
-            className="pl-8 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300 appearance-none"
-          >
+          <select value={period} onChange={(e) => setPeriod(e.target.value as PeriodKey)}
+            className="pl-8 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300 appearance-none">
             {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -290,9 +317,9 @@ export default function FaturamentoPage() {
 
       {/* Status da conexão */}
       <div className={`mb-5 flex items-start gap-2.5 p-3.5 rounded-xl border text-xs ${
-        loadingStatus ? "bg-gray-50 border-gray-100 text-gray-500" :
-        isConnected   ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
-                        "bg-amber-50 border-amber-100 text-amber-700"
+        loadingStatus ? "bg-gray-50 border-gray-100 text-gray-500"
+        : isConnected ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                      : "bg-amber-50 border-amber-100 text-amber-700"
       }`}>
         {loadingStatus ? (
           <><Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" /> Verificando conexão Cardápio Digital…</>
@@ -309,6 +336,7 @@ export default function FaturamentoPage() {
                 <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
                   {status.connection?.has_api_base_url ? "URL personalizada ✓" : "URL padrão do provider ✓"}
                 </span>
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full">Fonte: Cardápio Digital</span>
               </div>
               {lastSync && <span className="text-emerald-600 text-[10px] mt-0.5 block">Última sync: {fmtDate(lastSync)}</span>}
             </div>
@@ -317,30 +345,24 @@ export default function FaturamentoPage() {
           <>
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold">
-                {selectedClient ? `${selectedClient.company_name} sem conexão Cardápio Digital.` : "Selecione um cliente."}
-              </span>{" "}
+              <span className="font-semibold">{selectedClient ? `${selectedClient.company_name} sem conexão Cardápio Digital.` : "Selecione um cliente."}</span>{" "}
               <Link href="/admin/conexoes" className="underline font-bold">Conectar em Conexões →</Link>
             </div>
           </>
         )}
       </div>
 
-      {/* Aviso: conexão encontrada mas URL do provedor ausente (não deve aparecer para OlaClick) */}
+      {/* URL ausente */}
       {missingBaseUrl && (
         <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
             <div className="space-y-1">
               <p className="font-semibold text-amber-800">Conexão salva — falta configurar a URL do provedor</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">Token: salvo ✓</span>
-                <span className="text-[10px] bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded-full">URL da API: ausente ✗</span>
-              </div>
               <p className="mt-1 text-amber-600">
                 Edite a conexão em{" "}
-                <Link href="/admin/conexoes" className="underline font-bold">Conexões → Cardápio Digital</Link>
-                {" "}e preencha o campo <strong>URL da API do provedor</strong>.
+                <Link href="/admin/conexoes" className="underline font-bold">Conexões → Cardápio Digital</Link>{" "}
+                e preencha o campo <strong>URL da API do provedor</strong>.
               </p>
             </div>
           </div>
@@ -354,42 +376,32 @@ export default function FaturamentoPage() {
           {error}
         </div>
       )}
-
-      {/* Diagnóstico técnico seguro — só aparece quando há falha na API do provedor */}
       {apiDiag && (
         <div className="mb-5 p-3 rounded-xl bg-gray-50 border border-gray-200 text-[11px] text-gray-500 space-y-0.5">
-          {apiDiag.provider    && <p><span className="font-semibold text-gray-600">Provider:</span> {apiDiag.provider}</p>}
-          {apiDiag.endpoint    && <p><span className="font-semibold text-gray-600">Endpoint:</span> {apiDiag.endpoint}</p>}
-          {apiDiag.httpStatus  != null && <p><span className="font-semibold text-gray-600">HTTP Status:</span> {apiDiag.httpStatus ?? "—"}</p>}
-          {apiDiag.period      && <p><span className="font-semibold text-gray-600">Período:</span> {apiDiag.period}</p>}
-          {apiDiag.providerErrorMessage && (
-            <p><span className="font-semibold text-gray-600">Resposta do provider:</span> <span className="font-mono break-all">{apiDiag.providerErrorMessage}</span></p>
-          )}
+          {apiDiag.provider   && <p><span className="font-semibold text-gray-600">Provider:</span> {apiDiag.provider}</p>}
+          {apiDiag.endpoint   && <p><span className="font-semibold text-gray-600">Endpoint:</span> {apiDiag.endpoint}</p>}
+          {apiDiag.httpStatus != null && <p><span className="font-semibold text-gray-600">HTTP Status:</span> {apiDiag.httpStatus ?? "—"}</p>}
+          {apiDiag.period     && <p><span className="font-semibold text-gray-600">Período:</span> {apiDiag.period}</p>}
+          {apiDiag.providerErrorMessage && <p><span className="font-semibold text-gray-600">Resposta do provider:</span> <span className="font-mono break-all">{apiDiag.providerErrorMessage}</span></p>}
         </div>
       )}
 
-      {/* Empty state — sem conexão ou sem dados */}
+      {/* Empty state */}
       {!loading && !error && !report && isConnected && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 text-center">
           <ShoppingCart className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-semibold text-gray-600 mb-1">Nenhum dado ainda</p>
           <p className="text-xs text-gray-400 mb-4">Clique em "Sincronizar" para buscar dados do período.</p>
-          <button
-            onClick={() => void loadReport()}
-            className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-          >
+          <button onClick={() => void loadReport()} className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
             <RefreshCw className="w-4 h-4" /> Sincronizar agora
           </button>
         </div>
       )}
-
       {!isConnected && !loadingStatus && !error && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 text-center">
           <Link2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-semibold text-gray-600 mb-1">Sem conexão Cardápio Digital</p>
-          <p className="text-xs text-gray-400 mb-4">
-            Conecte o cliente ao Cardápio Digital para ver o faturamento real.
-          </p>
+          <p className="text-xs text-gray-400 mb-4">Conecte o cliente ao Cardápio Digital para ver o faturamento real.</p>
           <Link href="/admin/conexoes" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
             <Link2 className="w-4 h-4" /> Ir para Conexões
           </Link>
@@ -403,53 +415,169 @@ export default function FaturamentoPage() {
         </div>
       )}
 
-      {/* Report cards */}
+      {/* ── Relatório ── */}
       {report && !loading && (
         <div className="space-y-5">
+
+          {/* Aviso lista vazia */}
           {report.total_pedidos === 0 && (
             <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
               <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
               Nenhum pedido encontrado no período selecionado.
             </div>
           )}
+
+          {/* Aviso paginação/limite */}
+          {samePeriodsWarning && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>A API retornou exatamente <strong>{report.total_pedidos}</strong> pedidos — pode ser o limite por página do provider. Períodos diferentes podem ter retornado o mesmo conjunto se houver paginação não detectada.</span>
+            </div>
+          )}
+
+          {/* Cards principais */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard icon={DollarSign}   label="Faturamento total" value={fmtBRL(report.faturamento_total)}   color="bg-emerald-50 text-emerald-600" />
-            <StatCard icon={ShoppingCart} label="Total de pedidos"  value={fmtCount(report.total_pedidos)}    color="bg-blue-50 text-blue-600" />
-            <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)}        color="bg-violet-50 text-violet-600" />
+            <StatCard icon={DollarSign}   label="Faturamento total" value={fmtBRL(report.faturamento_total)}
+              sub={`Fonte: Cardápio Digital`} color="bg-emerald-50 text-emerald-600" />
+            <StatCard icon={ShoppingCart} label="Total de pedidos"  value={fmtCount(report.total_pedidos)}
+              sub={report.pagination?.pagesFetched && report.pagination.pagesFetched > 1 ? `${report.pagination.pagesFetched} páginas buscadas` : undefined}
+              color="bg-blue-50 text-blue-600" />
+            <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)} color="bg-violet-50 text-violet-600" />
           </div>
 
+          {/* Pedidos por status */}
           {report.pedidos_por_status && Object.keys(report.pedidos_por_status).length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-sm font-bold text-gray-900 mb-3">Pedidos por status</p>
+            <SectionCard title="Pedidos por status" icon={BarChart3}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {Object.entries(report.pedidos_por_status).map(([s, qty]) => (
                   <div key={s} className="bg-gray-50 rounded-xl p-3 text-center">
                     <p className="text-lg font-black text-gray-900">{qty}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5 capitalize">{s.replace(/_/g, " ")}</p>
+                    <div className="mt-1 flex justify-center"><StatusBadge label={s} /></div>
                   </div>
                 ))}
               </div>
-            </div>
+            </SectionCard>
           )}
 
-          {report.produtos_mais_vendidos && report.produtos_mais_vendidos.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-sm font-bold text-gray-900 mb-3">Produtos mais vendidos</p>
+          {/* Produtos mais vendidos */}
+          {report.produtos_mais_vendidos && report.produtos_mais_vendidos.length > 0 ? (
+            <SectionCard title="Produtos mais vendidos" icon={TrendingUp}>
               <div className="space-y-2">
                 {report.produtos_mais_vendidos.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <span className="w-5 h-5 flex-shrink-0 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full flex items-center justify-center">{i + 1}</span>
                     <span className="text-gray-700 truncate flex-1">{p.name}</span>
-                    <span className="font-bold text-gray-900 ml-3 flex-shrink-0">{p.qty}</span>
+                    <span className="font-bold text-gray-900 flex-shrink-0">{p.qty}</span>
                   </div>
                 ))}
               </div>
+            </SectionCard>
+          ) : report.topItemsUnavailable ? (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-gray-300" />
+                <p className="text-sm font-bold text-gray-400">Produtos mais vendidos</p>
+              </div>
+              <p className="text-xs text-gray-400">{report.topItemsReason ?? "Os itens/produtos não vieram na resposta do endpoint /v1/orders."}</p>
             </div>
+          ) : null}
+
+          {/* Melhores dias */}
+          {report.melhores_dias && report.melhores_dias.length > 0 && (
+            <SectionCard title="Melhores dias de venda" icon={CalendarDays}>
+              <div className="space-y-2">
+                {report.melhores_dias.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm gap-3">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="w-5 h-5 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full flex items-center justify-center">{i + 1}</span>
+                      <span className="text-gray-500 font-mono text-xs">{fmtDay(d.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <span className="text-gray-400 text-xs">{d.orders} ped.</span>
+                      <span className="font-bold text-gray-900">{fmtBRL(d.revenue)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
           )}
 
-          <div className="flex items-center gap-2 text-[11px] text-gray-400">
-            <Clock className="w-3 h-3" />
-            Última sincronização: {fmtDate(lastSync)}
+          {/* Pedidos recentes */}
+          {report.pedidos_recentes && report.pedidos_recentes.length > 0 && (
+            <SectionCard title="Pedidos recentes" icon={Clock}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400 text-[10px] uppercase tracking-widest border-b border-gray-50">
+                      <th className="pb-2 text-left font-semibold">ID</th>
+                      <th className="pb-2 text-left font-semibold">Data</th>
+                      <th className="pb-2 text-left font-semibold">Status</th>
+                      <th className="pb-2 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {report.pedidos_recentes.map((o, i) => (
+                      <tr key={i} className="text-gray-700">
+                        <td className="py-1.5 font-mono text-gray-400 truncate max-w-[80px]">{o.id ? `#${o.id.slice(-6)}` : "—"}</td>
+                        <td className="py-1.5 text-gray-500">{o.date ? fmtDay(o.date) : "—"}</td>
+                        <td className="py-1.5"><StatusBadge label={o.status} /></td>
+                        <td className="py-1.5 text-right font-semibold">{fmtBRL(o.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Diagnóstico API — colapsível */}
+          <div className="border border-gray-100 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setShowDiag((v) => !v)}
+              className="w-full flex items-center justify-between px-5 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Info className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-semibold text-gray-600">Diagnóstico da API</span>
+              </div>
+              <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showDiag ? "rotate-90" : ""}`} />
+            </button>
+            {showDiag && (
+              <div className="p-5 space-y-2 text-[11px] text-gray-500 bg-white">
+                <p><span className="font-semibold text-gray-700">Endpoint:</span> /v1/orders</p>
+                <p><span className="font-semibold text-gray-700">Período enviado:</span> {PERIODS.find(p => p.value === period)?.label}</p>
+                <p><span className="font-semibold text-gray-700">Pedidos retornados:</span> {report.total_pedidos}</p>
+                {report.pagination && (
+                  <>
+                    <p><span className="font-semibold text-gray-700">Paginação detectada:</span> {report.pagination.used ?? report.debugShape?.hasPagination ? "Sim" : "Não"}</p>
+                    {report.pagination.pagesFetched > 0 && <p><span className="font-semibold text-gray-700">Páginas buscadas:</span> {report.pagination.pagesFetched}</p>}
+                    {report.pagination.providerTotal !== null && <p><span className="font-semibold text-gray-700">Total informado pelo provider:</span> {report.pagination.providerTotal}</p>}
+                    {report.pagination.limitDetected !== null && <p><span className="font-semibold text-gray-700">Limite detectado por página:</span> {report.pagination.limitDetected}</p>}
+                    {report.pagination.hasMore && <p className="text-amber-600 font-semibold">⚠ Há mais pedidos além do retornado (limite de segurança atingido).</p>}
+                  </>
+                )}
+                {report.debugShape && (
+                  <>
+                    <p><span className="font-semibold text-gray-700">Formato da resposta:</span> {report.debugShape.topLevelType} · chave: {report.debugShape.listKeyUsed}</p>
+                    <p><span className="font-semibold text-gray-700">Itens/produtos disponíveis:</span> {report.topItemsUnavailable ? "Não" : "Sim"}</p>
+                    {report.debugShape.firstOrderKeys.length > 0 && (
+                      <p><span className="font-semibold text-gray-700">Campos do pedido:</span> {report.debugShape.firstOrderKeys.join(", ")}</p>
+                    )}
+                    {report.debugShape.firstItemKeys.length > 0 && (
+                      <p><span className="font-semibold text-gray-700">Campos do item:</span> {report.debugShape.firstItemKeys.join(", ")}</p>
+                    )}
+                  </>
+                )}
+                {report.snapshotWarning && (
+                  <p className="text-amber-600"><span className="font-semibold">Snapshot:</span> {report.snapshotWarning}</p>
+                )}
+                <div className="flex items-center gap-2 text-[10px] text-gray-300 pt-2 border-t border-gray-50">
+                  <Clock className="w-3 h-3" /> Última sincronização: {fmtDate(lastSync)}
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
       )}
     </div>
