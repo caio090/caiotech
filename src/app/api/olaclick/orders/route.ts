@@ -394,10 +394,28 @@ export async function GET(request: NextRequest) {
   const clientId = params.get("client_id");
   if (!clientId) return NextResponse.json({ ok: false, reason: "missing_client_id" }, { status: 400 });
 
-  const period      = (params.get("period") ?? "7dias") as PeriodKey;
-  const validPeriods: PeriodKey[] = ["hoje", "7dias", "15dias", "30dias", "mes_atual"];
-  const safePeriod  = validPeriods.includes(period) ? period : "7dias" as PeriodKey;
-  const { start, end } = resolveDateRange(safePeriod);
+  // Período personalizado: start_date + end_date têm prioridade sobre period
+  const rawStart = params.get("start_date");
+  const rawEnd   = params.get("end_date");
+  const YMD_RE   = /^\d{4}-\d{2}-\d{2}$/;
+
+  let start: string;
+  let end:   string;
+  let periodLabel: string;
+
+  if (rawStart && rawEnd && YMD_RE.test(rawStart) && YMD_RE.test(rawEnd) && rawStart <= rawEnd) {
+    start       = rawStart;
+    end         = rawEnd;
+    periodLabel = "personalizado";
+  } else {
+    const period      = (params.get("period") ?? "7dias") as PeriodKey;
+    const validPeriods: PeriodKey[] = ["hoje", "7dias", "15dias", "30dias", "mes_atual"];
+    const safePeriod  = validPeriods.includes(period) ? period : "7dias" as PeriodKey;
+    const range       = resolveDateRange(safePeriod);
+    start             = range.start;
+    end               = range.end;
+    periodLabel       = safePeriod;
+  }
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -484,7 +502,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok:           true,
-      period:       safePeriod,
+      period:       periodLabel,
       date_range:   { start, end },
       provider:     conn.provider,
       baseUrlResolved: true,

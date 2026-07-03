@@ -43,6 +43,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/financeiro",   label: "Financeiro",   icon: DollarSign },
       { href: "/admin/equipe",       label: "Equipe",       icon: UsersRound },
       { href: "/admin/conexoes",     label: "Conexoes",     icon: Link2 },
+      { href: "/admin/whatsapp",     label: "WhatsApp",     icon: MessageSquare },
       { href: "/admin/configuracoes",label: "Configurações",icon: Settings },
     ],
   },

@@ -10,13 +10,14 @@ import Link from "next/link";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
-type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
+type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual" | "personalizado";
 const PERIODS: { value: PeriodKey; label: string }[] = [
-  { value: "hoje",      label: "Hoje"           },
-  { value: "7dias",     label: "Últimos 7 dias"  },
-  { value: "15dias",    label: "Últimos 15 dias" },
-  { value: "30dias",    label: "Últimos 30 dias" },
-  { value: "mes_atual", label: "Mês atual"       },
+  { value: "hoje",         label: "Hoje"              },
+  { value: "7dias",        label: "Últimos 7 dias"    },
+  { value: "15dias",       label: "Últimos 15 dias"   },
+  { value: "30dias",       label: "Últimos 30 dias"   },
+  { value: "mes_atual",    label: "Mês atual"         },
+  { value: "personalizado", label: "Personalizado…"   },
 ];
 
 interface ClientOption { id: string; company_name: string }
@@ -161,6 +162,9 @@ export default function FaturamentoPage() {
   const [clients,       setClients]       = useState<ClientOption[]>([]);
   const [clientId,      setClientId]      = useState("");
   const [period,        setPeriod]        = useState<PeriodKey>("7dias");
+  const [customStart,   setCustomStart]   = useState("");
+  const [customEnd,     setCustomEnd]     = useState("");
+  const [customError,   setCustomError]   = useState<string | null>(null);
   const [status,        setStatus]        = useState<DigitalMenuStatus | null>(null);
   const [report,        setReport]        = useState<ReportData | null>(null);
   const [loading,       setLoading]       = useState(false);
@@ -207,6 +211,20 @@ export default function FaturamentoPage() {
   // Carrega relatório
   const loadReport = useCallback(async () => {
     if (!clientId) return;
+
+    // Valida período personalizado antes de disparar a requisição
+    if (period === "personalizado") {
+      if (!customStart || !customEnd) {
+        setCustomError("Informe as duas datas para o período personalizado.");
+        return;
+      }
+      if (customStart > customEnd) {
+        setCustomError("A data inicial deve ser menor ou igual à data final.");
+        return;
+      }
+    }
+    setCustomError(null);
+
     setLoading(true);
     setError(null);
     setReport(null);
@@ -214,7 +232,10 @@ export default function FaturamentoPage() {
     setApiDiag(null);
 
     try {
-      const r = await fetch(`/api/olaclick/orders?client_id=${clientId}&period=${period}`);
+      const url = period === "personalizado"
+        ? `/api/olaclick/orders?client_id=${clientId}&start_date=${customStart}&end_date=${customEnd}`
+        : `/api/olaclick/orders?client_id=${clientId}&period=${period}`;
+      const r = await fetch(url);
       const d = await r.json() as OrdersResult;
 
       if (!d.ok) {
@@ -268,7 +289,7 @@ export default function FaturamentoPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientId, period]);
+  }, [clientId, period, customStart, customEnd]);
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isConnected    = status?.ok && status?.connection;
@@ -295,7 +316,7 @@ export default function FaturamentoPage() {
       </PageHeader>
 
       {/* Seletores */}
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="mb-5 flex flex-wrap gap-3 items-start">
         <div className="relative">
           <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <select value={clientId} onChange={(e) => setClientId(e.target.value)}
@@ -307,13 +328,51 @@ export default function FaturamentoPage() {
         </div>
         <div className="relative">
           <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <select value={period} onChange={(e) => setPeriod(e.target.value as PeriodKey)}
+          <select value={period} onChange={(e) => { setPeriod(e.target.value as PeriodKey); setCustomError(null); }}
             className="pl-8 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300 appearance-none">
             {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
         </div>
+
+        {/* Campos de data personalizada */}
+        {period === "personalizado" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => { setCustomStart(e.target.value); setCustomError(null); }}
+              className="py-2 px-3 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300"
+            />
+            <span className="text-xs text-gray-400">até</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => { setCustomEnd(e.target.value); setCustomError(null); }}
+              className="py-2 px-3 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300"
+            />
+            <button
+              onClick={() => void loadReport()}
+              disabled={loading || !isConnected || !customStart || !customEnd}
+              className="flex items-center gap-1.5 text-sm font-medium text-white bg-indigo-600 px-3 py-2 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Aplicar período
+            </button>
+            {customError && (
+              <span className="text-xs text-red-500">{customError}</span>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Label de período personalizado ativo */}
+      {period === "personalizado" && customStart && customEnd && report && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+          <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
+          Período personalizado: {fmtDay(customStart)} até {fmtDay(customEnd)}
+        </div>
+      )}
 
       {/* Status da conexão */}
       <div className={`mb-5 flex items-start gap-2.5 p-3.5 rounded-xl border text-xs ${
