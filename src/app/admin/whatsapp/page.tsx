@@ -39,9 +39,9 @@ export default function WhatsAppPage() {
       <div className="mb-6 flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
         <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-amber-700 space-y-1">
-          <p className="font-semibold text-amber-800">Integração em planejamento</p>
-          <p>A conexão via WhatsApp ainda não está implementada. Esta página mostra o que está planejado e como funcionará.</p>
-          <p>Consulte <span className="font-mono">docs/DATA_SOURCES_AND_CLIENT_REPORTS_PLAN.md</span> para o plano técnico completo.</p>
+          <p className="font-semibold text-amber-800">Canal em desenvolvimento</p>
+          <p>O WhatsApp será uma fonte e canal operacional no Lokat OS — para aprovação de conteúdo, follow-ups comerciais e alertas ao cliente.</p>
+          <p>Uma atualização futura habilitará o QR Code de conexão via Evolution API ou WhatsApp Cloud API. Nenhum dado está sendo enviado agora.</p>
         </div>
       </div>
 

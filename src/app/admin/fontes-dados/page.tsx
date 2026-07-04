@@ -6,8 +6,9 @@ import {
   Upload, FileText, BarChart3, Link2, AlertCircle, CheckCircle2,
   Loader2, RefreshCw, ChevronDown, Building2, Plus, Clock,
   FileSpreadsheet, Image, FileType, Brain, Eye, CalendarDays,
-  UtensilsCrossed, AtSign, Globe, Layers,
+  UtensilsCrossed, AtSign, Globe, Layers, WifiOff, Wifi,
 } from "lucide-react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 // ── Tipos ──────────────────────────────────────────────────────
 interface ClientOption { id: string; company_name: string }
@@ -75,7 +76,7 @@ const FILE_TYPE_ICON: Record<string, React.ElementType> = {
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }); }
+  try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
   catch { return "—"; }
 }
 
@@ -264,6 +265,14 @@ function UploadModal({ clients, onClose, onSaved }: {
   );
 }
 
+interface SourceHealth {
+  digitalMenu: "connected" | "pending" | "error" | "unknown";
+  meta: "connected" | "pending" | "error" | "unknown";
+  digitalMenuSyncAt: string | null;
+  digitalMenuProvider: string | null;
+  metaUsername: string | null;
+}
+
 // ── Página principal ────────────────────────────────────────────
 export default function FontesDadosPage() {
   const [clients,       setClients]       = useState<ClientOption[]>([]);
@@ -273,6 +282,8 @@ export default function FontesDadosPage() {
   const [showUpload,    setShowUpload]    = useState(false);
   const [interpretingId, setInterpretingId] = useState<string | null>(null);
   const [interpretMsg,  setInterpretMsg]  = useState<Record<string, string>>({});
+  const [health,        setHealth]        = useState<SourceHealth | null>(null);
+  const [lastHealthSync, setLastHealthSync] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -299,6 +310,39 @@ export default function FontesDadosPage() {
   }, []);
 
   useEffect(() => { if (clientId) void loadUploads(clientId); }, [clientId, loadUploads]);
+
+  const loadHealth = useCallback(async (cid: string) => {
+    if (!cid) return;
+    try {
+      const [menuRes, metaRes] = await Promise.all([
+        fetch(`/api/olaclick/status?client_id=${cid}`).then((r) => r.json()),
+        fetch(`/api/meta/insights/status?client_id=${cid}`).then((r) => r.json()),
+      ]) as [
+        { ok: boolean; connected?: boolean; connection?: { provider?: string | null; last_sync_at?: string | null } | null },
+        { ok: boolean; hasLinkedAsset?: boolean; username?: string | null; canAttemptInsights?: boolean },
+      ];
+      setHealth({
+        digitalMenu: menuRes.ok && menuRes.connected ? "connected" : menuRes.ok === false ? "error" : "pending",
+        meta: metaRes.hasLinkedAsset ? (metaRes.canAttemptInsights ? "connected" : "error") : "pending",
+        digitalMenuSyncAt: menuRes.connection?.last_sync_at ?? null,
+        digitalMenuProvider: menuRes.connection?.provider ?? null,
+        metaUsername: metaRes.username ?? null,
+      });
+      setLastHealthSync(new Date().toISOString());
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { if (clientId) void loadHealth(clientId); }, [clientId, loadHealth]);
+
+  const refreshHealth = useCallback(() => { void loadHealth(clientId); }, [clientId, loadHealth]);
+
+  // Auto-refresh status das fontes a cada 5 min
+  useAutoRefresh({
+    enabled: !!clientId,
+    intervalMs: 300_000,
+    onRefresh: refreshHealth,
+    refreshOnMount: false,
+  });
 
   async function handleInterpret(uploadId: string) {
     setInterpretingId(uploadId);
@@ -357,6 +401,71 @@ export default function FontesDadosPage() {
           Gerenciar conexões →
         </Link>
       </div>
+
+      {/* Saúde das fontes */}
+      {clientId && (
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Cardápio Digital */}
+          {(() => {
+            const h = health?.digitalMenu ?? "unknown";
+            const icon = h === "connected" ? <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+              : h === "error" ? <WifiOff className="w-3.5 h-3.5 text-red-400" />
+              : <WifiOff className="w-3.5 h-3.5 text-gray-300" />;
+            const cls = h === "connected" ? "border-emerald-100 bg-emerald-50"
+              : h === "error" ? "border-red-100 bg-red-50"
+              : "border-gray-100 bg-gray-50";
+            return (
+              <div className={`rounded-xl border p-3 flex items-center gap-3 ${cls}`}>
+                <UtensilsCrossed className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    Cardápio Digital {icon}
+                  </p>
+                  {h === "connected" && health?.digitalMenuProvider && (
+                    <p className="text-[10px] text-gray-500">{health.digitalMenuProvider}</p>
+                  )}
+                  {h === "connected" && health?.digitalMenuSyncAt && (
+                    <p className="text-[10px] text-gray-400">sync: {fmtDate(health.digitalMenuSyncAt)}</p>
+                  )}
+                  {h === "pending" && <p className="text-[10px] text-gray-400">Não conectado · <Link href="/admin/conexoes" className="text-indigo-600 underline">Conectar</Link></p>}
+                  {h === "error"   && <p className="text-[10px] text-red-500">Erro na conexão · <Link href="/admin/conexoes" className="underline">Verificar</Link></p>}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Meta */}
+          {(() => {
+            const h = health?.meta ?? "unknown";
+            const icon = h === "connected" ? <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+              : h === "error" ? <WifiOff className="w-3.5 h-3.5 text-amber-400" />
+              : <WifiOff className="w-3.5 h-3.5 text-gray-300" />;
+            const cls = h === "connected" ? "border-emerald-100 bg-emerald-50"
+              : h === "error" ? "border-amber-100 bg-amber-50"
+              : "border-gray-100 bg-gray-50";
+            return (
+              <div className={`rounded-xl border p-3 flex items-center gap-3 ${cls}`}>
+                <AtSign className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    Meta / Instagram {icon}
+                  </p>
+                  {h === "connected" && health?.metaUsername && (
+                    <p className="text-[10px] text-gray-500">@{health.metaUsername}</p>
+                  )}
+                  {h === "pending" && <p className="text-[10px] text-gray-400">Não vinculado · <Link href="/admin/conexoes" className="text-indigo-600 underline">Vincular</Link></p>}
+                  {h === "error"   && <p className="text-[10px] text-amber-600">Vinculado mas sem acesso a insights · <Link href="/admin/conexoes" className="underline">Verificar</Link></p>}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {lastHealthSync && (
+        <p className="text-[10px] text-gray-400 mb-4 flex items-center gap-1">
+          <Clock className="w-3 h-3" /> Status atualizado: {fmtDate(lastHealthSync)} · próxima em até 5 min
+        </p>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Coluna esquerda: Fontes disponíveis */}

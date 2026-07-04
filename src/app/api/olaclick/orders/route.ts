@@ -385,6 +385,39 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
   };
 }
 
+// ── Busca detalhes de pedidos individuais ─────────────────────────────────────
+
+const MAX_ORDER_DETAILS = 50;
+
+async function fetchOrderDetails(
+  baseUrl: string,
+  token:   string,
+  orderIds: string[],
+): Promise<Record<string, unknown>[]> {
+  const results: Record<string, unknown>[] = [];
+  const ids = orderIds.slice(0, MAX_ORDER_DETAILS);
+  for (const id of ids) {
+    if (!id) continue;
+    try {
+      const url = `${baseUrl}/v1/orders/${encodeURIComponent(id)}`;
+      const r = await fetch(url, {
+        headers: { "x-api-key": token, "accept": "application/json" },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!r.ok) {
+        // 404 confirma que endpoint de detalhe não existe — aborta
+        if (r.status === 404) break;
+        continue;
+      }
+      const detail = await r.json() as unknown;
+      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+        results.push(detail as Record<string, unknown>);
+      }
+    } catch { continue; }
+  }
+  return results;
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────────
 
 const ENDPOINT = "/v1/orders";
@@ -475,7 +508,37 @@ export async function GET(request: NextRequest) {
     }
 
     const { orders, pagination, debugShape } = fetchResult;
-    const metrics = computeMetrics(orders);
+    let metrics = computeMetrics(orders);
+
+    // Se itens não vieram no listing, tenta detalhe individual (até 50 pedidos)
+    if (metrics.topItemsUnavailable && orders.length > 0) {
+      const ids = orders.slice(0, MAX_ORDER_DETAILS).map((o) =>
+        String(o["id"] ?? o["order_id"] ?? o["uuid"] ?? o["code"] ?? o["number"] ?? ""),
+      ).filter(Boolean);
+
+      if (ids.length > 0) {
+        const safeToken = sanitizeHeaderValue(conn.access_token);
+        const details = await fetchOrderDetails(baseUrl, safeToken, ids);
+        if (details.length > 0) {
+          // Mescla itens dos detalhes nos pedidos originais
+          const enriched = orders.map((o, idx) => {
+            const det = details[idx];
+            if (!det) return o;
+            const detItems = extractItems(det);
+            if (detItems.length > 0) return { ...o, items: detItems };
+            return o;
+          });
+          metrics = computeMetrics(enriched);
+          if (!metrics.topItemsUnavailable) {
+            metrics.topItemsReason = null;
+          } else {
+            metrics.topItemsReason = "Endpoint de detalhe de pedido retornou dados, mas sem itens identificáveis.";
+          }
+        } else {
+          metrics.topItemsReason = "Produtos mais vendidos indisponíveis: a API de listagem não retornou itens e o endpoint de detalhe de pedido não está disponível ou retornou 404.";
+        }
+      }
+    }
 
     // Snapshot — falha silenciosamente se tabela não existir
     let snapshotWarning: string | null = null;

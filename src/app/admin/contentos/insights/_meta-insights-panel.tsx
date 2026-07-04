@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Smartphone, RefreshCw, AlertTriangle, CheckCircle2,
-  Users, Eye, MousePointerClick, TrendingUp, Info,
+  Users, Eye, MousePointerClick, TrendingUp, Info, Link2, ChevronDown,
 } from "lucide-react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
   const [insights, setInsights]   = useState<InsightsResponse | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [showDiag, setShowDiag] = useState(false);
 
   // Diagnóstico (chamado uma vez ao montar)
   useEffect(() => {
@@ -106,6 +108,14 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
     if (status?.canAttemptInsights) fetchInsights();
   }, [fetchInsights, status]);
 
+  // Auto-refresh insights a cada 5 min quando conectado
+  useAutoRefresh({
+    enabled: !!status?.canAttemptInsights,
+    intervalMs: 300_000,
+    onRefresh: fetchInsights,
+    refreshOnMount: false,
+  });
+
   // ── Loading inicial ────────────────────────────────────────────────────────
   if (loadingStatus) {
     return (
@@ -119,17 +129,41 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
   // ── Sem vínculo ────────────────────────────────────────────────────────────
   if (!status?.hasLinkedAsset) {
     return (
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4 flex items-start gap-3">
-        <Smartphone className="w-5 h-5 text-gray-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-        <div>
-          <p className="text-sm font-bold text-gray-600">Meta não vinculada a este cliente</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Vincule uma Página Facebook ou Instagram Business para habilitar insights.
-          </p>
-          <a href="/admin/conexoes" className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800">
-            Ir para Conexões →
-          </a>
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-gray-300" strokeWidth={1.5} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-700">Meta ainda não vinculada a este cliente</p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+              Vincule uma Página Facebook ou Instagram Business para liberar insights de alcance, impressões e seguidores.
+            </p>
+          </div>
         </div>
+        <a
+          href="/admin/conexoes"
+          className="inline-flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors px-4 py-2 rounded-xl"
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          Ir para Conexões
+        </a>
+        {/* Diagnóstico colapsável */}
+        <button
+          onClick={() => setShowDiag((v) => !v)}
+          className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <ChevronDown className={`w-3 h-3 transition-transform ${showDiag ? "rotate-180" : ""}`} />
+          Diagnóstico técnico
+        </button>
+        {showDiag && (
+          <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-[10px] font-mono space-y-0.5 text-gray-500">
+            <p><span className="text-gray-400">client_id: </span>{clientId}</p>
+            <p><span className="text-gray-400">linkedAssetFound: </span>{String(!!status?.hasLinkedAsset)}</p>
+            <p><span className="text-gray-400">hasMetaConnection: </span>{String(!!status?.hasMetaConnection)}</p>
+            <p><span className="text-gray-400">safeMessage: </span>{status?.safeMessage ?? "—"}</p>
+          </div>
+        )}
       </div>
     );
   }

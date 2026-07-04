@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/page-header";
 import {
   ShoppingCart, RefreshCw, Loader2, AlertCircle, CheckCircle2,
   TrendingUp, DollarSign, Clock, Building2, CalendarDays,
-  Link2, ChevronDown, ChevronRight, Info, BarChart3,
+  Link2, ChevronDown, ChevronRight, Info, BarChart3, FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ export default function FaturamentoPage() {
   const [missingBaseUrl,setMissingBaseUrl]= useState(false);
   const [lastSync,      setLastSync]      = useState<string | null>(null);
   const [showDiag,      setShowDiag]      = useState(false);
+  const [prevReport,    setPrevReport]    = useState<ReportData | null>(null);
 
   // Carrega lista de clientes
   useEffect(() => {
@@ -293,6 +295,56 @@ export default function FaturamentoPage() {
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isConnected    = status?.ok && status?.connection;
+
+  // Busca período anterior para comparação
+  const loadPrevReport = useCallback(async () => {
+    if (!clientId || period === "personalizado") { setPrevReport(null); return; }
+    const now = new Date();
+    const toYMD = (d: Date) => d.toISOString().split("T")[0];
+    let days = 7;
+    if (period === "7dias")    days = 7;
+    else if (period === "15dias")  days = 15;
+    else if (period === "30dias")  days = 30;
+    else if (period === "mes_atual") {
+      const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      days = Math.ceil((now.getTime() - mStart.getTime()) / 86400000) || 1;
+    } else if (period === "hoje") days = 1;
+    const prevEnd   = new Date(now); prevEnd.setDate(prevEnd.getDate() - days);
+    const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - days + 1);
+    try {
+      const r = await fetch(`/api/olaclick/orders?client_id=${clientId}&start_date=${toYMD(prevStart)}&end_date=${toYMD(prevEnd)}`);
+      const d = await r.json() as OrdersResult;
+      if (d.ok && d.data) {
+        setPrevReport({
+          faturamento_total:      d.data.faturamento_total ?? 0,
+          total_pedidos:          d.data.total_pedidos ?? 0,
+          ticket_medio:           d.data.ticket_medio ?? null,
+          pedidos_por_status:     d.data.pedidos_por_status ?? null,
+          produtos_mais_vendidos: d.data.produtos_mais_vendidos ?? null,
+          topItemsUnavailable:    d.data.topItemsUnavailable ?? false,
+          topItemsReason:         d.data.topItemsReason ?? null,
+          melhores_dias:          d.data.melhores_dias ?? null,
+          pedidos_recentes:       d.data.pedidos_recentes ?? [],
+        });
+      } else {
+        setPrevReport(null);
+      }
+    } catch { setPrevReport(null); }
+  }, [clientId, period]);
+
+  // Dispara comparação sempre que o relatório principal muda
+  useEffect(() => {
+    if (report) void loadPrevReport();
+  }, [report, loadPrevReport]);
+
+  // Auto-refresh a cada 5 minutos
+  const { refresh: autoRefreshNow } = useAutoRefresh({
+    enabled: !!clientId && !!isConnected,
+    intervalMs: 300_000,
+    onRefresh: loadReport,
+    refreshOnMount: false,
+  });
+  void autoRefreshNow; // referência para evitar lint
 
   // Aviso de período idêntico — se 50 pedidos e sem paginação detectada
   const samePeriodsWarning = report
@@ -474,6 +526,16 @@ export default function FaturamentoPage() {
         </div>
       )}
 
+      {/* Última atualização */}
+      {lastSync && !loading && (
+        <div className="mb-4 flex items-center gap-2 text-[11px] text-gray-400">
+          <Clock className="w-3 h-3" />
+          Última atualização: {fmtDate(lastSync)}
+          <span className="text-gray-300">·</span>
+          <span>Próxima em até 5 min</span>
+        </div>
+      )}
+
       {/* ── Relatório ── */}
       {report && !loading && (
         <div className="space-y-5">
@@ -503,6 +565,89 @@ export default function FaturamentoPage() {
               color="bg-blue-50 text-blue-600" />
             <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)} color="bg-violet-50 text-violet-600" />
           </div>
+
+          {/* Comparação com período anterior */}
+          {prevReport && period !== "personalizado" && report.total_pedidos > 0 && (() => {
+            const diffFat  = prevReport.faturamento_total > 0
+              ? ((report.faturamento_total - prevReport.faturamento_total) / prevReport.faturamento_total * 100)
+              : null;
+            const diffPed  = prevReport.total_pedidos > 0
+              ? ((report.total_pedidos - prevReport.total_pedidos) / prevReport.total_pedidos * 100)
+              : null;
+            const diffTick = prevReport.ticket_medio && prevReport.ticket_medio > 0 && report.ticket_medio
+              ? ((report.ticket_medio - prevReport.ticket_medio) / prevReport.ticket_medio * 100)
+              : null;
+            const sign = (v: number) => v >= 0 ? "+" : "";
+            const cls  = (v: number) => v >= 0 ? "text-emerald-600" : "text-red-500";
+            return (
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <p className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" /> Comparação com período anterior
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  {diffFat !== null && (
+                    <div className="text-center">
+                      <p className={`text-base font-black ${cls(diffFat)}`}>{sign(diffFat)}{diffFat.toFixed(1)}%</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Faturamento</p>
+                      <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.faturamento_total)}</p>
+                    </div>
+                  )}
+                  {diffPed !== null && (
+                    <div className="text-center">
+                      <p className={`text-base font-black ${cls(diffPed)}`}>{sign(diffPed)}{diffPed.toFixed(1)}%</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Pedidos</p>
+                      <p className="text-[10px] text-gray-300">{fmtCount(prevReport.total_pedidos)}</p>
+                    </div>
+                  )}
+                  {diffTick !== null && (
+                    <div className="text-center">
+                      <p className={`text-base font-black ${cls(diffTick)}`}>{sign(diffTick)}{diffTick.toFixed(1)}%</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Ticket médio</p>
+                      <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.ticket_medio)}</p>
+                    </div>
+                  )}
+                  {diffFat === null && diffPed === null && diffTick === null && (
+                    <p className="col-span-3 text-xs text-gray-400 text-center">Período anterior sem dados para comparar.</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Resumo executivo */}
+          {report.total_pedidos > 0 && (() => {
+            const statusDominante = report.pedidos_por_status
+              ? Object.entries(report.pedidos_por_status).sort((a, b) => b[1] - a[1])[0]?.[0]
+              : null;
+            const melhorDia = report.melhores_dias?.[0];
+            const lines: string[] = [];
+            lines.push(`O período teve ${fmtBRL(report.faturamento_total)} em faturamento com ${fmtCount(report.total_pedidos)} pedido${report.total_pedidos !== 1 ? "s" : ""}.`);
+            if (report.ticket_medio) lines.push(`Ticket médio de ${fmtBRL(report.ticket_medio)}.`);
+            if (statusDominante) lines.push(`Status dominante: ${statusDominante}.`);
+            if (melhorDia) lines.push(`Melhor dia: ${fmtDay(melhorDia.date)}, com ${fmtBRL(melhorDia.revenue)}.`);
+            if (report.pagination && !report.pagination.used && report.pagination.limitDetected && report.total_pedidos === report.pagination.limitDetected) {
+              lines.push(`A API retornou exatamente ${report.total_pedidos} pedidos — pode haver limite de paginação do provider; os dados podem ser parciais.`);
+            }
+            if (report.topItemsUnavailable) {
+              lines.push("Produtos mais vendidos indisponíveis: a API não retornou itens nos pedidos.");
+            }
+            return (
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="w-4 h-4 text-gray-400" />
+                  <p className="text-sm font-bold text-gray-900">Leitura do período</p>
+                </div>
+                <ul className="space-y-1.5">
+                  {lines.map((l, i) => (
+                    <li key={i} className="text-xs text-gray-600 flex items-start gap-2">
+                      <span className="text-indigo-300 mt-0.5 flex-shrink-0">·</span>
+                      {l}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
 
           {/* Pedidos por status */}
           {report.pedidos_por_status && Object.keys(report.pedidos_por_status).length > 0 && (
