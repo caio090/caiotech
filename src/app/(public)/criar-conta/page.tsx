@@ -258,7 +258,7 @@ function CriarContaForm() {
                     type="text"
                     value={form.coupon}
                     onChange={(e) => setForm((f) => ({ ...f, coupon: e.target.value.toUpperCase() }))}
-                    placeholder="BETA100 · FOUNDERS"
+                    placeholder="Digite seu cupom"
                     autoComplete="off"
                     className={inputCls}
                     disabled={loading}

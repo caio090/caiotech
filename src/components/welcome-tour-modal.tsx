@@ -11,7 +11,7 @@ const TOURS: Record<AccountType, { icon: string; title: string; steps: { icon: s
     steps: [
       { icon: "👥", title: "Cadastre seus clientes",    desc: "Adicione empresas em Admin → Clientes e comece a organizar." },
       { icon: "🔗", title: "Conecte os canais",          desc: "Vincule Meta, Instagram e OlaClick de cada cliente." },
-      { icon: "📅", title: "Planeje no ContentOS",       desc: "Crie conteúdos, agende publicações e envie para aprovação." },
+      { icon: "📅", title: "Planeje no REC OS",            desc: "Crie conteúdos, agende publicações e envie para aprovação." },
       { icon: "📊", title: "Acompanhe relatórios",       desc: "Veja métricas reais por cliente em Resultados." },
     ],
   },
@@ -40,7 +40,7 @@ const TOURS: Record<AccountType, { icon: string; title: string; steps: { icon: s
     title: "Painel administrativo",
     steps: [
       { icon: "👥", title: "Gerencie clientes",          desc: "Crie e configure clientes em Admin → Clientes." },
-      { icon: "📣", title: "Gerencie ContentOS",         desc: "Produza e aprove conteúdos por cliente." },
+      { icon: "📣", title: "Gerencie o REC OS",            desc: "Produza e aprove conteúdos por cliente." },
       { icon: "📊", title: "Veja a plataforma",          desc: "Monitore contas e status geral em Admin → Plataforma." },
       { icon: "⚙️", title: "Configure conexões",         desc: "Vincule Meta e integrações em Admin → Conexões." },
     ],

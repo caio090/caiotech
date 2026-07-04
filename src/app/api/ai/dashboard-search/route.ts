@@ -27,7 +27,7 @@ const KEYWORD_MAP: Array<{
   {
     keywords: ["conteúdo", "conteudo", "post", "publicação", "publicacao", "briefing", "calendário", "calendario", "agendamento"],
     result: {
-      answer: "O ContentOS gerencia todo o fluxo de conteúdo: do briefing à aprovação do cliente.",
+      answer: "O REC OS gerencia todo o fluxo de conteúdo: do briefing à aprovação do cliente.",
       intent: "content",
       confidence: 0.85,
       suggestedRoute: "/admin/contentos",
@@ -238,8 +238,8 @@ function keywordSearch(query: string): SearchResult {
 const SYSTEM_PROMPT = `Você é o assistente de busca do Lokat OS, um sistema de gestão de marketing e conteúdo para agências e empresas.
 Responda perguntas sobre a plataforma de forma direta e útil.
 Retorne um JSON com os campos: answer (string, resposta direta), intent (string, intenção da busca), confidence (0-1), cards (array de {title, desc, href, color}), suggestedRoute (string opcional, rota principal sugerida).
-Módulos disponíveis: ContentOS (/admin/contentos), Faturamento (/admin/relatorios/faturamento), Insights Meta (/admin/contentos/insights), Operacional (/admin/operacional), Equipe (/admin/equipe), Conexões (/admin/conexoes), Fontes de Dados (/admin/fontes-dados), Status (/admin/status).
-Use cores hex: ContentOS=#a855f7, Faturamento=#10b981, Meta=#7b6ef6, Operacional=#3b82f6, Equipe=#f59e0b, default=#7b6ef6.
+Módulos disponíveis: REC OS (/admin/contentos), Faturamento (/admin/relatorios/faturamento), Insights Meta (/admin/contentos/insights), Operacional (/admin/operacional), Equipe (/admin/equipe), Conexões (/admin/conexoes), Fontes de Dados (/admin/fontes-dados), Portal da Agência (/agency/home), Status (/admin/status).
+Use cores hex: REC OS=#a855f7, Faturamento=#10b981, Meta=#7b6ef6, Operacional=#3b82f6, Equipe=#f59e0b, Portal da Agência=#7b6ef6, default=#7b6ef6.
 Responda sempre em português. Seja conciso.`;
 
 async function openaiSearch(query: string): Promise<SearchResult | null> {

@@ -9,7 +9,7 @@ import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, 
 const DEMO_ROLES = [
   { label: "Admin",        desc: "Dashboard completo da agência",   href: "/admin/dashboard",        icon: ShieldCheck,   color: "bg-indigo-600 hover:bg-indigo-700" },
   { label: "Cliente",      desc: "Portal do cliente",               href: "/client/home",             icon: User,          color: "bg-pink-500 hover:bg-pink-600" },
-  { label: "Social Media", desc: "ContentOS — criação de conteúdo", href: "/contentos/home",          icon: Sparkles,      color: "bg-purple-600 hover:bg-purple-700" },
+  { label: "Social Media", desc: "REC OS — criação de conteúdo",    href: "/contentos/home",          icon: Sparkles,      color: "bg-purple-600 hover:bg-purple-700" },
   { label: "Growth",       desc: "GrowthOS — funil e metas",        href: "/growth/diagnosticos",     icon: TrendingUp,    color: "bg-emerald-600 hover:bg-emerald-700" },
   { label: "Financeiro",   desc: "FinanceOS — pagamentos",          href: "/financeiro/pagamentos",   icon: Wallet,        color: "bg-teal-600 hover:bg-teal-700" },
   { label: "Aluno",        desc: "Academy — cursos e treinamentos", href: "/academy/home",            icon: GraduationCap, color: "bg-amber-500 hover:bg-amber-600" },

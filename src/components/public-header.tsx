@@ -8,7 +8,7 @@ import { Menu, X } from "lucide-react";
 const navLinks = [
   { href: "/plataforma",  label: "Plataforma" },
   { href: "/diagnostico", label: "Diagnóstico" },
-  { href: "/#contentos",  label: "ContentOS" },
+  { href: "/#rec-os",     label: "REC OS" },
   { href: "/planos",      label: "Planos" },
 ];
 

@@ -10,8 +10,8 @@ import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
 interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; coming?: boolean; }
 const modules: Module[] = [
   { Icon: Users,         accent: "#7b6ef6", tag: "■ CRM",        num: "01", title: "Clientes",   desc: "Centralize clientes, histórico, entregas e relacionamento em um só lugar." },
-  { Icon: Sparkles,      accent: "#a855f7", tag: "■ Conteúdo",   num: "02", title: "ContentOS",  desc: "Planeje, crie e aprove conteúdos com mais velocidade e menos retrabalho." },
-  { Icon: Video,         accent: "#e0635a", tag: "■ Audiovisual", num: "03", title: "RecOS",      desc: "Organize roteiros, gravações e produção audiovisual com clareza." },
+  { Icon: Sparkles,      accent: "#a855f7", tag: "■ Conteúdo",   num: "02", title: "REC OS",     desc: "Planeje, crie e aprove conteúdos com mais velocidade e menos retrabalho." },
+  { Icon: Video,         accent: "#e0635a", tag: "■ Audiovisual", num: "03", title: "REC OS Vídeo", desc: "Organize roteiros, gravações e produção audiovisual com clareza." },
   { Icon: DollarSign,    accent: "#10b981", tag: "■ Finanças",    num: "04", title: "FinanceOS",  desc: "Acompanhe cobranças, receitas e pagamentos sem perder o controle." },
   { Icon: TrendingUp,    accent: "#3b82f6", tag: "■ Vendas",      num: "05", title: "GrowthOS",   desc: "Gerencie leads, propostas e oportunidades comerciais em um fluxo único." },
   { Icon: GraduationCap, accent: "#f59e0b", tag: "■ Academy",     num: "06", title: "Academy",    desc: "Treinamento e onboarding da equipe — em breve.", coming: true },

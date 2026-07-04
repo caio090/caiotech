@@ -55,13 +55,17 @@ export default function ClientConfiguracoes() {
         const json = res.ok ? (await res.json() as { client: { company_name?: string | null; responsible_name?: string | null; email?: string | null; segment?: string | null; status?: string | null } | null }) : { client: null };
         const clientRow = json.client ?? null;
 
-        setProfile({
-          company_name:     clientRow?.company_name     ?? null,
-          responsible_name: clientRow?.responsible_name ?? null,
-          email:            clientRow?.email            ?? user.email ?? null,
-          segment:          clientRow?.segment          ?? null,
-          status:           clientRow?.status           ?? null,
-        });
+        if (!clientRow) {
+          setProfile(null);
+        } else {
+          setProfile({
+            company_name:     clientRow.company_name     ?? null,
+            responsible_name: clientRow.responsible_name ?? null,
+            email:            clientRow.email            ?? user.email ?? null,
+            segment:          clientRow.segment          ?? null,
+            status:           clientRow.status           ?? null,
+          });
+        }
       } catch { /* silent */ }
       finally { setLoadingProfile(false); }
     }

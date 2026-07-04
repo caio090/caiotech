@@ -34,7 +34,7 @@ const MODULES: Module[] = [
 
   // Parcial adicional
   { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
-  { name: "Billing / Planos",   desc: "Planos e cupons criados — SQL 68 pendente de execução",    status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
+  { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — pagamentos automáticos em breve",  status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
   { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",          status: "parcial", notes: "Fix de viewport mobile: em andamento" },
 
   // Em breve
@@ -78,7 +78,7 @@ const INTEGRATIONS = [
   },
   {
     name: "Billing / Planos",
-    desc: "Planos, cupons, trial e MRR — SQL 68 pendente de execução",
+    desc: "Planos, cupons e trial configurados — gateway em breve",
     statusKey: "billing",
     status: "em_construcao",
     href: "/admin/super/billing",
