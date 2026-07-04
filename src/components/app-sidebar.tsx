@@ -13,7 +13,9 @@ import {
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
   ScrollText, Palette, Video, MousePointerClick, Link2, Upload, SlidersHorizontal,
+  Shield,
 } from "lucide-react";
+import { RecDropIcon } from "@/components/icons/RecDropIcon";
 
 export type SidebarVariant = "admin" | "client" | "contentos" | "growth" | "financeiro" | "academy" | "operacional";
 
@@ -30,8 +32,7 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/admin/inicio",       label: "Início",       icon: Home },
       { href: "/admin/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-      { href: "/admin/contentos",    label: "REC OS",       icon: Sparkles },
-      { href: "/admin/recos",        label: "RecOS",        icon: Video },
+      { href: "/admin/contentos",    label: "REC OS",       icon: RecDropIcon },
       { href: "/admin/rec/videos",   label: "REC Vídeos",   icon: Upload },
       { href: "/admin/operacional",  label: "Operacional",  icon: KanbanSquare },
       { href: "/admin/clientes",     label: "Clientes",     icon: Users },
@@ -44,7 +45,9 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/equipe",       label: "Equipe",       icon: UsersRound },
       { href: "/admin/conexoes",     label: "Conexoes",     icon: Link2 },
       { href: "/admin/whatsapp",     label: "WhatsApp",     icon: MessageSquare },
-      { href: "/admin/configuracoes",label: "Configurações",icon: Settings },
+      { href: "/admin/configuracoes",     label: "Configurações", icon: Settings },
+      { href: "/admin/super/accounts",    label: "Contas",        icon: Shield },
+      { href: "/admin/super/billing",     label: "Billing",       icon: CreditCard },
     ],
   },
   client: {
@@ -66,8 +69,8 @@ export const configs: Record<SidebarVariant, {
     ],
   },
   contentos: {
-    logo: "C",
-    logoColor: "bg-purple-600",
+    logo: "R",
+    logoColor: "bg-red-600",
     title: "REC OS",
     nav: [
       { href: "/contentos/home",             label: "Visão Geral",     icon: Home },

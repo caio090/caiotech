@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Sparkles, ArrowLeft } from "lucide-react";
+import { Bell, ArrowLeft } from "lucide-react";
+import { RecDropIcon } from "@/components/icons/RecDropIcon";
 import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
@@ -161,9 +162,8 @@ export function ContentOSLayoutShell({ children }: Props) {
 
         <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" />
-            <span className="text-sm font-semibold text-gray-700">ContentOS</span>
-            <ContentOSBrandChip />
+            <RecDropIcon size={16} className="text-red-500" />
+            <span className="text-sm font-semibold text-gray-700">REC OS</span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors">
@@ -171,7 +171,7 @@ export function ContentOSLayoutShell({ children }: Props) {
             </button>
             <button
               onClick={handleSignOut}
-              className="w-8 h-8 bg-purple-600 rounded-xl flex items-center justify-center text-white text-xs font-bold hover:bg-purple-700 transition-colors"
+              className="w-8 h-8 bg-red-600 rounded-xl flex items-center justify-center text-white text-xs font-bold hover:bg-red-700 transition-colors"
               title={`${userName} — Clique para sair`}
             >
               {initials}

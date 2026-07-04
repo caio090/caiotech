@@ -566,7 +566,7 @@ export function BriefingsContent({ tasks, primaryRole, allRoles, initialTaskId }
                   ? "Nenhuma demanda com esses filtros"
                   : "Nenhuma demanda no momento"}
               </p>
-              <p className="text-xs text-gray-400">As demandas enviadas pela ContentOS aparecerão aqui.</p>
+              <p className="text-xs text-gray-400">As demandas enviadas pelo REC OS aparecerão aqui.</p>
             </div>
           )}
 

@@ -16,7 +16,7 @@ const MODULES: Module[] = [
   { name: "Login",             desc: "Autenticação via Google OAuth",       status: "funcional" },
   { name: "Dashboard Admin",   desc: "KPIs, clientes, aprovações, módulos", status: "funcional" },
   { name: "Clientes",          desc: "Lista, badges Meta/IG, filtros",      status: "funcional" },
-  { name: "REC OS",            desc: "Criar, produzir, aprovar, agendar (migrado de ContentOS)", status: "funcional" },
+  { name: "REC OS",            desc: "Criar, produzir, aprovar, agendar conteúdos por cliente", status: "funcional" },
   { name: "Base Estratégica",  desc: "Onboarding, tom de voz, objetivo",    status: "funcional" },
   { name: "Operacional",       desc: "Kanban de projetos e tarefas",        status: "funcional" },
   { name: "Conexões",          desc: "OAuth Meta/Instagram completo",       status: "funcional" },
@@ -34,18 +34,25 @@ const MODULES: Module[] = [
 
   // Parcial adicional
   { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
-  { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — pagamentos automáticos em breve",  status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
-  { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",          status: "parcial", notes: "Fix de viewport mobile: em andamento" },
+  { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — gateway em breve",   status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
+  { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",         status: "parcial", notes: "Fix de viewport mobile: em andamento" },
+  { name: "Central de Contas",  desc: "/admin/super/accounts — rastreio de cadastros, tipos, ações", status: "parcial", notes: "Plano/cupom/trial: após SQL 70" },
+  { name: "REC OS Identidade",  desc: "Migração completa de ContentOS → REC OS com identidade vermelha e ícone gota", status: "parcial", notes: "Identidade visual em consolidação" },
+  { name: "Meta Insights",      desc: "API Graph configurada — insights dependem de permissão da conta", status: "parcial", notes: "Scope instagram_basic + pages_read_engagement pendentes" },
+  { name: "Cardápio Digital",   desc: "Faturamento real funcionando — paginação e produtos detalhados em breve", status: "parcial", notes: "Paginação além 50 pedidos: próxima fase" },
 
   // Em breve
-  { name: "Growth OS",         desc: "Leads, propostas, pipeline comercial",         status: "em_breve" },
-  { name: "Finance OS completo", desc: "Cobranças, receitas, inadimplência, MRR",    status: "em_breve" },
-  { name: "Academy",           desc: "Módulos de ensino para clientes e equipe",     status: "em_breve" },
-  { name: "Publicação automática", desc: "Postar no Instagram/Facebook via API",     status: "em_breve" },
-  { name: "Anúncios Meta",     desc: "Criar e gerenciar campanhas Meta Ads",        status: "em_breve" },
-  { name: "Google Meu Negócio", desc: "Gerenciar avaliações e publicações",         status: "em_breve" },
-  { name: "Créditos de IA",    desc: "Controle de uso por plano e compra avulsa",   status: "em_breve" },
-  { name: "App do cliente",    desc: "Portal do cliente final para aprovações",      status: "em_breve" },
+  { name: "Tráfego OS",         desc: "Meta Ads, Google Ads, SEO, campanhas pagas, orçamento e públicos", status: "em_breve" },
+  { name: "Inteligência Local", desc: "Rastreio por bairro, mapas, região, origem de pedidos e leads",    status: "em_breve" },
+  { name: "WhatsApp QR",        desc: "Conexão QR via Evolution API / WhatsApp Cloud",                    status: "em_breve" },
+  { name: "Aprovação por link", desc: "Clientes aprovam conteúdos via link externo sem login",            status: "em_breve" },
+  { name: "REC OS Vídeo",       desc: "Timeline de produção audiovisual — roteiro, gravação, edição",     status: "em_breve" },
+  { name: "Growth OS",          desc: "Leads, propostas, pipeline comercial",                             status: "em_breve" },
+  { name: "Finance OS completo",desc: "Cobranças, receitas, inadimplência, MRR",                          status: "em_breve" },
+  { name: "Academy",            desc: "Módulos de ensino para clientes e equipe",                         status: "em_breve" },
+  { name: "Publicação automática", desc: "Postar no Instagram/Facebook via API",                          status: "em_breve" },
+  { name: "Créditos de IA",     desc: "Controle de uso por plano e compra avulsa",                        status: "em_breve" },
+  { name: "App do cliente",     desc: "Portal do cliente final para aprovações",                           status: "em_breve" },
 ];
 
 const STATUS_CONFIG: Record<ModuleStatus, { label: string; icon: typeof CheckCircle2; color: string; bg: string }> = {

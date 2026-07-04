@@ -178,7 +178,7 @@ const KEYWORD_MAP: Array<{
   {
     keywords: ["rec os", "recos", "conteudo", "roteiro", "video", "briefing", "campanha", "calendário", "calendario", "producao"],
     result: {
-      answer: "O REC OS (antes ContentOS) gerencia conteúdo, roteiros, briefings, campanhas e aprovações.",
+      answer: "O REC OS gerencia conteúdo, roteiros, briefings, campanhas e aprovações.",
       intent: "rec_os",
       confidence: 0.88,
       suggestedRoute: "/admin/contentos",

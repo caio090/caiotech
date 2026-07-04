@@ -1,7 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { RecDropIcon } from "@/components/icons/RecDropIcon";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
 import type { AdminContentosClient } from "@/lib/admin-contentos-clients";
 
@@ -19,22 +20,22 @@ export function ContentOSAdminCard({ clients }: Props) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-5 mb-8">
+    <div className="rounded-2xl p-5 mb-8" style={{ background: "linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)" }}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-white" />
+            <RecDropIcon size={20} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">ContentOS</p>
-            <p className="text-xs text-purple-200">Criação, aprovação e publicação de conteúdo</p>
+            <p className="text-sm font-bold text-white">REC OS</p>
+            <p className="text-xs text-red-200">Criação, aprovação e publicação de conteúdo</p>
           </div>
         </div>
         <Link
           href="/admin/contentos/selecionar-cliente"
           className="flex items-center gap-1.5 text-xs font-bold text-white bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl transition-colors flex-shrink-0"
         >
-          Abrir ContentOS
+          Abrir REC OS
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -56,8 +57,8 @@ export function ContentOSAdminCard({ clients }: Props) {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-purple-300 mt-2">
-              Clique em um cliente para abrir a ContentOS direto.
+            <p className="text-[10px] text-red-300 mt-2">
+              Clique em um cliente para abrir o REC OS direto.
             </p>
           </>
         )}

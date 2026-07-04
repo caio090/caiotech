@@ -556,7 +556,7 @@ export function KanbanClientContent({ initialTasks, clients, isAdmin }: KanbanCl
             <ClipboardList className="w-12 h-12 mx-auto mb-3 text-gray-200" />
             <p className="text-sm font-medium text-gray-500">Nenhuma tarefa operacional criada ainda.</p>
             <p className="text-xs text-gray-400 mt-1">
-              Crie conteúdos na ContentOS e envie para produção.
+              Crie conteúdos no REC OS e envie para produção.
             </p>
           </div>
         </div>

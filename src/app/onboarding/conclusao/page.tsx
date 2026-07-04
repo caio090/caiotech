@@ -191,6 +191,29 @@ export default function OnboardingConclusaoPage() {
             entity_type: "onboarding_profiles",
             metadata:    { brand_name: stored.marca?.nome, segment: stored.marca?.segmento },
           });
+
+          // Persistir account_type em profiles (defensivo — campo pode não existir antes SQL 69)
+          const accountType = (() => {
+            try { return sessionStorage.getItem("lokat_account_type") ?? null; } catch { return null; }
+          })();
+          if (authUser && accountType) {
+            await supabase
+              .from("profiles")
+              .update({ account_type: accountType } as Record<string, string>)
+              .eq("id", authUser.id);
+          }
+
+          // Criar notificação interna para super_admin (defensivo — tabela pode não existir antes SQL 70)
+          try {
+            const brandName = stored.marca?.nome || stored.cliente?.empresa || "Novo usuário";
+            const typeLabel = accountType === "agencia" ? "Nova agência" : "Nova empresa";
+            await supabase.from("platform_notifications").insert({
+              type:       accountType === "agencia" ? "new_agency_signup" : "new_business_signup",
+              title:      `${typeLabel} cadastrada: ${brandName}`,
+              body:       `Conta criada por ${authUser?.email ?? "desconhecido"} — tipo: ${accountType ?? "não definido"}`,
+              user_id:    authUser?.id ?? null,
+            });
+          } catch { /* tabela pode não existir ainda */ }
         }
       } catch (e) {
         console.error("[conclusao] Erro ao salvar no Supabase:", e);

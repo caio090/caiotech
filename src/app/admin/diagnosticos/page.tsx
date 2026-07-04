@@ -168,7 +168,7 @@ function DiagCard({ d, onRemoveDemo }: { d: ClientDiag; onRemoveDemo?: () => voi
 
         <div className="flex flex-wrap gap-1 mt-2">
           <SourceBadge label="Diagnóstico da marca" active={d.score !== null} />
-          <SourceBadge label="Content OS"            active={d.score !== null} />
+          <SourceBadge label="REC OS"                 active={d.score !== null} />
           <SourceBadge label="Insights Meta"         active={d.hasMetaConn} />
         </div>
       </div>
@@ -570,10 +570,10 @@ export default function AdminDiagnosticosPage() {
             <p className="text-xs font-black text-purple-800">Diagnóstico Digital</p>
           </div>
           <p className="text-[11px] text-purple-700 leading-relaxed">
-            Mede presença digital, conteúdo, engajamento, consistência e estratégia. Alimenta a <strong>Content OS</strong> com contexto.
+            Mede presença digital, conteúdo, engajamento, consistência e estratégia. Alimenta o <strong>REC OS</strong> com contexto.
           </p>
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {["Diagnóstico da marca", "Content OS", "Insights Meta", "Calendário editorial"].map((l) => (
+            {["Diagnóstico da marca", "REC OS", "Insights Meta", "Calendário editorial"].map((l) => (
               <span key={l} className="text-[9px] font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{l}</span>
             ))}
           </div>
