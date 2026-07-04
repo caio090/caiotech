@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   BarChart3, FileText, Download, X, Mail, MessageCircle,
@@ -127,6 +127,14 @@ function ReportTypeCard({ icon: Icon, title, description, color, fonte, status, 
 // ── Página principal ───────────────────────────────────────────
 export default function AdminRelatoriosPage() {
   const [showExport, setShowExport] = useState(false);
+  const [metaLinked, setMetaLinked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/meta/status")
+      .then((r) => r.json())
+      .then((d: { connected?: boolean }) => setMetaLinked(!!d.connected))
+      .catch(() => setMetaLinked(false));
+  }, []);
 
   return (
     <div>
@@ -157,10 +165,10 @@ export default function AdminRelatoriosPage() {
           description="Performance de posts, alcance, engajamento, aprovações e calendário editorial por cliente."
           color="bg-pink-50 text-pink-600"
           fonte="Meta/Instagram · ContentOS"
-          status="aguardando"
+          status={metaLinked === true ? "em_preparacao" : "aguardando"}
           cta={{ label: "Ir para ContentOS Insights", href: "/admin/contentos/insights" }}
           items={[
-            { label: "Alcance e impressões (Instagram)",    ready: false },
+            { label: "Alcance e impressões (Instagram)",    ready: metaLinked === true },
             { label: "Engajamento por post",                ready: false },
             { label: "Conteúdos publicados vs. planejados", ready: false },
             { label: "Taxa de aprovação cliente",           ready: false },

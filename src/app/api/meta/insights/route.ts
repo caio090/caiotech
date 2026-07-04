@@ -1,160 +1,407 @@
-import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  createServerSupabaseClient,
+  createSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
 
-// GET /api/meta/insights
-// Verifica se existe conexão Meta ativa e retorna estrutura preparada para métricas.
-// Não inventa dados — se não houver conexão real, retorna motivo claro.
-export async function GET() {
-  // 1. Verifica vars de ambiente
-  const appId      = process.env.META_APP_ID?.trim();
-  const appSecret  = process.env.META_APP_SECRET?.trim();
-  const apiVersion = process.env.META_API_VERSION?.trim() ?? "v21.0";
+const ALLOWED_ROLES = new Set(["admin", "super_admin", "operacional", "agency", "team"]);
+const API_VERSION = process.env.META_API_VERSION?.trim() ?? "v21.0";
+const GRAPH_BASE = `https://graph.facebook.com/${API_VERSION}`;
 
-  if (!appId || !appSecret) {
-    return NextResponse.json({
-      ok:      false,
-      reason:  "env_missing",
-      message: "Variáveis Meta não configuradas. Adicione META_APP_ID e META_APP_SECRET na Vercel.",
-    });
+// ── Utilitários de data ────────────────────────────────────────────────────────
+
+function toUnix(d: Date) { return Math.floor(d.getTime() / 1000); }
+
+function periodToRange(
+  period: string,
+  startDate: string | null,
+  endDate: string | null,
+): { since: number; until: number } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === "custom" && startDate && endDate) {
+    const s = new Date(startDate + "T00:00:00");
+    const e = new Date(endDate   + "T23:59:59");
+    return { since: toUnix(s), until: toUnix(e) };
+  }
+  if (period === "current_month") {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end   = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+    return { since: toUnix(start), until: toUnix(end) };
+  }
+  const days = period === "15d" ? 15 : period === "30d" ? 30 : 7;
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  return { since: toUnix(start), until: toUnix(new Date(today.setHours(23, 59, 59))) };
+}
+
+// ── Classificador de erros Meta ────────────────────────────────────────────────
+
+interface MetaGraphError {
+  message: string;
+  type?: string;
+  code?: number;
+  error_subcode?: number;
+  fbtrace_id?: string;
+}
+
+function classifyMetaError(
+  graphErr: MetaGraphError,
+  endpoint: string,
+  metricAttempted: string,
+): {
+  ok: false;
+  provider: "meta";
+  reason: string;
+  httpStatus: number;
+  graphErrorCode: number | null;
+  graphErrorSubcode: number | null;
+  graphErrorMessage: string;
+  endpoint: string;
+  metricAttempted: string;
+  missingPermissionsLikely: string[];
+  safeMessage: string;
+} {
+  const code    = graphErr.code    ?? null;
+  const subcode = graphErr.error_subcode ?? null;
+  const msg     = graphErr.message ?? "";
+
+  let reason = "unknown_meta_error";
+  let httpStatus = 400;
+  let missing: string[] = [];
+  let safeMessage = "Erro desconhecido da Meta.";
+
+  if (code === 190) {
+    reason      = "token_expired_or_invalid";
+    httpStatus  = 401;
+    safeMessage = "Token Meta expirado ou inválido. Reconecte a conta em /admin/conexoes.";
+  } else if (code === 10) {
+    reason      = "permission_missing";
+    httpStatus  = 403;
+    missing     = ["instagram_manage_insights", "pages_read_engagement"];
+    safeMessage = "Permissão ausente no App Meta. O escopo instagram_manage_insights ou pages_read_engagement não foi concedido.";
+  } else if (code === 200) {
+    reason      = "permission_error";
+    httpStatus  = 403;
+    missing     = ["instagram_manage_insights"];
+    safeMessage = "Erro de permissão Meta. Reconecte e aceite os escopos de insights.";
+  } else if (code === 100) {
+    reason      = "invalid_parameter_or_metric";
+    httpStatus  = 400;
+    safeMessage = `Parâmetro ou métrica inválida: ${msg}. Verifique a versão da API e os campos solicitados.`;
+  } else if (code === 4 || code === 17 || code === 32) {
+    reason      = "rate_limit_or_throttle";
+    httpStatus  = 429;
+    safeMessage = "Limite de requisições da Meta atingido. Aguarde alguns minutos e tente novamente.";
+  } else if (msg.toLowerCase().includes("does not exist") || msg.toLowerCase().includes("unsupported")) {
+    reason      = "endpoint_or_asset_invalid";
+    httpStatus  = 404;
+    safeMessage = `Endpoint ou ativo não encontrado na Meta: ${msg}`;
   }
 
-  // 2. Verifica sessão do usuário
-  let userId: string | null = null;
+  return {
+    ok: false,
+    provider: "meta",
+    reason,
+    httpStatus,
+    graphErrorCode: code,
+    graphErrorSubcode: subcode,
+    graphErrorMessage: msg,
+    endpoint,
+    metricAttempted,
+    missingPermissionsLikely: missing,
+    safeMessage,
+  };
+}
+
+// ── Fetch Graph API seguro ────────────────────────────────────────────────────
+
+async function graphGet(
+  path: string,
+  token: string,
+  params: Record<string, string> = {},
+): Promise<{ data?: unknown; error?: MetaGraphError }> {
+  const url = new URL(`${GRAPH_BASE}/${path}`);
+  url.searchParams.set("access_token", token);
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v);
+  }
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    userId = user?.id ?? null;
-  } catch {
-    userId = null;
+    const res  = await fetch(url.toString(), { cache: "no-store" });
+    const json = await res.json() as { data?: unknown; error?: MetaGraphError };
+    return json;
+  } catch (e) {
+    return { error: { message: String(e), code: 0 } };
   }
+}
 
-  if (!userId) {
+// ── Agregar valores diários ───────────────────────────────────────────────────
+
+interface InsightValue { value: number; end_time: string }
+interface InsightMetric { name: string; values: InsightValue[] }
+
+function sumMetric(metric: InsightMetric): number {
+  return (metric.values ?? []).reduce((acc, v) => acc + (v.value ?? 0), 0);
+}
+
+// ── Handler principal ─────────────────────────────────────────────────────────
+
+// GET /api/meta/insights?client_id=<uuid>&period=7d|15d|30d|current_month|custom&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const clientId  = searchParams.get("client_id");
+  const period    = searchParams.get("period")     ?? "7d";
+  const startDate = searchParams.get("start_date") ?? null;
+  const endDate   = searchParams.get("end_date")   ?? null;
+
+  if (!clientId) {
     return NextResponse.json(
-      { ok: false, reason: "unauthenticated", message: "Usuário não autenticado." },
-      { status: 401 }
+      { ok: false, reason: "missing_client_id" },
+      { status: 400 }
     );
   }
 
-  // 3. Busca conexão ativa na tabela meta_connections
-  let connection: {
-    id: string;
-    page_id: string | null;
-    page_name: string | null;
-    instagram_business_account_id: string | null;
-    instagram_username: string | null;
-    token_expires_at: string | null;
-    scopes: string | null;
-    status: string;
-    is_active: boolean | null;
-    created_at: string | null;
-    meta_user_id: string | null;
-  } | null = null;
+  // Autenticação
+  let userId: string | null = null;
+  let userRole: string | null = null;
+  let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
 
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from("meta_connections")
-      .select("id, page_id, page_name, instagram_business_account_id, instagram_username, token_expires_at, scopes, status, is_active, created_at, meta_user_id")
-      .eq("connected_by", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("profiles").select("role").eq("id", userId).maybeSingle();
+      userRole = profile?.role ?? null;
+    }
+  } catch { userId = null; }
 
-    if (error) {
-      if (error.code === "42P01") {
-        return NextResponse.json({
-          ok:      false,
-          reason:  "sql_pending",
-          message: "Tabela meta_connections não existe. Rode o SQL 35 no Supabase Editor para ativar conexões.",
-        });
+  if (!userId || !supabase) {
+    return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
+  }
+  if (!userRole || !ALLOWED_ROLES.has(userRole)) {
+    return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let db: any = supabase;
+  if (hasSupabaseServiceRoleKey()) {
+    try { db = createSupabaseAdminClient(); } catch { /* usa session */ }
+  }
+
+  // Busca ativo principal do cliente
+  const { data: assetRows, error: assetErr } = await db
+    .from("client_meta_assets")
+    .select("asset_type, asset_id, username, asset_name, meta_connection_id")
+    .eq("client_id", clientId)
+    .order("is_primary", { ascending: false });
+
+  if (assetErr?.code === "42P01") {
+    return NextResponse.json({
+      ok: false,
+      reason: "sql_pending",
+      message: "Rode o SQL 37 e SQL 62 no Supabase.",
+    });
+  }
+
+  const assets = (assetRows ?? []) as Array<{
+    asset_type: string; asset_id: string;
+    username: string | null; asset_name: string | null;
+    meta_connection_id: string | null;
+  }>;
+
+  const primaryAsset =
+    assets.find((a) => a.asset_type === "instagram_business") ??
+    assets.find((a) => a.asset_type === "facebook_page") ??
+    assets[0] ?? null;
+
+  if (!primaryAsset) {
+    return NextResponse.json({
+      ok: false,
+      reason: "no_linked_asset",
+      message: "Nenhum ativo Meta vinculado a este cliente.",
+    });
+  }
+
+  if (!primaryAsset.meta_connection_id) {
+    return NextResponse.json({
+      ok: false,
+      reason: "no_connection_id",
+      message: "Ativo Meta sem conexão associada. Re-vincule em /admin/conexoes.",
+    });
+  }
+
+  // Busca token (server-side, nunca exposto)
+  const { data: connRow, error: connErr } = await db
+    .from("meta_connections")
+    .select("access_token, status, token_expires_at, scopes")
+    .eq("id", primaryAsset.meta_connection_id)
+    .maybeSingle();
+
+  if (connErr?.code === "42P01") {
+    return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 35." });
+  }
+  if (!connRow) {
+    return NextResponse.json({ ok: false, reason: "connection_not_found" });
+  }
+  if (connRow.status !== "active") {
+    return NextResponse.json({
+      ok: false, reason: "connection_not_active",
+      message: `Conexão Meta com status '${connRow.status}'. Reconecte em /admin/conexoes.`,
+    });
+  }
+  if (connRow.token_expires_at && new Date(connRow.token_expires_at) < new Date()) {
+    return NextResponse.json({
+      ok: false, reason: "token_expired",
+      message: "Token Meta expirado. Reconecte a conta.",
+    });
+  }
+
+  const token: string = connRow.access_token;
+  if (!token) {
+    return NextResponse.json({ ok: false, reason: "no_access_token" });
+  }
+
+  const { since, until } = periodToRange(period, startDate, endDate);
+
+  // ── Instagram Business insights ────────────────────────────────────────────
+  if (primaryAsset.asset_type === "instagram_business") {
+    const igId = primaryAsset.asset_id;
+
+    // Métricas de conta
+    const IG_ACCOUNT_METRICS = "reach,impressions,profile_views,website_clicks";
+    const [accountInsights, accountInfo] = await Promise.all([
+      graphGet(`${igId}/insights`, token, {
+        metric: IG_ACCOUNT_METRICS,
+        period: "day",
+        since:  String(since),
+        until:  String(until),
+      }),
+      graphGet(igId, token, {
+        fields: "followers_count,username,name",
+      }),
+    ]);
+
+    if (accountInsights.error) {
+      const classified = classifyMetaError(
+        accountInsights.error,
+        `${igId}/insights`,
+        IG_ACCOUNT_METRICS,
+      );
+      return NextResponse.json(classified, { status: classified.httpStatus });
+    }
+
+    const metricsData = (accountInsights.data as InsightMetric[] | undefined) ?? [];
+    const metrics: Record<string, number | null> = {};
+
+    for (const m of metricsData) {
+      metrics[m.name] = sumMetric(m);
+    }
+
+    // follower_count vem da conta, não de insights
+    const igInfo = accountInfo.data as { followers_count?: number; username?: string; name?: string } | undefined;
+    const followerCount = igInfo?.followers_count ?? null;
+
+    const availableMetrics: string[] = [];
+    const unavailableMetrics: string[] = [];
+
+    const EXPECTED = ["reach", "impressions", "profile_views", "website_clicks"];
+    for (const m of EXPECTED) {
+      if (metrics[m] !== undefined && metrics[m] !== null) {
+        availableMetrics.push(m);
+      } else {
+        unavailableMetrics.push(m);
       }
-      throw error;
+    }
+    if (followerCount !== null) availableMetrics.push("followers_count");
+
+    return NextResponse.json({
+      ok: true,
+      provider: "meta",
+      assetType: "instagram_business",
+      assetId: igId,
+      username: igInfo?.username ?? primaryAsset.username,
+      period,
+      since,
+      until,
+      metrics: {
+        reach:          metrics["reach"]         ?? null,
+        impressions:    metrics["impressions"]    ?? null,
+        profile_views:  metrics["profile_views"]  ?? null,
+        website_clicks: metrics["website_clicks"] ?? null,
+        followers_count: followerCount,
+      },
+      availableMetrics,
+      unavailableMetrics: unavailableMetrics.map((m) => ({
+        metric: m,
+        metricUnavailable: true,
+        reason: "not_returned_by_meta",
+      })),
+      endpoint: `${GRAPH_BASE}/${igId}/insights`,
+    });
+  }
+
+  // ── Facebook Page insights ─────────────────────────────────────────────────
+  if (primaryAsset.asset_type === "facebook_page") {
+    const pageId = primaryAsset.asset_id;
+    const FB_PAGE_METRICS = "page_impressions,page_reach";
+
+    const pageInsights = await graphGet(`${pageId}/insights`, token, {
+      metric: FB_PAGE_METRICS,
+      period: "day",
+      since:  String(since),
+      until:  String(until),
+    });
+
+    if (pageInsights.error) {
+      const classified = classifyMetaError(
+        pageInsights.error,
+        `${pageId}/insights`,
+        FB_PAGE_METRICS,
+      );
+      return NextResponse.json(classified, { status: classified.httpStatus });
     }
 
-    connection = data;
-  } catch {
-    return NextResponse.json({
-      ok:      false,
-      reason:  "db_error",
-      message: "Erro ao consultar conexões Meta no banco de dados.",
-    });
-  }
-
-  if (!connection) {
-    return NextResponse.json({
-      ok:      false,
-      reason:  "not_connected",
-      message: "Conecte a Meta para visualizar insights reais.",
-    });
-  }
-
-  // 4. Verifica se o token expirou
-  if (connection.token_expires_at) {
-    if (new Date(connection.token_expires_at) < new Date()) {
-      return NextResponse.json({
-        ok:            false,
-        reason:        "token_expired",
-        message:       "Token da Meta expirado. Reconecte a conta para renovar o acesso.",
-        connection_id: connection.id,
-      });
+    const metricsData = (pageInsights.data as InsightMetric[] | undefined) ?? [];
+    const metrics: Record<string, number | null> = {};
+    for (const m of metricsData) {
+      metrics[m.name] = sumMetric(m);
     }
-  }
 
-  // Estrutura segura da conexão (nunca expõe access_token)
-  const safeConnection = {
-    id:                            connection.id,
-    meta_user_id:                  connection.meta_user_id,
-    page_id:                       connection.page_id,
-    page_name:                     connection.page_name,
-    instagram_business_account_id: connection.instagram_business_account_id,
-    instagram_username:            connection.instagram_username,
-    created_at:                    connection.created_at,
-    api_version:                   apiVersion,
-  };
+    const EXPECTED = ["page_impressions", "page_reach"];
+    const availableMetrics   = EXPECTED.filter((m) => metrics[m] !== undefined);
+    const unavailableMetrics = EXPECTED.filter((m) => metrics[m] === undefined);
 
-  // 5. Conexão ativa sem páginas vinculadas
-  // Isso ocorre quando o callback salvou o token mas ainda não obteve os dados de página.
-  // Ainda é uma conexão válida — o usuário autorizou o app.
-  if (!connection.page_id && !connection.instagram_business_account_id) {
     return NextResponse.json({
-      ok:         true,
-      reason:     "connected_no_pages",
-      message:    "Conta Meta conectada. Para vincular Páginas ou Instagram Business, o App Meta precisa de aprovação do escopo de páginas. Tente reconectar para atualizar os dados.",
-      connection: safeConnection,
-      metrics_available: [],
-      publish_available: false,
+      ok: true,
+      provider: "meta",
+      assetType: "facebook_page",
+      assetId: pageId,
+      assetName: primaryAsset.asset_name,
+      period,
+      since,
+      until,
+      metrics: {
+        page_impressions: metrics["page_impressions"] ?? null,
+        page_reach:       metrics["page_reach"]       ?? null,
+      },
+      availableMetrics,
+      unavailableMetrics: unavailableMetrics.map((m) => ({
+        metric: m,
+        metricUnavailable: true,
+        reason: "not_returned_by_meta",
+      })),
+      endpoint: `${GRAPH_BASE}/${pageId}/insights`,
     });
   }
 
-  // 6. Verifica permissão de insights
-  const scopes = connection.scopes?.split(",").map((s) => s.trim()) ?? [];
-  const hasInsightsScope = scopes.includes("instagram_manage_insights") || scopes.length === 0;
-
-  if (!hasInsightsScope) {
-    return NextResponse.json({
-      ok:         false,
-      reason:     "insufficient_permissions",
-      message:    "Permissões insuficientes. Reconecte e aceite o escopo instagram_manage_insights.",
-      connection: safeConnection,
-    });
-  }
-
-  // 7. Conexão completa — pronta para leitura de insights
   return NextResponse.json({
-    ok:      true,
-    reason:  "ready",
-    message: "Conexão ativa. Insights disponíveis.",
-    connection: safeConnection,
-    metrics_available: [
-      "alcance",
-      "impressoes",
-      "engajamento",
-      "seguidores",
-      "posts_recentes",
-      "performance_por_midia",
-    ],
-    publish_available: false,
-    publish_note:      "Publicação automática: em breve. Requer aprovação do Meta App Review.",
+    ok: false,
+    reason: "unsupported_asset_type",
+    assetType: primaryAsset.asset_type,
+    message: "Tipo de ativo Meta não suportado para insights.",
   });
 }
