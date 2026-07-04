@@ -148,7 +148,9 @@ export default function LoginPage() {
 
             <p className="text-center text-xs text-gray-400 mt-5">
               Não tem conta?{" "}
-              <Link href="/criar-conta" className="text-indigo-600 font-medium hover:underline">Criar conta grátis</Link>
+              <Link href="/criar-conta" className="text-indigo-600 font-medium hover:underline">Começar teste grátis</Link>
+              {" · "}
+              <Link href="/planos" className="text-gray-400 hover:text-indigo-600 hover:underline">Ver planos</Link>
             </p>
 
             {/* ── Recebi um convite ── */}

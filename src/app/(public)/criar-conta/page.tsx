@@ -3,14 +3,16 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
-import { ArrowRight, Sparkles, Users, BookOpen, Shield, Loader2, Eye, EyeOff, Target, CalendarDays, CheckCircle2, BarChart2 } from "lucide-react";
+import { ArrowRight, Sparkles, Clock, Shield, Loader2, Eye, EyeOff, Target, CalendarDays, CheckCircle2, BarChart2, Tag } from "lucide-react";
 import type { ElementType } from "react";
+import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
 
 const perks: { Icon: ElementType; text: string }[] = [
+  { Icon: Clock,        text: `14 dias grátis — a partir de R$ ${MIN_PUBLIC_PRICE}/mês` },
   { Icon: Target,       text: "Diagnóstico gratuito da sua marca" },
-  { Icon: CalendarDays, text: "Calendário editorial montado pela equipe" },
-  { Icon: CheckCircle2, text: "Aprovação de conteúdos pelo app" },
-  { Icon: BarChart2,    text: "Relatórios mensais de resultados" },
+  { Icon: CalendarDays, text: "Calendário editorial com aprovação por link" },
+  { Icon: CheckCircle2, text: "Faturamento, Meta e relatórios no painel" },
+  { Icon: BarChart2,    text: "Sem cartão de crédito para começar" },
 ];
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors";
@@ -19,7 +21,9 @@ function CriarContaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromDiagnostic = searchParams.get("from") === "diagnostic";
-  const [form, setForm] = useState({ name: "", company: "", email: "", password: "" });
+  const planFromUrl = searchParams.get("plan") ?? "";
+  const couponFromUrl = searchParams.get("coupon") ?? "";
+  const [form, setForm] = useState({ name: "", company: "", email: "", password: "", coupon: couponFromUrl });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError]     = useState("");
@@ -133,10 +137,10 @@ function CriarContaForm() {
             <span className="font-bold text-gray-900">LOKAT OS</span>
           </div>
           <h1 className="text-3xl font-black text-gray-900 mb-3 leading-tight">
-            O sistema operacional<br />da sua agência começa aqui.
+            Marketing organizado.<br />Resultado visível.
           </h1>
           <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-            Configure sua marca em menos de 5 minutos e deixe nossa equipe cuidar do seu marketing.
+            14 dias para testar tudo — conteúdo, relatórios, aprovações e integrações. Sem cartão.
           </p>
           <div className="space-y-3 mb-8">
             {perks.map((p) => (
@@ -150,9 +154,8 @@ function CriarContaForm() {
           </div>
           <div className="flex items-center gap-3">
             {[
-              { icon: Users,    label: "5 clientes ativos" },
-              { icon: BookOpen, label: "Academy inclusa" },
-              { icon: Shield,   label: "Sem fidelidade" },
+              { icon: Clock,  label: "14 dias grátis" },
+              { icon: Shield, label: "Sem fidelidade" },
             ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex items-center gap-1.5 text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-xl">
                 <Icon className="w-3 h-3" />
@@ -169,8 +172,13 @@ function CriarContaForm() {
               <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 lg:hidden">
                 <span className="text-white text-xl font-black">L</span>
               </div>
-              <h2 className="text-xl font-black text-gray-900">Criar conta grátis</h2>
-              <p className="text-xs text-gray-400 mt-1">Sem cartão de crédito. Configure em 5 minutos.</p>
+              <h2 className="text-xl font-black text-gray-900">Começar teste grátis</h2>
+              <p className="text-xs text-gray-400 mt-1">14 dias grátis · sem cartão · cancele quando quiser</p>
+              {planFromUrl && (
+                <span className="inline-block mt-1.5 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full capitalize">
+                  Plano: {planFromUrl}
+                </span>
+              )}
             </div>
 
             {isSupabaseConfigured ? (
@@ -240,6 +248,23 @@ function CriarContaForm() {
                   </div>
                 </div>
 
+                {/* Cupom opcional */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                    <Tag className="w-3 h-3 text-indigo-400" />
+                    Cupom <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.coupon}
+                    onChange={(e) => setForm((f) => ({ ...f, coupon: e.target.value.toUpperCase() }))}
+                    placeholder="BETA100 · FOUNDERS"
+                    autoComplete="off"
+                    className={inputCls}
+                    disabled={loading}
+                  />
+                </div>
+
                 {/* Aceite de termos */}
                 <label className="flex items-start gap-2.5 cursor-pointer group">
                   <input
@@ -276,8 +301,8 @@ function CriarContaForm() {
                   <div className="flex items-center gap-3">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
                     <div className="text-left">
-                      <p className="text-sm font-bold">{loading ? "Criando conta…" : "Criar conta e começar"}</p>
-                      <p className="text-xs text-indigo-200">Configure sua marca passo a passo</p>
+                      <p className="text-sm font-bold">{loading ? "Criando conta…" : "Começar teste grátis"}</p>
+                      <p className="text-xs text-indigo-200">14 dias grátis · sem cartão de crédito</p>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />

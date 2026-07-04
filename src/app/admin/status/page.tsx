@@ -51,12 +51,64 @@ const STATUS_CONFIG: Record<ModuleStatus, { label: string; icon: typeof CheckCir
 };
 
 const INTEGRATIONS = [
-  { name: "Cardápio Digital (OlaClick)", desc: "Pedidos, faturamento e ticket médio via API", statusKey: "olaclick",     href: "/admin/fontes-dados" },
-  { name: "Meta / Instagram",            desc: "Insights via Graph API",                       statusKey: "meta",         href: "/admin/conexoes"    },
-  { name: "OpenAI",                      desc: "Busca com IA no painel",                       statusKey: "openai",       href: "/admin/configuracoes" },
-  { name: "Supabase",                    desc: "Banco de dados e autenticação",                 statusKey: "supabase",     href: "/admin/configuracoes" },
-  { name: "WhatsApp",                    desc: "Aprovações e alertas via WhatsApp",             statusKey: "whatsapp",     href: "/admin/whatsapp"    },
+  {
+    name: "Cardápio Digital / OlaClick",
+    desc: "Faturamento real, pedidos, ticket médio — auto-refresh a cada 5 min",
+    statusKey: "olaclick",
+    status: "ativo",
+    href: "/admin/fontes-dados",
+  },
+  {
+    name: "Meta / Instagram",
+    desc: "Conexão existe — insights dependem de vínculo e permissão da conta",
+    statusKey: "meta",
+    status: "parcial",
+    href: "/admin/conexoes",
+  },
+  {
+    name: "OpenAI / Busca IA",
+    desc: "Dashboard search com gpt-4o-mini + fallback por palavras-chave",
+    statusKey: "openai",
+    status: "em_teste",
+    href: "/admin/configuracoes",
+  },
+  {
+    name: "Billing / Planos",
+    desc: "Planos, cupons, trial e MRR — SQL 68 pendente de execução",
+    statusKey: "billing",
+    status: "em_construcao",
+    href: "/admin/super/billing",
+  },
+  {
+    name: "Fontes manuais",
+    desc: "Base criada — dados inseridos manualmente no painel",
+    statusKey: "fontes_manuais",
+    status: "ativo",
+    href: "/admin/fontes-dados",
+  },
+  {
+    name: "WhatsApp",
+    desc: "Evolution API / WhatsApp Cloud — integração planejada para próxima fase",
+    statusKey: "whatsapp",
+    status: "planejado",
+    href: "/admin/whatsapp",
+  },
+  {
+    name: "Aprovações",
+    desc: "Fluxo de aprovação de conteúdo por link — planejado",
+    statusKey: "aprovacoes",
+    status: "planejado",
+    href: "/admin/contentos/aprovacoes",
+  },
 ];
+
+const INT_STATUS = {
+  ativo:         { label: "Ativo",           icon: Wifi,        iconCls: "text-emerald-500", labelCls: "text-emerald-600" },
+  parcial:       { label: "Parcial",         icon: AlertCircle, iconCls: "text-amber-400",  labelCls: "text-amber-500"  },
+  em_teste:      { label: "Em teste",        icon: AlertCircle, iconCls: "text-blue-400",   labelCls: "text-blue-500"   },
+  em_construcao: { label: "Em construção",   icon: AlertCircle, iconCls: "text-purple-400", labelCls: "text-purple-500" },
+  planejado:     { label: "Planejado",       icon: Clock,       iconCls: "text-gray-300",   labelCls: "text-gray-400"   },
+};
 
 export default function AdminStatusPage() {
   const funcional = MODULES.filter((m) => m.status === "funcional");
@@ -78,26 +130,16 @@ export default function AdminStatusPage() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {INTEGRATIONS.map((int) => {
-            const isActive  = ["olaclick", "meta", "supabase"].includes(int.statusKey);
-            const isPartial = int.statusKey === "openai";
-            const isSoon    = int.statusKey === "whatsapp";
+            const cfg = INT_STATUS[int.status as keyof typeof INT_STATUS] ?? INT_STATUS.planejado;
+            const Icon = cfg.icon;
             return (
               <Link key={int.name} href={int.href} className="rounded-xl border p-3.5 flex items-start gap-3 no-underline transition-colors hover:bg-gray-50"
                 style={{ background: "#fff", borderColor: "#f0f0f0" }}>
-                {isSoon
-                  ? <Clock className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                  : isActive
-                    ? <Wifi className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                    : isPartial
-                      ? <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                      : <WifiOff className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                }
+                <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${cfg.iconCls}`} strokeWidth={1.5} />
                 <div>
                   <p className="text-xs font-bold text-gray-800">{int.name}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">{int.desc}</p>
-                  <p className={`text-[9px] font-semibold mt-1 ${isSoon ? "text-gray-300" : isActive ? "text-emerald-600" : isPartial ? "text-amber-500" : "text-gray-300"}`}>
-                    {isSoon ? "Em breve" : isActive ? "Ativo" : isPartial ? "Configurar chave" : "Inativo"}
-                  </p>
+                  <p className={`text-[9px] font-semibold mt-1 ${cfg.labelCls}`}>{cfg.label}</p>
                 </div>
               </Link>
             );

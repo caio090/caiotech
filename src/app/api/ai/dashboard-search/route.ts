@@ -125,7 +125,45 @@ const KEYWORD_MAP: Array<{
     },
   },
   {
-    keywords: ["status", "sistema", "integração", "integracao", "saúde", "saude", "configuração", "configuracao"],
+    keywords: ["whatsapp", "zap", "qr", "atendimento", "notificacao", "notificacao"],
+    result: {
+      answer: "O WhatsApp está em preparação. Acesse o painel para ver provedores disponíveis (Evolution API e WhatsApp Cloud) e o planejamento de integração.",
+      intent: "whatsapp",
+      confidence: 0.88,
+      suggestedRoute: "/admin/whatsapp",
+      cards: [
+        { title: "WhatsApp", desc: "Planejamento e provedores disponíveis", href: "/admin/whatsapp", color: "#25d366" },
+        { title: "Fontes de dados", desc: "Status de todas as integrações", href: "/admin/fontes-dados", color: "#3b82f6" },
+      ],
+    },
+  },
+  {
+    keywords: ["plano", "planos", "preco", "assina", "trial", "teste gratis", "upgrade", "mensalidade", "valor", "pagamento"],
+    result: {
+      answer: "Veja os planos disponíveis (Start · Pro · Agência) com 14 dias de teste grátis sem cartão.",
+      intent: "plans",
+      confidence: 0.88,
+      suggestedRoute: "/planos",
+      cards: [
+        { title: "Planos", desc: "Start · Pro · Agência — 14 dias grátis", href: "/planos", color: "#7b6ef6" },
+        { title: "Billing & MRR", desc: "Painel de assinaturas e receita", href: "/admin/super/billing", color: "#10b981" },
+      ],
+    },
+  },
+  {
+    keywords: ["cupom", "desconto", "codigo", "coupon", "founders", "beta100"],
+    result: {
+      answer: "Use um cupom na página de planos para trial estendido ou desconto especial.",
+      intent: "coupon",
+      confidence: 0.85,
+      suggestedRoute: "/planos",
+      cards: [
+        { title: "Usar cupom", desc: "Aplicar desconto ou trial especial", href: "/planos", color: "#7b6ef6" },
+      ],
+    },
+  },
+  {
+    keywords: ["status", "sistema", "integracao", "saude", "configuracao", "roadmap"],
     result: {
       answer: "O painel de status mostra a saúde de todas as integrações e módulos do sistema.",
       intent: "system_status",

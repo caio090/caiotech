@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
 import { BeforeAfterSection } from "@/components/before-after-section";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video } from "lucide-react";
+import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, Zap } from "lucide-react";
 import type { ElementType } from "react";
+import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
 
 // ── Modules ──────────────────────────────────────────────────
 interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; coming?: boolean; }
@@ -183,17 +184,36 @@ export default function HomePage() {
               A Lokat OS foi criada para resolver exatamente isso.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
             {[
-              { problem: "Conteúdo aprovado via WhatsApp", solution: "Aprovação por link público — sem grupo, sem retrabalho", color: "#a855f7" },
-              { problem: "Planilha de calendário desatualizada", solution: "Calendário editorial com status em tempo real", color: "#7b6ef6" },
-              { problem: "Financeiro sem visibilidade", solution: "Faturamento, pedidos e ticket do cardápio em um painel", color: "#10b981" },
-              { problem: "Dados de Instagram espalhados", solution: "Insights de Meta/Instagram integrados ao relatório do cliente", color: "#3b82f6" },
+              {
+                before: "\"Aprovado no WhatsApp. Acho que foi no grupo das 14h…\"",
+                after:  "Cliente aprova por link. Histórico salvo, sem buscar mensagem.",
+                color: "#a855f7",
+              },
+              {
+                before: "\"A planilha do calendário está desatualizada de novo.\"",
+                after:  "Calendário editorial com status em tempo real — todo mundo no mesmo lugar.",
+                color: "#7b6ef6",
+              },
+              {
+                before: "\"Não sei quanto faturamos no cardápio esse mês.\"",
+                after:  "Faturamento, pedidos e ticket médio no painel — atualizado a cada 5 minutos.",
+                color: "#10b981",
+              },
+              {
+                before: "\"Precisa puxar os dados do Instagram na mão toda semana.\"",
+                after:  "Meta/Instagram conectado. Alcance e engajamento no relatório do cliente.",
+                color: "#3b82f6",
+              },
             ].map((item) => (
-              <div key={item.problem} className="p-5 md:p-7 flex flex-col gap-3" style={{ background: S.card }}>
-                <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted, textDecoration: "line-through" }}>{item.problem}</p>
-                <div style={{ width: "24px", height: "1px", background: item.color, opacity: 0.5 }} />
-                <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 600, color: S.text, lineHeight: 1.4 }}>{item.solution}</p>
+              <div key={item.before} className="p-5 md:p-8 flex flex-col gap-4" style={{ background: S.card }}>
+                <p style={{ ...S.grotesk, fontSize: ".78rem", lineHeight: 1.6, color: "#44445a", fontStyle: "italic" }}>{item.before}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+                  <div style={{ flex: 1, height: "1px", background: item.color, opacity: 0.3 }} />
+                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: item.color }} />
+                </div>
+                <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 600, color: S.text, lineHeight: 1.5 }}>{item.after}</p>
               </div>
             ))}
           </div>
@@ -261,17 +281,17 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { name: "Cardápio Digital", tag: "OlaClick", desc: "Pedidos, faturamento e ticket médio do seu cardápio digital em tempo real.", color: "#10b981", status: "ativo" },
-            { name: "Meta · Instagram", tag: "Graph API", desc: "Alcance, impressões, seguidores e engajamento da página ou perfil vinculado.", color: "#7b6ef6", status: "ativo" },
-            { name: "WhatsApp", tag: "Em breve", desc: "Aprovação de conteúdo, follow-up e alertas operacionais via WhatsApp.", color: "#25d366", status: "breve" },
-            { name: "Google Analytics", tag: "Roadmap", desc: "Tráfego, sessões e conversões do site integrados ao painel de resultados.", color: "#f59e0b", status: "roadmap" },
-            { name: "Google Meu Negócio", tag: "Roadmap", desc: "Avaliações, buscas e cliques no mapa para negócios locais.", color: "#ea4335", status: "roadmap" },
-            { name: "Dados manuais", tag: "Sempre disponível", desc: "Qualquer dado pode ser inserido manualmente enquanto a integração automática não estiver pronta.", color: "#555566", status: "ativo" },
+            { name: "Cardápio Digital", tag: "Automático",  desc: "Pedidos, faturamento e ticket médio direto do seu sistema de delivery — sem exportar nada.", color: "#10b981", status: "ativo" },
+            { name: "Meta · Instagram", tag: "Automático",  desc: "Alcance, impressões e seguidores da sua página ou perfil — conectados ao relatório.", color: "#7b6ef6", status: "ativo" },
+            { name: "WhatsApp",         tag: "Em breve",    desc: "Aprovação de arte, follow-up e alertas operacionais direto no WhatsApp.", color: "#25d366", status: "breve" },
+            { name: "Google Analytics", tag: "Em breve",    desc: "Tráfego, sessões e conversões do site no painel de resultados.", color: "#f59e0b", status: "roadmap" },
+            { name: "Google Meu Negócio", tag: "Em breve",  desc: "Avaliações e buscas no mapa para negócios locais.", color: "#ea4335", status: "roadmap" },
+            { name: "Entrada manual",   tag: "Disponível",  desc: "Adicione qualquer dado manualmente. Funciona agora, sem esperar integração.", color: "#555566", status: "ativo" },
           ].map((src) => (
             <div key={src.name} className="p-5 flex flex-col gap-2.5" style={{ background: S.card, border: `1px solid ${S.border}` }}>
               <div className="flex items-center justify-between">
                 <span style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: src.status === "roadmap" ? S.muted : S.text }}>{src.name}</span>
-                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: src.color, background: `${src.color}18`, border: `1px solid ${src.color}30`, padding: ".1rem .5rem" }}>{src.tag}</span>
+                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: src.color, background: `${src.color}18`, border: `1px solid ${src.color}30`, padding: ".1rem .5rem" }}>{src.tag}</span>
               </div>
               <p style={{ ...S.grotesk, fontSize: ".72rem", lineHeight: 1.6, color: S.muted }}>{src.desc}</p>
               {src.status === "ativo" && (
@@ -359,6 +379,34 @@ export default function HomePage() {
           <Link href="/criar-conta" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
             Criar conta grátis
           </Link>
+        </div>
+      </section>
+
+      {/* ── Beta pricing strip ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-10 md:pb-16">
+        <div style={{ border: `1px solid ${S.accent}30`, background: `${S.accent}08`, padding: "2rem 2.5rem" }}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Zap style={{ width: "14px", height: "14px", color: S.accent }} />
+                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".16em", textTransform: "uppercase", color: S.accent }}>Beta aberto</span>
+              </div>
+              <h2 style={{ ...S.grotesk, fontSize: "clamp(1.2rem, 3vw, 1.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".4rem" }}>
+                {`Comece por R$ ${MIN_PUBLIC_PRICE}/mês`}
+              </h2>
+              <p style={{ ...S.grotesk, fontSize: ".8rem", color: S.muted, lineHeight: 1.6 }}>
+                14 dias grátis. Sem cartão. Conecte fontes, gere relatórios e acompanhe resultado.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <Link href="/planos" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 1.5rem", textDecoration: "none", textAlign: "center" }}>
+                Ver planos
+              </Link>
+              <Link href="/criar-conta" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", background: S.accent, color: "#fff", padding: ".75rem 1.5rem", textDecoration: "none", textAlign: "center" }}>
+                Começar teste grátis →
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
