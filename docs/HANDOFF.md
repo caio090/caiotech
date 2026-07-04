@@ -9,6 +9,57 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Branch principal observada: `main`
 - Regra: preservar mudancas locais existentes e nao alterar codigo sem plano aprovado.
 
+### Ultima sessao — 2026-07-04 — Meta Insights real
+
+**Objetivo:** Sair do placeholder "em breve" e buscar metricas reais da Meta por cliente.
+
+**O que foi implementado:**
+
+- `GET /api/meta/insights/status?client_id=<uuid>`
+  - Diagnostico seguro sem expor token.
+  - Resolve: client_meta_assets → meta_connection → token (presenca + validade).
+  - Retorna: ok, hasLinkedAsset, assetType, assetId, username, hasMetaConnection, hasAccessToken, canAttemptInsights, missing[], diagnostics, safeMessage.
+
+- `GET /api/meta/insights?client_id=<uuid>&period=7d|15d|30d|current_month|custom&start_date&end_date`
+  - Reescrito completamente.
+  - Resolve token server-side via client_meta_assets → meta_connections.access_token.
+  - Instagram Business: reach, impressions, profile_views, website_clicks, followers_count.
+  - Facebook Page: page_impressions, page_reach.
+  - Classifica erros Meta: 190=token_expired, 10=permission_missing, 100=invalid_param, 200=permission_error, 4/17/32=rate_limit.
+  - Nunca retorna token.
+
+- `src/app/admin/contentos/insights/_meta-insights-panel.tsx` (novo Client Component)
+  - Seletor de periodo: 7 dias / 15 dias / 30 dias / mes atual / personalizado.
+  - Chama status + insights no browser.
+  - Cards: Alcance, Impressoes, Seguidores, Vis. de perfil, Cliques.
+  - Bloco de diagnostico com erro Graph API + permissoes provaveis ausentes.
+
+- `src/app/admin/contentos/insights/page.tsx`
+  - Bloco Meta estatico "em breve" substituido por <MetaInsightsPanel clientId={clientId} />.
+  - Query client_meta_assets removida do server component (feita pelo painel client-side).
+
+- `src/app/admin/relatorios/page.tsx`
+  - useEffect busca /api/meta/status ao montar.
+  - Card "Relatorio de Conteudo": status aguardando → em_preparacao quando Meta conectada.
+
+**Commit:** `4364e0d` — feat: adiciona insights reais da meta
+**Push:** origin/main
+
+**O que o sistema faz agora ao acessar ContentOS Insights com Meta vinculada:**
+1. Mostra painel com seletor de periodo.
+2. Chama Graph API com token real.
+3. Se retornar metricas: exibe cards com numeros reais.
+4. Se retornar erro de permissao (code 10 ou 200): exibe "Meta conectada, mas o app ainda nao tem permissao para ler esses insights" + scope provavel + endpoint + codigo Graph.
+5. Se token expirado (code 190): exibe mensagem clara para reconectar.
+
+**SQL necessario:** Nenhum novo. Depende dos SQLs 35, 37, 59/62 ja documentados.
+
+**Pendencias:**
+- Testar em producao apos deploy automatico Vercel.
+- Se Graph API retornar erro 10 (permission_missing): anotar scope exato e endpoint.
+- Se retornar metricas reais: confirmar valores com Codex Web.
+- Produtos mais vendidos OlaClick: endpoint /v1/orders nao retorna itens — investigar se ha endpoint especifico para itens de pedido na OlaClick API.
+
 ### Ultima sessao — 2026-07-02 — fix OlaClick connect + Meta vinculation
 
 **Causa raiz OlaClick "Selecione um cliente real":**
