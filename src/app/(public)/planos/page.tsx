@@ -1,8 +1,25 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, Tag, Zap } from "lucide-react";
+import { CheckCircle2, ChevronDown, Tag, Zap, ChevronRight } from "lucide-react";
 import { PLANS, MIN_PUBLIC_PRICE, formatPrice } from "@/lib/billing/plans";
+
+const ENTITLEMENT_LABELS: Record<string, string> = {
+  dashboard_basic:      "Painel inicial",
+  data_sources_manual:  "Relatórios por arquivo ou planilha",
+  digital_menu:         "Conexão com cardápio digital",
+  meta_connection:      "Meta/Instagram conectado",
+  meta_insights:        "Insights de Meta em tempo real",
+  whatsapp_placeholder: "WhatsApp (em preparação)",
+  whatsapp_connection:  "Integração WhatsApp",
+  approvals:            "Aprovações por link",
+  ai_search:            "Busca com IA no painel",
+  contentos:            "REC OS — conteúdo e campanhas",
+  commercial_crm:       "CRM e operação comercial",
+  multi_client:         "Múltiplos clientes",
+  team_members:         "Equipe e colaboradores",
+  advanced_reports:     "Relatórios avançados",
+};
 import { PublicHeader } from "@/components/public-header";
 
 const S = {
@@ -137,7 +154,7 @@ export default function PlanosPage() {
                       <div key={e} className="flex items-center gap-2 mb-2">
                         <CheckCircle2 style={{ width: "12px", height: "12px", color, flexShrink: 0 }} strokeWidth={2} />
                         <span style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted }}>
-                          {e.replace(/_/g, " ")}
+                          {ENTITLEMENT_LABELS[e] ?? e.replace(/_/g, " ")}
                         </span>
                       </div>
                     ))}
@@ -185,54 +202,20 @@ export default function PlanosPage() {
           })}
         </div>
 
-        {/* ── Coupon block ── */}
-        <div className="mt-10" style={{ border: `1px solid ${S.border}`, background: S.card, padding: "1.5rem" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <Tag style={{ width: "14px", height: "14px", color: S.accent }} />
-            <span style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: S.text }}>Tem um cupom?</span>
-          </div>
-          <p style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted, marginBottom: "1rem" }}>
-            Use seu cupom de beta, founders ou desconto especial no checkout.
-          </p>
-          <div className="flex gap-3 flex-col sm:flex-row">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponPreview(null); setCouponMsg(""); setCouponOk(null); }}
-              onKeyDown={(e) => e.key === "Enter" && void handleValidateCoupon()}
-              placeholder="BETA100 · FOUNDERS · TESTE14"
-              style={{ flex: 1, background: "#0a0a0c", border: `1px solid ${S.border}`, color: S.text, padding: ".75rem 1rem", ...S.mono, fontSize: ".65rem", letterSpacing: ".1em", outline: "none" }}
-            />
-            <button
-              onClick={() => void handleValidateCoupon()}
-              disabled={couponLoading || !couponCode.trim()}
-              style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", background: S.accent, color: "#fff", padding: ".75rem 1.5rem", border: "none", cursor: "pointer", opacity: couponLoading ? 0.6 : 1, whiteSpace: "nowrap" }}
-            >
-              {couponLoading ? "Validando…" : "Validar cupom"}
-            </button>
-          </div>
-          {couponMsg && (
-            <div style={{ marginTop: ".75rem", padding: ".6rem .9rem", background: couponOk ? "#10b98115" : "#e0635a15", border: `1px solid ${couponOk ? "#10b98130" : "#e0635a30"}` }}>
-              <p style={{ ...S.grotesk, fontSize: ".75rem", color: couponOk ? "#10b981" : "#e0635a" }}>{couponMsg}</p>
-              {couponOk && couponPreview && (
-                <div className="flex gap-4 mt-1.5 flex-wrap">
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>
-                    {couponPreview.discountLabel}
-                  </span>
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>
-                    {`Preço: ${couponPreview.finalPrice}/mês`}
-                  </span>
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>
-                    {`Trial: ${couponPreview.trialDays} dias`}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-          <p style={{ ...S.grotesk, fontSize: ".65rem", color: S.muted, marginTop: ".75rem" }}>
-            O cupom será aplicado no cadastro. Planos anuais serão liberados no beta fechado.
-          </p>
-        </div>
+        {/* ── Coupon — discrete accordion ── */}
+        <CouponAccordion
+          couponCode={couponCode}
+          setCouponCode={setCouponCode}
+          couponLoading={couponLoading}
+          couponMsg={couponMsg}
+          couponOk={couponOk}
+          couponPreview={couponPreview}
+          setCouponPreview={setCouponPreview}
+          setCouponMsg={setCouponMsg}
+          setCouponOk={setCouponOk}
+          handleValidateCoupon={handleValidateCoupon}
+          S={S}
+        />
 
         {/* ── FAQ section ── */}
         <div className="mt-10 grid md:grid-cols-2 gap-4">
@@ -262,6 +245,77 @@ export default function PlanosPage() {
           </Link>
         </div>
       </section>
+    </div>
+  );
+}
+
+// ── Discrete coupon accordion ─────────────────────────────────────────────────
+
+interface CouponAccordionProps {
+  couponCode: string;
+  setCouponCode: (v: string) => void;
+  couponLoading: boolean;
+  couponMsg: string;
+  couponOk: boolean | null;
+  couponPreview: { discountLabel: string; trialDays: number; finalPrice: string } | null;
+  setCouponPreview: (v: { discountLabel: string; trialDays: number; finalPrice: string } | null) => void;
+  setCouponMsg: (v: string) => void;
+  setCouponOk: (v: boolean | null) => void;
+  handleValidateCoupon: () => Promise<void>;
+  S: { grotesk: React.CSSProperties; mono: React.CSSProperties; muted: string; border: string; card: string; accent: string; text: string };
+}
+
+function CouponAccordion({ couponCode, setCouponCode, couponLoading, couponMsg, couponOk, couponPreview, setCouponPreview, setCouponMsg, setCouponOk, handleValidateCoupon, S }: CouponAccordionProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-8" style={{ border: `1px solid ${S.border}` }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5"
+        style={{ background: "transparent", cursor: "pointer" }}
+      >
+        <div className="flex items-center gap-2">
+          <Tag style={{ width: "13px", height: "13px", color: S.muted }} />
+          <span style={{ ...S.grotesk, fontSize: ".78rem", color: S.muted }}>Tenho um cupom</span>
+        </div>
+        <ChevronRight style={{ width: "13px", height: "13px", color: S.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+      </button>
+      {open && (
+        <div style={{ padding: "0 1.25rem 1.25rem", borderTop: `1px solid ${S.border}`, paddingTop: "1rem" }}>
+          <p style={{ ...S.grotesk, fontSize: ".7rem", color: S.muted, marginBottom: ".75rem" }}>
+            O cupom será aplicado no cadastro. Você pode inserir também na tela de criação de conta.
+          </p>
+          <div className="flex gap-3 flex-col sm:flex-row">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponPreview(null); setCouponMsg(""); setCouponOk(null); }}
+              onKeyDown={(e) => e.key === "Enter" && void handleValidateCoupon()}
+              placeholder="Digite seu cupom"
+              style={{ flex: 1, background: "#0a0a0c", border: `1px solid ${S.border}`, color: S.text, padding: ".65rem .9rem", ...S.mono, fontSize: ".65rem", letterSpacing: ".08em", outline: "none" }}
+            />
+            <button
+              onClick={() => void handleValidateCoupon()}
+              disabled={couponLoading || !couponCode.trim()}
+              style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", background: S.accent, color: "#fff", padding: ".65rem 1.2rem", border: "none", cursor: "pointer", opacity: couponLoading ? 0.6 : 1, whiteSpace: "nowrap" }}
+            >
+              {couponLoading ? "Validando…" : "Validar"}
+            </button>
+          </div>
+          {couponMsg && (
+            <div style={{ marginTop: ".6rem", padding: ".5rem .75rem", background: couponOk ? "#10b98115" : "#e0635a15", border: `1px solid ${couponOk ? "#10b98130" : "#e0635a30"}` }}>
+              <p style={{ ...S.grotesk, fontSize: ".72rem", color: couponOk ? "#10b981" : "#e0635a" }}>{couponMsg}</p>
+              {couponOk && couponPreview && (
+                <div className="flex gap-3 mt-1 flex-wrap">
+                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{couponPreview.discountLabel}</span>
+                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{`Preço: ${couponPreview.finalPrice}/mês`}</span>
+                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{`Trial: ${couponPreview.trialDays} dias`}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

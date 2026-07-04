@@ -151,14 +151,14 @@ const KEYWORD_MAP: Array<{
     },
   },
   {
-    keywords: ["cupom", "desconto", "codigo", "coupon", "founders", "beta100"],
+    keywords: ["cupom", "desconto", "codigo", "coupon"],
     result: {
-      answer: "Use um cupom na página de planos para trial estendido ou desconto especial.",
+      answer: "Você pode aplicar um cupom na página de planos ou durante o cadastro.",
       intent: "coupon",
       confidence: 0.85,
       suggestedRoute: "/planos",
       cards: [
-        { title: "Usar cupom", desc: "Aplicar desconto ou trial especial", href: "/planos", color: "#7b6ef6" },
+        { title: "Ver planos", desc: "Aplicar cupom no cadastro", href: "/planos", color: "#7b6ef6" },
       ],
     },
   },
@@ -172,6 +172,45 @@ const KEYWORD_MAP: Array<{
       cards: [
         { title: "Status do sistema", desc: "Saúde das integrações", href: "/admin/status", color: "#10b981" },
         { title: "Fontes de dados", desc: "Cardápio digital e Meta", href: "/admin/fontes-dados", color: "#3b82f6" },
+      ],
+    },
+  },
+  {
+    keywords: ["rec os", "recos", "conteudo", "roteiro", "video", "briefing", "campanha", "calendário", "calendario", "producao"],
+    result: {
+      answer: "O REC OS (antes ContentOS) gerencia conteúdo, roteiros, briefings, campanhas e aprovações.",
+      intent: "rec_os",
+      confidence: 0.88,
+      suggestedRoute: "/admin/contentos",
+      cards: [
+        { title: "REC OS", desc: "Conteúdo, campanhas e aprovações", href: "/admin/contentos", color: "#a855f7" },
+        { title: "Aprovações", desc: "Conteúdos aguardando revisão", href: "/admin/contentos/aprovacoes", color: "#f59e0b" },
+      ],
+    },
+  },
+  {
+    keywords: ["agencia", "agência", "portal da agencia", "clientes da agencia", "minha agencia"],
+    result: {
+      answer: "O Portal da Agência mostra clientes, limite de uso, aprovações e ações rápidas.",
+      intent: "agency_portal",
+      confidence: 0.88,
+      suggestedRoute: "/agency/home",
+      cards: [
+        { title: "Portal da Agência", desc: "Clientes, plano e operação", href: "/agency/home", color: "#7b6ef6" },
+        { title: "Clientes", desc: "Gerenciar clientes atendidos", href: "/admin/clientes", color: "#a855f7" },
+      ],
+    },
+  },
+  {
+    keywords: ["upgrade", "trial", "teste gratis", "periodo de teste", "assinar", "renovar"],
+    result: {
+      answer: "Veja os planos para fazer upgrade ou entender seu período de teste atual.",
+      intent: "upgrade",
+      confidence: 0.87,
+      suggestedRoute: "/planos",
+      cards: [
+        { title: "Fazer upgrade", desc: "Ver planos e preços", href: "/planos", color: "#7b6ef6" },
+        { title: "Billing", desc: "Assinaturas e status do plano", href: "/admin/super/billing", color: "#10b981" },
       ],
     },
   },

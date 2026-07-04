@@ -173,278 +173,168 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── O que a Lokat OS resolve ── */}
-      <section className="py-14 md:py-20" style={{ borderTop: `1px solid ${S.border}` }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
-          <div className="mb-10 md:mb-14">
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, maxWidth: "600px" }}>
-              Tudo espalhado. Nada funcionando junto.
+      {/* ════════════════════════════════════════════════════════
+          SEÇÕES CLARAS — abaixo do hero o design vira clean/branco
+          ════════════════════════════════════════════════════════ */}
+      <div style={{ background: "#fff", color: "#111" }}>
+
+        {/* ── O que a Lokat OS organiza ── */}
+        <section className="max-w-5xl mx-auto px-4 md:px-8 py-16 md:py-24">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-4xl font-black text-gray-900 leading-tight mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              O que a Lokat OS organiza para você
             </h2>
-            <p style={{ ...S.grotesk, color: S.muted, fontSize: ".9rem", lineHeight: 1.7, maxWidth: "500px", marginTop: ".7rem" }}>
-              A Lokat OS foi criada para resolver exatamente isso.
+            <p className="text-gray-500 text-sm md:text-base max-w-xl mx-auto leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Cada parte do negócio num lugar só — sem planilha avulsa, sem WhatsApp perdido.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              {
-                before: "\"Aprovado no WhatsApp. Acho que foi no grupo das 14h…\"",
-                after:  "Cliente aprova por link. Histórico salvo, sem buscar mensagem.",
-                color: "#a855f7",
-              },
-              {
-                before: "\"A planilha do calendário está desatualizada de novo.\"",
-                after:  "Calendário editorial com status em tempo real — todo mundo no mesmo lugar.",
-                color: "#7b6ef6",
-              },
-              {
-                before: "\"Não sei quanto faturamos no cardápio esse mês.\"",
-                after:  "Faturamento, pedidos e ticket médio no painel — atualizado a cada 5 minutos.",
-                color: "#10b981",
-              },
-              {
-                before: "\"Precisa puxar os dados do Instagram na mão toda semana.\"",
-                after:  "Meta/Instagram conectado. Alcance e engajamento no relatório do cliente.",
-                color: "#3b82f6",
-              },
-            ].map((item) => (
-              <div key={item.before} className="p-5 md:p-8 flex flex-col gap-4" style={{ background: S.card }}>
-                <p style={{ ...S.grotesk, fontSize: ".78rem", lineHeight: 1.6, color: "#44445a", fontStyle: "italic" }}>{item.before}</p>
-                <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
-                  <div style={{ flex: 1, height: "1px", background: item.color, opacity: 0.3 }} />
-                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: item.color }} />
-                </div>
-                <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 600, color: S.text, lineHeight: 1.5 }}>{item.after}</p>
+              { icon: "📊", title: "Dados do negócio",      desc: "Faturamento, pedidos e métricas das suas fontes — atualizados automaticamente." },
+              { icon: "✅", title: "Conteúdo e aprovações", desc: "Calendário, briefings e aprovação por link. Sem vai e vem no WhatsApp." },
+              { icon: "📈", title: "Relatórios e decisões", desc: "Resultados de campanha, alcance Meta e ticket médio num único painel." },
+              { icon: "👥", title: "Clientes e operação",   desc: "Gerencie clientes, equipe, tarefas e contratos no mesmo sistema." },
+            ].map((c) => (
+              <div key={c.title} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div className="text-2xl mb-3">{c.icon}</div>
+                <h3 className="font-bold text-gray-900 text-sm mb-1.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.title}</h3>
+                <p className="text-gray-500 text-xs leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.desc}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Prova social — logos ── */}
-      <section className="py-12 md:py-16" style={{ overflow: "hidden" }}>
-        <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".22em", textTransform: "uppercase", color: S.muted, textAlign: "center", marginBottom: "2.5rem" }}>
-          Empresas que confiam na Lokat
-        </p>
-        <div style={{ overflow: "hidden", maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)" }}>
-          <div className="lk-logo-track" style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem" }}>
-            {[...clients, ...clients, ...clients, ...clients].map((c, i) => (
-              <div
-                key={i}
-                style={{
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.07)",
-                  borderRadius: "50%",
-                  width: "76px",
-                  height: "76px",
-                  filter: "grayscale(100%)",
-                  opacity: 0.45,
-                  transition: "opacity .3s, filter .3s, transform .3s",
-                  cursor: "default",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.filter = "none"; e.currentTarget.style.transform = "scale(1.06)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.45"; e.currentTarget.style.filter = "grayscale(100%)"; e.currentTarget.style.transform = "scale(1)"; }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/clients/${c.file}`}
-                  alt={c.name}
-                  style={{ height: "44px", width: "44px", objectFit: "contain", borderRadius: "4px" }}
-                  onError={(e) => {
-                    const el = e.currentTarget;
-                    el.style.display = "none";
-                    const next = el.nextElementSibling as HTMLElement;
-                    if (next) next.style.display = "block";
-                  }}
-                />
-                <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".08em", textTransform: "uppercase", color: S.muted, display: "none" }}>
-                  {c.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Fontes que a Lokat OS entende ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 py-14 md:py-20">
-        <div className="mb-10">
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
-            Conecta com o que você já usa
-          </h2>
-          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".85rem", lineHeight: 1.65, marginTop: ".5rem", maxWidth: "480px" }}>
-            Sem exportar planilha. Sem copiar dado manualmente. A plataforma puxa os números automaticamente.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[
-            { name: "Cardápio Digital", tag: "Automático",  desc: "Pedidos, faturamento e ticket médio direto do seu sistema de delivery — sem exportar nada.", color: "#10b981", status: "ativo" },
-            { name: "Meta · Instagram", tag: "Automático",  desc: "Alcance, impressões e seguidores da sua página ou perfil — conectados ao relatório.", color: "#7b6ef6", status: "ativo" },
-            { name: "WhatsApp",         tag: "Em breve",    desc: "Aprovação de arte, follow-up e alertas operacionais direto no WhatsApp.", color: "#25d366", status: "breve" },
-            { name: "Google Analytics", tag: "Em breve",    desc: "Tráfego, sessões e conversões do site no painel de resultados.", color: "#f59e0b", status: "roadmap" },
-            { name: "Google Meu Negócio", tag: "Em breve",  desc: "Avaliações e buscas no mapa para negócios locais.", color: "#ea4335", status: "roadmap" },
-            { name: "Entrada manual",   tag: "Disponível",  desc: "Adicione qualquer dado manualmente. Funciona agora, sem esperar integração.", color: "#555566", status: "ativo" },
-          ].map((src) => (
-            <div key={src.name} className="p-5 flex flex-col gap-2.5" style={{ background: S.card, border: `1px solid ${S.border}` }}>
-              <div className="flex items-center justify-between">
-                <span style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: src.status === "roadmap" ? S.muted : S.text }}>{src.name}</span>
-                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: src.color, background: `${src.color}18`, border: `1px solid ${src.color}30`, padding: ".1rem .5rem" }}>{src.tag}</span>
-              </div>
-              <p style={{ ...S.grotesk, fontSize: ".72rem", lineHeight: 1.6, color: S.muted }}>{src.desc}</p>
-              {src.status === "ativo" && (
-                <div className="flex items-center gap-1.5" style={{ marginTop: "auto" }}>
-                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: src.color }} />
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: src.color }}>integrado</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Como funciona ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-14 md:pb-20">
-        <div className="mb-10">
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
-            Como funciona
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
-          {[
-            { step: "1", color: "#7b6ef6", title: "Conecte e configure", desc: "Vincule o cardápio digital, Meta/Instagram e configure os clientes. Tudo em menos de 10 minutos." },
-            { step: "2", color: "#a855f7", title: "Crie e aprove conteúdo", desc: "Briefings, calendário editorial e aprovação do cliente por link público — sem WhatsApp, sem retrabalho." },
-            { step: "3", color: "#10b981", title: "Acompanhe os resultados", desc: "Faturamento, insights de Meta e relatórios por cliente em um painel que se atualiza automaticamente." },
-          ].map((item) => (
-            <div key={item.step} className="p-6 md:p-8 flex flex-col gap-4" style={{ background: S.card }}>
-              <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: `${item.color}18`, border: `1.5px solid ${item.color}35`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ ...S.mono, fontSize: ".7rem", color: item.color, fontWeight: 700 }}>{item.step}</span>
-              </div>
-              <div>
-                <h3 style={{ ...S.grotesk, fontSize: ".95rem", fontWeight: 700, color: S.text, marginBottom: ".4rem", lineHeight: 1.2 }}>{item.title}</h3>
-                <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.7, color: S.muted }}>{item.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Antes e Depois (animado com IntersectionObserver) ── */}
-      <BeforeAfterSection />
-
-
-      {/* ── O que você visualiza no painel ── */}
-      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-8 pb-10 md:pb-20">
-        <div className="mb-8">
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
-            Tudo em um único painel
-          </h2>
-          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".85rem", lineHeight: 1.65, marginTop: ".5rem", maxWidth: "480px" }}>
-            Cada módulo resolve uma parte do negócio. Juntos, formam uma visão completa do cliente.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
-          {modules.map((m) => (
-            <div
-              key={m.title}
-              className="p-4 md:p-6"
-              style={{
-                background: m.coming ? "#0d0d14" : S.card,
-                position: "relative",
-                transition: "background .2s",
-                opacity: m.coming ? 0.55 : 1,
-              }}
-              onMouseEnter={(e) => { if (!m.coming) e.currentTarget.style.background = "#191924"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; }}
-            >
-              {m.coming && (
-                <div style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#f59e0b", background: "#f59e0b18", border: "1px solid #f59e0b30", padding: ".1rem .4rem", position: "absolute", top: ".4rem", right: ".4rem" }}>
-                  breve
-                </div>
-              )}
-              <div style={{ width: "32px", height: "32px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".65rem" }}>
-                <m.Icon style={{ width: "14px", height: "14px", color: m.accent }} strokeWidth={1.5} />
-              </div>
-              <p style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: S.text, marginBottom: ".25rem", lineHeight: 1.2 }}>{m.title}</p>
-              <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 mt-6">
-          <Link href="/diagnostico" style={{ background: S.accent, color: "#fff", padding: ".85rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
-            ■ Ver na prática →
-          </Link>
-          <Link href="/criar-conta" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
-            Criar conta grátis
-          </Link>
-        </div>
-      </section>
-
-      {/* ── Beta pricing strip ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-10 md:pb-16">
-        <div style={{ border: `1px solid ${S.accent}30`, background: `${S.accent}08`, padding: "2rem 2.5rem" }}>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Zap style={{ width: "14px", height: "14px", color: S.accent }} />
-                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".16em", textTransform: "uppercase", color: S.accent }}>Beta aberto</span>
-              </div>
-              <h2 style={{ ...S.grotesk, fontSize: "clamp(1.2rem, 3vw, 1.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".4rem" }}>
-                {`Comece por R$ ${MIN_PUBLIC_PRICE}/mês`}
+        {/* ── Jornada: Conecta → Analisa → Produz → Aprova → Mede ── */}
+        <section className="py-12 md:py-20" style={{ background: "#f9f8ff" }}>
+          <div className="max-w-5xl mx-auto px-4 md:px-8">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                Do conteúdo ao faturamento, tudo no mesmo fluxo
               </h2>
-              <p style={{ ...S.grotesk, fontSize: ".8rem", color: S.muted, lineHeight: 1.6 }}>
-                14 dias grátis. Sem cartão. Conecte fontes, gere relatórios e acompanhe resultado.
+              <p className="text-gray-500 text-sm max-w-md mx-auto" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                Cada etapa conectada à próxima — sem exportar, sem copiar, sem retrabalho.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
-              <Link href="/planos" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".75rem 1.5rem", textDecoration: "none", textAlign: "center" }}>
-                Ver planos
+            <div className="flex flex-col md:flex-row items-stretch gap-0 overflow-hidden rounded-2xl border border-gray-100 shadow-sm">
+              {[
+                { num: "1", label: "Conecta",  desc: "Cardápio, Meta, planilhas", color: "#7b6ef6" },
+                { num: "2", label: "Analisa",  desc: "Dados e métricas reais",    color: "#a855f7" },
+                { num: "3", label: "Produz",   desc: "Conteúdo com briefing IA",  color: "#6366f1" },
+                { num: "4", label: "Aprova",   desc: "Cliente aprova por link",   color: "#8b5cf6" },
+                { num: "5", label: "Mede",     desc: "Resultado e relatório",     color: "#10b981" },
+              ].map((step, i, arr) => (
+                <div
+                  key={step.label}
+                  className="flex-1 flex flex-col items-center justify-center text-center p-5 md:p-6 relative"
+                  style={{ background: i % 2 === 0 ? "#fff" : "#fafafe", borderRight: i < arr.length - 1 ? "1px solid #ebebf7" : "none" }}
+                >
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center mb-2.5 text-white text-xs font-black" style={{ background: step.color, fontFamily: "'Space Mono', monospace" }}>
+                    {step.num}
+                  </div>
+                  <p className="font-black text-gray-900 text-sm mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{step.label}</p>
+                  <p className="text-gray-400 text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Fontes que a Lokat OS entende ── */}
+        <section className="max-w-5xl mx-auto px-4 md:px-8 py-16 md:py-24">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Conecta com o que você já usa
+            </h2>
+            <p className="text-gray-500 text-sm max-w-md mx-auto" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Sem exportar planilha. Sem copiar dado à mão. Os números chegam automaticamente.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { name: "Cardápio Digital", sub: "Pedidos e faturamento",     color: "#10b981", status: "ativo"    },
+              { name: "Meta / Instagram", sub: "Alcance e engajamento",     color: "#7b6ef6", status: "ativo"    },
+              { name: "WhatsApp",         sub: "Aprovações e alertas",      color: "#25d366", status: "breve"    },
+              { name: "Arquivos e planilhas", sub: "Entrada manual",        color: "#6b7280", status: "ativo"    },
+              { name: "CRM",              sub: "Leads e oportunidades",     color: "#f59e0b", status: "breve"    },
+              { name: "PDV / Caixa",      sub: "Vendas presenciais",        color: "#3b82f6", status: "roadmap"  },
+            ].map((src) => (
+              <div key={src.name} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${src.color}15` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: src.color }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm text-gray-900 leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{src.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{src.sub}</p>
+                  <span className="inline-block mt-1.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ fontFamily: "'Space Mono', monospace", color: src.color, background: `${src.color}12` }}>
+                    {src.status === "ativo" ? "Disponível" : src.status === "breve" ? "Em breve" : "Roadmap"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Beta pricing ── */}
+        <section className="py-12 md:py-20" style={{ background: "#f9f8ff" }}>
+          <div className="max-w-3xl mx-auto px-4 md:px-8 text-center">
+            <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-4 py-1.5 rounded-full mb-6">
+              <Zap className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-xs font-bold text-indigo-700" style={{ fontFamily: "'Space Mono', monospace" }}>Beta aberto</span>
+            </div>
+            <h2 className="text-2xl md:text-4xl font-black text-gray-900 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Comece pelo beta
+            </h2>
+            <p className="text-gray-500 text-sm md:text-base mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              A partir de <strong className="text-gray-900">R$ {MIN_PUBLIC_PRICE}/mês</strong> · 14 dias grátis · Sem cartão
+            </p>
+            <p className="text-gray-400 text-xs mb-8" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Planos para empresa e agência — cancele quando quiser
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/criar-conta"
+                className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Começar 14 dias grátis
               </Link>
-              <Link href="/criar-conta" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", background: S.accent, color: "#fff", padding: ".75rem 1.5rem", textDecoration: "none", textAlign: "center" }}>
-                Começar teste grátis →
+              <Link
+                href="/planos"
+                className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Ver planos e preços
               </Link>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── CTA final ── */}
-      <section id="cta" className="px-4 md:px-8 py-16 md:py-[6rem]" style={{ position: "relative", overflow: "hidden", textAlign: "center" }}>
-        {/* bg accent gradient */}
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${S.accent}22 0%, #a855f720 50%, ${S.accent}15 100%)`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", inset: 0, borderTop: `1px solid ${S.accent}30`, borderBottom: `1px solid ${S.accent}30`, pointerEvents: "none" }} />
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, marginBottom: "1rem" }}>[Pronto para começar?]</p>
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".75rem" }}>
-            Diagnóstico gratuito.<br />Resultado em minutos.
+        {/* ── CTA final ── */}
+        <section className="max-w-4xl mx-auto px-4 md:px-8 py-16 md:py-24 text-center">
+          <h2 className="text-2xl md:text-4xl font-black text-gray-900 mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Diagnóstico gratuito.<br className="hidden md:block" /> Resultado em minutos.
           </h2>
-          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".95rem", maxWidth: "480px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
-            Entenda o potencial da sua presença digital e comece a organizar sem planilha, sem WhatsApp perdido e sem retrabalho.
+          <p className="text-gray-500 text-sm md:text-base max-w-lg mx-auto mb-8 leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Entenda o potencial da sua presença digital. Comece a organizar sem planilha, sem WhatsApp perdido e sem retrabalho.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/diagnostico"
-              className="w-full sm:w-auto text-center"
-              style={{ background: S.accent, color: "#fff", padding: ".85rem 2.5rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700, transition: "background .2s, box-shadow .2s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#8f84f8"; e.currentTarget.style.boxShadow = `0 0 36px ${S.accent}60`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.boxShadow = "none"; }}
+              className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-bold px-8 py-3.5 rounded-xl hover:bg-indigo-700 transition-colors"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              ■ Quero ver na prática →
+              Quero ver na prática →
             </Link>
             <Link
               href="/criar-conta"
-              className="w-full sm:w-auto text-center"
-              style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s, color .2s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.color = S.text; }}
+              className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3.5 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               Criar conta grátis
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/* ── Footer ── */}
       <footer style={{ borderTop: `1px solid ${S.border}`, padding: "3rem 2rem 2rem" }}>

@@ -177,7 +177,19 @@ export default function ClientConfiguracoes() {
             </p>
           </div>
         ) : (
-          <p className="text-xs text-gray-400">Nenhum dado encontrado.</p>
+          <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-700">Nenhuma empresa vinculada a esta conta</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Se você é agência ou opera por conta própria, acesse o painel correspondente.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <a href="/agency/home" className="text-xs font-bold text-purple-600 hover:underline">→ Portal da Agência</a>
+              <a href="/admin/inicio" className="text-xs font-bold text-indigo-600 hover:underline">→ Painel Admin</a>
+            </div>
+            <p className="text-[11px] text-gray-400 pt-1">
+              Se recebeu um convite de empresa, peça um novo link à agência responsável.
+            </p>
+          </div>
         )}
       </div>
 

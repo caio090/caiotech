@@ -16,9 +16,8 @@ const MODULES: Module[] = [
   { name: "Login",             desc: "Autenticação via Google OAuth",       status: "funcional" },
   { name: "Dashboard Admin",   desc: "KPIs, clientes, aprovações, módulos", status: "funcional" },
   { name: "Clientes",          desc: "Lista, badges Meta/IG, filtros",      status: "funcional" },
-  { name: "Content OS",        desc: "Criar, produzir, aprovar, agendar",   status: "funcional" },
+  { name: "REC OS",            desc: "Criar, produzir, aprovar, agendar (migrado de ContentOS)", status: "funcional" },
   { name: "Base Estratégica",  desc: "Onboarding, tom de voz, objetivo",    status: "funcional" },
-  { name: "Rec OS",            desc: "Gravações, roteiros, aprovação",      status: "funcional" },
   { name: "Operacional",       desc: "Kanban de projetos e tarefas",        status: "funcional" },
   { name: "Conexões",          desc: "OAuth Meta/Instagram completo",       status: "funcional" },
   { name: "Equipe",            desc: "Solicitações de acesso e membros",    status: "funcional" },
@@ -32,6 +31,11 @@ const MODULES: Module[] = [
   { name: "Financeiro",        desc: "Página criada, sem dados reais ainda",         status: "parcial", notes: "Cobranças e MRR: próxima fase" },
   { name: "Relatórios",        desc: "Estrutura criada, dados limitados",            status: "parcial", notes: "Cruzamento de dados: próxima fase" },
   { name: "Diagnósticos",      desc: "Formulário criado, sem automação de envio",    status: "parcial" },
+
+  // Parcial adicional
+  { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
+  { name: "Billing / Planos",   desc: "Planos e cupons criados — SQL 68 pendente de execução",    status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
+  { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",          status: "parcial", notes: "Fix de viewport mobile: em andamento" },
 
   // Em breve
   { name: "Growth OS",         desc: "Leads, propostas, pipeline comercial",         status: "em_breve" },

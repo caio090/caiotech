@@ -198,7 +198,15 @@ export default function OnboardingConclusaoPage() {
       }
     }
 
-    router.push("/client/home");
+    // Redirecionar conforme tipo de conta escolhido no onboarding
+    let destination = "/client/home";
+    try {
+      const accountType = sessionStorage.getItem("lokat_account_type");
+      if (accountType === "agencia" || accountType === "agency") {
+        destination = "/agency/home";
+      }
+    } catch {}
+    router.push(destination);
   }
 
   const principal = getObjetivoPrincipal(data);
