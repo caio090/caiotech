@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/page-header";
-import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Wifi, WifiOff, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 
 type ModuleStatus = "funcional" | "parcial" | "em_breve";
 
@@ -49,6 +50,14 @@ const STATUS_CONFIG: Record<ModuleStatus, { label: string; icon: typeof CheckCir
   em_breve:  { label: "Em breve",   icon: Clock,        color: "text-gray-400",    bg: "bg-gray-50 border-gray-100"     },
 };
 
+const INTEGRATIONS = [
+  { name: "Cardápio Digital (OlaClick)", desc: "Pedidos, faturamento e ticket médio via API", statusKey: "olaclick",     href: "/admin/fontes-dados" },
+  { name: "Meta / Instagram",            desc: "Insights via Graph API",                       statusKey: "meta",         href: "/admin/conexoes"    },
+  { name: "OpenAI",                      desc: "Busca com IA no painel",                       statusKey: "openai",       href: "/admin/configuracoes" },
+  { name: "Supabase",                    desc: "Banco de dados e autenticação",                 statusKey: "supabase",     href: "/admin/configuracoes" },
+  { name: "WhatsApp",                    desc: "Aprovações e alertas via WhatsApp",             statusKey: "whatsapp",     href: "/admin/whatsapp"    },
+];
+
 export default function AdminStatusPage() {
   const funcional = MODULES.filter((m) => m.status === "funcional");
   const parcial   = MODULES.filter((m) => m.status === "parcial");
@@ -58,8 +67,43 @@ export default function AdminStatusPage() {
     <div>
       <PageHeader
         title="Status da V1"
-        description="O que está funcional, parcial e em breve na LOKAT OS"
+        description="Saúde das integrações e estado dos módulos da LOKAT OS"
       />
+
+      {/* Integrações */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <ShieldAlert className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
+          <h2 className="text-sm font-black text-gray-700">Integrações</h2>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {INTEGRATIONS.map((int) => {
+            const isActive  = ["olaclick", "meta", "supabase"].includes(int.statusKey);
+            const isPartial = int.statusKey === "openai";
+            const isSoon    = int.statusKey === "whatsapp";
+            return (
+              <Link key={int.name} href={int.href} className="rounded-xl border p-3.5 flex items-start gap-3 no-underline transition-colors hover:bg-gray-50"
+                style={{ background: "#fff", borderColor: "#f0f0f0" }}>
+                {isSoon
+                  ? <Clock className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                  : isActive
+                    ? <Wifi className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                    : isPartial
+                      ? <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                      : <WifiOff className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                }
+                <div>
+                  <p className="text-xs font-bold text-gray-800">{int.name}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{int.desc}</p>
+                  <p className={`text-[9px] font-semibold mt-1 ${isSoon ? "text-gray-300" : isActive ? "text-emerald-600" : isPartial ? "text-amber-500" : "text-gray-300"}`}>
+                    {isSoon ? "Em breve" : isActive ? "Ativo" : isPartial ? "Configurar chave" : "Inativo"}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Resumo */}
       <div className="grid grid-cols-3 gap-4 mb-8">

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, Search, ArrowLeft, CheckSquare,
-  UserRoundPlus, X, UsersRound,
+  UserRoundPlus, X, UsersRound, Activity,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -43,6 +43,7 @@ interface Props {
 export function AdminLayoutShell({ children }: Props) {
   const [userName,         setUserName]         = useState("Admin");
   const [initials,         setInitials]         = useState("A");
+  const [userRole,         setUserRole]         = useState<string | null>(null);
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const pathname = usePathname();
 
@@ -80,11 +81,11 @@ export function AdminLayoutShell({ children }: Props) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
         const { data: profile } = await supabase
-          .from("profiles").select("name").eq("id", user.id).maybeSingle();
+          .from("profiles").select("name, role").eq("id", user.id).maybeSingle();
         if (!profile || cancelled) return;
         const name = profile.name ?? user.email ?? "Admin";
         const ini  = name.split(/\s+/).slice(0, 2).map((w: string) => w[0] ?? "").join("").toUpperCase() || "A";
-        if (!cancelled) { setUserName(name); setInitials(ini); }
+        if (!cancelled) { setUserName(name); setInitials(ini); setUserRole(profile.role ?? null); }
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -368,6 +369,17 @@ export function AdminLayoutShell({ children }: Props) {
               )}
               </AnimatePresence>
             </div>
+
+            {userRole === "super_admin" && (
+              <Link
+                href="/admin/status"
+                title="Status do sistema"
+                className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-emerald-600"
+              >
+                <Activity className="w-4 h-4" />
+                <span className="text-[10px] font-bold hidden md:inline">Status</span>
+              </Link>
+            )}
 
             <button
               onClick={handleSignOut}

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
 import { BeforeAfterSection } from "@/components/before-after-section";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, FileSearch, CalendarDays, Calendar, FileText, CheckCircle2, Building2, Rocket, UserCheck, ClipboardList, BarChart3, Send, BarChart2, RefreshCw } from "lucide-react";
+import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video } from "lucide-react";
 import type { ElementType } from "react";
 
 // ── Modules ──────────────────────────────────────────────────
@@ -14,16 +14,6 @@ const modules: Module[] = [
   { Icon: DollarSign,    accent: "#10b981", tag: "■ Finanças",    num: "04", title: "FinanceOS",  desc: "Acompanhe cobranças, receitas e pagamentos sem perder o controle." },
   { Icon: TrendingUp,    accent: "#3b82f6", tag: "■ Vendas",      num: "05", title: "GrowthOS",   desc: "Gerencie leads, propostas e oportunidades comerciais em um fluxo único." },
   { Icon: GraduationCap, accent: "#f59e0b", tag: "■ Academy",     num: "06", title: "Academy",    desc: "Treinamento e onboarding da equipe — em breve.", coming: true },
-];
-
-// ── ContentOS features ────────────────────────────────────────
-const contentosFeatures: { Icon: ElementType; title: string; desc: string }[] = [
-  { Icon: FileSearch,   title: "Diagnóstico da marca",  desc: "Posicionamento, tom de voz e público-alvo definidos antes de criar qualquer conteúdo." },
-  { Icon: CalendarDays, title: "Estratégia mensal",      desc: "Pautas, formatos e canais planejados por ciclo — com base na realidade do cliente, não em achismo." },
-  { Icon: Calendar,     title: "Calendário editorial",   desc: "Cada conteúdo com data, responsável e status. Sem planilha, sem grupo de WhatsApp." },
-  { Icon: FileText,     title: "Roteiros e briefings",   desc: "Briefings completos com legenda, CTA e referência visual. O time executa sem perguntar no grupo." },
-  { Icon: CheckCircle2, title: "Aprovação pelo cliente", desc: "O cliente aprova com um clique, sem login. Feedback centralizado e histórico claro." },
-  { Icon: Video,        title: "Produção operacional",   desc: "Do briefing à publicação: um fluxo único com etapas, responsáveis e prazos visíveis." },
 ];
 
 // ── Client logos ─────────────────────────────────────────────
@@ -182,47 +172,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Da ideia ao post publicado — etapas ── */}
-      <section className="py-10 md:py-16" style={{ borderTop: `1px solid ${S.border}` }}>
-        <div className="px-4 md:px-8 mb-6 md:mb-8">
-          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".35rem" }}>[O fluxo]</p>
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.1rem, 3vw, 1.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Da ideia ao post publicado</h2>
-          <p className="lk-carousel-hint mt-2 md:hidden" style={{ color: S.muted }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M15 6l6 6-6 6"/></svg>
-            <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase" }}>deslize para ver</span>
-          </p>
-        </div>
-        <div className="lk-carousel px-4 md:px-8">
-          {[
-            { num: "01", Icon: ClipboardList, color: "#7b6ef6", title: "Diagnóstico",  desc: "Entenda posicionamento, público e oportunidades da marca antes de criar." },
-            { num: "02", Icon: BarChart2,     color: "#a855f7", title: "Estratégia",   desc: "Defina objetivos, formatos, canais e calendário para o mês inteiro." },
-            { num: "03", Icon: Sparkles,      color: "#e0635a", title: "Conteúdo",     desc: "Crie briefings, legendas e roteiros com IA — sem retrabalho." },
-            { num: "04", Icon: Video,         color: "#3b82f6", title: "Produção",      desc: "Organize gravações, storyboards e edição em um fluxo visual." },
-            { num: "05", Icon: CheckCircle2,  color: "#10b981", title: "Aprovação",    desc: "O cliente aprova por link público sem precisar de login ou WhatsApp." },
-            { num: "06", Icon: Send,          color: "#f59e0b", title: "Publicação",   desc: "Agende e publique com data, horário e status rastreável no calendário." },
-            { num: "07", Icon: BarChart3,     color: "#06b6d4", title: "Relatório",    desc: "Resultados por cliente, formato e período em painel automático." },
-            { num: "08", Icon: RefreshCw,     color: "#84cc16", title: "Automação",    desc: "Fluxos recorrentes, alertas e integrações que rodam sem intervenção." },
-          ].map((step) => (
-            <div key={step.num} className="lk-carousel-card" style={{ background: S.card, border: `1px solid ${S.border}`, padding: "1.25rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".85rem" }}>
-                <div style={{ width: "38px", height: "38px", flexShrink: 0, borderRadius: "10px", background: `${step.color}18`, border: `1px solid ${step.color}35`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <step.Icon style={{ width: "17px", height: "17px", color: step.color }} strokeWidth={1.5} />
-                </div>
-                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".15em", textTransform: "uppercase", color: step.color }}>{step.num}</span>
+      {/* ── O que a Lokat OS resolve ── */}
+      <section className="py-14 md:py-20" style={{ borderTop: `1px solid ${S.border}` }}>
+        <div className="max-w-6xl mx-auto px-4 md:px-8">
+          <div className="mb-10 md:mb-14">
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, maxWidth: "600px" }}>
+              Tudo espalhado. Nada funcionando junto.
+            </h2>
+            <p style={{ ...S.grotesk, color: S.muted, fontSize: ".9rem", lineHeight: 1.7, maxWidth: "500px", marginTop: ".7rem" }}>
+              A Lokat OS foi criada para resolver exatamente isso.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
+            {[
+              { problem: "Conteúdo aprovado via WhatsApp", solution: "Aprovação por link público — sem grupo, sem retrabalho", color: "#a855f7" },
+              { problem: "Planilha de calendário desatualizada", solution: "Calendário editorial com status em tempo real", color: "#7b6ef6" },
+              { problem: "Financeiro sem visibilidade", solution: "Faturamento, pedidos e ticket do cardápio em um painel", color: "#10b981" },
+              { problem: "Dados de Instagram espalhados", solution: "Insights de Meta/Instagram integrados ao relatório do cliente", color: "#3b82f6" },
+            ].map((item) => (
+              <div key={item.problem} className="p-5 md:p-7 flex flex-col gap-3" style={{ background: S.card }}>
+                <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted, textDecoration: "line-through" }}>{item.problem}</p>
+                <div style={{ width: "24px", height: "1px", background: item.color, opacity: 0.5 }} />
+                <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 600, color: S.text, lineHeight: 1.4 }}>{item.solution}</p>
               </div>
-              <p style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".35rem", lineHeight: 1.2 }}>{step.title}</p>
-              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted }}>{step.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
-
-      {/* ── Info strip ── */}
-      <div style={{ borderTop: `1px solid ${S.border}`, borderBottom: `1px solid ${S.border}` }}>
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-6 overflow-x-auto">
-          <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, whiteSpace: "nowrap" }}>IA · Automação · Dados · Conteúdo · Audiovisual</span>
-        </div>
-      </div>
 
       {/* ── Prova social — logos ── */}
       <section className="py-12 md:py-16" style={{ overflow: "hidden" }}>
@@ -273,116 +249,63 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Escolha seu caminho ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
-        <div className="mb-8 text-center">
-          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[Para quem é?]</p>
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Escolha seu caminho</h2>
+      {/* ── Fontes que a Lokat OS entende ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-8 py-14 md:py-20">
+        <div className="mb-10">
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
+            Conecta com o que você já usa
+          </h2>
+          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".85rem", lineHeight: 1.65, marginTop: ".5rem", maxWidth: "480px" }}>
+            Sem exportar planilha. Sem copiar dado manualmente. A plataforma puxa os números automaticamente.
+          </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { Icon: Building2,    iconColor: "#7b6ef6", title: "Sou empresa ou autônomo",      desc: "Organize sua marca, conteúdo e leads com autonomia e IA — sem depender de agência.",        cta: "Começar →",           href: "/criar-conta",  accent: "#7b6ef6" },
-            { Icon: Rocket,       iconColor: "#a855f7", title: "Tenho uma agência ou produtora", desc: "Gerencie clientes, equipe, aprovações e entregas em um único sistema escalável.",           cta: "Ver plataforma →",    href: "/plataforma",   accent: "#a855f7" },
-            { Icon: UserCheck,    iconColor: "#10b981", title: "Sou cliente ou recebi convite", desc: "Acesse aprovações, calendário e acompanhe os conteúdos da sua marca sendo produzidos.",      cta: "Entrar →",            href: "/login",        accent: "#10b981" },
-            { Icon: ClipboardList,iconColor: "#f59e0b", title: "Quero só um diagnóstico",       desc: "Análise da sua presença digital antes de criar conta. Resultado em minutos, sem compromisso.", cta: "Fazer diagnóstico →", href: "/diagnostico",  accent: "#f59e0b" },
-          ].map((item) => (
-            <a key={item.title} href={item.href} className="p-5 md:p-8 flex flex-col no-underline" style={{ background: S.card, transition: "background .2s, border-color .2s", textDecoration: "none", borderTop: `2px solid ${item.accent}20` }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#191924"; e.currentTarget.style.borderTopColor = `${item.iconColor}60`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = S.card; e.currentTarget.style.borderTopColor = `${item.iconColor}20`; }}
-            >
-              <div style={{ width: "38px", height: "38px", background: `${item.iconColor}18`, border: `1px solid ${item.iconColor}35`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".9rem" }}>
-                <item.Icon style={{ width: "17px", height: "17px", color: item.iconColor }} strokeWidth={1.5} />
+            { name: "Cardápio Digital", tag: "OlaClick", desc: "Pedidos, faturamento e ticket médio do seu cardápio digital em tempo real.", color: "#10b981", status: "ativo" },
+            { name: "Meta · Instagram", tag: "Graph API", desc: "Alcance, impressões, seguidores e engajamento da página ou perfil vinculado.", color: "#7b6ef6", status: "ativo" },
+            { name: "WhatsApp", tag: "Em breve", desc: "Aprovação de conteúdo, follow-up e alertas operacionais via WhatsApp.", color: "#25d366", status: "breve" },
+            { name: "Google Analytics", tag: "Roadmap", desc: "Tráfego, sessões e conversões do site integrados ao painel de resultados.", color: "#f59e0b", status: "roadmap" },
+            { name: "Google Meu Negócio", tag: "Roadmap", desc: "Avaliações, buscas e cliques no mapa para negócios locais.", color: "#ea4335", status: "roadmap" },
+            { name: "Dados manuais", tag: "Sempre disponível", desc: "Qualquer dado pode ser inserido manualmente enquanto a integração automática não estiver pronta.", color: "#555566", status: "ativo" },
+          ].map((src) => (
+            <div key={src.name} className="p-5 flex flex-col gap-2.5" style={{ background: S.card, border: `1px solid ${S.border}` }}>
+              <div className="flex items-center justify-between">
+                <span style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: src.status === "roadmap" ? S.muted : S.text }}>{src.name}</span>
+                <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".12em", textTransform: "uppercase", color: src.color, background: `${src.color}18`, border: `1px solid ${src.color}30`, padding: ".1rem .5rem" }}>{src.tag}</span>
               </div>
-              <h3 style={{ ...S.grotesk, fontSize: ".9rem", fontWeight: 700, color: S.text, marginBottom: ".5rem", lineHeight: 1.3 }}>{item.title}</h3>
-              <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.65, color: S.muted, flexGrow: 1, marginBottom: "1.3rem" }}>{item.desc}</p>
-              <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: item.accent }}>{item.cta}</span>
-            </a>
+              <p style={{ ...S.grotesk, fontSize: ".72rem", lineHeight: 1.6, color: S.muted }}>{src.desc}</p>
+              {src.status === "ativo" && (
+                <div className="flex items-center gap-1.5" style={{ marginTop: "auto" }}>
+                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: src.color }} />
+                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: src.color }}>integrado</span>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </section>
 
-      {/* ── Do diagnóstico à execução ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-14 md:pb-20">
-        <div className="mb-10 text-center">
-          <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".4rem" }}>[O processo]</p>
-          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Do diagnóstico à execução</h2>
-          <p style={{ ...S.grotesk, fontSize: ".85rem", color: S.muted, marginTop: ".6rem" }}>Cada módulo conectado ao próximo.</p>
+      {/* ── Como funciona ── */}
+      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-14 md:pb-20">
+        <div className="mb-10">
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
+            Como funciona
+          </h2>
         </div>
-
-        {/* Orbital layout — desktop only */}
-        <div className="relative hidden lg:block" style={{ height: "600px" }}>
-          {/* Orbit ring 1 (slow, dashed) */}
-          <div className="orbit-slow" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <svg width="420" height="420" viewBox="-210 -210 420 420" style={{ overflow: "visible" }}>
-              <circle cx="0" cy="0" r="210" stroke="#7b6ef622" strokeWidth="1" fill="none" strokeDasharray="8 12" />
-              <circle cx="0" cy="-210" r="3.5" fill="#7b6ef635" />
-            </svg>
-          </div>
-          {/* Orbit ring 2 (reverse, subtle) */}
-          <div className="orbit-rev" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <svg width="280" height="280" viewBox="-140 -140 280 280" style={{ overflow: "visible" }}>
-              <circle cx="0" cy="0" r="140" stroke="#7b6ef612" strokeWidth="1" fill="none" strokeDasharray="3 18" />
-            </svg>
-          </div>
-
-          {/* Central panel */}
-          <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "176px", zIndex: 2, background: `linear-gradient(160deg, ${S.card} 60%, #0d0d14)`, border: `1px solid ${S.accent}35`, padding: "1.25rem", textAlign: "center", boxShadow: `0 0 48px ${S.accent}10` }}>
-            <div style={{ ...S.mono, fontSize: ".44rem", letterSpacing: ".22em", textTransform: "uppercase", color: S.accent, marginBottom: ".55rem" }}>LOKAT OS</div>
-            <div style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, lineHeight: 1.2, marginBottom: ".65rem" }}>Plataforma<br />completa</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: ".22rem" }}>
-              {["Conteúdo", "Finanças", "Leads", "Audiovisual"].map((t) => (
-                <div key={t} style={{ ...S.grotesk, fontSize: ".6rem", color: S.muted, borderTop: `1px solid ${S.border}`, paddingTop: ".22rem" }}>{t}</div>
-              ))}
-            </div>
-          </div>
-
-          {/* Module nodes — fixed positions, text does NOT rotate */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
           {[
-            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Presença digital e oportunidades",  l: "50%",               t: "calc(50% - 210px)" },
-            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, conteúdo e aprovação", l: "calc(50% + 182px)", t: "calc(50% - 105px)" },
-            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro e produção audiovisual",   l: "calc(50% + 182px)", t: "calc(50% + 105px)" },
-            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças e previsibilidade",      l: "50%",               t: "calc(50% + 210px)" },
-            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e crescimento",   l: "calc(50% - 182px)", t: "calc(50% + 105px)" },
-            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados e próximos passos",     l: "calc(50% - 182px)", t: "calc(50% - 105px)" },
-          ].map((node) => (
-            <div key={node.num} style={{ position: "absolute", left: node.l, top: node.t, transform: "translate(-50%,-50%)", width: "118px", zIndex: 2, textAlign: "center" }}>
-              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: `${node.color}18`, border: `1.5px solid ${node.color}45`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .45rem", boxShadow: `0 0 18px ${node.color}20`, transition: "box-shadow .25s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 32px ${node.color}55`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 18px ${node.color}20`; }}
-              >
-                <span style={{ ...S.mono, fontSize: ".52rem", color: node.color, fontWeight: 700 }}>{node.num}</span>
+            { step: "1", color: "#7b6ef6", title: "Conecte e configure", desc: "Vincule o cardápio digital, Meta/Instagram e configure os clientes. Tudo em menos de 10 minutos." },
+            { step: "2", color: "#a855f7", title: "Crie e aprove conteúdo", desc: "Briefings, calendário editorial e aprovação do cliente por link público — sem WhatsApp, sem retrabalho." },
+            { step: "3", color: "#10b981", title: "Acompanhe os resultados", desc: "Faturamento, insights de Meta e relatórios por cliente em um painel que se atualiza automaticamente." },
+          ].map((item) => (
+            <div key={item.step} className="p-6 md:p-8 flex flex-col gap-4" style={{ background: S.card }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: `${item.color}18`, border: `1.5px solid ${item.color}35`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ ...S.mono, fontSize: ".7rem", color: item.color, fontWeight: 700 }}>{item.step}</span>
               </div>
-              <p style={{ ...S.grotesk, fontSize: ".75rem", fontWeight: 700, color: S.text, marginBottom: ".12rem", lineHeight: 1.2 }}>{node.title}</p>
-              <p style={{ ...S.grotesk, fontSize: ".6rem", lineHeight: 1.45, color: S.muted }}>{node.desc}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Mobile fallback — vertical list */}
-        <div className="lg:hidden flex flex-col gap-3">
-          {[
-            { num: "01", color: "#7b6ef6", title: "Diagnóstico",  desc: "Entenda a presença digital, oportunidades e gargalos da marca." },
-            { num: "02", color: "#a855f7", title: "Content OS",    desc: "Estratégia, campanhas, briefings e aprovações — tudo conectado." },
-            { num: "03", color: "#e0635a", title: "Rec OS",        desc: "Roteiro, storyboard, gravação e produção audiovisual organizada." },
-            { num: "04", color: "#10b981", title: "Finance OS",    desc: "Cobranças, recebimentos, inadimplência e previsibilidade financeira." },
-            { num: "05", color: "#3b82f6", title: "Growth OS",     desc: "Leads, propostas e oportunidades comerciais em um fluxo único." },
-            { num: "06", color: "#f59e0b", title: "Relatórios",    desc: "Resultados, insights e próximos passos em painel claro." },
-          ].map((step, idx, arr) => (
-            <div key={step.num}>
-              <div className="flex flex-row items-center gap-4 p-4" style={{ background: S.card, border: `1px solid ${S.border}` }}>
-                <div style={{ flexShrink: 0, width: "40px", height: "40px", borderRadius: "50%", background: `${step.color}18`, border: `1.5px solid ${step.color}40`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ ...S.mono, fontSize: ".52rem", color: step.color, fontWeight: 700 }}>{step.num}</span>
-                </div>
-                <div>
-                  <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".2rem" }}>{step.title}</p>
-                  <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.5, color: S.muted }}>{step.desc}</p>
-                </div>
+              <div>
+                <h3 style={{ ...S.grotesk, fontSize: ".95rem", fontWeight: 700, color: S.text, marginBottom: ".4rem", lineHeight: 1.2 }}>{item.title}</h3>
+                <p style={{ ...S.grotesk, fontSize: ".75rem", lineHeight: 1.7, color: S.muted }}>{item.desc}</p>
               </div>
-              {idx < arr.length - 1 && (
-                <div className="flex justify-center py-1" style={{ color: S.border }}>
-                  <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 0v10M1 7l5 7 5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -391,19 +314,17 @@ export default function HomePage() {
       {/* ── Antes e Depois (animado com IntersectionObserver) ── */}
       <BeforeAfterSection />
 
-      {/* ── Módulos ── */}
-      <section id="modulos" className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-20">
-        <div className="flex items-end justify-between mb-6 pb-4 flex-wrap gap-3" style={{ borderBottom: `1px solid ${S.border}` }}>
-          <div>
-            <p style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".35rem" }}>[Módulos]</p>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.8rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>Tudo conectado em um único painel.</h2>
-          </div>
-          <a href="#contentos" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, border: `1px solid ${S.border}`, padding: ".35rem .8rem", textDecoration: "none", whiteSpace: "nowrap" }}>
-            Ver destaque →
-          </a>
-        </div>
 
-        {/* Grid 2 col no mobile, 3 no desktop */}
+      {/* ── O que você visualiza no painel ── */}
+      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-8 pb-10 md:pb-20">
+        <div className="mb-8">
+          <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 3.5vw, 2.2rem)", fontWeight: 700, color: S.text, lineHeight: 1.1 }}>
+            Tudo em um único painel
+          </h2>
+          <p style={{ ...S.grotesk, color: S.muted, fontSize: ".85rem", lineHeight: 1.65, marginTop: ".5rem", maxWidth: "480px" }}>
+            Cada módulo resolve uma parte do negócio. Juntos, formam uma visão completa do cliente.
+          </p>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: S.border, border: `1px solid ${S.border}` }}>
           {modules.map((m) => (
             <div
@@ -412,80 +333,32 @@ export default function HomePage() {
               style={{
                 background: m.coming ? "#0d0d14" : S.card,
                 position: "relative",
-                transition: "background .2s, transform .2s, box-shadow .2s",
-                cursor: "default",
+                transition: "background .2s",
                 opacity: m.coming ? 0.55 : 1,
               }}
-              onMouseEnter={(e) => { if (!m.coming) { e.currentTarget.style.background = "#191924"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.4)"; } }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
+              onMouseEnter={(e) => { if (!m.coming) e.currentTarget.style.background = "#191924"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = m.coming ? "#0d0d14" : S.card; }}
             >
-              <div style={{ ...S.mono, fontSize: ".5rem", color: S.border, position: "absolute", top: ".4rem", left: ".4rem" }}>{m.num}</div>
               {m.coming && (
                 <div style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#f59e0b", background: "#f59e0b18", border: "1px solid #f59e0b30", padding: ".1rem .4rem", position: "absolute", top: ".4rem", right: ".4rem" }}>
                   breve
                 </div>
               )}
-              <div style={{ width: "32px", height: "32px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".6rem" }}>
+              <div style={{ width: "32px", height: "32px", background: `${m.accent}18`, border: `1px solid ${m.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".65rem" }}>
                 <m.Icon style={{ width: "14px", height: "14px", color: m.accent }} strokeWidth={1.5} />
               </div>
-              <div style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".25rem", lineHeight: 1.2 }}>{m.title}</div>
-              <p className="hidden md:block" style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
-              <span className="md:hidden" style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".12em", textTransform: "uppercase", color: m.accent }}>{m.tag.replace("■ ", "")}</span>
+              <p style={{ ...S.grotesk, fontSize: ".85rem", fontWeight: 700, color: S.text, marginBottom: ".25rem", lineHeight: 1.2 }}>{m.title}</p>
+              <p style={{ ...S.grotesk, fontSize: ".7rem", lineHeight: 1.6, color: S.muted }}>{m.desc}</p>
             </div>
           ))}
         </div>
-      </section>
-
-      {/* ── ContentOS feature ── */}
-      <section id="contentos" className="max-w-6xl mx-auto px-4 md:px-6 pb-10 md:pb-20">
-        <div style={{ border: `1px solid ${S.border}`, background: S.card }}>
-          {/* Header */}
-          <div className="p-5 md:p-10" style={{ borderBottom: `1px solid ${S.border}` }}>
-            <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.accent, background: `${S.accent}15`, border: `1px solid ${S.accent}25`, padding: ".15rem .5rem", display: "inline-block", marginBottom: ".7rem" }}>■ Módulo ContentOS</span>
-            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.3rem, 4vw, 2.6rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".5rem" }}>
-              Content OS
-            </h2>
-            <p style={{ ...S.grotesk, color: S.muted, fontSize: "clamp(.8rem, 2.5vw, .95rem)", maxWidth: "520px", lineHeight: 1.6 }}>
-              Planeje, crie, aprove e acompanhe conteúdos sem perder nada no WhatsApp. Estratégia, calendário, briefings e aprovação do cliente em um único fluxo.
-            </p>
-          </div>
-
-          {/* Features grid: oculto no mobile, visível no md+ */}
-          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: S.border }}>
-            {contentosFeatures.map((f) => (
-              <div key={f.title} className="p-5 md:p-6" style={{ background: S.card }}>
-                <div style={{ width: "34px", height: "34px", background: `${S.accent}18`, border: `1px solid ${S.accent}30`, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: ".65rem" }}>
-                  <f.Icon style={{ width: "15px", height: "15px", color: S.accent }} strokeWidth={1.5} />
-                </div>
-                <p style={{ ...S.grotesk, fontSize: ".83rem", fontWeight: 600, color: S.text, marginBottom: ".3rem" }}>{f.title}</p>
-                <p style={{ ...S.grotesk, fontSize: ".73rem", lineHeight: 1.6, color: S.muted }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Features mobile: carrossel compacto — wrapper md:hidden garante ocultação no desktop
-              sem conflito com .lk-carousel (display:flex vem depois no cascade) */}
-          <div className="md:hidden" style={{ borderBottom: `1px solid ${S.border}` }}>
-            <div className="lk-carousel px-4 py-4">
-              {contentosFeatures.map((f) => (
-                <div key={f.title} className="lk-carousel-card" style={{ background: "#0d0d14", border: `1px solid ${S.border}`, padding: "1rem", minWidth: "200px", width: "70vw", maxWidth: "240px" }}>
-                  <f.Icon style={{ width: "16px", height: "16px", color: S.accent, marginBottom: ".5rem" }} strokeWidth={1.5} />
-                  <p style={{ ...S.grotesk, fontSize: ".8rem", fontWeight: 700, color: S.text, marginBottom: ".2rem", lineHeight: 1.2 }}>{f.title}</p>
-                  <p style={{ ...S.grotesk, fontSize: ".68rem", lineHeight: 1.5, color: S.muted }}>{f.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CTAs */}
-          <div className="p-4 md:p-8 flex flex-col sm:flex-row gap-3">
-            <Link href="/diagnostico" style={{ background: S.accent, color: "#fff", padding: ".85rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
-              ■ Quero ver na prática →
-            </Link>
-            <Link href="/criar-conta" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 1.5rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
-              Criar conta grátis
-            </Link>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+          <Link href="/diagnostico" style={{ background: S.accent, color: "#fff", padding: ".85rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
+            ■ Ver na prática →
+          </Link>
+          <Link href="/criar-conta" style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".12em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}>
+            Criar conta grátis
+          </Link>
         </div>
       </section>
 
