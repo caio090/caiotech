@@ -8,7 +8,7 @@ import {
   Activity, Clock, CheckCircle2, XCircle, Eye,
   Bell, MoreHorizontal,
 } from "lucide-react";
-import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -102,46 +102,17 @@ export default function PlatformAccountsPage() {
   const [actionMsg, setActionMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    if (!isSupabaseConfigured) { setLoading(false); return; }
     setLoading(true);
     try {
-      const supabase = createClient();
-
-      // Fetch profiles with joined data where available
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, email, name, role, account_type, account_status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (!profiles) { setLoading(false); return; }
-
-      // Enrich with client data (company name, plan)
-      const { data: clients } = await supabase
-        .from("clients")
-        .select("owner_id, company_name")
-        .in("owner_id", profiles.map((p) => p.id))
-        .not("deleted_at", "is", null)
-        .limit(200);
-
-      const clientMap = new Map((clients ?? []).map((c) => [c.owner_id, c.company_name]));
-
-      setAccounts(
-        profiles.map((p) => ({
-          id:                  p.id,
-          email:               p.email ?? null,
-          name:                p.name ?? null,
-          role:                p.role ?? null,
-          account_type:        (p as { account_type?: string | null }).account_type ?? null,
-          account_status:      (p as { account_status?: string | null }).account_status ?? "active",
-          created_at:          p.created_at ?? null,
-          last_sign_in_at:     null,
-          company_name:        clientMap.get(p.id) ?? null,
-          plan_slug:           null,
-          coupon_code:         null,
-          subscription_status: null,
-        }))
-      );
+      const res = await fetch("/api/admin/accounts");
+      if (!res.ok) {
+        console.error("[accounts] API error:", res.status, await res.text().catch(() => ""));
+        setLoading(false);
+        return;
+      }
+      const json = await res.json() as { ok: boolean; accounts?: Account[] };
+      if (!json.ok || !Array.isArray(json.accounts)) { setLoading(false); return; }
+      setAccounts(json.accounts.map((a) => ({ ...a, last_sign_in_at: null })));
     } catch (e) {
       console.error("[accounts] load error:", e);
     } finally {
@@ -257,10 +228,13 @@ export default function PlatformAccountsPage() {
         </button>
       </div>
 
-      {/* Note about account_status column */}
+      {/* Info note */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
+        A Central mostra todos os perfis encontrados. Contas sem empresa ou agência aparecem como pendentes de configuração.
+      </div>
       {!isSupabaseConfigured && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
-          Supabase não configurado — exibindo dados de exemplo.
+          Supabase não configurado — dados podem estar incompletos.
         </div>
       )}
 

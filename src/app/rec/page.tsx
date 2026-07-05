@@ -46,13 +46,13 @@ function mkv(id: string, title: string, file: string, category: string, order: n
 
 // Filenames exatos do bucket rec-videos no Supabase Storage
 const STATIC_VIDEOS: RecVideo[] = [
-  mkv("s0", "Dia dos Solteiros", "duhlache-DIA -DO-SOLTEIRO.mp4", "campanha", 0),
-  mkv("s1", "Sandubão Vol. 1",   "duhlanche1.mp4",            "campanha", 1),
-  mkv("s2", "Sandubão Vol. 2",   "duhlache2.mp4",             "campanha", 2),
-  mkv("s3", "Sandubão Vol. 3",   "duhlanche3.mp4",            "campanha", 3),
-  mkv("s4", "Sandubão Vol. 4",   "duhlanche4.mp4",            "campanha", 4),
-  mkv("s5", "Sandubão Vol. 5",   "dulanche5.mp4",             "campanha", 5),
-  mkv("s6", "VT HP",             "VT HP II 30 SEG V2.mp4",   "institucional", 6),
+  mkv("s0", "Dia dos Solteiros",  "duhlache-DIA -DO-SOLTEIRO.mp4", "campanha", 0),
+  { ...mkv("s1", "DUH Lanches",  "duhlanche1.mp4",            "campanha", 1),   client_name: "DUH Lanches" },
+  { ...mkv("s2", "Vol. 2",       "duhlache2.mp4",             "campanha", 2),   client_name: "DUH Lanches" },
+  { ...mkv("s3", "Vol. 3",       "duhlanche3.mp4",            "campanha", 3),   client_name: "DUH Lanches" },
+  { ...mkv("s4", "Vol. 4",       "duhlanche4.mp4",            "campanha", 4),   client_name: "DUH Lanches" },
+  { ...mkv("s5", "Vol. 5",       "dulanche5.mp4",             "campanha", 5),   client_name: "DUH Lanches" },
+  { ...mkv("s6", "VT HP",        "VT HP II 30 SEG V2.mp4",   "institucional", 6), client_name: "DUH Lanches" },
 ];
 
 const STATIC_FEEDBACK: RecVideo = {
@@ -229,13 +229,14 @@ function PortfolioCard({ video, position, onActivate, onOpen, isMobile, onVideoE
           onError={() => { setVideoFailed(true); onVideoError?.(); }} />
       )}
 
-      {/* Fundo */}
+      {/* Fundo — mostra CAIS com overlay leve quando sem vídeo */}
       <div style={{
         position: "absolute", inset: 0,
-        background: hov && isActive && video.video_url
-          ? "linear-gradient(to top, rgba(10,8,6,0.96) 0%, rgba(10,8,6,0.35) 50%, transparent 100%)"
-          : `linear-gradient(155deg, rgba(8,4,2,0.93) 0%, rgba(22,10,5,0.84) 55%, rgba(10,6,4,0.96) 100%), url('${CAIS}') center/cover`,
-        transition: "background .5s ease",
+        backgroundImage: `linear-gradient(155deg, rgba(8,4,2,0.62) 0%, rgba(22,10,5,0.55) 50%, rgba(10,6,4,0.72) 100%), url('${CAIS}')`,
+        backgroundSize: "auto, cover",
+        backgroundPosition: "center, center 55%",
+        transition: "opacity .5s ease",
+        opacity: hov && isActive && video.video_url && !videoFailed ? 0 : 1,
       }} />
 
       {/* Cantos do viewfinder — apenas no card ativo */}
@@ -510,7 +511,7 @@ function FilmeSection({ isMobile }: { isMobile: boolean }) {
   const opacity = isMobile ? 1 : undefined;
 
   return (
-    <section ref={sectionRef} style={{ position: "relative", padding: "10rem 0", overflow: "hidden", background: `linear-gradient(180deg, ${R.bg} 0%, #0e0a06 50%, ${R.bg} 100%)` }}>
+    <section ref={sectionRef} style={{ position: "relative", padding: isMobile ? "5rem 0" : "10rem 0", overflow: "hidden", background: `linear-gradient(180deg, ${R.bg} 0%, #0e0a06 50%, ${R.bg} 100%)` }}>
       <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "60%", background: `linear-gradient(to bottom, transparent, ${R.red}40, transparent)`, pointerEvents: "none" }} />
       <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.45 }} />
 
@@ -823,7 +824,7 @@ export default function LokatRecPage() {
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "2px", background: `linear-gradient(to bottom, transparent, ${R.red}28 30%, ${R.red}18 70%, transparent)`, pointerEvents: "none" }} />
 
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "14vh 2rem 6rem", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "8vh 2rem 4rem" : "14vh 2rem 6rem", position: "relative", zIndex: 1 }}>
           <div className="rec-hero-in" style={{ display: "flex", alignItems: "center", gap: "1.4rem", marginBottom: "2rem" }}>
             <div className="rec-drop-float"><RecDrop size={52} phase="red" /></div>
             <div>
@@ -1029,7 +1030,7 @@ export default function LokatRecPage() {
               <p style={{ ...R.grotesk, fontSize: ".9rem", lineHeight: 1.8, color: R.muted, marginBottom: "2rem" }}>Conta sobre sua marca e o que você quer comunicar.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: R.border }}>
                 {[
-                  { label: "WhatsApp", sub: "(89) 9 9421-7181",       Icon: Video,  href: "https://wa.me/5589994217181?text=Ol%C3%A1%2C%20vi%20a%20LOKAT.REC%20e%20tenho%20um%20projeto%20em%20mente." },
+                  { label: "WhatsApp", sub: "(89) 9 9421-7181",       Icon: Video,  href: "https://wa.me/5589994217181?text=Ol%C3%A1%2C%20vim%20pela%20Lokat.rec%20e%20quero%20fazer%20um%20projeto%20audiovisual." },
                   { label: "E-mail",   sub: "lokat.rec@hotmail.com",   Icon: Mail,  href: "mailto:lokat.rec@hotmail.com" },
                   { label: "Instagram",sub: "@Lokat.rec",              Icon: AtSign, href: "https://instagram.com/lokat.rec" },
                 ].map(({ label, sub, Icon, href }) => (

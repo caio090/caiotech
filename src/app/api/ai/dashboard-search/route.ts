@@ -176,15 +176,51 @@ const KEYWORD_MAP: Array<{
     },
   },
   {
-    keywords: ["rec os", "recos", "conteudo", "roteiro", "video", "briefing", "campanha", "calendário", "calendario", "producao"],
+    keywords: ["rec os", "recos", "contentos", "contentos", "content os", "conteudo", "roteiro", "video", "briefing", "campanha", "calendário", "calendario", "producao", "pauta"],
     result: {
-      answer: "O REC OS gerencia conteúdo, roteiros, briefings, campanhas e aprovações.",
+      answer: "O REC OS é a central de conteúdo, campanhas, briefing, roteiro, vídeo e aprovações. (Antes chamado ContentOS.)",
       intent: "rec_os",
       confidence: 0.88,
-      suggestedRoute: "/admin/contentos",
+      suggestedRoute: "/admin/rec-os",
       cards: [
-        { title: "REC OS", desc: "Conteúdo, campanhas e aprovações", href: "/admin/contentos", color: "#a855f7" },
+        { title: "REC OS", desc: "Central de conteúdo, campanhas e aprovações", href: "/admin/rec-os", color: "#c0392b" },
         { title: "Aprovações", desc: "Conteúdos aguardando revisão", href: "/admin/contentos/aprovacoes", color: "#f59e0b" },
+      ],
+    },
+  },
+  {
+    keywords: ["central de contas", "contas", "cadastros", "novos cadastros", "usuarios novos", "usuários novos", "pessoas cadastrando", "crm da plataforma", "plataforma contas"],
+    result: {
+      answer: "A Central de Contas mostra todos os cadastros, tipos de conta, status e ações do super_admin.",
+      intent: "platform_accounts",
+      confidence: 0.9,
+      suggestedRoute: "/admin/super/accounts",
+      cards: [
+        { title: "Central de Contas", desc: "Cadastros, tipos de conta e ações administrativas", href: "/admin/super/accounts", color: "#6366f1" },
+      ],
+    },
+  },
+  {
+    keywords: ["trafego", "tráfego", "meta ads", "google ads", "seo", "anuncio", "anúncio", "campanha paga", "anuncios"],
+    result: {
+      answer: "O módulo Tráfego OS está em planejamento. Acompanhe o status do sistema para saber quando será lançado.",
+      intent: "traffic_os",
+      confidence: 0.8,
+      suggestedRoute: "/admin/status",
+      cards: [
+        { title: "Status do sistema", desc: "Roadmap de módulos planejados", href: "/admin/status", color: "#3b82f6" },
+      ],
+    },
+  },
+  {
+    keywords: ["bairro", "mapa", "geolocalizacao", "geolocalização", "rastreio de pedido", "regiao", "região", "inteligencia local"],
+    result: {
+      answer: "O módulo Inteligência Local está em planejamento. Acompanhe o status do sistema.",
+      intent: "local_intelligence",
+      confidence: 0.8,
+      suggestedRoute: "/admin/status",
+      cards: [
+        { title: "Status do sistema", desc: "Roadmap de módulos planejados", href: "/admin/status", color: "#3b82f6" },
       ],
     },
   },
@@ -238,8 +274,10 @@ function keywordSearch(query: string): SearchResult {
 const SYSTEM_PROMPT = `Você é o assistente de busca do Lokat OS, um sistema de gestão de marketing e conteúdo para agências e empresas.
 Responda perguntas sobre a plataforma de forma direta e útil.
 Retorne um JSON com os campos: answer (string, resposta direta), intent (string, intenção da busca), confidence (0-1), cards (array de {title, desc, href, color}), suggestedRoute (string opcional, rota principal sugerida).
-Módulos disponíveis: REC OS (/admin/contentos), Faturamento (/admin/relatorios/faturamento), Insights Meta (/admin/contentos/insights), Operacional (/admin/operacional), Equipe (/admin/equipe), Conexões (/admin/conexoes), Fontes de Dados (/admin/fontes-dados), Portal da Agência (/agency/home), Status (/admin/status).
-Use cores hex: REC OS=#a855f7, Faturamento=#10b981, Meta=#7b6ef6, Operacional=#3b82f6, Equipe=#f59e0b, Portal da Agência=#7b6ef6, default=#7b6ef6.
+Módulos disponíveis: REC OS (/admin/rec-os — antes chamado ContentOS), Faturamento (/admin/relatorios/faturamento), Insights Meta (/admin/contentos/insights), Operacional (/admin/operacional), Equipe (/admin/equipe), Conexões (/admin/conexoes), Fontes de Dados (/admin/fontes-dados), Portal da Agência (/agency/home), Status (/admin/status), Central de Contas (/admin/super/accounts).
+Se o usuário buscar "contentos", "ContentOS" ou "content os", redirecione para REC OS (/admin/rec-os).
+Se o usuário buscar "central de contas", "contas", "cadastros" ou "novos usuários", redirecione para /admin/super/accounts.
+Use cores hex: REC OS=#c0392b, Central de Contas=#6366f1, Faturamento=#10b981, Meta=#7b6ef6, Operacional=#3b82f6, Equipe=#f59e0b, Portal da Agência=#7b6ef6, default=#7b6ef6.
 Responda sempre em português. Seja conciso.`;
 
 async function openaiSearch(query: string): Promise<SearchResult | null> {

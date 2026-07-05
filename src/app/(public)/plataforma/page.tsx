@@ -11,8 +11,8 @@ const features = [
   {
     icon: FolderKanban,
     color: "purple",
-    title: "Contentos — Gestão de Entregas",
-    desc: "Projetos, tarefas em kanban, upload de arquivos e aprovação de entregas. Tudo por cliente.",
+    title: "REC OS — Conteúdo e Campanhas",
+    desc: "Briefings, calendário editorial, aprovação de conteúdo, roteiro e vídeo. Tudo organizado por cliente.",
   },
   {
     icon: Wallet,
