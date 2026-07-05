@@ -338,7 +338,7 @@ export default function PlatformAccountsPage() {
       <p className="text-[11px] text-gray-400 mt-3">
         {filtered.length} de {accounts.length} conta{accounts.length !== 1 ? "s" : ""}
         {" · "}Bloqueio/suspensão é apenas status interno — não remove acesso ao auth ainda.
-        {" · "}Dados enriquecidos (plano, cupom, trial) ficam disponíveis após SQL 70.
+        {" · "}Contas sem empresa ou agência aparecem sem vínculo — isso é esperado para super_admin e contas de diagnóstico.
       </p>
     </div>
   );
