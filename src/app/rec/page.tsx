@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Play, Mail, AtSign, Video,
@@ -168,23 +168,26 @@ function VideoModal({ video, onClose }: { video: RecVideo; onClose: () => void }
 }
 
 // ── Card do portfolio — deck com profundidade ─────────────────────────────────
-function PortfolioCard({ video, position, onActivate, onOpen }: {
+function PortfolioCard({ video, position, onActivate, onOpen, isMobile, onVideoError }: {
   video: RecVideo;
   position: number;   // -1 | 0 | 1  (0 = ativo)
   onActivate: () => void;
   onOpen:     () => void;
+  isMobile?:  boolean;
+  onVideoError?: () => void;
 }) {
-  const videoRef  = useRef<HTMLVideoElement>(null);
-  const isActive  = position === 0;
-  const [hov, setHov] = useState(false);
+  const videoRef    = useRef<HTMLVideoElement>(null);
+  const isActive    = position === 0;
+  const [hov, setHov]           = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
-  // Toca preview muted só quando ativo + hover
+  // Toca preview muted só quando ativo + hover (e sem erro)
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !video.video_url) return;
+    if (!el || !video.video_url || videoFailed) return;
     if (isActive && hov) { el.play().catch(() => undefined); }
     else                 { el.pause(); el.currentTime = 0; }
-  }, [isActive, hov, video.video_url]);
+  }, [isActive, hov, video.video_url, videoFailed]);
 
   // Pausa quando sai da viewport
   useEffect(() => {
@@ -220,9 +223,10 @@ function PortfolioCard({ video, position, onActivate, onOpen }: {
       }}
     >
       {/* Vídeo preview */}
-      {video.video_url && (
+      {video.video_url && !videoFailed && (
         <video ref={videoRef} src={video.video_url} muted loop playsInline preload="metadata"
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: hov && isActive ? 1 : 0, transition: "opacity .5s ease" }} />
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: hov && isActive ? 1 : 0, transition: "opacity .5s ease" }}
+          onError={() => { setVideoFailed(true); onVideoError?.(); }} />
       )}
 
       {/* Fundo */}
@@ -251,10 +255,10 @@ function PortfolioCard({ video, position, onActivate, onOpen }: {
       {/* Conteúdo */}
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: "1.2rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".2em", color: isActive ? R.red : R.muted }}>
+          <span style={{ ...R.mono, fontSize: isMobile ? ".6rem" : ".44rem", letterSpacing: ".2em", color: isActive ? R.red : R.muted }}>
             {String(video.sort_order + 1).padStart(2, "0")}
           </span>
-          <span style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
+          <span style={{ ...R.mono, fontSize: isMobile ? ".58rem" : ".44rem", letterSpacing: ".16em", textTransform: "uppercase", color: R.muted }}>
             {video.category ?? ""}
           </span>
         </div>
@@ -270,20 +274,20 @@ function PortfolioCard({ video, position, onActivate, onOpen }: {
         </div>
 
         <div>
-          <p style={{ ...R.mono, fontSize: ".44rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted, marginBottom: ".3rem" }}>
+          <p style={{ ...R.mono, fontSize: isMobile ? ".62rem" : ".44rem", letterSpacing: ".18em", textTransform: "uppercase", color: R.muted, marginBottom: ".3rem" }}>
             {video.client_name ?? "LOKAT.REC"}
           </p>
-          <p style={{ ...R.grotesk, fontSize: "1.15rem", fontWeight: 700, color: isActive ? R.text : "#7a6a5a", lineHeight: 1, letterSpacing: "-.01em" }}>
+          <p style={{ ...R.grotesk, fontSize: "1.15rem", fontWeight: 700, color: isActive ? R.text : "#7a6a5a", lineHeight: 1.1, letterSpacing: "-.01em" }}>
             {video.title.toUpperCase()}
           </p>
-          {isActive && video.video_url && (
-            <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", color: `${R.muted}90`, marginTop: ".35rem" }}>
-              passe o mouse para preview · clique para abrir
+          {isActive && video.video_url && !videoFailed && (
+            <p style={{ ...R.mono, fontSize: isMobile ? ".58rem" : ".42rem", letterSpacing: ".14em", color: `${R.muted}90`, marginTop: ".35rem" }}>
+              {isMobile ? "toque para abrir" : "passe o mouse para preview · clique para abrir"}
             </p>
           )}
-          {isActive && !video.video_url && (
-            <p style={{ ...R.mono, fontSize: ".42rem", letterSpacing: ".14em", color: `${R.muted}70`, marginTop: ".35rem" }}>
-              vídeo indisponível
+          {isActive && (!video.video_url || videoFailed) && (
+            <p style={{ ...R.mono, fontSize: isMobile ? ".58rem" : ".42rem", letterSpacing: ".14em", color: `${R.muted}70`, marginTop: ".35rem" }}>
+              prévia indisponível
             </p>
           )}
         </div>
@@ -693,11 +697,24 @@ export default function LokatRecPage() {
     return window.innerWidth < 768 || navigator.maxTouchPoints > 0;
   });
   const [dropPhase,     setDropPhase]     = useState<"purple" | "red">("purple");
-  const [activeIdx,     setActiveIdx]     = useState(0);
-  const [modalVideo,    setModalVideo]    = useState<RecVideo | null>(null);
-  const [videos,        setVideos]        = useState<RecVideo[]>([]);
-  const [feedbackVideo, setFeedbackVideo] = useState<RecVideo | null>(null);
-  const [dataLoaded,    setDataLoaded]    = useState(false);
+  const [activeIdx,      setActiveIdx]     = useState(0);
+  const [modalVideo,     setModalVideo]    = useState<RecVideo | null>(null);
+  const [videos,         setVideos]        = useState<RecVideo[]>([]);
+  const [failedVideoIds, setFailedVideoIds] = useState<Set<string>>(new Set());
+  const [feedbackVideo,  setFeedbackVideo] = useState<RecVideo | null>(null);
+  const [dataLoaded,     setDataLoaded]    = useState(false);
+
+  const visibleVideos = useMemo(
+    () => videos.filter((v) => !failedVideoIds.has(v.id)),
+    [videos, failedVideoIds]
+  );
+
+  // Mantém activeIdx dentro dos limites quando vídeos são removidos por erro
+  useEffect(() => {
+    if (visibleVideos.length > 0 && activeIdx >= visibleVideos.length) {
+      setActiveIdx(0);
+    }
+  }, [visibleVideos.length, activeIdx]);
 
   const portfolioRef = useRef<HTMLDivElement>(null);
   const quemRef      = useRef<HTMLDivElement>(null);
@@ -743,16 +760,16 @@ export default function LokatRecPage() {
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>
     ref.current?.scrollIntoView({ behavior: "smooth" });
 
-  const prev = useCallback(() => setActiveIdx((i) => (i - 1 + videos.length) % videos.length), [videos.length]);
-  const next = useCallback(() => setActiveIdx((i) => (i + 1) % videos.length), [videos.length]);
+  const prev = useCallback(() => setActiveIdx((i) => (i - 1 + visibleVideos.length) % visibleVideos.length), [visibleVideos.length]);
+  const next = useCallback(() => setActiveIdx((i) => (i + 1) % visibleVideos.length), [visibleVideos.length]);
 
   const getPos = useCallback((idx: number) => {
     let p = idx - activeIdx;
-    const half = Math.floor(videos.length / 2);
-    if (p > half)  p -= videos.length;
-    if (p < -half) p += videos.length;
+    const half = Math.floor(visibleVideos.length / 2);
+    if (p > half)  p -= visibleVideos.length;
+    if (p < -half) p += visibleVideos.length;
     return Math.max(-1, Math.min(1, p));
-  }, [activeIdx, videos.length]);
+  }, [activeIdx, visibleVideos.length]);
 
   return (
     <div style={{ background: R.bg, color: R.text, minHeight: "100vh", overflowX: "hidden" }}>
@@ -855,17 +872,17 @@ export default function LokatRecPage() {
           >
             <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Trabalhos]</p>
             <h2 style={{ ...R.grotesk, fontSize: "clamp(1.6rem,4vw,2.4rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>
-              Passe o mouse.<br />O vídeo toca.
+              {isMobile ? "Toque para assistir." : <><span>Passe o mouse.</span><br /><span>O vídeo toca.</span></>}
             </h2>
             <p style={{ ...R.grotesk, fontSize: ".82rem", color: R.muted, marginTop: ".6rem" }}>
-              Clique no card ativo para assistir em tela cheia.
+              {isMobile ? "Toque no card ativo para abrir em tela cheia." : "Clique no card ativo para assistir em tela cheia."}
             </p>
           </motion.div>
 
           {/* Deck */}
           <div className="rec-case-carousel" style={{ position: "relative", height: isMobile ? "340px" : "440px", userSelect: "none", overflow: "hidden" }}>
             {dataLoaded
-              ? videos.map((video, idx) => {
+              ? visibleVideos.map((video, idx) => {
                   const pos    = getPos(idx);
                   const hidden = Math.abs(pos) > 1;
                   return (
@@ -875,6 +892,8 @@ export default function LokatRecPage() {
                         position={pos}
                         onActivate={() => setActiveIdx(idx)}
                         onOpen={() => setModalVideo(video)}
+                        isMobile={isMobile}
+                        onVideoError={() => setFailedVideoIds((prev) => new Set([...prev, video.id]))}
                       />
                     </div>
                   );
@@ -896,7 +915,7 @@ export default function LokatRecPage() {
             ><ChevronLeft style={{ width: "18px" }} strokeWidth={1.5} /></button>
 
             <div style={{ display: "flex", gap: ".5rem" }}>
-              {videos.map((_, i) => (
+              {visibleVideos.map((_, i) => (
                 <button key={i} onClick={() => setActiveIdx(i)}
                   style={{ width: i === activeIdx ? "20px" : "6px", height: "6px", background: i === activeIdx ? R.red : R.border, border: "none", cursor: "pointer", transition: "all .3s ease", padding: 0 }}
                 />
@@ -911,13 +930,13 @@ export default function LokatRecPage() {
           </div>
 
           {/* Label do card ativo */}
-          {videos[activeIdx] && (
+          {visibleVideos[activeIdx] && (
             <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
-              <p style={{ ...R.mono, fontSize: ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.muted }}>
-                {videos[activeIdx].client_name ?? "LOKAT.REC"} · {videos[activeIdx].category}
+              <p style={{ ...R.mono, fontSize: isMobile ? ".62rem" : ".48rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.muted }}>
+                {visibleVideos[activeIdx].client_name ?? "LOKAT.REC"} · {visibleVideos[activeIdx].category}
               </p>
               <p style={{ ...R.grotesk, fontSize: "1.25rem", fontWeight: 700, color: R.text, marginTop: ".2rem" }}>
-                {videos[activeIdx].title}
+                {visibleVideos[activeIdx].title}
               </p>
             </div>
           )}
