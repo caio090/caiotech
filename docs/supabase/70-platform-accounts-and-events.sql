@@ -133,3 +133,29 @@ COMMENT ON TABLE  public.platform_account_events   IS 'Rastreia eventos de ciclo
 COMMENT ON TABLE  public.platform_admin_notes      IS 'Notas internas do super_admin sobre usuários/clientes/agências';
 COMMENT ON TABLE  public.platform_notifications    IS 'Notificações internas para super_admin (novos cadastros, bloqueios, etc.)';
 COMMENT ON COLUMN public.profiles.account_status   IS 'Status administrativo: active | trialing | beta_free | suspended | blocked | pending_setup';
+
+-- ============================================================
+-- COMO RODAR ESTE SQL NO SUPABASE
+-- ============================================================
+--
+-- PRÉ-REQUISITOS (rodar antes, nesta ordem):
+--   1. SQL 68 — billing_plans, client_subscriptions, billing_coupons
+--      (necessário para a view v_platform_accounts_overview)
+--   2. SQL 69 — agency_workspaces, account_type em profiles
+--      (necessário para a FK em platform_account_events e para a view)
+--
+-- SE SQL 68 ou 69 ainda não foram rodados, a criação da view
+-- (seção 8) vai falhar com erro de tabela/coluna não encontrada.
+-- Nesse caso: rode 68 e 69 primeiro, depois execute este arquivo.
+--
+-- PASSO A PASSO:
+--   1. Abra o Supabase SQL Editor
+--   2. Clique em "+ New query" (NÃO abra uma query salva antiga)
+--   3. Cole TODO o conteúdo deste arquivo na nova aba
+--   4. Clique em "Run" (Ctrl+Enter)
+--   5. Confirme que todas as seções executaram sem erro
+--
+-- NOTA: Este SQL é idempotente (IF NOT EXISTS em todo lugar).
+--   Pode ser executado novamente sem efeito colateral.
+--   Se alguma seção falhar, corrija a dependência e re-execute.
+-- ============================================================

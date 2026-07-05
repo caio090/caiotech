@@ -334,7 +334,7 @@ function FeedbackSection({ video, isMobile }: { video: RecVideo | null; isMobile
   };
 
   return (
-    <section ref={sectionRef} style={{ position: "relative", padding: "8rem 0", overflow: "hidden" }}>
+    <section ref={sectionRef} style={{ position: "relative", padding: isMobile ? "4rem 0" : "8rem 0", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${R.bg} 0%, #100c06 50%, ${R.bg} 100%)`, pointerEvents: "none" }} />
       <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.5 }} />
       <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: "3px", height: "40%", background: `linear-gradient(to bottom, transparent, ${R.red}45, transparent)`, pointerEvents: "none" }} />
@@ -359,10 +359,10 @@ function FeedbackSection({ video, isMobile }: { video: RecVideo | null; isMobile
           </div>
         </motion.div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4rem", alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "2rem" : "4rem", alignItems: "center" }}>
           {/* Vídeo */}
           <motion.div
-            style={{ y: yVid }}
+            style={{ y: yVid, maxWidth: isMobile ? "340px" : "unset", margin: isMobile ? "0 auto" : "unset" }}
             initial={{ opacity: 0, y: 40 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: .9, delay: .1, ease: [0.16, 1, 0.3, 1] }}
@@ -772,23 +772,33 @@ export default function LokatRecPage() {
       )}
 
       {/* ── NAV ──────────────────────────────────────────────────── */}
-      <header className="rec-menu-in" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".9rem 2rem", background: "rgba(10,8,6,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderBottom: `1px solid ${R.border}` }}>
+      <header className="rec-menu-in" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".9rem 1.25rem", background: "rgba(10,8,6,0.92)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", borderBottom: `1px solid ${R.border}` }}>
         <span style={{ ...R.mono, fontSize: ".82rem", letterSpacing: ".08em", fontWeight: 700, color: R.text }}>
           LOKAT<span style={{ color: R.red }}>.</span><span style={{ color: R.red }}>REC</span>
         </span>
-        <nav style={{ display: "flex", gap: "2rem" }}>
-          {[["Trabalhos", portfolioRef], ["Quem somos", quemRef], ["Contato", contatoRef]] .map(([label, ref]) => (
-            <button key={label as string} onClick={() => scrollTo(ref as React.RefObject<HTMLDivElement>)}
-              style={{ ...R.mono, fontSize: ".62rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color .2s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
-            >{label as string}</button>
-          ))}
-        </nav>
-        <Link href="/" className="rec-lokat-os-btn" style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#c4baff", textDecoration: "none", display: "flex", alignItems: "center", gap: ".5rem", padding: ".35rem .75rem", border: "1px solid #7b6ef640", background: "#7b6ef610", position: "relative", overflow: "hidden", transition: "background .2s, border-color .2s" }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#7b6ef620"; e.currentTarget.style.borderColor = "#7b6ef680"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#7b6ef610"; e.currentTarget.style.borderColor = "#7b6ef640"; }}
-        ><ArrowLeft style={{ width: "11px" }} /> LOKAT OS</Link>
+        {!isMobile && (
+          <nav style={{ display: "flex", gap: "2rem" }}>
+            {[["Trabalhos", portfolioRef], ["Quem somos", quemRef], ["Contato", contatoRef]].map(([label, ref]) => (
+              <button key={label as string} onClick={() => scrollTo(ref as React.RefObject<HTMLDivElement>)}
+                style={{ ...R.mono, fontSize: ".62rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color .2s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = R.text)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = R.muted)}
+              >{label as string}</button>
+            ))}
+          </nav>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
+          {isMobile && (
+            <button onClick={() => scrollTo(contatoRef)}
+              style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".14em", textTransform: "uppercase", color: R.muted, background: "none", border: `1px solid ${R.border}`, cursor: "pointer", padding: ".3rem .65rem" }}>
+              Contato
+            </button>
+          )}
+          <Link href="/" className="rec-lokat-os-btn" style={{ ...R.mono, fontSize: ".52rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#c4baff", textDecoration: "none", display: "flex", alignItems: "center", gap: ".5rem", padding: ".35rem .75rem", border: "1px solid #7b6ef640", background: "#7b6ef610", position: "relative", overflow: "hidden", transition: "background .2s, border-color .2s" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#7b6ef620"; e.currentTarget.style.borderColor = "#7b6ef680"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#7b6ef610"; e.currentTarget.style.borderColor = "#7b6ef640"; }}
+          ><ArrowLeft style={{ width: "11px" }} /> LOKAT OS</Link>
+        </div>
       </header>
 
       {/* ── HERO ─────────────────────────────────────────────────── */}
@@ -853,7 +863,7 @@ export default function LokatRecPage() {
           </motion.div>
 
           {/* Deck */}
-          <div className="rec-case-carousel" style={{ position: "relative", height: "440px", userSelect: "none" }}>
+          <div className="rec-case-carousel" style={{ position: "relative", height: isMobile ? "340px" : "440px", userSelect: "none", overflow: "hidden" }}>
             {dataLoaded
               ? videos.map((video, idx) => {
                   const pos    = getPos(idx);
@@ -934,7 +944,7 @@ export default function LokatRecPage() {
             <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Como fazemos]</p>
             <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05 }}>Do roteiro ao resultado.</h2>
           </motion.div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1px", background: R.border }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: "1px", background: R.border }}>
             {[
               { n: "01", t: "Roteiro",   d: "Briefing, conceito e estrutura do vídeo antes de ligar a câmera." },
               { n: "02", t: "Captação",  d: "Direção de cena, enquadramento, luz e ritmo de produção no set." },
@@ -955,8 +965,8 @@ export default function LokatRecPage() {
       <section ref={quemRef} style={{ background: R.bg, position: "relative", overflow: "hidden" }}>
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.6 }} />
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "6rem 2rem", position: "relative", zIndex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "center" }}>
-            <div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "2rem" : "5rem", alignItems: "center" }}>
+            {!isMobile && <div>
               <div style={{ width: "100%", aspectRatio: "4/5", overflow: "hidden", border: `1px solid ${R.border}`, ...caisOverlay("qs", "center 60%"), position: "relative" }}>
                 <div className="rec-grain" style={{ position: "absolute", inset: 0 }} />
                 <div style={{ position: "absolute", bottom: "2rem", left: "2rem", right: "2rem", zIndex: 1 }}>
@@ -964,7 +974,7 @@ export default function LokatRecPage() {
                   <p style={{ ...R.grotesk, fontSize: "2rem", fontWeight: 700, color: R.red, lineHeight: 1 }}>SOMOS.</p>
                 </div>
               </div>
-            </div>
+            </div>}
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -992,7 +1002,7 @@ export default function LokatRecPage() {
         <div className="rec-grain" style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", background: `linear-gradient(to bottom, ${R.bg}, transparent)`, pointerEvents: "none" }} />
         <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "8rem 2rem", position: "relative", zIndex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "3rem" : "5rem", alignItems: "start" }}>
             <div>
               <p style={{ ...R.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: R.red, marginBottom: ".6rem" }}>[Contato]</p>
               <h2 style={{ ...R.grotesk, fontSize: "clamp(1.5rem,3.5vw,2.2rem)", fontWeight: 700, color: R.text, lineHeight: 1.05, marginBottom: "1rem" }}>Tem um projeto<br />em mente?</h2>
