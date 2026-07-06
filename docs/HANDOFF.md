@@ -2,6 +2,45 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
+## Última sessão — 2026-07-06 — waitlist, leads, landing REC OS
+
+**Commit:** `c0f4a6a` — fix: waitlist leads e landing rec os
+
+**P0 — Waitlist POST:**
+- SQL 75 aplicado pelo usuário corrigiu `42703` (coluna `social_or_site` ausente na tabela).
+- A rota POST `/api/launch/waitlist` já tinha anon fallback do commit anterior — agora deve funcionar.
+- Se ainda falhar: verificar se `SUPABASE_SERVICE_ROLE_KEY` na Vercel aponta para o **mesmo projeto** que `NEXT_PUBLIC_SUPABASE_URL`.
+
+**P0 — Admin waitlist (0 registros):**
+- A rota já retorna debug `{ rowsReturned, countReturned }`.
+- A página agora mostra diagnóstico detalhado quando `entries = []`.
+- Causa mais provável: service role key incorreta/apontando para outro projeto → service role opera como anon → RLS filtra silenciosamente.
+- **Ação manual**: confirmar no Supabase SQL Editor que `SELECT * FROM launch_waitlist` retorna registros.
+
+**P1 — Central de Leads:**
+- Nova rota: `GET /api/admin/leads` — une `launch_waitlist` + `admin_signups_view` (graceful fallback).
+- Nova página: `/admin/super/leads` — filtros por fonte/status, ações para waitlist, legado somente leitura.
+- Tab "Central de Leads" adicionado em `/admin/super/waitlist`.
+- `admin_signups_view` somente leitura até mapear tabela base: rodar `SELECT pg_get_viewdef('public.admin_signups_view', true)` no SQL Editor.
+
+**P2 — Landing:**
+- Link "REC OS" no header: `/rec` → `/#rec-os` (seção na home, não o app externo).
+- Nova seção `id="rec-os"` (dark) explica briefing/roteiro/calendário/aprovação/performance.
+- Gradiente de transição hero → branco com gota vermelha animada (ponte visual Lokat OS → Lokat.rec).
+- Beta pricing simplificado: 1 CTA principal + link para planos.
+
+**Documentação:**
+- `docs/DATA_MODEL_MULTI_TENANT_ARCHITECTURE.md` — modelo multi-tenant completo criado.
+- `docs/DECISIONS.md` — 5 novas decisões registradas.
+- `docs/ROADMAP.md` — pendências técnicas atualizadas.
+
+**Pendências para próxima sessão:**
+- Testar `/pre-acesso` em produção após deploy.
+- Testar `/admin/super/waitlist` — deve mostrar registros ou diagnóstico claro.
+- Testar `/admin/super/leads` — deve unir fontes.
+- Rodar `SELECT pg_get_viewdef('public.admin_signups_view', true)` para descobrir tabela base.
+- Ativar ações delete/archive em admin_signups_view após identificar tabela base.
+
 ## Estado atual
 
 - Projeto: Lokat OS
