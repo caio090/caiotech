@@ -11,6 +11,7 @@ const PUBLIC_PATH_PREFIXES = [
     "/aprovar/", "/convite", "/equipe/solicitar-acesso", "/rec",
     "/pre-acesso", "/api/launch/",
     "/api/meta/status", "/api/meta/callback", "/api/debug/",
+    "/api/leads/typebot", // public webhook — auth via LOKAT_TYPEBOT_WEBHOOK_SECRET header
   ];
 
 function isPublic(pathname: string): boolean {

@@ -44,6 +44,10 @@ const FAQ = [
 
 export default function HomePage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalKey,  setModalKey]  = useState(0);
+
+  const openModal  = () => { setModalKey((k) => k + 1); setModalOpen(true); };
+  const closeModal = () => setModalOpen(false);
   const [openFaq, setOpenFaq]     = useState<number | null>(null);
 
   const betaHref = LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta";
@@ -134,7 +138,7 @@ export default function HomePage() {
             {/* Secondary action */}
             <div className="hero-fade-up-d3 mt-4">
               <button
-                onClick={() => setModalOpen(true)}
+                onClick={openModal}
                 style={{ background: "none", border: "none", cursor: "pointer", ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px" }}
               >
                 Ou agendar demonstração →
@@ -645,7 +649,8 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <LeadConversationModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      {/* key={modalKey} remounts the modal on each open, resetting all internal state cleanly */}
+      <LeadConversationModal key={modalKey} open={modalOpen} onClose={closeModal} />
     </div>
   );
 }

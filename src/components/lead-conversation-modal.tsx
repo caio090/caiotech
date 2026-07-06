@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { normalizeAccountType } from "@/lib/leads/normalize-lead-payload";
 
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
 
@@ -11,27 +12,32 @@ const FIELDS: Field[] = [
   { name: "message",      label: "Alguma mensagem? (opcional)", type: "textarea" },
 ];
 
+type ModalState = {
+  step:    number;
+  values:  Record<string, string>;
+  loading: boolean;
+  done:    boolean;
+  error:   string | null;
+};
+
+const INITIAL_STATE: ModalState = { step: 0, values: {}, loading: false, done: false, error: null };
+
 interface Props {
-  open: boolean;
+  open:    boolean;
   onClose: () => void;
 }
 
 export function LeadConversationModal({ open, onClose }: Props) {
-  const [step, setStep]     = useState(0);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [error, setError]   = useState<string | null>(null);
-  const overlayRef          = useRef<HTMLDivElement>(null);
-  const inputRef            = useRef<HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement>(null);
+  const [s, setS]  = useState<ModalState>(INITIAL_STATE);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const inputRef   = useRef<HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement>(null);
 
-  useEffect(() => {
-    if (open) { setStep(0); setValues({}); setDone(false); setError(null); }
-  }, [open]);
+  // State resets automatically when parent changes the `key` prop on re-open.
+  // No effect needed here — see LeadConversationModal usage in page.tsx.
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
-  }, [open, step]);
+  }, [open, s.step]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -41,42 +47,42 @@ export function LeadConversationModal({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const field = FIELDS[step];
-  const value = values[field.name] ?? "";
+  const field    = FIELDS[s.step];
+  const value    = s.values[field.name] ?? "";
+  const canNext  = !field.required || value.trim().length > 0;
 
-  const canAdvance = !field.required || value.trim().length > 0;
+  const setValues = (vals: Record<string, string>) => setS((p) => ({ ...p, values: vals }));
+  const setStep   = (step: number)                  => setS((p) => ({ ...p, step }));
 
   const advance = () => {
-    if (step < FIELDS.length - 1) {
-      setStep(step + 1);
+    if (s.step < FIELDS.length - 1) {
+      setStep(s.step + 1);
     } else {
       submit();
     }
   };
 
   const submit = async () => {
-    setLoading(true);
-    setError(null);
+    setS((p) => ({ ...p, loading: true, error: null }));
     try {
       const payload = {
-        name:         values.name ?? "",
-        email:        "", // email not collected here — saved with source=site_conversation
-        phone:        values.phone ?? null,
-        account_type: values.account_type ?? null,
-        interest:     values.interest ?? null,
+        name:         s.values.name ?? "",
+        email:        "", // email not collected here — follow-up is by WhatsApp
+        phone:        s.values.phone ?? null,
+        // normalizeAccountType maps "Empresa / Negócio local" → "business" etc.
+        account_type: normalizeAccountType(s.values.account_type ?? null),
+        interest:     s.values.interest ?? null,
         source:       "site_conversation",
       };
       const res  = await fetch("/api/launch/waitlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const json = await res.json() as { ok: boolean; message?: string; code?: string };
       if (!json.ok && json.code !== "missing_required_fields") {
-        setError(json.message ?? "Erro ao enviar. Tente novamente.");
+        setS((p) => ({ ...p, loading: false, error: json.message ?? "Erro ao enviar. Tente novamente." }));
       } else {
-        setDone(true);
+        setS((p) => ({ ...p, loading: false, done: true }));
       }
     } catch {
-      setError("Erro de conexão. Tente novamente.");
-    } finally {
-      setLoading(false);
+      setS((p) => ({ ...p, loading: false, error: "Erro de conexão. Tente novamente." }));
     }
   };
 
@@ -87,7 +93,7 @@ export function LeadConversationModal({ open, onClose }: Props) {
     text:   "#e8e8e8",
     muted:  "#555566",
     accent: "#7b6ef6",
-    mono:   { fontFamily: "'Space Mono', monospace" } as React.CSSProperties,
+    mono:   { fontFamily: "'Space Mono', monospace" }     as React.CSSProperties,
     grotesk:{ fontFamily: "'Space Grotesk', sans-serif" } as React.CSSProperties,
   };
 
@@ -109,7 +115,7 @@ export function LeadConversationModal({ open, onClose }: Props) {
           style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", color: S.muted, cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}
         >✕</button>
 
-        {done ? (
+        {s.done ? (
           <div style={{ textAlign: "center", padding: "1rem 0" }}>
             <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>✦</div>
             <h2 style={{ ...S.grotesk, color: S.text, fontSize: "1.25rem", fontWeight: 700, marginBottom: ".5rem" }}>
@@ -127,10 +133,10 @@ export function LeadConversationModal({ open, onClose }: Props) {
           <>
             <div style={{ marginBottom: "2rem" }}>
               <div style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.accent, marginBottom: ".5rem" }}>
-                {step + 1} / {FIELDS.length}
+                {s.step + 1} / {FIELDS.length}
               </div>
               <div style={{ height: 2, background: S.border, borderRadius: 1 }}>
-                <div style={{ height: "100%", width: `${((step + 1) / FIELDS.length) * 100}%`, background: S.accent, borderRadius: 1, transition: "width .3s ease" }} />
+                <div style={{ height: "100%", width: `${((s.step + 1) / FIELDS.length) * 100}%`, background: S.accent, borderRadius: 1, transition: "width .3s ease" }} />
               </div>
             </div>
 
@@ -143,7 +149,7 @@ export function LeadConversationModal({ open, onClose }: Props) {
                 {field.options.map((opt) => (
                   <button
                     key={opt}
-                    onClick={() => { setValues({ ...values, [field.name]: opt }); setTimeout(advance, 180); }}
+                    onClick={() => { setValues({ ...s.values, [field.name]: opt }); setTimeout(advance, 180); }}
                     style={{
                       background: value === opt ? `${S.accent}20` : "transparent",
                       border: `1px solid ${value === opt ? S.accent : S.border}`,
@@ -162,7 +168,7 @@ export function LeadConversationModal({ open, onClose }: Props) {
               <textarea
                 ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                 value={value}
-                onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                onChange={(e) => setValues({ ...s.values, [field.name]: e.target.value })}
                 onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) advance(); }}
                 rows={3}
                 placeholder="Opcional..."
@@ -173,31 +179,31 @@ export function LeadConversationModal({ open, onClose }: Props) {
                 ref={inputRef as React.RefObject<HTMLInputElement>}
                 type={field.type ?? "text"}
                 value={value}
-                onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                onKeyDown={(e) => { if (e.key === "Enter" && canAdvance) advance(); }}
+                onChange={(e) => setValues({ ...s.values, [field.name]: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Enter" && canNext) advance(); }}
                 placeholder={field.label}
                 style={{ width: "100%", background: S.bg, border: `1px solid ${S.border}`, color: S.text, padding: ".75rem", ...S.grotesk, fontSize: ".9rem", outline: "none", boxSizing: "border-box" }}
               />
             )}
 
-            {error && (
-              <p style={{ ...S.mono, color: "#e05555", fontSize: ".7rem", marginTop: ".75rem" }}>{error}</p>
+            {s.error && (
+              <p style={{ ...S.mono, color: "#e05555", fontSize: ".7rem", marginTop: ".75rem" }}>{s.error}</p>
             )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
               <button
-                onClick={() => step > 0 && setStep(step - 1)}
-                disabled={step === 0}
-                style={{ background: "none", border: "none", color: step > 0 ? S.muted : "transparent", cursor: step > 0 ? "pointer" : "default", ...S.mono, fontSize: ".68rem", letterSpacing: ".1em" }}
+                onClick={() => s.step > 0 && setStep(s.step - 1)}
+                disabled={s.step === 0}
+                style={{ background: "none", border: "none", color: s.step > 0 ? S.muted : "transparent", cursor: s.step > 0 ? "pointer" : "default", ...S.mono, fontSize: ".68rem", letterSpacing: ".1em" }}
               >← Voltar</button>
 
               {!field.options && (
                 <button
                   onClick={advance}
-                  disabled={!canAdvance || loading}
-                  style={{ background: canAdvance ? S.accent : S.border, color: "#fff", border: "none", padding: ".7rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: canAdvance ? "pointer" : "default", transition: "background .2s", opacity: loading ? .7 : 1 }}
+                  disabled={!canNext || s.loading}
+                  style={{ background: canNext ? S.accent : S.border, color: "#fff", border: "none", padding: ".7rem 1.8rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: canNext ? "pointer" : "default", transition: "background .2s", opacity: s.loading ? .7 : 1 }}
                 >
-                  {loading ? "Enviando..." : step === FIELDS.length - 1 ? "Enviar →" : "Próximo →"}
+                  {s.loading ? "Enviando..." : s.step === FIELDS.length - 1 ? "Enviar →" : "Próximo →"}
                 </button>
               )}
             </div>

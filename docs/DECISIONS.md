@@ -15,4 +15,8 @@ Registro de decisoes do projeto Lokat OS.
 - 2026-07-06: Link "REC OS" no menu público aponta para `/#rec-os` (seção explicativa na home), não para `/rec` (o app Lokat.rec). São coisas diferentes: REC OS é a área dentro do Lokat OS; Lokat.rec é a plataforma de vídeo separada.
 - 2026-07-06: LeadConversationModal é V1 local (sem dependência do Typebot real). Fonte salva como `source="site_conversation"`. Estratégia completa em `docs/TYPEBOT_LEAD_CAPTURE_STRATEGY.md`.
 - 2026-07-06: Modal de conversa não coleta email — follow-up é por WhatsApp. Reduz fricção na primeira interação.
+- 2026-07-06: `normalizeLeadPayload()` em `src/lib/leads/normalize-lead-payload.ts` é o helper centralizado de normalização — usar em novos canais (WhatsApp bot, CRM, etc.).
+- 2026-07-06: Typebot é canal externo de captação, não CRM. Ele envia dados; a Lokat OS normaliza, classifica e salva.
+- 2026-07-06: `LOKAT_TYPEBOT_WEBHOOK_SECRET` protege o endpoint Typebot. Sem a variável, aceita sem autenticação (dev). Com a variável, exige header `x-lokat-webhook-secret`.
+- 2026-07-06: Fallback sem SQL 76: se `typebot_result_id` etc. não existem, endpoint faz segundo INSERT sem campos estendidos. Lead é salvo mesmo sem a migration.
 - 2026-07-06: Landing reformulada com seções O Problema, Para quem, FAQ, prévia visual simulada (labelled "Simulação — interface em desenvolvimento"), jornada 7 etapas.

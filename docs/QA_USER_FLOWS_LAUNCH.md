@@ -117,9 +117,20 @@ Execute cada fluxo manualmente antes de um deploy ou lançamento. Marque ✅ qua
 |---|---|---|
 | 8.1 | Conexão OlaClick (cardápio digital) | Dados de pedido/faturamento puxados sem erro |
 | 8.2 | Conexão Meta / Instagram | Métricas de alcance carregam |
-| 8.3 | Webhook Typebot `POST /api/leads/typebot` | Salva em `launch_waitlist` com `source="typebot"` |
-| 8.4 | Webhook com email duplicado | Retorna `{ ok: true, duplicate: true }`, não duplica |
-| 8.5 | Webhook sem email | Retorna `{ ok: false, code: "missing_required_fields" }` |
+| 8.3 | Webhook Typebot flat payload | `POST /api/leads/typebot` → `{ ok: true, lead_id, source: "typebot" }` |
+| 8.4 | Webhook Typebot formato `variables` | Normaliza e salva corretamente |
+| 8.5 | Lead sem email, só com WhatsApp | `{ ok: true }` — aceita sem email |
+| 8.6 | Lead sem nenhum contato | `{ ok: false, error: "validation_error" }` |
+| 8.7 | Lead com email duplicado | `{ ok: true, duplicate: true }` |
+| 8.8 | Lead com `typebot_result_id` duplicado | `{ ok: true, duplicate: true }` |
+| 8.9 | Secret ausente (variável configurada) | `{ ok: false, error: "unauthorized" }` (401) |
+| 8.10 | Secret correto | Passa autenticação normalmente |
+| 8.11 | Payload inválido (não-JSON) | `{ ok: false, error: "validation_error" }` (400) |
+| 8.12 | SQL 76 pendente (42703) | Fallback sem colunas estendidas, `_note: "SQL 76 pendente"` |
+| 8.13 | Após SQL 76: verificar `raw_payload` | Campo jsonb salvo com payload completo |
+| 8.14 | Após SQL 76: verificar `lead_score` | Pontuação calculada corretamente |
+| 8.15 | Lead via modal local | Salvo com `source="site_conversation"` |
+| 8.16 | Modal com "Agência" selecionada | `account_type = "agency"` no banco (normalizado) |
 
 ---
 
