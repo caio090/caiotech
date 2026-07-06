@@ -5,8 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import {
   Users, Building2, Rocket, UserCheck, AlertTriangle,
   RefreshCw, Search, Filter, ChevronDown, Shield,
-  Activity, Clock, CheckCircle2, XCircle, Eye,
-  Bell, MoreHorizontal,
+  Activity, Clock, CheckCircle2, XCircle,
+  Bell, UserX,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -22,12 +22,24 @@ interface Account {
   created_at: string | null;
   last_sign_in_at: string | null;
   company_name: string | null;
+  agency_name: string | null;
   plan_slug: string | null;
   coupon_code: string | null;
   subscription_status: string | null;
+  source: string;
+  has_profile: boolean;
 }
 
-type AccountFilter = "todos" | "agencia" | "empresa" | "invited_client" | "diagnostic_only" | "trial" | "sem_vinculo" | "bloqueado";
+type AccountFilter =
+  | "todos"
+  | "agencia"
+  | "empresa"
+  | "invited_client"
+  | "diagnostic_only"
+  | "trial"
+  | "sem_vinculo"
+  | "sem_perfil"
+  | "bloqueado";
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   agencia:          "Agência",
@@ -46,15 +58,23 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   pending_setup:   { label: "Pendente",    cls: "bg-gray-100 text-gray-500" },
 };
 
+const SOURCE_LABELS: Record<string, { label: string; cls: string }> = {
+  "auth+profile+client":  { label: "Cliente",  cls: "text-emerald-600" },
+  "auth+profile+agency":  { label: "Agência",  cls: "text-purple-600" },
+  "auth+profile":         { label: "Perfil",   cls: "text-blue-600" },
+  "auth_only":            { label: "Auth",     cls: "text-amber-600" },
+};
+
 const FILTER_OPTIONS: { value: AccountFilter; label: string }[] = [
-  { value: "todos",          label: "Todos" },
-  { value: "agencia",        label: "Agências" },
-  { value: "empresa",        label: "Empresas" },
-  { value: "invited_client", label: "Clientes convidados" },
-  { value: "diagnostic_only",label: "Só diagnóstico" },
-  { value: "trial",          label: "Em trial" },
-  { value: "sem_vinculo",    label: "Sem vínculo" },
-  { value: "bloqueado",      label: "Bloqueado/Suspenso" },
+  { value: "todos",           label: "Todos" },
+  { value: "agencia",         label: "Agências" },
+  { value: "empresa",         label: "Empresas" },
+  { value: "invited_client",  label: "Clientes convidados" },
+  { value: "diagnostic_only", label: "Só diagnóstico" },
+  { value: "trial",           label: "Em trial" },
+  { value: "sem_vinculo",     label: "Sem vínculo" },
+  { value: "sem_perfil",      label: "Sem perfil" },
+  { value: "bloqueado",       label: "Bloqueado/Suspenso" },
 ];
 
 const inputCls = "border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors bg-white";
@@ -75,9 +95,11 @@ function fmtRelative(s: string | null) {
   return fmtDate(s);
 }
 
-// ── Stats card ─────────────────────────────────────────────────────────────────
+// ── Stat card ──────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: React.ElementType; color: string }) {
+function StatCard({ label, value, icon: Icon, color }: {
+  label: string; value: number | string; icon: React.ElementType; color: string;
+}) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
@@ -94,27 +116,41 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: n
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export default function PlatformAccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [search,   setSearch]   = useState("");
-  const [filter,   setFilter]   = useState<AccountFilter>("todos");
+  const [accounts,     setAccounts]     = useState<Account[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [apiError,     setApiError]     = useState<string | null>(null);
+  const [search,       setSearch]       = useState("");
+  const [filter,       setFilter]       = useState<AccountFilter>("todos");
   const [actionTarget, setActionTarget] = useState<string | null>(null);
-  const [actionMsg, setActionMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
+  const [actionMsg,    setActionMsg]    = useState<{ id: string; ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const res = await fetch("/api/admin/accounts");
-      if (!res.ok) {
-        console.error("[accounts] API error:", res.status, await res.text().catch(() => ""));
+
+      // Tentar ler JSON em qualquer caso para ter mensagem de erro real
+      let json: { ok: boolean; accounts?: Account[]; code?: string; message?: string; debug?: Record<string, unknown> } | null = null;
+      try { json = await res.json(); } catch { /* empty */ }
+
+      if (!res.ok || !json?.ok) {
+        const code    = json?.code ?? `http_${res.status}`;
+        const message = json?.message ?? `Erro ${res.status} ao carregar contas.`;
+        setApiError(`[${code}] ${message}`);
         setLoading(false);
         return;
       }
-      const json = await res.json() as { ok: boolean; accounts?: Account[] };
-      if (!json.ok || !Array.isArray(json.accounts)) { setLoading(false); return; }
-      setAccounts(json.accounts.map((a) => ({ ...a, last_sign_in_at: null })));
+
+      if (!Array.isArray(json.accounts)) {
+        setApiError("A API retornou um formato inesperado. Verifique os logs do servidor.");
+        setLoading(false);
+        return;
+      }
+
+      setAccounts(json.accounts);
     } catch (e) {
-      console.error("[accounts] load error:", e);
+      setApiError(`Erro de rede: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -135,7 +171,7 @@ export default function PlatformAccountsPage() {
       if (error) {
         setActionMsg({ id: userId, ok: false, text: `Erro: ${error.message}` });
       } else {
-        setActionMsg({ id: userId, ok: true, text: `Status atualizado para "${newStatus}".` });
+        setActionMsg({ id: userId, ok: true, text: `Status: "${newStatus}".` });
         setAccounts((prev) => prev.map((a) => a.id === userId ? { ...a, account_status: newStatus } : a));
       }
     } catch {
@@ -151,46 +187,49 @@ export default function PlatformAccountsPage() {
     const matchSearch = !q ||
       (a.email ?? "").toLowerCase().includes(q) ||
       (a.name ?? "").toLowerCase().includes(q) ||
-      (a.company_name ?? "").toLowerCase().includes(q);
+      (a.company_name ?? "").toLowerCase().includes(q) ||
+      (a.agency_name ?? "").toLowerCase().includes(q);
     const matchFilter =
-      filter === "todos" ? true :
-      filter === "agencia" ? a.account_type === "agencia" :
-      filter === "empresa" ? a.account_type === "empresa" :
-      filter === "invited_client" ? a.account_type === "invited_client" :
+      filter === "todos"           ? true :
+      filter === "agencia"         ? a.account_type === "agencia" :
+      filter === "empresa"         ? a.account_type === "empresa" :
+      filter === "invited_client"  ? a.account_type === "invited_client" :
       filter === "diagnostic_only" ? a.account_type === "diagnostic_only" :
-      filter === "trial" ? a.subscription_status === "trialing" :
-      filter === "sem_vinculo" ? !a.company_name :
-      filter === "bloqueado" ? (a.account_status === "blocked" || a.account_status === "suspended") :
+      filter === "trial"           ? a.subscription_status === "trialing" :
+      filter === "sem_vinculo"     ? (!a.company_name && !a.agency_name) :
+      filter === "sem_perfil"      ? !a.has_profile :
+      filter === "bloqueado"       ? (a.account_status === "blocked" || a.account_status === "suspended") :
       true;
     return matchSearch && matchFilter;
   });
 
   // Stats
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const week = new Date(); week.setDate(week.getDate() - 7); week.setHours(0, 0, 0, 0);
-  const newToday = accounts.filter((a) => a.created_at && new Date(a.created_at) >= today).length;
-  const newWeek  = accounts.filter((a) => a.created_at && new Date(a.created_at) >= week).length;
-  const agencies = accounts.filter((a) => a.account_type === "agencia").length;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const week  = new Date(); week.setDate(week.getDate() - 7); week.setHours(0, 0, 0, 0);
+  const newToday   = accounts.filter((a) => a.created_at && new Date(a.created_at) >= today).length;
+  const newWeek    = accounts.filter((a) => a.created_at && new Date(a.created_at) >= week).length;
+  const agencies   = accounts.filter((a) => a.account_type === "agencia").length;
   const businesses = accounts.filter((a) => a.account_type === "empresa").length;
-  const trialing = accounts.filter((a) => a.subscription_status === "trialing").length;
-  const blocked  = accounts.filter((a) => a.account_status === "blocked" || a.account_status === "suspended").length;
+  const trialing   = accounts.filter((a) => a.subscription_status === "trialing").length;
+  const blocked    = accounts.filter((a) => a.account_status === "blocked" || a.account_status === "suspended").length;
+  const noProfile  = accounts.filter((a) => !a.has_profile).length;
 
   return (
     <div>
       <PageHeader
         title="Central de Contas"
-        description="Cadastros, tipos de conta, status e ações administrativas"
+        description="Todos os usuários do auth — cadastros, tipos de conta, status e ações"
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <StatCard label="Hoje"       value={newToday}   icon={Bell}        color="bg-indigo-50 text-indigo-600" />
-        <StatCard label="7 dias"     value={newWeek}    icon={Activity}    color="bg-blue-50 text-blue-600" />
-        <StatCard label="Agências"   value={agencies}   icon={Rocket}      color="bg-purple-50 text-purple-600" />
-        <StatCard label="Empresas"   value={businesses} icon={Building2}   color="bg-emerald-50 text-emerald-600" />
-        <StatCard label="Em trial"   value={trialing}   icon={Clock}       color="bg-amber-50 text-amber-600" />
-        <StatCard label="Bloqueados" value={blocked}    icon={AlertTriangle} color="bg-red-50 text-red-600" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+        <StatCard label="Total"      value={accounts.length} icon={Users}         color="bg-gray-100 text-gray-600" />
+        <StatCard label="Hoje"       value={newToday}        icon={Bell}          color="bg-indigo-50 text-indigo-600" />
+        <StatCard label="7 dias"     value={newWeek}         icon={Activity}      color="bg-blue-50 text-blue-600" />
+        <StatCard label="Agências"   value={agencies}        icon={Rocket}        color="bg-purple-50 text-purple-600" />
+        <StatCard label="Empresas"   value={businesses}      icon={Building2}     color="bg-emerald-50 text-emerald-600" />
+        <StatCard label="Sem perfil" value={noProfile}       icon={UserX}         color="bg-amber-50 text-amber-600" />
+        <StatCard label="Bloqueados" value={blocked}         icon={AlertTriangle} color="bg-red-50 text-red-600" />
       </div>
 
       {/* Filters + search */}
@@ -228,13 +267,22 @@ export default function PlatformAccountsPage() {
         </button>
       </div>
 
-      {/* Info note */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
-        A Central mostra todos os perfis encontrados. Contas sem empresa ou agência aparecem como pendentes de configuração.
-      </div>
+      {/* Banners de estado */}
+      {apiError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-xs text-red-700 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+          <span><strong>Erro ao carregar contas:</strong> {apiError}</span>
+        </div>
+      )}
       {!isSupabaseConfigured && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
           Supabase não configurado — dados podem estar incompletos.
+        </div>
+      )}
+      {!apiError && !loading && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
+          A Central lista todos os usuários do auth, incluindo contas sem perfil público.
+          Contas sem empresa ou agência aparecem como pendentes de configuração.
         </div>
       )}
 
@@ -245,38 +293,59 @@ export default function PlatformAccountsPage() {
             <RefreshCw className="w-4 h-4 animate-spin" />
             Carregando contas...
           </div>
+        ) : apiError ? (
+          <div className="text-center py-16">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-red-300" />
+            <p className="text-sm text-red-500 font-medium">Não foi possível carregar as contas.</p>
+            <p className="text-xs text-gray-400 mt-1">Veja o erro acima. Tente atualizar ou verifique os logs.</p>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <Users className="w-8 h-8 mx-auto mb-2 text-gray-200" />
-            <p className="text-sm text-gray-400">Nenhuma conta encontrada.</p>
+            <p className="text-sm text-gray-400">Nenhuma conta encontrada com este filtro.</p>
+            {accounts.length > 0 && (
+              <p className="text-xs text-gray-300 mt-1">{accounts.length} conta{accounts.length !== 1 ? "s" : ""} no total — ajuste o filtro ou busca.</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {["Nome / E-mail", "Tipo", "Empresa", "Status", "Plano", "Cadastro", "Ações"].map((h) => (
+                  {["Nome / E-mail", "Tipo", "Vínculo", "Origem", "Status", "Cadastro / Acesso", "Ações"].map((h) => (
                     <th key={h} className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((a) => {
-                  const statusCfg = STATUS_LABELS[a.account_status ?? "active"] ?? STATUS_LABELS.active;
+                  const statusCfg  = STATUS_LABELS[a.account_status ?? "pending_setup"] ?? STATUS_LABELS.pending_setup;
+                  const sourceCfg  = SOURCE_LABELS[a.source] ?? SOURCE_LABELS["auth_only"];
                   const isActionRow = actionTarget === a.id;
+                  const noProfile  = !a.has_profile;
+
                   return (
-                    <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={a.id} className={`hover:bg-gray-50 transition-colors ${noProfile ? "opacity-75" : ""}`}>
                       <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-gray-900">{a.name ?? "—"}</p>
+                        <p className="text-xs font-semibold text-gray-900">{a.name ?? <span className="text-gray-400 italic">sem nome</span>}</p>
                         <p className="text-[11px] text-gray-400">{a.email ?? "—"}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-gray-600">
-                          {a.account_type ? (ACCOUNT_TYPE_LABELS[a.account_type] ?? a.account_type) : "—"}
+                          {a.account_type ? (ACCOUNT_TYPE_LABELS[a.account_type] ?? a.account_type) : <span className="text-gray-300">—</span>}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-gray-600">{a.company_name ?? <span className="text-gray-300">sem vínculo</span>}</span>
+                        {a.company_name ? (
+                          <span className="text-xs text-gray-700">{a.company_name}</span>
+                        ) : a.agency_name ? (
+                          <span className="text-xs text-purple-600">{a.agency_name}</span>
+                        ) : (
+                          <span className="text-[11px] text-gray-300">sem vínculo</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-semibold ${sourceCfg.cls}`}>{sourceCfg.label}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCfg.cls}`}>
@@ -287,42 +356,37 @@ export default function PlatformAccountsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-gray-500">{a.plan_slug ?? a.subscription_status ?? "—"}</span>
-                      </td>
-                      <td className="px-4 py-3">
                         <p className="text-[11px] text-gray-500">{fmtDate(a.created_at)}</p>
                         <p className="text-[10px] text-gray-400">acesso {fmtRelative(a.last_sign_in_at)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          {a.account_status !== "blocked" && a.account_status !== "suspended" ? (
-                            <button
-                              onClick={() => void handleStatusChange(a.id, "blocked")}
-                              disabled={isActionRow}
-                              className="text-[10px] font-medium text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40"
-                              title="Bloquear conta"
-                            >
-                              Bloquear
-                            </button>
+                          {noProfile ? (
+                            <span className="text-[10px] text-gray-300" title="Crie ou repare o profile antes de alterar status">Sem perfil</span>
+                          ) : a.account_status !== "blocked" && a.account_status !== "suspended" ? (
+                            <>
+                              <button
+                                onClick={() => void handleStatusChange(a.id, "blocked")}
+                                disabled={isActionRow}
+                                className="text-[10px] font-medium text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40"
+                                title="Bloquear conta"
+                              >Bloquear</button>
+                              {a.account_status === "active" && (
+                                <button
+                                  onClick={() => void handleStatusChange(a.id, "suspended")}
+                                  disabled={isActionRow}
+                                  className="text-[10px] font-medium text-amber-600 hover:text-amber-700 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                  title="Suspender temporariamente"
+                                >Suspender</button>
+                              )}
+                            </>
                           ) : (
                             <button
                               onClick={() => void handleStatusChange(a.id, "active")}
                               disabled={isActionRow}
                               className="text-[10px] font-medium text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-40"
                               title="Reativar conta"
-                            >
-                              Reativar
-                            </button>
-                          )}
-                          {a.account_status === "active" && (
-                            <button
-                              onClick={() => void handleStatusChange(a.id, "suspended")}
-                              disabled={isActionRow}
-                              className="text-[10px] font-medium text-amber-600 hover:text-amber-700 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
-                              title="Suspender temporariamente"
-                            >
-                              Suspender
-                            </button>
+                            >Reativar</button>
                           )}
                         </div>
                       </td>
@@ -337,8 +401,8 @@ export default function PlatformAccountsPage() {
 
       <p className="text-[11px] text-gray-400 mt-3">
         {filtered.length} de {accounts.length} conta{accounts.length !== 1 ? "s" : ""}
-        {" · "}Bloqueio/suspensão é apenas status interno — não remove acesso ao auth ainda.
-        {" · "}Contas sem empresa ou agência aparecem sem vínculo — isso é esperado para super_admin e contas de diagnóstico.
+        {" · "}Bloqueio/suspensão é status interno — não remove acesso ao auth.
+        {" · "}Contas sem empresa ou agência são normais para super_admin e diagnóstico.
       </p>
     </div>
   );

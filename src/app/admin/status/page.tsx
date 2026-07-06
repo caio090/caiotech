@@ -36,7 +36,7 @@ const MODULES: Module[] = [
   { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
   { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — gateway em breve",   status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
   { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",         status: "parcial", notes: "Fix de viewport mobile: em andamento" },
-  { name: "Central de Contas",  desc: "SQL 70 e SQL 71 aplicados. View v_platform_accounts_overview inclui todos os perfis. API service-role lista cadastros, tipos e ações.", status: "parcial", notes: "Em teste — validar cadastros recentes em produção" },
+  { name: "Central de Contas",  desc: "Usa auth.users como fonte de verdade via auth.admin.listUsers(). SQLs 70 e 71 aplicados. SQL 72 criado para backfill de profiles ausentes.", status: "parcial", notes: "Em teste — validar cadastros em produção. Rodar SQL 72 se houver auth sem profile." },
   { name: "/rec Mobile",        desc: "Layout responsivo ajustado — nav colapsada, grids em coluna única, textos legíveis, fallback de vídeo com erro", status: "funcional" },
   { name: "Meta Insights",      desc: "API Graph configurada — insights dependem de permissão da conta", status: "parcial", notes: "Scope instagram_basic + pages_read_engagement pendentes" },
   { name: "Cardápio Digital",   desc: "Faturamento real funcionando — paginação e produtos detalhados em breve", status: "parcial", notes: "Paginação além 50 pedidos: próxima fase" },
