@@ -28,9 +28,10 @@ const inputCls =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all";
 
 export default function PreAcessoPage() {
-  const [sent,    setSent]    = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [sent,       setSent]       = useState(false);
+  const [duplicate,  setDuplicate]  = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name:          "",
@@ -63,9 +64,12 @@ export default function PreAcessoPage() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ ...form, source: "pre-acesso" }),
       });
-      const json = await res.json() as { ok: boolean; message?: string };
+      const json = await res.json() as { ok: boolean; duplicate?: boolean; message?: string };
       if (!json.ok) {
         setError(json.message ?? "Erro ao registrar. Tente novamente.");
+      } else if (json.duplicate) {
+        setDuplicate(true);
+        setSent(true);
       } else {
         setSent(true);
       }
@@ -83,11 +87,18 @@ export default function PreAcessoPage() {
           <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 className="w-7 h-7 text-emerald-500" strokeWidth={1.5} />
           </div>
-          <h2 className="text-xl font-black text-gray-900 mb-2">Você está na lista!</h2>
+          <h2 className="text-xl font-black text-gray-900 mb-2">
+            {duplicate ? "Você já está na lista!" : "Você está na lista!"}
+          </h2>
           <p className="text-sm text-gray-500 leading-relaxed mb-6">
-            Vamos te avisar quando o acesso beta for liberado para o seu perfil.
-            Quem entrar na fase beta pode receber até{" "}
-            <strong className="text-gray-700">6 meses de acesso gratuito</strong>.
+            {duplicate
+              ? "Seu e-mail já estava cadastrado. Vamos te avisar quando o acesso beta for liberado."
+              : <>
+                  Vamos te avisar quando o acesso beta for liberado para o seu perfil.
+                  Quem entrar na fase beta pode receber até{" "}
+                  <strong className="text-gray-700">6 meses de acesso gratuito</strong>.
+                </>
+            }
           </p>
           <Link
             href="/"
@@ -103,11 +114,8 @@ export default function PreAcessoPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header — PublicHeader já vem do layout (public) */}
       <header className="max-w-2xl mx-auto px-4 pt-10 pb-6 text-center">
-        <Link href="/" className="inline-block mb-6">
-          <span className="text-xs font-bold tracking-widest text-gray-400 uppercase">Lokat OS</span>
-        </Link>
         <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight mb-3">
           A Lokat OS está abrindo acesso beta
         </h1>

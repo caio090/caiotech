@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient, createRequiredSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import {
+  createRequiredSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
 
 const VALID_ACCOUNT_TYPES = new Set(["agency", "business", "professional", "interested"]);
 
@@ -12,7 +15,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, message: "Payload inválido." }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "invalid_json", message: "Payload inválido." }, { status: 400 });
+  }
+
+  // Honeypot — bots preenchem campos ocultos; responder ok sem inserir
+  if (body._hp) {
+    return NextResponse.json({ ok: true, duplicate: false, message: "Inscrição recebida." });
   }
 
   const name         = (body.name as string | undefined)?.trim() ?? "";
@@ -28,89 +36,127 @@ export async function POST(req: NextRequest) {
   const utm_medium   = (body.utm_medium as string | undefined) || null;
   const utm_campaign = (body.utm_campaign as string | undefined) || null;
 
-  // Honeypot — bots preenchem campos ocultos
-  if (body._hp) {
-    return NextResponse.json({ ok: true, message: "Inscrição recebida." });
-  }
-
   if (!name || name.length < 2) {
-    return NextResponse.json({ ok: false, message: "Nome é obrigatório." }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "validation_name", message: "Nome é obrigatório (mínimo 2 caracteres)." }, { status: 400 });
   }
   if (!email || !isValidEmail(email)) {
-    return NextResponse.json({ ok: false, message: "E-mail inválido." }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "validation_email", message: "E-mail inválido." }, { status: 400 });
   }
   if (!VALID_ACCOUNT_TYPES.has(account_type)) {
-    return NextResponse.json({ ok: false, message: "Tipo de conta inválido." }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "validation_account_type", message: "Tipo de conta inválido." }, { status: 400 });
   }
 
-  // Usar service role para inserir e verificar duplicata
+  // Service role é obrigatório — sem fallback silencioso
   if (!hasSupabaseServiceRoleKey()) {
-    // Fallback: usar session client (insert público via RLS)
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { error } = await supabase
-        .from("launch_waitlist")
-        .insert({ name, email, phone, account_type, city, segment, interest,
-          social_or_site: social, source, utm_source, utm_medium, utm_campaign });
-      if (error?.message?.includes("already exists") || error?.code === "23505") {
-        return NextResponse.json({ ok: true, message: "Você já está na lista. Vamos te avisar quando o acesso for liberado." });
-      }
-      if (error) throw error;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "unknown";
-      if (msg.includes("does not exist") || msg.includes("42P01")) {
-        return NextResponse.json({ ok: false, message: "A lista beta ainda não foi ativada no banco de dados. Rode o SQL 73 no Supabase." }, { status: 503 });
-      }
-      return NextResponse.json({ ok: false, message: "Erro ao registrar inscrição." }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true, message: "Inscrição recebida. Vamos te avisar quando o acesso beta for liberado." });
+    return NextResponse.json({
+      ok: false,
+      code: "service_role_missing",
+      message: "Serviço temporariamente indisponível. Tente novamente em instantes.",
+    }, { status: 503 });
   }
 
+  let admin: ReturnType<typeof createRequiredSupabaseAdminClient>;
   try {
-    const admin = createRequiredSupabaseAdminClient();
-
-    // Verificar duplicata por email
-    const { data: existing } = await admin
-      .from("launch_waitlist")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (existing) {
-      return NextResponse.json({ ok: true, message: "Você já está na lista. Vamos te avisar quando o acesso for liberado." });
-    }
-
-    const { error: insertErr } = await admin
-      .from("launch_waitlist")
-      .insert({ name, email, phone, account_type, city, segment, interest,
-        social_or_site: social, source, utm_source, utm_medium, utm_campaign });
-
-    if (insertErr) {
-      if (insertErr.message?.includes("does not exist") || insertErr.code === "42P01") {
-        return NextResponse.json({ ok: false, message: "A lista beta ainda não foi ativada. Rode o SQL 73 no Supabase." }, { status: 503 });
-      }
-      throw insertErr;
-    }
-
-    // Notificação para super_admin (try/catch para não quebrar se tabela não existir)
-    try {
-      const typeLabel = account_type === "agency" ? "Agência" :
-                        account_type === "business" ? "Empresa" :
-                        account_type === "professional" ? "Profissional" : "Interessado";
-      await admin.from("platform_notifications").insert({
-        type:  "launch_waitlist_signup",
-        title: `Novo interessado no beta: ${name}`,
-        body:  `${name} (${email}) entrou na lista beta como ${typeLabel}${city ? ` — ${city}` : ""}`,
-      });
-    } catch { /* silencioso se platform_notifications não existir */ }
-
+    admin = createRequiredSupabaseAdminClient();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown";
-    return NextResponse.json({ ok: false, message: `Erro ao registrar inscrição: ${msg}` }, { status: 500 });
+    return NextResponse.json({
+      ok: false,
+      code: "admin_client_error",
+      message: "Não foi possível conectar ao banco de dados.",
+      debug: { error: e instanceof Error ? e.message : String(e) },
+    }, { status: 500 });
   }
+
+  // ── Checar duplicata por email ─────────────────────────────────────────────
+  const { data: existing, error: dupErr } = await admin
+    .from("launch_waitlist")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (dupErr) {
+    // Se a tabela não existe, retornar mensagem clara
+    if (dupErr.code === "42P01" || dupErr.message?.includes("does not exist")) {
+      return NextResponse.json({
+        ok: false,
+        code: "table_missing",
+        message: "A lista beta ainda não foi ativada no banco de dados. O administrador precisa rodar o SQL 73.",
+      }, { status: 503 });
+    }
+    return NextResponse.json({
+      ok: false,
+      code: "waitlist_check_failed",
+      message: "Não foi possível verificar sua inscrição. Tente novamente.",
+      debug: { stage: "duplicate_check", supabaseCode: dupErr.code, supabaseMessage: dupErr.message },
+    }, { status: 500 });
+  }
+
+  if (existing) {
+    return NextResponse.json({
+      ok: true,
+      duplicate: true,
+      id: (existing as { id: string }).id,
+      message: "Você já está na lista. Vamos te avisar quando o acesso beta for liberado.",
+    });
+  }
+
+  // ── Inserir ────────────────────────────────────────────────────────────────
+  const { data: inserted, error: insertErr } = await admin
+    .from("launch_waitlist")
+    .insert({
+      name, email, phone, account_type, city, segment, interest,
+      social_or_site: social, source, utm_source, utm_medium, utm_campaign,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr) {
+    if (insertErr.code === "42P01" || insertErr.message?.includes("does not exist")) {
+      return NextResponse.json({
+        ok: false,
+        code: "table_missing",
+        message: "A lista beta ainda não foi ativada. O administrador precisa rodar o SQL 73.",
+      }, { status: 503 });
+    }
+    if (insertErr.code === "23505") {
+      // Unique constraint — duplicata capturada tarde
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        message: "Você já está na lista. Vamos te avisar quando o acesso beta for liberado.",
+      });
+    }
+    return NextResponse.json({
+      ok: false,
+      code: "waitlist_insert_failed",
+      message: "Não foi possível salvar sua inscrição agora. Tente novamente.",
+      debug: {
+        stage:           "insert",
+        supabaseCode:    insertErr.code,
+        supabaseMessage: insertErr.message,
+        supabaseDetails: insertErr.details ?? null,
+        supabaseHint:    insertErr.hint ?? null,
+      },
+    }, { status: 500 });
+  }
+
+  // ── Notificação interna (silenciosa se tabela não existir) ─────────────────
+  try {
+    const typeLabel =
+      account_type === "agency"       ? "Agência" :
+      account_type === "business"     ? "Empresa" :
+      account_type === "professional" ? "Profissional" : "Interessado";
+    await admin.from("platform_notifications").insert({
+      type:  "launch_waitlist_signup",
+      title: `Novo interessado no beta: ${name}`,
+      body:  `${name} (${email}) — ${typeLabel}${city ? ` — ${city}` : ""}`,
+    });
+  } catch { /* silencioso */ }
 
   return NextResponse.json({
-    ok:      true,
-    message: "Inscrição recebida. Vamos te avisar quando o acesso beta for liberado.",
+    ok:        true,
+    duplicate: false,
+    id:        (inserted as { id: string }).id,
+    message:   "Inscrição recebida! Vamos te avisar quando o acesso beta for liberado.",
   });
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
+import { LAUNCH_MODE } from "@/lib/launch/config";
 
 const navLinks = [
   { href: "/plataforma",  label: "Plataforma" },
@@ -57,15 +58,23 @@ export function PublicHeader() {
           <Link href="/login" className="text-[.72rem] uppercase tracking-[.1em] transition-colors text-[#555566] hover:text-[#e8e8e8]" style={{ fontFamily: "'Space Mono', monospace" }}>
             Entrar
           </Link>
-          <Link href="/criar-conta" className="text-[.7rem] uppercase tracking-[.12em] font-bold px-4 py-[.35rem]" style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}>
-            ■ Começar
+          <Link
+            href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+            className="text-[.7rem] uppercase tracking-[.12em] font-bold px-4 py-[.35rem] hover:opacity-90 active:scale-95 transition-all"
+            style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}
+          >
+            {LAUNCH_MODE.publicSignupMode === "waitlist" ? "■ Entrar no beta" : "■ Começar"}
           </Link>
         </div>
 
         {/* Mobile */}
         <div className="flex md:hidden items-center gap-2">
-          <Link href="/criar-conta" className="text-[.65rem] uppercase tracking-[.1em] font-bold px-3 py-1.5" style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}>
-            Começar
+          <Link
+            href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+            className="text-[.65rem] uppercase tracking-[.1em] font-bold px-3 py-1.5 active:scale-95 transition-all"
+            style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}
+          >
+            {LAUNCH_MODE.publicSignupMode === "waitlist" ? "Beta" : "Começar"}
           </Link>
           <button onClick={() => setOpen((v) => !v)} className="p-2 transition-colors" style={{ color: "#555566" }} aria-label={open ? "Fechar" : "Menu"}>
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

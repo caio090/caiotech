@@ -60,10 +60,12 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
 };
 
 const SOURCE_LABELS: Record<string, { label: string; cls: string }> = {
-  "auth+profile+client":  { label: "Cliente",  cls: "text-emerald-600" },
-  "auth+profile+agency":  { label: "Agência",  cls: "text-purple-600" },
-  "auth+profile":         { label: "Perfil",   cls: "text-blue-600" },
-  "auth_only":            { label: "Auth",     cls: "text-amber-600" },
+  "auth+profile+client":  { label: "Cliente",    cls: "text-emerald-600" },
+  "auth+profile+agency":  { label: "Agência",    cls: "text-purple-600" },
+  "auth+profile":         { label: "Perfil",     cls: "text-blue-600" },
+  "auth_only":            { label: "Auth",       cls: "text-amber-600" },
+  "profiles_fallback":    { label: "Contingência", cls: "text-orange-600" },
+  "current_session":      { label: "Sessão",     cls: "text-indigo-600" },
 };
 
 const FILTER_OPTIONS: { value: AccountFilter; label: string }[] = [
@@ -120,6 +122,8 @@ export default function PlatformAccountsPage() {
   const [accounts,     setAccounts]     = useState<Account[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [apiError,     setApiError]     = useState<string | null>(null);
+  const [degraded,     setDegraded]     = useState(false);
+  const [degradedMsg,  setDegradedMsg]  = useState<string | null>(null);
   const [search,       setSearch]       = useState("");
   const [filter,       setFilter]       = useState<AccountFilter>("todos");
   const [actionTarget, setActionTarget] = useState<string | null>(null);
@@ -128,11 +132,20 @@ export default function PlatformAccountsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setApiError(null);
+    setDegraded(false);
+    setDegradedMsg(null);
     try {
       const res = await fetch("/api/admin/accounts");
 
-      // Tentar ler JSON em qualquer caso para ter mensagem de erro real
-      let json: { ok: boolean; accounts?: Account[]; code?: string; message?: string; debug?: Record<string, unknown> } | null = null;
+      let json: {
+        ok: boolean;
+        accounts?: Account[];
+        code?: string;
+        message?: string;
+        degraded?: boolean;
+        warning?: string | null;
+        debug?: Record<string, unknown>;
+      } | null = null;
       try { json = await res.json(); } catch { /* empty */ }
 
       if (!res.ok || !json?.ok) {
@@ -150,6 +163,10 @@ export default function PlatformAccountsPage() {
       }
 
       setAccounts(json.accounts);
+      if (json.degraded) {
+        setDegraded(true);
+        setDegradedMsg(json.warning ?? "Dados em modo de contingência.");
+      }
     } catch (e) {
       setApiError(`Erro de rede: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -234,6 +251,21 @@ export default function PlatformAccountsPage() {
         </Link>
       </div>
 
+      {/* Degraded warning */}
+      {degraded && degradedMsg && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
+          <span>{degradedMsg} Os dados abaixo são provenientes dos perfis do banco de dados.</span>
+        </div>
+      )}
+
+      {/* API error */}
+      {apiError && (
+        <div className="mb-4 bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm text-red-700">
+          {apiError}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
         <StatCard label="Total"      value={accounts.length} icon={Users}         color="bg-gray-100 text-gray-600" />
@@ -280,13 +312,7 @@ export default function PlatformAccountsPage() {
         </button>
       </div>
 
-      {/* Banners de estado */}
-      {apiError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-xs text-red-700 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-          <span><strong>Erro ao carregar contas:</strong> {apiError}</span>
-        </div>
-      )}
+      {/* Banners de estado — erro já tratado acima */}
       {!isSupabaseConfigured && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-700">
           Supabase não configurado — dados podem estar incompletos.

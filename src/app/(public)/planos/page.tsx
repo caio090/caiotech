@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, Tag, Zap, ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronDown, Tag, ChevronRight, Zap, MessageCircle } from "lucide-react";
 import { PLANS, MIN_PUBLIC_PRICE, formatPrice } from "@/lib/billing/plans";
 import { LAUNCH_MODE } from "@/lib/launch/config";
 
@@ -21,24 +21,19 @@ const ENTITLEMENT_LABELS: Record<string, string> = {
   team_members:         "Equipe e colaboradores",
   advanced_reports:     "Relatórios avançados",
 };
-import { PublicHeader } from "@/components/public-header";
-
-const S = {
-  mono: { fontFamily: "'Space Mono', monospace" } as React.CSSProperties,
-  grotesk: { fontFamily: "'Space Grotesk', sans-serif" } as React.CSSProperties,
-  bg: "#0a0a0c",
-  card: "#13131a",
-  border: "#222230",
-  text: "#e8e8e8",
-  muted: "#555566",
-  accent: "#7b6ef6",
-};
 
 const PLAN_COLORS: Record<string, string> = {
   comunidade: "#f59e0b",
   start:      "#7b6ef6",
   pro:        "#a855f7",
   agencia:    "#10b981",
+};
+
+const PLAN_DESC: Record<string, string> = {
+  comunidade: "Para quem quer organizar o básico antes de escalar.",
+  start:      "Para negócios que querem organizar marketing e resultados.",
+  pro:        "Para quem quer crescer com dados reais e equipe.",
+  agencia:    "Para agências que querem operar múltiplos clientes.",
 };
 
 interface CouponPreview {
@@ -48,12 +43,12 @@ interface CouponPreview {
 }
 
 export default function PlanosPage() {
-  const [couponCode, setCouponCode]     = useState("");
+  const [couponCode, setCouponCode]       = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponPreview, setCouponPreview] = useState<CouponPreview | null>(null);
-  const [couponMsg, setCouponMsg]       = useState("");
-  const [couponOk, setCouponOk]         = useState<boolean | null>(null);
-  const [expanded, setExpanded]         = useState<string | null>(null);
+  const [couponMsg, setCouponMsg]         = useState("");
+  const [couponOk, setCouponOk]           = useState<boolean | null>(null);
+  const [expanded, setExpanded]           = useState<string | null>(null);
 
   async function handleValidateCoupon() {
     if (!couponCode.trim()) return;
@@ -81,80 +76,87 @@ export default function PlanosPage() {
   const visiblePlans = PLANS.filter((p) => p.status !== "coming_soon");
 
   return (
-    <div style={{ background: S.bg, color: S.text, minHeight: "100vh" }}>
-      <PublicHeader />
+    <div className="bg-gray-50 min-h-screen">
 
       {/* ── Hero ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 pt-16 md:pt-24 pb-10 text-center">
-        <div style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, marginBottom: "1.2rem", display: "inline-flex", alignItems: "center", gap: ".5rem", background: `${S.accent}10`, border: `1px solid ${S.accent}25`, padding: ".25rem .8rem" }}>
-          <Zap style={{ width: "10px", height: "10px" }} /> Beta aberto
-        </div>
-        <h1 style={{ ...S.grotesk, fontSize: "clamp(1.8rem, 5vw, 3.5rem)", fontWeight: 700, color: S.text, lineHeight: 1.1, marginBottom: ".75rem" }}>
+      <section className="max-w-3xl mx-auto px-4 md:px-8 pt-14 pb-10 text-center">
+        {LAUNCH_MODE.publicSignupMode === "waitlist" && (
+          <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full px-4 py-1.5 mb-6 text-xs font-semibold" style={{ fontFamily: "'Space Mono', monospace" }}>
+            <Zap className="w-3.5 h-3.5" />
+            Acesso beta — por convite
+          </div>
+        )}
+        <h1 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           Escolha como começar
         </h1>
-        <p style={{ ...S.grotesk, color: S.muted, fontSize: "clamp(.85rem, 2.5vw, 1rem)", maxWidth: "480px", margin: "0 auto 1.5rem", lineHeight: 1.65 }}>
-          {`A partir de R$ ${MIN_PUBLIC_PRICE}/mês. 14 dias de teste grátis. Sem cartão de crédito.`}
+        <p className="text-gray-500 text-sm md:text-base max-w-md mx-auto leading-relaxed mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          {`A partir de R$ ${MIN_PUBLIC_PRICE}/mês · 14 dias grátis · Sem cartão de crédito`}
         </p>
-        <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted }}>
-          Preços em beta — podem mudar antes do lançamento oficial
-        </p>
+        {LAUNCH_MODE.publicSignupMode === "waitlist" && (
+          <p className="text-gray-400 text-xs mt-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Durante o beta, os acessos são liberados por convite ou lista de espera.
+          </p>
+        )}
       </section>
 
       {/* ── Plans grid ── */}
-      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-16">
+      <section className="max-w-5xl mx-auto px-4 md:px-8 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {visiblePlans.map((plan) => {
-            const color = PLAN_COLORS[plan.slug] ?? S.accent;
-            const isOpen = expanded === plan.slug;
+            const color   = PLAN_COLORS[plan.slug] ?? "#7b6ef6";
+            const isOpen  = expanded === plan.slug;
+            const planDesc = PLAN_DESC[plan.slug] ?? plan.tagline;
+
             return (
               <div
                 key={plan.slug}
-                style={{
-                  background: plan.highlight ? `linear-gradient(160deg, #1a1428 0%, ${S.card} 100%)` : S.card,
-                  border: `1px solid ${plan.highlight ? `${color}40` : S.border}`,
-                  position: "relative",
-                }}
+                className={`bg-white rounded-2xl border transition-shadow hover:shadow-md ${plan.highlight ? "shadow-md ring-1" : "shadow-sm border-gray-100"}`}
+                style={plan.highlight ? { borderColor: `${color}30`, outline: `1px solid ${color}25` } : {}}
               >
-                {/* Badge */}
                 {plan.badge && (
-                  <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", ...S.mono, fontSize: ".5rem", letterSpacing: ".14em", textTransform: "uppercase", color: "#fff", background: color, padding: ".18rem .7rem", whiteSpace: "nowrap" }}>
+                  <div
+                    className="text-center py-1.5 rounded-t-2xl text-[10px] font-bold uppercase tracking-widest text-white"
+                    style={{ background: color, fontFamily: "'Space Mono', monospace" }}
+                  >
                     {plan.badge}
                   </div>
                 )}
 
-                <div className="p-6 md:p-7">
-                  {/* Header */}
-                  <div style={{ marginBottom: "1.2rem" }}>
-                    <div style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".16em", textTransform: "uppercase", color, marginBottom: ".4rem" }}>
+                <div className="p-6">
+                  {/* Plan name + desc */}
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color, fontFamily: "'Space Mono', monospace" }}>
                       {plan.slug}
                     </div>
-                    <h2 style={{ ...S.grotesk, fontSize: "1.1rem", fontWeight: 700, color: S.text, lineHeight: 1.2, marginBottom: ".25rem" }}>
+                    <h2 className="text-lg font-black text-gray-900 mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                       {plan.name}
                     </h2>
-                    <p style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted, lineHeight: 1.5 }}>{plan.tagline}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {planDesc}
+                    </p>
                   </div>
 
                   {/* Price */}
-                  <div style={{ marginBottom: "1.4rem", paddingBottom: "1.2rem", borderBottom: `1px solid ${S.border}` }}>
+                  <div className="mb-5 pb-4 border-b border-gray-100">
                     <div className="flex items-end gap-1">
-                      <span style={{ ...S.grotesk, fontSize: "2.2rem", fontWeight: 700, color: S.text, lineHeight: 1 }}>
+                      <span className="text-3xl font-black text-gray-900" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                         {formatPrice(plan.price_monthly)}
                       </span>
-                      <span style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted, marginBottom: ".3rem" }}>/mês</span>
+                      <span className="text-xs text-gray-400 mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>/mês</span>
                     </div>
                     {plan.trial_days > 0 && (
-                      <p style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".1em", textTransform: "uppercase", color, marginTop: ".3rem" }}>
+                      <p className="text-[11px] font-semibold mt-1" style={{ color, fontFamily: "'Space Mono', monospace" }}>
                         {plan.trial_days} dias grátis para testar
                       </p>
                     )}
                   </div>
 
                   {/* Features */}
-                  <div style={{ marginBottom: "1.5rem" }}>
+                  <div className="mb-5 space-y-2">
                     {plan.entitlements.slice(0, isOpen ? undefined : 5).map((e) => (
-                      <div key={e} className="flex items-center gap-2 mb-2">
-                        <CheckCircle2 style={{ width: "12px", height: "12px", color, flexShrink: 0 }} strokeWidth={2} />
-                        <span style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted }}>
+                      <div key={e} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} strokeWidth={2} />
+                        <span className="text-xs text-gray-600" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                           {ENTITLEMENT_LABELS[e] ?? e.replace(/_/g, " ")}
                         </span>
                       </div>
@@ -162,44 +164,33 @@ export default function PlanosPage() {
                     {plan.entitlements.length > 5 && (
                       <button
                         onClick={() => setExpanded(isOpen ? null : plan.slug)}
-                        className="flex items-center gap-1 mt-1"
-                        style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.muted, background: "none", border: "none", cursor: "pointer" }}
+                        className="flex items-center gap-1 mt-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: ".55rem", letterSpacing: ".08em", textTransform: "uppercase" }}
                       >
-                        <ChevronDown style={{ width: "10px", height: "10px", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+                        <ChevronDown className="w-3 h-3" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
                         {isOpen ? "Mostrar menos" : `+${plan.entitlements.length - 5} módulos`}
                       </button>
                     )}
                   </div>
 
                   {/* CTA */}
-                  {LAUNCH_MODE.publicSignupMode === "waitlist" && (
-                    <p style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".06em", textAlign: "center", color: S.muted, marginBottom: ".75rem" }}>
-                      Durante o beta, os acessos são liberados por convite.
-                    </p>
-                  )}
                   <Link
                     href={LAUNCH_MODE.publicSignupMode === "waitlist"
                       ? "/pre-acesso"
                       : `/criar-conta?plan=${plan.slug}${couponCode ? `&coupon=${couponCode}` : ""}`}
+                    className="block w-full text-center text-xs font-bold rounded-xl py-3 transition-all active:scale-[.98]"
                     style={{
-                      display: "block",
-                      textAlign: "center",
-                      padding: ".85rem 1.5rem",
                       background: plan.highlight ? color : "transparent",
-                      color: plan.highlight ? "#fff" : S.text,
-                      border: `1px solid ${plan.highlight ? "transparent" : S.border}`,
-                      ...S.mono,
-                      fontSize: ".6rem",
-                      letterSpacing: ".12em",
-                      textTransform: "uppercase",
+                      color: plan.highlight ? "#fff" : color,
+                      border: `1.5px solid ${color}`,
+                      fontFamily: "'Space Grotesk', sans-serif",
                       textDecoration: "none",
-                      transition: "background .2s, border-color .2s",
                     }}
                     onMouseEnter={(e) => {
-                      if (!plan.highlight) { e.currentTarget.style.background = `${color}18`; e.currentTarget.style.borderColor = `${color}50`; }
+                      if (!plan.highlight) e.currentTarget.style.background = `${color}12`;
                     }}
                     onMouseLeave={(e) => {
-                      if (!plan.highlight) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = S.border; }
+                      if (!plan.highlight) e.currentTarget.style.background = "transparent";
                     }}
                   >
                     {LAUNCH_MODE.publicSignupMode === "waitlist"
@@ -213,46 +204,64 @@ export default function PlanosPage() {
         </div>
 
         {/* ── Coupon — discrete accordion ── */}
-        <CouponAccordion
-          couponCode={couponCode}
-          setCouponCode={setCouponCode}
-          couponLoading={couponLoading}
-          couponMsg={couponMsg}
-          couponOk={couponOk}
-          couponPreview={couponPreview}
-          setCouponPreview={setCouponPreview}
-          setCouponMsg={setCouponMsg}
-          setCouponOk={setCouponOk}
-          handleValidateCoupon={handleValidateCoupon}
-          S={S}
-        />
+        <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <button
+            onClick={() => { /* toggle handled by CouponAccordion */ }}
+          >
+          </button>
+          <CouponAccordion
+            couponCode={couponCode}
+            setCouponCode={setCouponCode}
+            couponLoading={couponLoading}
+            couponMsg={couponMsg}
+            couponOk={couponOk}
+            couponPreview={couponPreview}
+            setCouponPreview={setCouponPreview}
+            setCouponMsg={setCouponMsg}
+            setCouponOk={setCouponOk}
+            handleValidateCoupon={handleValidateCoupon}
+          />
+        </div>
 
-        {/* ── FAQ section ── */}
-        <div className="mt-10 grid md:grid-cols-2 gap-4">
+        {/* ── FAQ ── */}
+        <div className="mt-8 grid md:grid-cols-2 gap-4">
           {[
-            { q: "Preciso de cartão para testar?", a: "Não. O teste grátis de 14 dias não requer cartão de crédito." },
-            { q: "Posso cancelar a qualquer momento?", a: "Sim. Nesta fase beta não há contrato de fidelidade." },
-            { q: "O que acontece quando o trial acaba?", a: "Você escolhe um plano para continuar. Sem cobrança automática enquanto estamos no beta." },
-            { q: "Meus dados ficam salvos?", a: "Sim. Ao assinar, todos os dados criados no trial são preservados." },
+            { q: "Preciso de cartão para testar?",        a: "Não. O teste de 14 dias não exige cartão de crédito." },
+            { q: "Posso cancelar a qualquer momento?",     a: "Sim. Na fase beta não há contrato de fidelidade." },
+            { q: "O que acontece quando o trial acaba?",   a: "Você escolhe um plano para continuar. Sem cobrança automática enquanto estamos em beta." },
+            { q: "Meus dados ficam salvos?",               a: "Sim. Ao assinar, todos os dados do trial são preservados." },
           ].map((item) => (
-            <div key={item.q} style={{ border: `1px solid ${S.border}`, padding: "1.2rem" }}>
-              <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: S.text, marginBottom: ".35rem" }}>{item.q}</p>
-              <p style={{ ...S.grotesk, fontSize: ".72rem", color: S.muted, lineHeight: 1.6 }}>{item.a}</p>
+            <div key={item.q} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <p className="font-bold text-sm text-gray-900 mb-1.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.q}</p>
+              <p className="text-xs text-gray-500 leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.a}</p>
             </div>
           ))}
         </div>
 
-        {/* ── Bottom CTA ── */}
-        <div className="mt-10 text-center">
-          <p style={{ ...S.grotesk, fontSize: ".85rem", color: S.muted, marginBottom: "1rem" }}>
+        {/* ── Bottom CTAs ── */}
+        <div className="mt-10 text-center space-y-3">
+          <p className="text-sm text-gray-500 mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             Ainda com dúvida? Comece pelo diagnóstico gratuito.
           </p>
-          <Link
-            href="/diagnostico"
-            style={{ display: "inline-block", padding: ".85rem 2.5rem", background: S.accent, color: "#fff", ...S.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none" }}
-          >
-            ■ Fazer diagnóstico grátis →
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/diagnostico"
+              className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 active:scale-[.98] transition-all"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              Fazer diagnóstico grátis →
+            </Link>
+            <a
+              href="https://wa.me/5589994584163?text=Ol%C3%A1%2C+vim+pelo+site+da+Lokat+e+quero+conhecer+a+proposta+para+meu+neg%C3%B3cio."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3 rounded-xl border border-gray-200 hover:border-green-300 hover:text-green-700 active:scale-[.98] transition-all"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Falar com a Lokat
+            </a>
+          </div>
         </div>
       </section>
     </div>
@@ -272,27 +281,26 @@ interface CouponAccordionProps {
   setCouponMsg: (v: string) => void;
   setCouponOk: (v: boolean | null) => void;
   handleValidateCoupon: () => Promise<void>;
-  S: { grotesk: React.CSSProperties; mono: React.CSSProperties; muted: string; border: string; card: string; accent: string; text: string };
 }
 
-function CouponAccordion({ couponCode, setCouponCode, couponLoading, couponMsg, couponOk, couponPreview, setCouponPreview, setCouponMsg, setCouponOk, handleValidateCoupon, S }: CouponAccordionProps) {
+function CouponAccordion({ couponCode, setCouponCode, couponLoading, couponMsg, couponOk, couponPreview, setCouponPreview, setCouponMsg, setCouponOk, handleValidateCoupon }: CouponAccordionProps) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-8" style={{ border: `1px solid ${S.border}` }}>
+    <div>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
         style={{ background: "transparent", cursor: "pointer" }}
       >
         <div className="flex items-center gap-2">
-          <Tag style={{ width: "13px", height: "13px", color: S.muted }} />
-          <span style={{ ...S.grotesk, fontSize: ".78rem", color: S.muted }}>Tenho um cupom</span>
+          <Tag className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-500" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Tenho um cupom</span>
         </div>
-        <ChevronRight style={{ width: "13px", height: "13px", color: S.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+        <ChevronRight className="w-4 h-4 text-gray-400" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
       </button>
       {open && (
-        <div style={{ padding: "0 1.25rem 1.25rem", borderTop: `1px solid ${S.border}`, paddingTop: "1rem" }}>
-          <p style={{ ...S.grotesk, fontSize: ".7rem", color: S.muted, marginBottom: ".75rem" }}>
+        <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+          <p className="text-xs text-gray-400 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             O cupom será aplicado no cadastro. Você pode inserir também na tela de criação de conta.
           </p>
           <div className="flex gap-3 flex-col sm:flex-row">
@@ -302,24 +310,26 @@ function CouponAccordion({ couponCode, setCouponCode, couponLoading, couponMsg, 
               onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponPreview(null); setCouponMsg(""); setCouponOk(null); }}
               onKeyDown={(e) => e.key === "Enter" && void handleValidateCoupon()}
               placeholder="Digite seu cupom"
-              style={{ flex: 1, background: "#0a0a0c", border: `1px solid ${S.border}`, color: S.text, padding: ".65rem .9rem", ...S.mono, fontSize: ".65rem", letterSpacing: ".08em", outline: "none" }}
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             />
             <button
               onClick={() => void handleValidateCoupon()}
               disabled={couponLoading || !couponCode.trim()}
-              style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", background: S.accent, color: "#fff", padding: ".65rem 1.2rem", border: "none", cursor: "pointer", opacity: couponLoading ? 0.6 : 1, whiteSpace: "nowrap" }}
+              className="text-xs font-bold uppercase tracking-wide bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all"
+              style={{ fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}
             >
               {couponLoading ? "Validando…" : "Validar"}
             </button>
           </div>
           {couponMsg && (
-            <div style={{ marginTop: ".6rem", padding: ".5rem .75rem", background: couponOk ? "#10b98115" : "#e0635a15", border: `1px solid ${couponOk ? "#10b98130" : "#e0635a30"}` }}>
-              <p style={{ ...S.grotesk, fontSize: ".72rem", color: couponOk ? "#10b981" : "#e0635a" }}>{couponMsg}</p>
+            <div className={`mt-3 px-3 py-2.5 rounded-xl text-xs ${couponOk ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-600 border border-red-100"}`} style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              {couponMsg}
               {couponOk && couponPreview && (
-                <div className="flex gap-3 mt-1 flex-wrap">
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{couponPreview.discountLabel}</span>
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{`Preço: ${couponPreview.finalPrice}/mês`}</span>
-                  <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#10b981" }}>{`Trial: ${couponPreview.trialDays} dias`}</span>
+                <div className="flex gap-3 mt-1 flex-wrap text-[11px] font-semibold">
+                  <span>{couponPreview.discountLabel}</span>
+                  <span>Preço: {couponPreview.finalPrice}/mês</span>
+                  <span>Trial: {couponPreview.trialDays} dias</span>
                 </div>
               )}
             </div>

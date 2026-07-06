@@ -36,14 +36,15 @@ const MODULES: Module[] = [
   { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
   { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — gateway em breve",   status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
   { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",         status: "parcial", notes: "Fix de viewport mobile: em andamento" },
-  { name: "Central de Contas",  desc: "Usa session client + triple fallback para role. auth.admin.listUsers() como fonte de verdade. SQLs 70/71/72 aplicados.", status: "funcional", notes: "Route reescrita para corrigir 403. Validar em produção." },
-  { name: "Pré-acesso / Waitlist Beta", desc: "/pre-acesso + /api/launch/waitlist + painel /admin/super/waitlist. SQL 73 necessário para ativar.", status: "parcial", notes: "Rodar SQL 73 no Supabase para ativar. LAUNCH_MODE controla modo waitlist/open." },
-  { name: "Motion / Microinterações",   desc: "hover e active:scale nos CTAs da landing. prefers-reduced-motion respeitado via Tailwind.", status: "parcial", notes: "Cards hover e animações de seção: próxima fase." },
+  { name: "Central de Contas",  desc: "Session client + triple fallback para role. Fallback para profiles quando auth.admin.listUsers() falhar. SQLs 70/71/72/74 aplicados.", status: "parcial", notes: "Exibe em modo de contingência se service role não autorizar listUsers. Rodar SQL 74 se waitlist vazia." },
+  { name: "Pré-acesso / Waitlist Beta", desc: "/pre-acesso + /api/launch/waitlist + painel /admin/super/waitlist. SQL 73 aplicado. LAUNCH_MODE em waitlist.", status: "parcial", notes: "SQL 73 aplicado. Validar inscrições reais. Rodar SQL 74 se painel mostrar 0 registros após inscrição." },
+  { name: "Motion / Microinterações",   desc: "hover e active:scale nos CTAs da landing e planos. prefers-reduced-motion respeitado via Tailwind.", status: "parcial", notes: "Cards hover e animações de seção: próxima fase." },
   { name: "/rec Mobile",        desc: "Layout responsivo ajustado — nav colapsada, grids em coluna única, textos legíveis, fallback de vídeo com erro", status: "funcional" },
   { name: "Meta Insights",      desc: "API Graph configurada — insights dependem de permissão da conta", status: "parcial", notes: "Scope instagram_basic + pages_read_engagement pendentes" },
   { name: "Cardápio Digital",   desc: "Faturamento real funcionando — paginação e produtos detalhados em breve", status: "parcial", notes: "Paginação além 50 pedidos: próxima fase" },
 
   // Em breve
+  { name: "Storage & Drive",    desc: "Upload de arquivos, artes aprovadas, briefings e vínculos Google Drive. Planejado para Fase 1 via Supabase Storage.", status: "em_breve", notes: "Ver docs/STORAGE_AND_DRIVE_STRATEGY.md. Sem implementação ainda." },
   { name: "Tráfego OS",         desc: "Meta Ads, Google Ads, SEO, campanhas pagas, orçamento e públicos", status: "em_breve" },
   { name: "Inteligência Local", desc: "Rastreio por bairro, mapas, região, origem de pedidos e leads",    status: "em_breve" },
   { name: "WhatsApp QR",        desc: "Conexão QR via Evolution API / WhatsApp Cloud",                    status: "em_breve" },
