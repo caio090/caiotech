@@ -28,12 +28,42 @@ CREATE TABLE IF NOT EXISTS public.launch_waitlist (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- ── 2. Unique constraint de e-mail (evita duplicatas silenciosas) ─
-ALTER TABLE public.launch_waitlist
-  ADD CONSTRAINT IF NOT EXISTS launch_waitlist_email_unique UNIQUE (email);
+-- ── 2. Índice único de e-mail (idempotente, via DO block) ────
+-- Verifica duplicatas antes de criar o índice.
+-- Se houver duplicatas, emite NOTICE e NÃO altera dados.
+DO $$
+DECLARE
+  duplicate_count integer;
+BEGIN
+  SELECT count(*)
+  INTO duplicate_count
+  FROM (
+    SELECT lower(trim(email)) AS normalized_email
+    FROM public.launch_waitlist
+    WHERE email IS NOT NULL AND trim(email) <> ''
+    GROUP BY lower(trim(email))
+    HAVING count(*) > 1
+  ) d;
 
--- ── 3. Índices ────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_waitlist_email     ON public.launch_waitlist(email);
+  IF duplicate_count = 0 THEN
+    -- Sem duplicatas: cria o índice único com segurança
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_indexes
+      WHERE tablename = 'launch_waitlist'
+        AND indexname  = 'launch_waitlist_email_unique_idx'
+    ) THEN
+      EXECUTE 'CREATE UNIQUE INDEX launch_waitlist_email_unique_idx
+               ON public.launch_waitlist (lower(trim(email)))';
+      RAISE NOTICE 'Índice único criado: launch_waitlist_email_unique_idx';
+    ELSE
+      RAISE NOTICE 'Índice launch_waitlist_email_unique_idx já existe — nenhuma alteração.';
+    END IF;
+  ELSE
+    RAISE NOTICE 'launch_waitlist possui % email(s) duplicado(s). Índice único não criado automaticamente. Resolva as duplicatas manualmente antes de rodar novamente.', duplicate_count;
+  END IF;
+END $$;
+
+-- ── 3. Índices auxiliares ─────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_waitlist_status    ON public.launch_waitlist(status);
 CREATE INDEX IF NOT EXISTS idx_waitlist_created   ON public.launch_waitlist(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_waitlist_acct_type ON public.launch_waitlist(account_type);
@@ -43,21 +73,20 @@ ALTER TABLE public.launch_waitlist ENABLE ROW LEVEL SECURITY;
 
 -- ── 5. Recriar políticas de forma limpa ──────────────────────
 
--- Admin (service role bypassa RLS — mas manter para consistência)
+-- Admin via RLS (service role bypassa RLS, mas mantido para consistência)
 DROP POLICY IF EXISTS "waitlist_admin_all"    ON public.launch_waitlist;
 CREATE POLICY "waitlist_admin_all"
   ON public.launch_waitlist FOR ALL
   USING (public.current_user_role() IN ('super_admin', 'admin'));
 
--- Insert público controlado via API
--- Nota: a API usa service role, então esta policy só importa
--- no fallback com anon key. Mantida para garantia.
+-- Insert público controlado (API valida e usa service role;
+-- policy como garantia para fallback com anon key)
 DROP POLICY IF EXISTS "waitlist_public_insert" ON public.launch_waitlist;
 CREATE POLICY "waitlist_public_insert"
   ON public.launch_waitlist FOR INSERT
   WITH CHECK (true);
 
--- ── 6. Grants explícitos para o role anon e service_role ──────
+-- ── 6. Grants explícitos ──────────────────────────────────────
 GRANT INSERT ON public.launch_waitlist TO anon;
 GRANT ALL    ON public.launch_waitlist TO service_role;
 
@@ -75,25 +104,27 @@ CREATE TRIGGER trg_waitlist_updated_at
   BEFORE UPDATE ON public.launch_waitlist
   FOR EACH ROW EXECUTE FUNCTION public.set_waitlist_updated_at();
 
--- ── 8. Diagnóstico: quantos registros existem ─────────────────
+-- ── 8. Diagnóstico: contagem de registros ─────────────────────
 SELECT
-  count(*)                        AS total_registros,
-  count(*) FILTER (WHERE status = 'new')       AS novos,
-  count(*) FILTER (WHERE status = 'contacted') AS contatados,
-  count(*) FILTER (WHERE status = 'invited')   AS convidados,
-  count(*) FILTER (WHERE status = 'accepted')  AS aceitos,
-  min(created_at)                 AS primeiro_registro,
-  max(created_at)                 AS ultimo_registro
+  count(*)                                              AS total_registros,
+  count(*) FILTER (WHERE status = 'new')               AS novos,
+  count(*) FILTER (WHERE status = 'contacted')         AS contatados,
+  count(*) FILTER (WHERE status = 'invited')           AS convidados,
+  count(*) FILTER (WHERE status = 'accepted')          AS aceitos,
+  min(created_at)                                       AS primeiro_registro,
+  max(created_at)                                       AS ultimo_registro
 FROM public.launch_waitlist;
 
 -- ============================================================
 -- COMO RODAR
 -- 1. Abra uma NOVA query no Supabase SQL Editor (aba nova!).
 -- 2. Cole este arquivo inteiro.
--- 3. Clique em "Run".
--- 4. Resultado esperado: uma linha com contagem de registros.
---    Se aparecer 0 e o formulário público funcionou → indício de
---    que a API não está usando service role corretamente.
---    Confirme que SUPABASE_SERVICE_ROLE_KEY está configurada
---    na Vercel (Settings → Environment Variables → All envs).
+-- 3. Clique em Run.
+-- 4. Resultado esperado: Success. + uma linha com contagem.
+-- 5. Se houver emails duplicados, o SQL exibirá NOTICE e não
+--    criará o índice único até resolver manualmente.
+--    Nenhum dado é apagado ou alterado automaticamente.
+-- 6. Se total_registros = 0 após inscrição real → confirmar que
+--    SUPABASE_SERVICE_ROLE_KEY está configurada na Vercel
+--    (Settings → Environment Variables → All environments).
 -- ============================================================
