@@ -6,6 +6,7 @@ import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { ArrowRight, Sparkles, Clock, Shield, Loader2, Eye, EyeOff, Target, CalendarDays, CheckCircle2, BarChart2, Tag } from "lucide-react";
 import type { ElementType } from "react";
 import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
+import { LAUNCH_MODE } from "@/lib/launch/config";
 
 const perks: { Icon: ElementType; text: string }[] = [
   { Icon: Clock,        text: `14 dias grátis — a partir de R$ ${MIN_PUBLIC_PRICE}/mês` },
@@ -20,9 +21,48 @@ const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm o
 function CriarContaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fromDiagnostic = searchParams.get("from") === "diagnostic";
-  const planFromUrl = searchParams.get("plan") ?? "";
-  const couponFromUrl = searchParams.get("coupon") ?? "";
+  const fromDiagnostic  = searchParams.get("from") === "diagnostic";
+  const planFromUrl     = searchParams.get("plan") ?? "";
+  const couponFromUrl   = searchParams.get("coupon") ?? "";
+  const inviteFromUrl   = searchParams.get("invite") ?? "";
+  const hasInviteOrCoupon = !!(couponFromUrl || inviteFromUrl);
+
+  // Modo waitlist: mostrar gate se não tiver convite/cupom
+  if (LAUNCH_MODE.publicSignupMode === "waitlist" && !hasInviteOrCoupon) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-sm w-full bg-white rounded-3xl border border-gray-100 shadow-sm p-8 text-center">
+          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-6 h-6 text-indigo-500" strokeWidth={1.5} />
+          </div>
+          <h1 className="text-lg font-black text-gray-900 mb-2">Acesso por convite</h1>
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            Durante o beta, os acessos são liberados manualmente.
+            Reserve seu lugar ou use um convite para continuar.
+          </p>
+          <div className="space-y-3">
+            <Link
+              href="/pre-acesso"
+              className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold text-sm px-5 py-3 rounded-xl hover:bg-indigo-700 active:scale-[.98] transition-all"
+            >
+              Entrar na lista beta
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <button
+              onClick={() => router.push("/criar-conta?invite=manual")}
+              className="w-full text-sm text-gray-500 hover:text-indigo-600 py-2 transition-colors"
+            >
+              Tenho convite ou cupom →
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-5">
+            Já tem conta?{" "}
+            <Link href="/login" className="text-indigo-600 hover:underline">Entrar</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
   const [form, setForm] = useState({ name: "", company: "", email: "", password: "", coupon: couponFromUrl });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPwd, setShowPwd] = useState(false);

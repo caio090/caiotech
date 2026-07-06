@@ -5,6 +5,7 @@ import { BeforeAfterSection } from "@/components/before-after-section";
 import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, Zap } from "lucide-react";
 import type { ElementType } from "react";
 import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
+import { LAUNCH_MODE } from "@/lib/launch/config";
 
 // ── Modules ──────────────────────────────────────────────────
 interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; coming?: boolean; }
@@ -292,15 +293,15 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
-                href="/criar-conta"
-                className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors"
+                href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+                className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 active:scale-[.98] transition-all"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                Começar 14 dias grátis
+                {LAUNCH_MODE.publicSignupMode === "waitlist" ? "Reservar acesso beta" : "Começar 14 dias grátis"}
               </Link>
               <Link
                 href="/planos"
-                className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-all"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 Ver planos e preços
@@ -326,11 +327,11 @@ export default function HomePage() {
               Quero ver na prática →
             </Link>
             <Link
-              href="/criar-conta"
-              className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3.5 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+              href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+              className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 text-sm font-bold px-6 py-3.5 rounded-xl border border-gray-200 hover:border-indigo-300 hover:text-indigo-600 transition-all"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              Criar conta grátis
+              {LAUNCH_MODE.publicSignupMode === "waitlist" ? "Entrar na lista beta" : "Criar conta grátis"}
             </Link>
           </div>
         </section>

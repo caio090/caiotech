@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
 import {
   Users, Building2, Rocket, UserCheck, AlertTriangle,
   RefreshCw, Search, Filter, ChevronDown, Shield,
   Activity, Clock, CheckCircle2, XCircle,
-  Bell, UserX,
+  Bell, UserX, ListOrdered,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -220,6 +221,18 @@ export default function PlatformAccountsPage() {
         title="Central de Contas"
         description="Todos os usuários do auth — cadastros, tipos de conta, status e ações"
       />
+
+      {/* Super admin tabs */}
+      <div className="flex gap-2 mb-5">
+        <span className="text-xs font-bold px-3 py-1.5 bg-gray-900 text-white rounded-xl">Contas</span>
+        <Link
+          href="/admin/super/waitlist"
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+        >
+          <ListOrdered className="w-3.5 h-3.5" />
+          Lista Beta
+        </Link>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">

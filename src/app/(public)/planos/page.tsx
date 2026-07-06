@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ChevronDown, Tag, Zap, ChevronRight } from "lucide-react";
 import { PLANS, MIN_PUBLIC_PRICE, formatPrice } from "@/lib/billing/plans";
+import { LAUNCH_MODE } from "@/lib/launch/config";
 
 const ENTITLEMENT_LABELS: Record<string, string> = {
   dashboard_basic:      "Painel inicial",
@@ -171,8 +172,15 @@ export default function PlanosPage() {
                   </div>
 
                   {/* CTA */}
+                  {LAUNCH_MODE.publicSignupMode === "waitlist" && (
+                    <p style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".06em", textAlign: "center", color: S.muted, marginBottom: ".75rem" }}>
+                      Durante o beta, os acessos são liberados por convite.
+                    </p>
+                  )}
                   <Link
-                    href={`/criar-conta?plan=${plan.slug}${couponCode ? `&coupon=${couponCode}` : ""}`}
+                    href={LAUNCH_MODE.publicSignupMode === "waitlist"
+                      ? "/pre-acesso"
+                      : `/criar-conta?plan=${plan.slug}${couponCode ? `&coupon=${couponCode}` : ""}`}
                     style={{
                       display: "block",
                       textAlign: "center",
@@ -194,7 +202,9 @@ export default function PlanosPage() {
                       if (!plan.highlight) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = S.border; }
                     }}
                   >
-                    {plan.trial_days > 0 ? `Começar ${plan.trial_days} dias grátis →` : "Entrar em contato →"}
+                    {LAUNCH_MODE.publicSignupMode === "waitlist"
+                      ? "Solicitar acesso beta →"
+                      : plan.trial_days > 0 ? `Começar ${plan.trial_days} dias grátis →` : "Entrar em contato →"}
                   </Link>
                 </div>
               </div>
