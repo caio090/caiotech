@@ -141,7 +141,7 @@ export default function WaitlistPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       {/* Super admin tabs */}
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-2 flex-wrap">
         <Link
           href="/admin/super/accounts"
           className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
@@ -152,6 +152,12 @@ export default function WaitlistPage() {
         <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-gray-900 text-white rounded-xl">
           Lista Beta
         </span>
+        <Link
+          href="/admin/super/leads"
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+        >
+          Central de Leads
+        </Link>
       </div>
 
       {/* Header */}
