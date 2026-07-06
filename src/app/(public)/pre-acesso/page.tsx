@@ -64,9 +64,17 @@ export default function PreAcessoPage() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ ...form, source: "pre-acesso" }),
       });
-      const json = await res.json() as { ok: boolean; duplicate?: boolean; message?: string };
+      type WaitlistRes = {
+        ok: boolean; duplicate?: boolean; message?: string; code?: string;
+        debug?: { supabaseCode?: string; supabaseMessage?: string; primary?: { code?: string; message?: string }; fallback?: { code?: string; message?: string } };
+      };
+      const json = await res.json() as WaitlistRes;
       if (!json.ok) {
-        setError(json.message ?? "Erro ao registrar. Tente novamente.");
+        let errMsg = json.message ?? "Erro ao registrar. Tente novamente.";
+        const dbCode = json.debug?.primary?.code ?? json.debug?.supabaseCode;
+        const dbMsg  = json.debug?.primary?.message ?? json.debug?.supabaseMessage;
+        if (dbCode) errMsg += ` [${json.code ?? "err"}: ${dbCode}${dbMsg ? " — " + dbMsg : ""}]`;
+        setError(errMsg);
       } else if (json.duplicate) {
         setDuplicate(true);
         setSent(true);

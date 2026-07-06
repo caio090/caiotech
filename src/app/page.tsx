@@ -1,22 +1,9 @@
 "use client";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
-import { BeforeAfterSection } from "@/components/before-after-section";
-import { Users, Sparkles, DollarSign, TrendingUp, GraduationCap, Video, Zap } from "lucide-react";
-import type { ElementType } from "react";
+import { Zap } from "lucide-react";
 import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
 import { LAUNCH_MODE } from "@/lib/launch/config";
-
-// ── Modules ──────────────────────────────────────────────────
-interface Module { Icon: ElementType; accent: string; tag: string; title: string; desc: string; num: string; coming?: boolean; }
-const modules: Module[] = [
-  { Icon: Users,         accent: "#7b6ef6", tag: "■ CRM",        num: "01", title: "Clientes",   desc: "Centralize clientes, histórico, entregas e relacionamento em um só lugar." },
-  { Icon: Sparkles,      accent: "#a855f7", tag: "■ Conteúdo",   num: "02", title: "REC OS",     desc: "Planeje, crie e aprove conteúdos com mais velocidade e menos retrabalho." },
-  { Icon: Video,         accent: "#e0635a", tag: "■ Audiovisual", num: "03", title: "REC OS Vídeo", desc: "Organize roteiros, gravações e produção audiovisual com clareza." },
-  { Icon: DollarSign,    accent: "#10b981", tag: "■ Finanças",    num: "04", title: "FinanceOS",  desc: "Acompanhe cobranças, receitas e pagamentos sem perder o controle." },
-  { Icon: TrendingUp,    accent: "#3b82f6", tag: "■ Vendas",      num: "05", title: "GrowthOS",   desc: "Gerencie leads, propostas e oportunidades comerciais em um fluxo único." },
-  { Icon: GraduationCap, accent: "#f59e0b", tag: "■ Academy",     num: "06", title: "Academy",    desc: "Treinamento e onboarding da equipe — em breve.", coming: true },
-];
 
 // ── Client logos ─────────────────────────────────────────────
 const clients = [
@@ -113,7 +100,7 @@ export default function HomePage() {
                 ■ Quero ver na prática →
               </Link>
               <a
-                href="#modulos"
+                href="#plataforma"
                 className="w-full sm:w-auto text-center"
                 style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".72rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s, color .2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
@@ -128,6 +115,12 @@ export default function HomePage() {
               {["Empresas", "Agências", "Autônomos"].map((l) => (
                 <span key={l} style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".15rem .6rem" }}>{l}</span>
               ))}
+              <span style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".08em", color: S.muted }}>·</span>
+              <a href="/rec" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#c0392b", textDecoration: "none", border: "1px solid #c0392b30", padding: ".15rem .5rem" }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#c0392b60")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#c0392b30")}
+              >Lokat.rec</a>
+              <span style={{ ...S.grotesk, fontSize: ".62rem", color: S.muted, fontStyle: "italic" }}>um ecossistema Lokat</span>
             </div>
           </div>
 
@@ -180,7 +173,7 @@ export default function HomePage() {
       <div style={{ background: "#fff", color: "#111" }}>
 
         {/* ── O que a Lokat OS organiza ── */}
-        <section className="max-w-5xl mx-auto px-4 md:px-8 py-16 md:py-24">
+        <section id="plataforma" className="max-w-5xl mx-auto px-4 md:px-8 py-16 md:py-24">
           <div className="text-center mb-12">
             <h2 className="text-2xl md:text-4xl font-black text-gray-900 leading-tight mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               O que a Lokat OS organiza para você
@@ -191,13 +184,15 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: "📊", title: "Dados do negócio",      desc: "Faturamento, pedidos e métricas das suas fontes — atualizados automaticamente." },
-              { icon: "✅", title: "Conteúdo e aprovações", desc: "Calendário, briefings e aprovação por link. Sem vai e vem no WhatsApp." },
-              { icon: "📈", title: "Relatórios e decisões", desc: "Resultados de campanha, alcance Meta e ticket médio num único painel." },
-              { icon: "👥", title: "Clientes e operação",   desc: "Gerencie clientes, equipe, tarefas e contratos no mesmo sistema." },
+              { color: "#7b6ef6", title: "Dados do negócio",      desc: "Faturamento, pedidos e métricas das suas fontes — atualizados automaticamente." },
+              { color: "#10b981", title: "Conteúdo e aprovações", desc: "Calendário, briefings e aprovação por link. Sem vai e vem no WhatsApp." },
+              { color: "#3b82f6", title: "Relatórios e decisões", desc: "Resultados de campanha, alcance Meta e ticket médio num único painel." },
+              { color: "#a855f7", title: "Clientes e operação",   desc: "Gerencie clientes, equipe, tarefas e contratos no mesmo sistema." },
             ].map((c) => (
               <div key={c.title} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="text-2xl mb-3">{c.icon}</div>
+                <div className="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style={{ background: `${c.color}15` }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: c.color }} />
+                </div>
                 <h3 className="font-bold text-gray-900 text-sm mb-1.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.title}</h3>
                 <p className="text-gray-500 text-xs leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.desc}</p>
               </div>
@@ -267,7 +262,7 @@ export default function HomePage() {
                   <p className="font-bold text-sm text-gray-900 leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{src.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{src.sub}</p>
                   <span className="inline-block mt-1.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ fontFamily: "'Space Mono', monospace", color: src.color, background: `${src.color}12` }}>
-                    {src.status === "ativo" ? "Disponível" : src.status === "breve" ? "Em breve" : "Roadmap"}
+                    {src.status === "ativo" ? "Já conecta" : src.status === "breve" ? "Em validação" : "A caminho"}
                   </span>
                 </div>
               </div>

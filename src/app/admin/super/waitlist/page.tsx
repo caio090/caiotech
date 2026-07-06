@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Clock, CheckCircle2, Mail, Phone, MapPin, Tag, Filter,
-  RefreshCw, Copy, Check, UserCheck, Archive, Send, Users,
+  RefreshCw, Copy, Check, UserCheck, Archive, Send, Users, Trash2, AlertTriangle,
 } from "lucide-react";
 
 type WaitlistEntry = {
@@ -116,6 +116,17 @@ export default function WaitlistPage() {
     }
   }
 
+  async function deleteEntry(id: string) {
+    if (!confirm("Apagar este registro definitivamente? Esta ação não pode ser desfeita.")) return;
+    setUpdating(id);
+    try {
+      await fetch(`/api/admin/waitlist?id=${id}`, { method: "DELETE" });
+      await load();
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   function whatsappMsg(entry: WaitlistEntry) {
     const phone = entry.phone?.replace(/\D/g, "") ?? "";
     const text = encodeURIComponent(
@@ -185,7 +196,20 @@ export default function WaitlistPage() {
 
       {/* Table */}
       {!loading && !error && entries.length === 0 && (
-        <div className="text-center py-20 text-gray-400 text-sm">Nenhum registro encontrado.</div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-6 space-y-2">
+          <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            Nenhum registro encontrado
+          </div>
+          <p className="text-xs text-amber-700 leading-relaxed">
+            A tabela <code className="bg-amber-100 px-1 rounded">launch_waitlist</code> existe mas retornou 0 registros com permissão de leitura do service role.
+          </p>
+          <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+            <li>Verifique se <code className="bg-amber-100 px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code> está configurada na Vercel (Settings → Environment Variables).</li>
+            <li>Confirme que a chave aponta para o mesmo projeto que <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code>.</li>
+            <li>Se o SQL 74 foi rodado, execute <code className="bg-amber-100 px-1 rounded">SELECT * FROM launch_waitlist</code> no SQL Editor para confirmar os dados existem.</li>
+          </ul>
+        </div>
       )}
 
       {entries.length > 0 && (
@@ -294,6 +318,14 @@ export default function WaitlistPage() {
                             <Archive className="w-4 h-4" />
                           </button>
                         )}
+                        <button
+                          disabled={updating === e.id}
+                          onClick={() => deleteEntry(e.id)}
+                          title="Apagar definitivamente"
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>

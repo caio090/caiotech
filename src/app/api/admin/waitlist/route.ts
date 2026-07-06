@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, code: "db_error", message: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, entries: data ?? [], total: count ?? 0 });
+  return NextResponse.json({ ok: true, entries: data ?? [], total: count ?? 0, debug: { rowsReturned: data?.length ?? 0, countReturned: count ?? 0 } });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -89,6 +89,29 @@ export async function PATCH(req: NextRequest) {
 
   const admin = createRequiredSupabaseAdminClient();
   const { error } = await admin.from("launch_waitlist").update(update).eq("id", id);
+  if (error) {
+    return NextResponse.json({ ok: false, code: "db_error", message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await authorizeAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, code: auth.error }, { status: auth.status });
+  }
+
+  if (!hasSupabaseServiceRoleKey()) {
+    return NextResponse.json({ ok: false, code: "service_role_missing" }, { status: 503 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ ok: false, code: "missing_id" }, { status: 400 });
+
+  const admin = createRequiredSupabaseAdminClient();
+  const { error } = await admin.from("launch_waitlist").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ ok: false, code: "db_error", message: error.message }, { status: 500 });
   }

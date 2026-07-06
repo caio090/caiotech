@@ -9,7 +9,7 @@ import { LAUNCH_MODE } from "@/lib/launch/config";
 const navLinks = [
   { href: "/plataforma",  label: "Plataforma" },
   { href: "/diagnostico", label: "Diagnóstico" },
-  { href: "/#rec-os",     label: "REC OS" },
+  { href: "/rec",         label: "REC OS" },
   { href: "/planos",      label: "Planos" },
 ];
 

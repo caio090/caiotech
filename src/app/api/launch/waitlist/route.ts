@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  createServerSupabaseClient,
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
@@ -119,13 +120,42 @@ export async function POST(req: NextRequest) {
       }, { status: 503 });
     }
     if (insertErr.code === "23505") {
-      // Unique constraint — duplicata capturada tarde
       return NextResponse.json({
         ok: true,
         duplicate: true,
         message: "Você já está na lista. Vamos te avisar quando o acesso beta for liberado.",
       });
     }
+
+    // Fallback: tentar insert via anon key — RLS waitlist_public_insert permite
+    try {
+      const anonClient = await createServerSupabaseClient();
+      const { error: anonErr } = await anonClient
+        .from("launch_waitlist")
+        .insert({ name, email, phone, account_type, city, segment, interest,
+                  social_or_site: social, source, utm_source, utm_medium, utm_campaign });
+      if (!anonErr) {
+        return NextResponse.json({
+          ok: true, duplicate: false,
+          message: "Inscrição recebida! Vamos te avisar quando o acesso beta for liberado.",
+        });
+      }
+      if (anonErr.code === "23505") {
+        return NextResponse.json({ ok: true, duplicate: true,
+          message: "Você já está na lista. Vamos te avisar quando o acesso beta for liberado." });
+      }
+      return NextResponse.json({
+        ok: false, code: "waitlist_insert_failed",
+        message: "Não foi possível salvar sua inscrição agora. Tente novamente.",
+        debug: {
+          primary:  { code: insertErr.code,  message: insertErr.message,  hint: insertErr.hint  },
+          fallback: { code: anonErr.code,    message: anonErr.message,    hint: anonErr.hint    },
+        },
+      }, { status: 500 });
+    } catch {
+      // anon fallback também falhou — retornar erro original com debug
+    }
+
     return NextResponse.json({
       ok: false,
       code: "waitlist_insert_failed",
