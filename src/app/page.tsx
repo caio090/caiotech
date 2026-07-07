@@ -203,23 +203,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Transição hero → branco ────────────────────────────── */}
-      <div style={{ background: `linear-gradient(to bottom, ${S.bg} 0%, #ffffff 100%)`, position: "relative", overflow: "hidden" }}>
-        <div className="flex flex-col items-center justify-center py-10 gap-3">
-          <svg viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg" className="lk-drop-float"
-            style={{ width: "48px", height: "63px", filter: "drop-shadow(0 0 12px rgba(192,57,43,0.45))" }}>
-            <defs>
-              <linearGradient id="rec-drop-g" x1="0.3" y1="0" x2="0.7" y2="1">
-                <stop offset="0%" stopColor="#e07060" />
-                <stop offset="55%" stopColor="#c0392b" />
-                <stop offset="100%" stopColor="#7a1a10" />
-              </linearGradient>
-            </defs>
-            <path d="M100 22 C146 80 174 123 174 164 C174 215 141 247 100 247 C59 247 26 215 26 164 C26 123 54 80 100 22Z" fill="url(#rec-drop-g)" />
-            <path d="M70 58 C78 46 92 38 104 37 C92 78 74 112 63 143 C50 114 56 76 70 58Z" fill="rgba(255,255,255,0.15)" />
-          </svg>
-          <a href="/rec" style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".16em", textTransform: "uppercase", color: S.red, textDecoration: "none", opacity: 0.8 }}>LOKAT.REC →</a>
-        </div>
-      </div>
+      <div style={{ background: `linear-gradient(to bottom, ${S.bg} 0%, #ffffff 100%)`, height: "64px" }} />
 
       {/* ════════════════════════════════════════════════════════
           SEÇÕES CLARAS

@@ -4,8 +4,9 @@ import { PageHeader } from "@/components/page-header";
 import {
   Users, Flame, Thermometer, Snowflake, Clock, MessageSquare,
   Globe, AtSign, Plus, Bot, ChevronRight, Lock,
-  AlertTriangle, TrendingUp, Filter,
+  AlertTriangle, TrendingUp, Filter, ListOrdered,
 } from "lucide-react";
+import Link from "next/link";
 
 type LeadStatus = "novo" | "em_atendimento" | "aguardando_resposta" | "no_vacuo" | "qualificado" | "perdido" | "convertido";
 type LeadTemp   = "quente" | "morno" | "frio";
@@ -73,7 +74,7 @@ export default function AdminLeadsPage() {
 
   return (
     <div>
-      <PageHeader title="Leads" description={`${DEMO_LEADS.length} leads · Pipeline de prospecção`}>
+      <PageHeader title="CRM" description="Gestão de leads, pipeline e relacionamento com prospects">
         <button className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">
           <Plus className="w-4 h-4" /> Novo lead
         </button>
@@ -103,6 +104,25 @@ export default function AdminLeadsPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Waitlist shortcut */}
+      <div className="mb-5 bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <ListOrdered className="w-4 h-4 text-indigo-500" strokeWidth={1.5} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-800">Lista de Espera — Waitlist</p>
+            <p className="text-[10px] text-gray-400">Leads captados pelo site, modal e /pre-acesso · entrada no CRM</p>
+          </div>
+        </div>
+        <Link
+          href="/admin/super/waitlist"
+          className="flex-shrink-0 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition-colors"
+        >
+          Ver waitlist →
+        </Link>
       </div>
 
       {/* Agente IA */}

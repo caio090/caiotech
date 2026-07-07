@@ -138,7 +138,7 @@ export default function AdminRelatoriosPage() {
 
   return (
     <div>
-      <PageHeader title="Relatórios" description="Performance por cliente · Selecione o tipo de relatório">
+      <PageHeader title="Central de Dados & Insights" description="Relatórios, fontes de dados e análises por cliente">
         <button
           onClick={() => setShowExport(true)}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
@@ -224,6 +224,25 @@ export default function AdminRelatoriosPage() {
             { label: "Projeção de receita",    ready: false },
           ]}
         />
+      </div>
+
+      {/* Link para Fontes de Dados */}
+      <div className="mt-6 bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Link2 className="w-4 h-4 text-indigo-500" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-800">Fontes de Dados</p>
+            <p className="text-[10px] text-gray-400">Integrações, uploads manuais e saúde das conexões por cliente</p>
+          </div>
+        </div>
+        <Link
+          href="/admin/fontes-dados"
+          className="flex-shrink-0 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition-colors"
+        >
+          Gerenciar fontes →
+        </Link>
       </div>
 
       {/* Próximas funções */}

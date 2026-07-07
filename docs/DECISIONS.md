@@ -20,3 +20,11 @@ Registro de decisoes do projeto Lokat OS.
 - 2026-07-06: `LOKAT_TYPEBOT_WEBHOOK_SECRET` protege o endpoint Typebot. Sem a variável, aceita sem autenticação (dev). Com a variável, exige header `x-lokat-webhook-secret`.
 - 2026-07-06: Fallback sem SQL 76: se `typebot_result_id` etc. não existem, endpoint faz segundo INSERT sem campos estendidos. Lead é salvo mesmo sem a migration.
 - 2026-07-06: Landing reformulada com seções O Problema, Para quem, FAQ, prévia visual simulada (labelled "Simulação — interface em desenvolvimento"), jornada 7 etapas.
+- 2026-07-07: Sidebar admin reorganizada para 11 itens: Dashboard, CRM, ContentOS, Operacional, Clientes, Dados & Insights, Financeiro, Billing & Planos, Contas, Integrações, Configurações. Removidos do nav (páginas continuam existindo): Início, REC Vídeos, Projetos, Diagnósticos, Fontes de Dados, Equipe, WhatsApp.
+- 2026-07-07: `/admin/leads` é o hub de CRM. Waitlist (`/admin/super/waitlist`) é a entrada de leads novos; CRM é a operação (pipeline, temperatura, próxima ação). CRM não substitui a waitlist — são estágios diferentes do funil.
+- 2026-07-07: `/admin/relatorios` renomeado para "Central de Dados & Insights". `/admin/fontes-dados` permanece como página separada acessível pelo hub de Dados.
+- 2026-07-07: `/admin/financeiro` é a visão financeira da operação (MRR, CAC, LTV, Churn, ROI, ROAS, Custo IA, Margem). `/admin/super/billing` é o controle de planos/assinaturas/cupons. São distintos: Financeiro = saúde financeira do negócio; Billing = controle técnico de planos.
+- 2026-07-07: Filtros da Central de Contas expandidos: Internas, Agências, Clientes diretos, Clientes de agência, Autônomos, Operacionais, Leads. Aviso exibido: filtros dependem da classificação no cadastro.
+- 2026-07-07: Créditos de IA monitorados como "Custo IA" no Financeiro. Integração real com provider é sprint futura.
+- 2026-07-07: Google Drive: integração futura — não implementar agora.
+- 2026-07-07: Landing — gota vermelha (Lokat.rec) removida da transição hero→branco. Gradiente suavizado para 64px sem conteúdo.

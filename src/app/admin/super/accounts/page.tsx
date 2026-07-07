@@ -33,12 +33,14 @@ interface Account {
 
 type AccountFilter =
   | "todos"
+  | "interna"
   | "agencia"
-  | "empresa"
-  | "invited_client"
-  | "diagnostic_only"
+  | "cliente_direto"
+  | "cliente_agencia"
+  | "autonomo"
+  | "operacional"
+  | "lead"
   | "trial"
-  | "sem_vinculo"
   | "sem_perfil"
   | "bloqueado";
 
@@ -69,13 +71,15 @@ const SOURCE_LABELS: Record<string, { label: string; cls: string }> = {
 };
 
 const FILTER_OPTIONS: { value: AccountFilter; label: string }[] = [
-  { value: "todos",           label: "Todos" },
+  { value: "todos",           label: "Todas" },
+  { value: "interna",         label: "Internas" },
   { value: "agencia",         label: "Agências" },
-  { value: "empresa",         label: "Empresas" },
-  { value: "invited_client",  label: "Clientes convidados" },
-  { value: "diagnostic_only", label: "Só diagnóstico" },
+  { value: "cliente_direto",  label: "Clientes diretos" },
+  { value: "cliente_agencia", label: "Clientes de agência" },
+  { value: "autonomo",        label: "Autônomos" },
+  { value: "operacional",     label: "Operacionais" },
+  { value: "lead",            label: "Leads" },
   { value: "trial",           label: "Em trial" },
-  { value: "sem_vinculo",     label: "Sem vínculo" },
   { value: "sem_perfil",      label: "Sem perfil" },
   { value: "bloqueado",       label: "Bloqueado/Suspenso" },
 ];
@@ -209,12 +213,14 @@ export default function PlatformAccountsPage() {
       (a.agency_name ?? "").toLowerCase().includes(q);
     const matchFilter =
       filter === "todos"           ? true :
+      filter === "interna"         ? (a.role === "super_admin" || a.role === "admin") :
       filter === "agencia"         ? a.account_type === "agencia" :
-      filter === "empresa"         ? a.account_type === "empresa" :
-      filter === "invited_client"  ? a.account_type === "invited_client" :
-      filter === "diagnostic_only" ? a.account_type === "diagnostic_only" :
+      filter === "cliente_direto"  ? a.account_type === "empresa" :
+      filter === "cliente_agencia" ? a.account_type === "invited_client" :
+      filter === "autonomo"        ? (a.account_type === "autonomo" || a.account_type === "freelancer") :
+      filter === "operacional"     ? (a.role === "social_media" || a.role === "operacional") :
+      filter === "lead"            ? a.account_type === "diagnostic_only" :
       filter === "trial"           ? a.subscription_status === "trialing" :
-      filter === "sem_vinculo"     ? (!a.company_name && !a.agency_name) :
       filter === "sem_perfil"      ? !a.has_profile :
       filter === "bloqueado"       ? (a.account_status === "blocked" || a.account_status === "suspended") :
       true;
@@ -310,6 +316,12 @@ export default function PlatformAccountsPage() {
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} strokeWidth={1.5} />
           Atualizar
         </button>
+      </div>
+
+      {/* Aviso filtros */}
+      <div className="mb-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2 text-[11px] text-amber-700 flex items-center gap-2">
+        <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+        Alguns filtros dependem da classificação de conta no cadastro — resultados podem estar incompletos.
       </div>
 
       {/* Banners de estado — erro já tratado acima */}
