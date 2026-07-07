@@ -1,6 +1,24 @@
 # Estratégia de Captura de Leads — Typebot
 
-*Criado: 2026-07-06. Atualizado: 2026-07-06.*
+*Criado: 2026-07-06. Atualizado: 2026-07-07.*
+
+---
+
+## ⏸ STATUS: PAUSADO
+
+**Decisão (2026-07-07):** Typebot pausado nesta sprint. Virou gargalo operacional. Prioridade é o MVP principal funcional até 31/07.
+
+**Estado atual:**
+- ✅ Typebot criado e fluxo parcialmente montado
+- ✅ Email adicionado ao fluxo
+- ✅ Bloco HTTP Request parcialmente configurado
+- ✅ Endpoint `/api/leads/typebot` implementado e deployado
+- ❌ Pendente: finalizar conexão Interesse → HTTP → bloco Final
+- ❌ Pendente: testar body com email + publicar
+
+Quando retomar: o endpoint está pronto. Só finalizar o fluxo no Typebot e publicar.
+
+**Não debugar Typebot até o MVP estar estável.**
 
 ---
 

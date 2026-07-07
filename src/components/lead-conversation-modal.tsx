@@ -5,11 +5,12 @@ import { normalizeAccountType } from "@/lib/leads/normalize-lead-payload";
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
 
 const FIELDS: Field[] = [
-  { name: "name",         label: "Seu nome",                    required: true },
-  { name: "phone",        label: "WhatsApp (com DDD)",          type: "tel" },
-  { name: "account_type", label: "Você é...",                   options: ["Empresa / Negócio local", "Agência", "Autônomo / Freelancer", "Outro"] },
-  { name: "interest",     label: "Principal objetivo",          options: ["Organizar conteúdo", "Conectar dados do negócio", "Gestão de clientes (agência)", "Aprovação de conteúdo", "Outro"] },
-  { name: "message",      label: "Alguma mensagem? (opcional)", type: "textarea" },
+  { name: "name",         label: "Seu nome",                required: true },
+  { name: "email",        label: "Seu melhor e-mail",       type: "email", required: true },
+  { name: "phone",        label: "WhatsApp (com DDD)",      type: "tel" },
+  { name: "account_type", label: "Você é...",               options: ["Empresa / Negócio local", "Agência", "Autônomo / Freelancer", "Outro"] },
+  { name: "main_problem", label: "Qual é o seu maior gargalo hoje?", options: ["Organizar conteúdo e aprovações", "Entender resultados de marketing", "Gestão de clientes / agência", "Conectar dados do negócio", "Outro"] },
+  { name: "interest",     label: "O que você quer resolver primeiro?", options: ["Diagnóstico gratuito", "Demonstração guiada", "Falar com a equipe", "Só estou explorando"] },
 ];
 
 type ModalState = {
@@ -65,21 +66,23 @@ export function LeadConversationModal({ open, onClose }: Props) {
   const submit = async () => {
     setS((p) => ({ ...p, loading: true, error: null }));
     try {
+      const mainProblem = s.values.main_problem ?? null;
+      const interest    = s.values.interest ?? null;
       const payload = {
         name:         s.values.name ?? "",
-        email:        "", // email not collected here — follow-up is by WhatsApp
+        email:        s.values.email ?? "",
         phone:        s.values.phone ?? null,
         // normalizeAccountType maps "Empresa / Negócio local" → "business" etc.
         account_type: normalizeAccountType(s.values.account_type ?? null),
-        interest:     s.values.interest ?? null,
-        source:       "site_conversation",
+        interest:     [mainProblem, interest].filter(Boolean).join(" — ") || null,
+        source:       "site_modal",
       };
       const res  = await fetch("/api/launch/waitlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const json = await res.json() as { ok: boolean; message?: string; code?: string };
-      if (!json.ok && json.code !== "missing_required_fields") {
-        setS((p) => ({ ...p, loading: false, error: json.message ?? "Erro ao enviar. Tente novamente." }));
-      } else {
+      if (json.ok) {
         setS((p) => ({ ...p, loading: false, done: true }));
+      } else {
+        setS((p) => ({ ...p, loading: false, error: json.message ?? "Erro ao enviar. Tente novamente." }));
       }
     } catch {
       setS((p) => ({ ...p, loading: false, error: "Erro de conexão. Tente novamente." }));
