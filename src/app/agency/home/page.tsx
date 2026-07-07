@@ -19,7 +19,7 @@ interface AgencyStats {
 
 const QUICK_ACTIONS = [
   { label: "Adicionar cliente",  href: "/admin/clientes",              icon: Plus,         color: "#7b6ef6" },
-  { label: "Abrir ContentOS",    href: "/admin/contentos",             icon: Rocket,       color: "#a855f7" },
+  { label: "Abrir REC OS",       href: "/admin/contentos",             icon: Rocket,       color: "#a855f7" },
   { label: "Ver aprovações",     href: "/admin/contentos/aprovacoes",  icon: FileCheck,    color: "#f59e0b" },
   { label: "Ver relatórios",     href: "/admin/relatorios",            icon: BarChart2,    color: "#10b981" },
   { label: "Conectar fontes",    href: "/admin/conexoes",              icon: Wifi,         color: "#3b82f6" },

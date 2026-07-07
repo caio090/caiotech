@@ -188,7 +188,7 @@ export default async function AdminDashboardPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
           {[
             { href: "/admin/dashboard",     icon: BarChart2,  label: "Dashboard",    color: "indigo" },
-            { href: "/admin/contentos",     icon: Sparkles,   label: "ContentOS",    color: "red"    },
+            { href: "/admin/contentos",     icon: Sparkles,   label: "REC OS",       color: "red"    },
             { href: "/admin/recos",         icon: Video,      label: "RecOS",        color: "red"    },
             { href: "/admin/leads",         icon: Target,     label: "GrowthOS",     color: "emerald"},
             { href: "/admin/financeiro",    icon: DollarSign, label: "FinanceOS",    color: "teal"   },

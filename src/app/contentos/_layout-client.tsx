@@ -163,7 +163,7 @@ export function ContentOSLayoutShell({ children }: Props) {
         <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
           <div className="flex items-center gap-2">
             <RecDropIcon size={16} className="text-red-500" />
-            <span className="text-sm font-semibold text-gray-700">ContentOS</span>
+            <span className="text-sm font-semibold text-gray-700">REC OS</span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors">

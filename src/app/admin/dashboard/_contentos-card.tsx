@@ -27,7 +27,7 @@ export function ContentOSAdminCard({ clients }: Props) {
             <RecDropIcon size={20} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">ContentOS</p>
+            <p className="text-sm font-bold text-white">REC OS</p>
             <p className="text-xs text-red-200">Criação, aprovação e publicação de conteúdo</p>
           </div>
         </div>
@@ -35,7 +35,7 @@ export function ContentOSAdminCard({ clients }: Props) {
           href="/admin/contentos/selecionar-cliente"
           className="flex items-center gap-1.5 text-xs font-bold text-white bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl transition-colors flex-shrink-0"
         >
-          Abrir ContentOS
+          Abrir REC OS
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -58,7 +58,7 @@ export function ContentOSAdminCard({ clients }: Props) {
               ))}
             </div>
             <p className="text-[10px] text-red-300 mt-2">
-              Clique em um cliente para abrir o ContentOS direto.
+              Clique em um cliente para abrir a REC OS direto.
             </p>
           </>
         )}

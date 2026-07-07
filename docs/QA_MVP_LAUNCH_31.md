@@ -21,7 +21,7 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] Botão "Ou agendar demonstração →" → abre modal conversacional
 - [ ] Seção "O Problema" renderiza 5 cards
 - [ ] Jornada 7 etapas renderiza
-- [ ] Seção REC OS renderiza
+- [ ] Seção REC OS renderiza (nome público do módulo: REC OS — não ContentOS)
 - [ ] Seção "Para quem" renderiza
 - [ ] FAQ renderiza e acordeão funciona
 - [ ] Seção beta / waitlist renderiza

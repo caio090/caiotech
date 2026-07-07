@@ -70,7 +70,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
     <div className="max-w-xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-black text-gray-900 mb-1">Selecione um cliente</h1>
       <p className="text-sm text-gray-500 mb-8">
-        Escolha para qual marca você quer trabalhar no ContentOS.
+        Escolha para qual marca você quer trabalhar na REC OS.
       </p>
 
       {!isSupabaseActive ? (
@@ -80,13 +80,13 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
           </div>
           <p className="text-sm font-medium text-gray-700 mb-1">Modo demonstração ativo</p>
           <p className="text-xs text-gray-400 mb-6">
-            ContentOS usa dados de exemplo — nenhum cliente real cadastrado.
+            REC OS usa dados de exemplo — nenhum cliente real cadastrado.
           </p>
           <a
             href="/admin/contentos/home"
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-2xl hover:bg-purple-700 transition-colors"
           >
-            Ir para ContentOS
+            Ir para REC OS
             <ArrowRight className="w-4 h-4" />
           </a>
         </div>
@@ -135,7 +135,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
               <p className="text-xs text-gray-400 mb-4">
                 {search || statusFilter !== "todos"
                   ? "Tente ajustar os filtros ou a busca."
-                  : "Adicione um cliente para começar a usar o ContentOS."}
+                  : "Adicione um cliente para começar a usar a REC OS."}
               </p>
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 {(search || statusFilter !== "todos") && (
@@ -263,7 +263,7 @@ export function AdminSelecionarClienteContent({ clients, isSupabaseActive }: Pro
             disabled={!selectedId}
             className="w-full flex items-center justify-center gap-2 py-3.5 bg-purple-600 text-white font-semibold rounded-2xl hover:bg-purple-700 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Abrir ContentOS
+            Abrir REC OS
             <ArrowRight className="w-4 h-4" />
           </button>
         </>

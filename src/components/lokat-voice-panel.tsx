@@ -30,7 +30,7 @@ const QUICK_ACTIONS: { label: string; href: string; icon: React.ElementType }[] 
   { label: "Aprovações pendentes",    href: "/admin/contentos",              icon: CheckSquare  },
   { label: "Tarefas atrasadas",       href: "/admin/operacional/kanban",     icon: AlertTriangle },
   { label: "Prontos para agendar",    href: "/admin/contentos",              icon: Clock        },
-  { label: "Abrir ContentOS",          href: "/admin/contentos",              icon: Sparkles     },
+  { label: "Abrir REC OS",             href: "/admin/contentos",              icon: Sparkles     },
   { label: "Abrir Operacional",       href: "/admin/operacional",            icon: KanbanSquare },
   { label: "Abrir Relatórios",        href: "/admin/relatorios",             icon: BarChart3    },
   { label: "Abrir ComercialOS",       href: "/admin/leads",                  icon: ShoppingBag  },

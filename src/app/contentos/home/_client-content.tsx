@@ -530,7 +530,7 @@ export function ContentOSHomeContent({
 
   return (
     <div>
-      <PageHeader title="ContentOS" description={headerDesc} />
+      <PageHeader title="REC OS" description={headerDesc} />
 
       {/* Badges de contexto */}
       <div className="mb-3 flex items-center gap-2 flex-wrap">
@@ -544,7 +544,7 @@ export function ContentOSHomeContent({
         )}
         {isAdmin && !isDemo && (
           <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
-            Admin visualizando ContentOS
+            Admin visualizando REC OS
           </span>
         )}
       </div>

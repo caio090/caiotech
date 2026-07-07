@@ -394,7 +394,7 @@ export function AdminLayoutShell({ children }: Props) {
         {isOnContentosPage && (
           <div className="bg-purple-700 border-b border-purple-600 flex items-center justify-between px-4 md:px-6 py-2 flex-shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white">ContentOS</span>
+              <span className="text-xs font-bold text-white">REC OS</span>
               {isSelectingClient ? (
                 <span className="text-xs text-purple-300">· Selecione um cliente</span>
               ) : activeClientName ? (
@@ -418,7 +418,7 @@ export function AdminLayoutShell({ children }: Props) {
                   className="text-xs text-purple-200 hover:text-white transition-colors flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3 h-3" />
-                  Sair do ContentOS
+                  Sair da REC OS
                 </Link>
               </div>
             )}
