@@ -57,6 +57,15 @@ const ACCOUNT_LABEL: Record<string, string> = {
   interested:   "Interessado",
 };
 
+const SOURCE_LABEL: Record<string, string> = {
+  site_modal:        "Agendamento",
+  site_conversation: "Agendamento",
+  "pre-acesso":      "Beta",
+  landing:           "Site",
+  website:           "Site",
+  typebot:           "Typebot",
+};
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   function copy() {
@@ -227,6 +236,7 @@ export default function WaitlistPage() {
                 <th className="text-left px-4 py-3 font-semibold">Tipo</th>
                 <th className="text-left px-4 py-3 font-semibold">Cidade / Segmento</th>
                 <th className="text-left px-4 py-3 font-semibold">Interesse</th>
+                <th className="text-left px-4 py-3 font-semibold">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
                 <th className="text-left px-4 py-3 font-semibold">Entrada</th>
                 <th className="text-right px-4 py-3 font-semibold">Ações</th>
@@ -262,6 +272,11 @@ export default function WaitlistPage() {
                     <td className="px-4 py-3 text-xs text-gray-500 max-w-[180px]">
                       <p className="line-clamp-2">{e.interest ?? "—"}</p>
                       {e.social_or_site && <p className="text-indigo-600 truncate mt-0.5">{e.social_or_site}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] text-gray-500">
+                        {e.source ? (SOURCE_LABEL[e.source] ?? e.source) : "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-semibold px-2 py-1 rounded-lg ${STATUS_COLOR[e.status] ?? "bg-gray-100 text-gray-600"}`}>

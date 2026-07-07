@@ -32,7 +32,7 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/admin/inicio",       label: "Início",       icon: Home },
       { href: "/admin/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-      { href: "/admin/contentos",    label: "REC OS",       icon: RecDropIcon },
+      { href: "/admin/contentos",    label: "ContentOS",    icon: RecDropIcon },
       { href: "/admin/rec/videos",   label: "REC Vídeos",   icon: Upload },
       { href: "/admin/operacional",  label: "Operacional",  icon: KanbanSquare },
       { href: "/admin/clientes",     label: "Clientes",     icon: Users },
@@ -69,9 +69,9 @@ export const configs: Record<SidebarVariant, {
     ],
   },
   contentos: {
-    logo: "R",
+    logo: "C",
     logoColor: "bg-red-600",
-    title: "REC OS",
+    title: "ContentOS",
     nav: [
       { href: "/contentos/home",             label: "Visão Geral",     icon: Home },
       { href: "/contentos/base-estrategica", label: "Base Estratégica",icon: BookOpen },

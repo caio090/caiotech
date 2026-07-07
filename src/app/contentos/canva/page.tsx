@@ -200,7 +200,7 @@ export default function ContentosCanvaPage() {
         )}
 
         <button onClick={() => router.push("/contentos/home")} className="mt-5 text-sm text-indigo-600 hover:underline">
-          ← Voltar para REC OS
+          ← Voltar para ContentOS
         </button>
       </div>
     );

@@ -114,7 +114,7 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 
 ---
 
-## 9. ContentOS / REC OS (`/contentos`)
+## 9. ContentOS (`/contentos`)
 
 - [ ] `/contentos/home` carrega sem erro
 - [ ] Sidebar exibe: Visão Geral, Base Estratégica, Campanhas, Calendário, Produção, Distribuição, Insights, Aprovações, Relatórios
@@ -171,6 +171,24 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 | Typebot: finalizar fluxo + publicar | Pausado intencionalmente | Próxima sprint |
 | `app.lokat.io` SSL + Vercel | Domínio sem certificado | Infraestrutura |
 | Integração de pagamento real | MVP não requer | Futura sprint |
+
+---
+
+## Melhorias futuras — documentadas, NÃO implementar agora
+
+### P2 — Campo livre no modal (baixa prioridade)
+
+O modal conversacional (`LeadConversationModal`) usa opções fixas nos passos de "maior gargalo" e "objetivo". Para leads com situações fora das opções, não há campo livre.
+
+**Futuro:** nos passos com options, adicionar opção "Outro" que abre um `<input>` de texto inline para o usuário descrever sua situação específica. Não bloqueia o envio — apenas enriquece o dado.
+
+### P3 — Rota `/operacional/kanban` (comportamento documentado)
+
+`/operacional/kanban` não tem uma rota própria — ao acessar, redireciona para `/operacional/briefings` porque o Kanban é um toggle de visualização dentro da página de Briefings (não uma rota separada).
+
+**Comportamento atual:** correto pelo design. O link "Kanban" na sidebar navega para `/operacional/briefings` com o Kanban como view alternativa.
+
+**Futuro (se necessário):** criar rota `/operacional/kanban` com redirect para `/operacional/briefings?view=kanban` ou fazer a página de Briefings aceitar o parâmetro `view` para inicializar na visualização correta.
 
 ---
 

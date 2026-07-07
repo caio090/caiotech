@@ -83,7 +83,7 @@ export default function ContentosConfigPage() {
 
   return (
     <div>
-      <PageHeader title="Configurações" description="Preferências do REC OS" />
+      <PageHeader title="Configurações" description="Preferências do ContentOS" />
       <div className="max-w-2xl space-y-4">
 
         {/* Brand profile from onboarding */}
@@ -168,7 +168,7 @@ export default function ContentosConfigPage() {
         ) : (
           <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5">
             <p className="text-sm font-bold text-purple-800 mb-1">Marca não configurada</p>
-            <p className="text-xs text-purple-600 mb-3">Complete o onboarding para personalizar o REC OS com os dados da sua marca.</p>
+            <p className="text-xs text-purple-600 mb-3">Complete o onboarding para personalizar o ContentOS com os dados da sua marca.</p>
             <Link href="/onboarding/marca" className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-700 bg-purple-100 px-3 py-1.5 rounded-xl hover:bg-purple-200 transition-colors">
               Configurar marca →
             </Link>

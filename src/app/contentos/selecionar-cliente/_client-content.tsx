@@ -59,7 +59,7 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive }
       {/* Title */}
       <h1 className="text-2xl font-black text-gray-900 mb-1">Selecione um cliente</h1>
       <p className="text-sm text-gray-500 mb-8">
-        Escolha para qual marca você quer trabalhar no REC OS.
+        Escolha para qual marca você quer trabalhar no ContentOS.
       </p>
 
       {!isSupabaseActive ? (
@@ -70,13 +70,13 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive }
           </div>
           <p className="text-sm font-medium text-gray-700 mb-1">Modo demonstração ativo</p>
           <p className="text-xs text-gray-400 mb-6">
-            REC OS usa dados de exemplo — nenhum cliente real cadastrado.
+            ContentOS usa dados de exemplo — nenhum cliente real cadastrado.
           </p>
           <a
             href="/contentos/home"
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-2xl hover:bg-purple-700 transition-colors"
           >
-            Ir para REC OS
+            Ir para ContentOS
             <ArrowRight className="w-4 h-4" />
           </a>
         </div>
@@ -140,7 +140,7 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive }
             disabled={!selectedId}
             className="w-full flex items-center justify-center gap-2 py-3.5 bg-purple-600 text-white font-semibold rounded-2xl hover:bg-purple-700 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Entrar no REC OS
+            Entrar no ContentOS
             <ArrowRight className="w-4 h-4" />
           </button>
         </>
