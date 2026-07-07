@@ -9,7 +9,7 @@ import { SmartStartInput } from "@/components/smart-start-input";
 
 const SHORTCUTS = [
   { href: "/admin/contentos/campanhas",  label: "Criar campanha",   icon: Flag },
-  { href: "/admin/contentos",            label: "Abrir REC OS",     icon: Sparkles },
+  { href: "/admin/contentos",            label: "Abrir ContentOS",  icon: Sparkles },
   { href: "/admin/contentos/aprovacoes", label: "Ver aprovações",   icon: CheckSquare },
   { href: "/admin/contentos/calendario", label: "Ver calendário",   icon: CalendarDays },
   { href: "/admin/clientes",             label: "Ver clientes",     icon: Users },

@@ -96,7 +96,7 @@ export default async function OperacionalDashboardPage() {
           <div className="text-center py-10">
             <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-gray-200" />
             <p className="text-sm text-gray-400">Nenhuma tarefa atribuída no momento.</p>
-            <p className="text-xs text-gray-300 mt-1">Novas tarefas aparecerão aqui quando forem criadas pelo REC OS.</p>
+            <p className="text-xs text-gray-300 mt-1">Novas tarefas aparecerão aqui quando forem criadas pelo ContentOS.</p>
           </div>
         ) : (
           <div className="space-y-2">

@@ -144,7 +144,7 @@ export default async function AdminContentosProducaoPage({
           <Lightbulb className="w-3.5 h-3.5" /> Como funciona a produção
         </p>
         <p className="text-xs text-indigo-600">
-          O REC OS cria estratégia, briefing, roteiro e direção criativa.
+          O ContentOS cria estratégia, briefing, roteiro e direção criativa.
           Ao enviar para produção, uma tarefa é criada no Operacional para o responsável (designer, videomaker, editor ou social media).
           O resultado volta para aprovação do cliente.
         </p>

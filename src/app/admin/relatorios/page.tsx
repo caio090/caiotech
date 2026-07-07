@@ -164,9 +164,9 @@ export default function AdminRelatoriosPage() {
           title="Relatório de Conteúdo"
           description="Performance de posts, alcance, engajamento, aprovações e calendário editorial por cliente."
           color="bg-pink-50 text-pink-600"
-          fonte="Meta/Instagram · REC OS"
+          fonte="Meta/Instagram · ContentOS"
           status={metaLinked === true ? "em_preparacao" : "aguardando"}
-          cta={{ label: "Ir para REC OS Insights", href: "/admin/contentos/insights" }}
+          cta={{ label: "Ir para ContentOS Insights", href: "/admin/contentos/insights" }}
           items={[
             { label: "Alcance e impressões (Instagram)",    ready: metaLinked === true },
             { label: "Engajamento por post",                ready: false },
