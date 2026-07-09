@@ -20,19 +20,6 @@ const S = {
   red:    "#c0392b",
 };
 
-// ── Ticker items ───────────────────────────────────────────────
-const _tickerBase = [
-  "■ DIAGNÓSTICO",
-  "✦ CONTEÚDO",
-  "■ APROVAÇÃO",
-  "✦ RELATÓRIO",
-  "■ FATURAMENTO",
-  "✦ REC OS",
-  "■ TRÁFEGO",
-  "✦ WHATSAPP",
-];
-const tickerItems = [..._tickerBase, ..._tickerBase, ..._tickerBase, ..._tickerBase];
-
 // ── FAQ data ───────────────────────────────────────────────────
 const FAQ = [
   { q: "O que é o acesso beta?", a: "É o período de uso antecipado da plataforma, por convite. Você entra antes do lançamento oficial, sem cobrança automática, e ajuda a moldar o produto com feedback real." },
@@ -56,17 +43,6 @@ export default function HomePage() {
   return (
     <div style={{ background: S.bg, color: S.text, minHeight: "100vh" }}>
       <PublicHeader />
-
-      {/* ── Ticker ───────────────────────────────────────────── */}
-      <div style={{ background: S.accent, overflow: "hidden", padding: ".3rem 0" }}>
-        <div className="lk-ticker-track" style={{ display: "inline-flex" }}>
-          {tickerItems.map((item, i) => (
-            <span key={i} style={{ ...S.mono, fontSize: ".62rem", letterSpacing: ".2em", textTransform: "uppercase", color: "#fff", margin: "0 2.5rem", whiteSpace: "nowrap" }}>
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section
@@ -102,8 +78,8 @@ export default function HomePage() {
               Planeje conteúdo, aprovações, leads e finanças em um único lugar — sem planilha perdida, sem WhatsApp bagunçado, com IA do início ao fim.
             </p>
 
-            {/* 3 CTAs principais + modal */}
-            <div className="hero-fade-up-d3 flex flex-col sm:flex-row flex-wrap gap-3">
+            {/* 2 CTAs principais */}
+            <div className="hero-fade-up-d3 flex flex-col sm:flex-row gap-3">
               <Link
                 href={betaHref}
                 className="w-full sm:w-auto text-center"
@@ -113,36 +89,25 @@ export default function HomePage() {
               >
                 ■ {betaLabel}
               </Link>
-              <Link
-                href="/diagnostico"
+              <button
+                onClick={openModal}
                 className="w-full sm:w-auto text-center"
-                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s, color .2s" }}
+                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", display: "inline-block", fontWeight: 700, transition: "border-color .2s, color .2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.color = S.text; }}
               >
-                Diagnóstico gratuito
-              </Link>
-              <a
-                href="https://wa.me/5589994584163?text=Ol%C3%A1%2C+vim+pelo+site+da+Lokat+e+tenho+interesse+em+um+projeto+para+minha+empresa."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto text-center"
-                style={{ background: "transparent", color: "#25d366", border: "1px solid #25d36640", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", transition: "border-color .2s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#25d36680"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#25d36640"; }}
-              >
-                Falar com a Lokat
-              </a>
+                Agendar demonstração
+              </button>
             </div>
 
-            {/* Secondary action */}
+            {/* Link auxiliar discreto */}
             <div className="hero-fade-up-d3 mt-4">
-              <button
-                onClick={openModal}
-                style={{ background: "none", border: "none", cursor: "pointer", ...S.mono, fontSize: ".65rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px" }}
+              <Link
+                href="/diagnostico"
+                style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px" }}
               >
-                Ou agendar demonstração →
-              </button>
+                Diagnóstico gratuito →
+              </Link>
             </div>
 
             <div className="hero-fade-up-d3 flex flex-wrap items-center justify-center lg:justify-start gap-3 mt-6 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>

@@ -38,3 +38,5 @@ Registro de decisoes do projeto Lokat OS.
 - 2026-07-09: Topbar CRM exibe badge vermelho com contagem de leads com status "new" (max exibido: "9+"). Fetch em /api/admin/waitlist no mount.
 - 2026-07-09: Meta Insights — período "Mês atual" corrigido para respeitar limite de 30 dias da Graph API. until = hoje, since = max(1º do mês, hoje-29d). Label UI atualizado para "Mês atual (30d)".
 - 2026-07-09: Campo account_type e role em Central de Leads agora passam por ACCOUNT_LABEL e ROLE_LABEL respectivamente. "novo_cadastro" → "Cadastro legado" / "Legado" — não aparece mais cru.
+- 2026-07-09: Hero da landing tem apenas 2 CTAs principais: "Entrar no beta" (primário) e "Agendar demonstração" (secundário). Diagnóstico gratuito permanece como link discreto abaixo dos CTAs e em seção dedicada mais abaixo. WhatsApp permanece em seção dedicada e footer. Ticker roxo removido do topo da landing.
+- 2026-07-09: Login usa tema escuro (#0a0a0c / #13131a) alinhado com identidade LOKAT OS. Inputs usam classe .lk-login-input com override de autofill Chrome (box-shadow inset escuro, -webkit-text-fill-color claro). Não afeta inputs de outros formulários do sistema.

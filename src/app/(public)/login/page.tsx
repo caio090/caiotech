@@ -9,13 +9,13 @@ import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, 
 const DEMO_ROLES = [
   { label: "Admin",        desc: "Dashboard completo da agência",   href: "/admin/dashboard",        icon: ShieldCheck,   color: "bg-indigo-600 hover:bg-indigo-700" },
   { label: "Cliente",      desc: "Portal do cliente",               href: "/client/home",             icon: User,          color: "bg-pink-500 hover:bg-pink-600" },
-  { label: "Social Media", desc: "REC OS — criação de conteúdo", href: "/contentos/home",          icon: Sparkles,      color: "bg-purple-600 hover:bg-purple-700" },
+  { label: "Social Media", desc: "REC OS — criação de conteúdo",    href: "/contentos/home",          icon: Sparkles,      color: "bg-purple-600 hover:bg-purple-700" },
   { label: "Growth",       desc: "GrowthOS — funil e metas",        href: "/growth/diagnosticos",     icon: TrendingUp,    color: "bg-emerald-600 hover:bg-emerald-700" },
   { label: "Financeiro",   desc: "FinanceOS — pagamentos",          href: "/financeiro/pagamentos",   icon: Wallet,        color: "bg-teal-600 hover:bg-teal-700" },
   { label: "Aluno",        desc: "Academy — cursos e treinamentos", href: "/academy/home",            icon: GraduationCap, color: "bg-amber-500 hover:bg-amber-600" },
 ];
 
-const inputCls = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors";
+const inputCls = "lk-login-input w-full rounded-xl px-4 py-2.5 text-sm";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +32,6 @@ export default function LoginPage() {
     setInviteErr("");
     const raw = inviteCode.trim();
     if (!raw) { setInviteErr("Cole o link ou código do convite."); return; }
-    // Extrair token de link ou usar direto como token
     let token = raw;
     try {
       const url = new URL(raw);
@@ -57,7 +56,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Read role from profiles (authoritative), fall back to user_metadata
       const { data: profileRow } = await supabase
         .from("profiles")
         .select("role")
@@ -74,23 +72,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#0a0a0c" }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-xl font-black">L</span>
           </div>
-          <h1 className="text-2xl font-black text-gray-900">LOKAT OS</h1>
-          <p className="text-sm text-gray-500 mt-1">Acesse sua conta</p>
+          <h1 className="text-2xl font-black" style={{ color: "#e8e8e8", fontFamily: "'Space Grotesk', sans-serif" }}>LOKAT OS</h1>
+          <p className="text-sm mt-1" style={{ color: "#555566" }}>Acesse sua conta</p>
         </div>
 
         {isSupabaseConfigured ? (
           /* ── Login real ─────────────────────────────────── */
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+          <div className="rounded-3xl p-6" style={{ background: "#13131a", border: "1px solid #222230" }}>
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">E-mail</label>
+                <label className="block text-xs font-bold mb-1.5" style={{ color: "#c0bde8" }}>E-mail</label>
                 <input
                   type="email"
                   value={email}
@@ -103,7 +101,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Senha</label>
+                <label className="block text-xs font-bold mb-1.5" style={{ color: "#c0bde8" }}>Senha</label>
                 <div className="relative">
                   <input
                     type={showPwd ? "text" : "password"}
@@ -117,8 +115,11 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPwd((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                    style={{ color: "#555566" }}
                     tabIndex={-1}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#9990cc")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#555566")}
                   >
                     {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -126,13 +127,16 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                <p className="text-xs rounded-xl px-3 py-2" style={{ color: "#f87171", background: "#1f1014", border: "1px solid #4a1828" }}>
                   {error}
                 </p>
               )}
 
               <div className="flex justify-end -mt-1">
-                <Link href="/recuperar-senha" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                <Link href="/recuperar-senha" className="text-xs flex items-center gap-1 transition-colors" style={{ color: "#555566" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#7b6ef6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#555566")}
+                >
                   <KeyRound className="w-3 h-3" /> Esqueci minha senha
                 </Link>
               </div>
@@ -146,39 +150,46 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="text-center text-xs text-gray-400 mt-5">
+            <p className="text-center text-xs mt-5" style={{ color: "#555566" }}>
               Não tem conta?{" "}
-              <Link href="/criar-conta" className="text-indigo-600 font-medium hover:underline">Começar teste grátis</Link>
+              <Link href="/criar-conta" className="font-medium hover:underline" style={{ color: "#7b6ef6" }}>Começar teste grátis</Link>
               {" · "}
-              <Link href="/planos" className="text-gray-400 hover:text-indigo-600 hover:underline">Ver planos</Link>
+              <Link href="/planos" className="hover:underline transition-colors" style={{ color: "#555566" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#7b6ef6")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#555566")}
+              >Ver planos</Link>
             </p>
 
             {/* ── Recebi um convite ── */}
-            <div className="mt-4 pt-4 border-t border-gray-50">
+            <div className="mt-4 pt-4" style={{ borderTop: "1px solid #1e1e2c" }}>
               {!showInvite ? (
                 <button
                   type="button"
                   onClick={() => setShowInvite(true)}
-                  className="w-full flex items-center justify-center gap-2 text-xs text-gray-400 hover:text-indigo-600 transition-colors py-1"
+                  className="w-full flex items-center justify-center gap-2 text-xs transition-colors py-1"
+                  style={{ color: "#555566" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#7b6ef6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#555566")}
                 >
                   <Link2 className="w-3.5 h-3.5" /> Recebi um convite
                 </button>
               ) : (
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-700">Link ou código do convite</label>
+                  <label className="block text-xs font-bold" style={{ color: "#c0bde8" }}>Link ou código do convite</label>
                   <input
                     type="text"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="Cole o link ou o código aqui…"
-                    className="w-full border border-indigo-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 transition-colors"
+                    className="lk-login-input w-full rounded-xl px-4 py-2.5 text-sm"
                   />
-                  {inviteErr && <p className="text-xs text-red-500">{inviteErr}</p>}
+                  {inviteErr && <p className="text-xs" style={{ color: "#f87171" }}>{inviteErr}</p>}
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => { setShowInvite(false); setInviteCode(""); setInviteErr(""); }}
-                      className="flex-1 text-xs text-gray-400 border border-gray-200 py-2 rounded-xl hover:bg-gray-50"
+                      className="flex-1 text-xs py-2 rounded-xl transition-opacity hover:opacity-70"
+                      style={{ color: "#888899", border: "1px solid #2e2e40", background: "transparent" }}
                     >
                       Cancelar
                     </button>
@@ -198,14 +209,14 @@ export default function LoginPage() {
           /* ── Modo demonstração ──────────────────────────── */
           <div>
             <div className="flex items-center justify-center gap-2 mb-4">
-              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider" style={{ color: "#f59e0b", background: "#1a1000", border: "1px solid #3a2800" }}>
                 Modo demonstração
               </span>
             </div>
-            <p className="text-xs text-center text-gray-500 mb-5">
+            <p className="text-xs text-center mb-5" style={{ color: "#555566" }}>
               Supabase não configurado. Selecione um perfil para explorar o sistema.
             </p>
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-2 space-y-1.5 mb-4">
+            <div className="rounded-3xl p-2 space-y-1.5 mb-4" style={{ background: "#13131a", border: "1px solid #222230" }}>
               {DEMO_ROLES.map((role) => {
                 const Icon = role.icon;
                 return (
@@ -225,9 +236,9 @@ export default function LoginPage() {
                 );
               })}
             </div>
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs" style={{ color: "#555566" }}>
               Não tem conta?{" "}
-              <Link href="/criar-conta" className="text-indigo-600 font-medium hover:underline">Criar conta grátis</Link>
+              <Link href="/criar-conta" className="font-medium hover:underline" style={{ color: "#7b6ef6" }}>Criar conta grátis</Link>
             </p>
           </div>
         )}

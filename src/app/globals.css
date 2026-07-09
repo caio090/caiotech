@@ -212,6 +212,35 @@ body {
 }
 .lk-ticker-track:hover { animation-play-state: paused; }
 
+/* ── Login input — dark theme com override de autofill ──────── */
+.lk-login-input {
+  background: #1a1a26;
+  border: 1px solid #2e2e40;
+  color: #e8e8e8;
+  caret-color: #7b6ef6;
+}
+.lk-login-input::placeholder {
+  color: #44445a;
+}
+.lk-login-input:focus {
+  border-color: #7b6ef6;
+  box-shadow: 0 0 0 3px rgba(123, 110, 246, 0.12);
+  outline: none;
+}
+.lk-login-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lk-login-input:-webkit-autofill,
+.lk-login-input:-webkit-autofill:hover,
+.lk-login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e8e8e8;
+  -webkit-box-shadow: 0 0 0 1000px #1a1a26 inset;
+  caret-color: #7b6ef6;
+  border-color: #4a3fcc;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 .lk-logo-track {
   display: inline-flex;
   align-items: center;
