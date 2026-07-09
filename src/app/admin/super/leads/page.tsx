@@ -56,6 +56,24 @@ const SOURCE_LABEL: Record<string, string> = {
   manual:             "Manual",
 };
 
+const ACCOUNT_LABEL: Record<string, string> = {
+  novo_cadastro: "Cadastro legado",
+  agency:        "Agência",
+  business:      "Empresa",
+  professional:  "Profissional",
+  interested:    "Interessado",
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  novo_cadastro: "Legado",
+  cliente:       "Cliente",
+  admin:         "Admin",
+  super_admin:   "Super Admin",
+  agency:        "Agência",
+  team:          "Equipe",
+  operacional:   "Operacional",
+};
+
 const SOURCE_COLOR: Record<string, string> = {
   waitlist:           "bg-indigo-50 text-indigo-700",
   admin_signups_view: "bg-gray-50 text-gray-500",
@@ -112,6 +130,7 @@ export default function LeadsPage() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   async function updateStatus(id: string, status: string) {
@@ -291,8 +310,8 @@ export default function LeadsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
-                      {l.account_type && <div className="flex items-center gap-1"><Tag className="w-3 h-3" />{l.account_type}</div>}
-                      {l.role && <div className="text-gray-400">{l.role}</div>}
+                      {l.account_type && <div className="flex items-center gap-1"><Tag className="w-3 h-3" />{ACCOUNT_LABEL[l.account_type] ?? l.account_type}</div>}
+                      {l.role && <div className="text-gray-400">{ROLE_LABEL[l.role] ?? l.role}</div>}
                       {l.segment && <div className="text-gray-400 mt-0.5">{l.segment}</div>}
                     </td>
                     <td className="px-4 py-3">

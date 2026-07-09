@@ -110,7 +110,12 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] `/admin/super/waitlist` — ação "arquivar" funciona
 - [ ] `/admin/super/accounts` carrega sem erro
 - [ ] `/admin/super/leads` carrega sem erro
-- [ ] Sidebar admin exibe itens corretos (sem nomes antigos como "Candy")
+- [ ] `/admin/super/leads` — coluna "Tipo/Perfil" não exibe "novo_cadastro" cru (deve exibir "Cadastro legado" ou "Legado")
+- [ ] `/admin/leads` carrega sem erro (CRM hub)
+- [ ] `/admin/leads` — cards de origem exibem contagens corretas
+- [ ] Sidebar admin exibe 10 itens (CRM removido — acessível via topbar)
+- [ ] Topbar CRM (ícone Target) visível na navbar admin
+- [ ] Topbar CRM exibe badge vermelho com contagem de leads "new" quando > 0
 
 ---
 

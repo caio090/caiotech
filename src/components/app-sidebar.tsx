@@ -31,7 +31,6 @@ export const configs: Record<SidebarVariant, {
     title: "LOKAT OS",
     nav: [
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
-      { href: "/admin/leads",             label: "CRM",              icon: Target },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/operacional",       label: "Operacional",      icon: KanbanSquare },
       { href: "/admin/clientes",          label: "Clientes",         icon: Users },

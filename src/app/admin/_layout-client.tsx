@@ -47,6 +47,9 @@ export function AdminLayoutShell({ children }: Props) {
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const pathname = usePathname();
 
+  // CRM new-lead count (topbar badge)
+  const [newLeadCount, setNewLeadCount] = useState(0);
+
   // Bell state
   const [notifs,           setNotifs]           = useState<AdminNotif[]>([]);
   const [notifTotal,       setNotifTotal]       = useState(0);
@@ -70,6 +73,21 @@ export function AdminLayoutShell({ children }: Props) {
     window.addEventListener("mousemove", handleMove);
     return () => window.removeEventListener("mousemove", handleMove);
   }, [isInicioPage]);
+
+  // Fetch new-lead count for CRM topbar badge
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    fetch("/api/admin/waitlist")
+      .then((r) => r.json())
+      .then((d: { ok?: boolean; entries?: Array<{ status: string }> }) => {
+        if (cancelled || !d.ok) return;
+        const count = (d.entries ?? []).filter((e) => e.status === "new").length;
+        if (!cancelled) setNewLeadCount(count);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch user name
   useEffect(() => {
@@ -373,10 +391,15 @@ export function AdminLayoutShell({ children }: Props) {
             <Link
               href="/admin/leads"
               title="CRM — Leads"
-              className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
+              className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
             >
               <Target className="w-4 h-4" />
               <span className="text-[10px] font-bold hidden md:inline">CRM</span>
+              {newLeadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center leading-none px-0.5">
+                  {newLeadCount > 9 ? "9+" : newLeadCount}
+                </span>
+              )}
             </Link>
 
             {userRole === "super_admin" && (

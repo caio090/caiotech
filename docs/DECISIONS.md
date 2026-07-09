@@ -34,3 +34,7 @@ Registro de decisoes do projeto Lokat OS.
 - 2026-07-09: Diagnóstico (/diagnostico) é GAP conhecido — não salva lead na launch_waitlist. Navegação vai para /diagnostico/resultado sem POST. Integração futura necessária.
 - 2026-07-09: Integrações futuras planejadas: Meta Ads (leads de campanhas), OláClick (dados comerciais de cardápio), Google Drive (relatórios de conteúdo). Nenhuma implementada — apenas documentadas.
 - 2026-07-09: CRM shortcut adicionado ao topbar admin (ícone Target → /admin/leads), visível para todos os perfis admin.
+- 2026-07-09: CRM removido da sidebar admin (era item #2). Sidebar admin agora tem 10 itens. CRM acessível exclusivamente via topbar.
+- 2026-07-09: Topbar CRM exibe badge vermelho com contagem de leads com status "new" (max exibido: "9+"). Fetch em /api/admin/waitlist no mount.
+- 2026-07-09: Meta Insights — período "Mês atual" corrigido para respeitar limite de 30 dias da Graph API. until = hoje, since = max(1º do mês, hoje-29d). Label UI atualizado para "Mês atual (30d)".
+- 2026-07-09: Campo account_type e role em Central de Leads agora passam por ACCOUNT_LABEL e ROLE_LABEL respectivamente. "novo_cadastro" → "Cadastro legado" / "Legado" — não aparece mais cru.

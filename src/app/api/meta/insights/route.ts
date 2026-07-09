@@ -28,8 +28,11 @@ function periodToRange(
   }
   if (period === "current_month") {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    const end   = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-    return { since: toUnix(start), until: toUnix(end) };
+    // Meta enforces a 30-day maximum window; cap since to today-29 for months with 31 days
+    const minSince = new Date(today);
+    minSince.setDate(minSince.getDate() - 29);
+    const effectiveSince = start >= minSince ? start : minSince;
+    return { since: toUnix(effectiveSince), until: toUnix(new Date(today.setHours(23, 59, 59))) };
   }
   const days = period === "15d" ? 15 : period === "30d" ? 30 : 7;
   const start = new Date(today);

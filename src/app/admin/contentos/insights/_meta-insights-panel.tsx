@@ -53,7 +53,7 @@ const PERIOD_LABELS: Record<Period, string> = {
   "7d":            "7 dias",
   "15d":           "15 dias",
   "30d":           "30 dias",
-  "current_month": "Mês atual",
+  "current_month": "Mês atual (30d)",
   "custom":        "Personalizado",
 };
 
