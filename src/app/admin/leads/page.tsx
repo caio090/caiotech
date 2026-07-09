@@ -45,6 +45,7 @@ const SOURCE_LABEL: Record<string, string> = {
   typebot:           "Typebot",
   whatsapp:          "WhatsApp",
   manual:            "Manual",
+  novo_cadastro:     "Cadastro legado",
 };
 
 function getSourceLabel(s: string | null | undefined): string {

@@ -41,6 +41,7 @@ const STATUS_COLOR: Record<string, string> = {
 const SOURCE_LABEL: Record<string, string> = {
   waitlist:           "Beta",
   admin_signups_view: "Legado",
+  novo_cadastro:      "Cadastro legado",
   site_modal:         "Agendamento",
   site_conversation:  "Agendamento",
   "pre-acesso":       "Beta",
@@ -58,6 +59,7 @@ const SOURCE_LABEL: Record<string, string> = {
 const SOURCE_COLOR: Record<string, string> = {
   waitlist:           "bg-indigo-50 text-indigo-700",
   admin_signups_view: "bg-gray-50 text-gray-500",
+  novo_cadastro:      "bg-gray-50 text-gray-500",
   Agendamento:        "bg-indigo-50 text-indigo-700",
   Beta:               "bg-purple-50 text-purple-700",
   Site:               "bg-blue-50 text-blue-700",
