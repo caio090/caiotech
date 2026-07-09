@@ -21,21 +21,33 @@ type ApiResponse = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  new:       "Novo",
-  contacted: "Contatado",
-  invited:   "Convidado",
-  accepted:  "Aceito",
-  archived:  "Arquivado",
-  legacy:    "Legado",
+  new:           "Novo",
+  novo:          "Novo",
+  novo_cadastro: "Novo",
+  contacted:     "Contatado",
+  contatado:     "Contatado",
+  invited:       "Convidado",
+  convidado:     "Convidado",
+  accepted:      "Aceito",
+  aceito:        "Aceito",
+  archived:      "Arquivado",
+  arquivado:     "Arquivado",
+  legacy:        "Legado",
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  new:       "bg-blue-50 text-blue-700",
-  contacted: "bg-yellow-50 text-yellow-700",
-  invited:   "bg-purple-50 text-purple-700",
-  accepted:  "bg-green-50 text-green-700",
-  archived:  "bg-gray-100 text-gray-500",
-  legacy:    "bg-gray-50 text-gray-400",
+  new:           "bg-blue-50 text-blue-700",
+  novo:          "bg-blue-50 text-blue-700",
+  novo_cadastro: "bg-blue-50 text-blue-700",
+  contacted:     "bg-yellow-50 text-yellow-700",
+  contatado:     "bg-yellow-50 text-yellow-700",
+  invited:       "bg-purple-50 text-purple-700",
+  convidado:     "bg-purple-50 text-purple-700",
+  accepted:      "bg-green-50 text-green-700",
+  aceito:        "bg-green-50 text-green-700",
+  archived:      "bg-gray-100 text-gray-500",
+  arquivado:     "bg-gray-100 text-gray-500",
+  legacy:        "bg-gray-50 text-gray-400",
 };
 
 const SOURCE_LABEL: Record<string, string> = {

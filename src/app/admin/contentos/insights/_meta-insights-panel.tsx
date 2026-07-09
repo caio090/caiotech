@@ -337,7 +337,9 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
               <>
                 <MetricCard icon={TrendingUp}       label="Alcance"           value={fmt(insights.metrics.reach)}          color="text-pink-600 bg-pink-50" />
                 <MetricCard icon={Eye}              label="Visualizações"     value={fmt(insights.metrics.views)}           color="text-indigo-600 bg-indigo-50" />
-                <MetricCard icon={Users}            label="Seguidores"        value={fmt(insights.metrics.followers_count)} color="text-emerald-600 bg-emerald-50" />
+                {insights.metrics.followers_count != null && (
+                  <MetricCard icon={Users} label="Seguidores" value={fmt(insights.metrics.followers_count)} color="text-emerald-600 bg-emerald-50" />
+                )}
                 <MetricCard icon={Eye}              label="Vis. de perfil"    value={fmt(insights.metrics.profile_views)}  color="text-sky-600 bg-sky-50" />
                 <MetricCard icon={MousePointerClick} label="Cliques no site"  value={fmt(insights.metrics.website_clicks)} color="text-amber-600 bg-amber-50" />
               </>
