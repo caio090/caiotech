@@ -41,11 +41,29 @@ const STATUS_COLOR: Record<string, string> = {
 const SOURCE_LABEL: Record<string, string> = {
   waitlist:           "Beta",
   admin_signups_view: "Legado",
+  site_modal:         "Agendamento",
+  site_conversation:  "Agendamento",
+  "pre-acesso":       "Beta",
+  pre_acesso:         "Beta",
+  beta:               "Beta",
+  landing:            "Site",
+  website:            "Site",
+  diagnostico:        "Diagnóstico",
+  diagnostic:         "Diagnóstico",
+  typebot:            "Typebot",
+  whatsapp:           "WhatsApp",
+  manual:             "Manual",
 };
 
 const SOURCE_COLOR: Record<string, string> = {
   waitlist:           "bg-indigo-50 text-indigo-700",
   admin_signups_view: "bg-gray-50 text-gray-500",
+  Agendamento:        "bg-indigo-50 text-indigo-700",
+  Beta:               "bg-purple-50 text-purple-700",
+  Site:               "bg-blue-50 text-blue-700",
+  Diagnóstico:        "bg-amber-50 text-amber-700",
+  Typebot:            "bg-emerald-50 text-emerald-700",
+  WhatsApp:           "bg-green-50 text-green-700",
 };
 
 function CopyButton({ text }: { text: string }) {

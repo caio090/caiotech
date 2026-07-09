@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, Search, ArrowLeft, CheckSquare,
-  UserRoundPlus, X, UsersRound, Activity,
+  UserRoundPlus, X, UsersRound, Activity, Target,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -369,6 +369,15 @@ export function AdminLayoutShell({ children }: Props) {
               )}
               </AnimatePresence>
             </div>
+
+            <Link
+              href="/admin/leads"
+              title="CRM — Leads"
+              className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
+            >
+              <Target className="w-4 h-4" />
+              <span className="text-[10px] font-bold hidden md:inline">CRM</span>
+            </Link>
 
             {userRole === "super_admin" && (
               <Link

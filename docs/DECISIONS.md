@@ -29,3 +29,8 @@ Registro de decisoes do projeto Lokat OS.
 - 2026-07-07: Créditos de IA monitorados como "Custo IA" no Financeiro. Integração real com provider é sprint futura.
 - 2026-07-07: Google Drive: integração futura — não implementar agora.
 - 2026-07-07: Landing — gota vermelha (Lokat.rec) removida da transição hero→branco. Gradiente suavizado para 64px sem conteúdo.
+- 2026-07-09: CRM (/admin/leads) é o hub comercial da plataforma. Waitlist (/admin/super/waitlist) é o ponto de entrada dos leads. Leads classificados por origem (source), intenção (interest), etapa (status) e perfil (account_type).
+- 2026-07-09: Mapeamento de origens de lead: site_modal→Agendamento, pre-acesso/pre_acesso→Beta, diagnostico→Diagnóstico, typebot→Typebot, whatsapp→WhatsApp, landing/website→Site, manual→Manual. Sem source = "Não informado".
+- 2026-07-09: Diagnóstico (/diagnostico) é GAP conhecido — não salva lead na launch_waitlist. Navegação vai para /diagnostico/resultado sem POST. Integração futura necessária.
+- 2026-07-09: Integrações futuras planejadas: Meta Ads (leads de campanhas), OláClick (dados comerciais de cardápio), Google Drive (relatórios de conteúdo). Nenhuma implementada — apenas documentadas.
+- 2026-07-09: CRM shortcut adicionado ao topbar admin (ícone Target → /admin/leads), visível para todos os perfis admin.

@@ -61,10 +61,21 @@ const SOURCE_LABEL: Record<string, string> = {
   site_modal:        "Agendamento",
   site_conversation: "Agendamento",
   "pre-acesso":      "Beta",
+  pre_acesso:        "Beta",
+  beta:              "Beta",
   landing:           "Site",
   website:           "Site",
+  diagnostico:       "Diagnóstico",
+  diagnostic:        "Diagnóstico",
   typebot:           "Typebot",
+  whatsapp:          "WhatsApp",
+  manual:            "Manual",
 };
+
+function getSourceLabel(s: string | null | undefined): string {
+  if (!s) return "—";
+  return SOURCE_LABEL[s] ?? SOURCE_LABEL[s.toLowerCase()] ?? s;
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -87,6 +98,7 @@ export default function WaitlistPage() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [filter, setFilter]       = useState<string>("all");
+  const [srcFilter, setSrcFilter] = useState<string>("all");
   const [updating, setUpdating]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -147,6 +159,27 @@ export default function WaitlistPage() {
   const counts: Record<string, number> = {};
   for (const e of entries) counts[e.status] = (counts[e.status] ?? 0) + 1;
 
+  const bySrc: Record<string, number> = {};
+  for (const e of entries) {
+    const lbl = getSourceLabel(e.source);
+    bySrc[lbl] = (bySrc[lbl] ?? 0) + 1;
+  }
+
+  const SOURCE_TABS = [
+    { key: "all",           label: "Todos" },
+    { key: "Beta",          label: "Beta" },
+    { key: "Agendamento",   label: "Agendamento" },
+    { key: "Diagnóstico",   label: "Diagnóstico" },
+    { key: "Typebot",       label: "Typebot" },
+    { key: "Site",          label: "Site" },
+    { key: "WhatsApp",      label: "WhatsApp" },
+    { key: "—",             label: "Sem origem" },
+  ];
+
+  const displayed = entries.filter((e) =>
+    srcFilter === "all" || getSourceLabel(e.source) === srcFilter
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       {/* Super admin tabs */}
@@ -202,6 +235,27 @@ export default function WaitlistPage() {
         ))}
       </div>
 
+      {/* Source filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] text-gray-400 mr-1">Origem:</span>
+        {SOURCE_TABS.map((f) => {
+          const cnt = f.key === "all" ? total : (bySrc[f.key] ?? 0);
+          return (
+            <button
+              key={f.key}
+              onClick={() => setSrcFilter(f.key)}
+              className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                srcFilter === f.key
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {f.label}{cnt > 0 ? ` (${cnt})` : ""}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm text-red-700">
@@ -227,7 +281,7 @@ export default function WaitlistPage() {
         </div>
       )}
 
-      {entries.length > 0 && (
+      {displayed.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-gray-100">
           <table className="w-full text-sm">
             <thead>
@@ -243,7 +297,7 @@ export default function WaitlistPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {entries.map((e) => {
+              {displayed.map((e) => {
                 const wa = whatsappMsg(e);
                 return (
                   <tr key={e.id} className="hover:bg-gray-50/60 transition-colors">
@@ -275,7 +329,7 @@ export default function WaitlistPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-[11px] text-gray-500">
-                        {e.source ? (SOURCE_LABEL[e.source] ?? e.source) : "—"}
+                        {getSourceLabel(e.source)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
