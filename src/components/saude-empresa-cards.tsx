@@ -117,7 +117,7 @@ export function SaudeEmpresaCards({
           {/* Source badges */}
           <div className="flex flex-wrap gap-1.5 mb-3">
             <SourceBadge label="Diagnóstico da marca" active={hasOnboarding} />
-            <SourceBadge label="Baseado na Content OS" active={hasOnboarding} />
+            <SourceBadge label="Baseado na REC OS" active={hasOnboarding} />
             <SourceBadge label="Insights Meta" active={metaConnected} />
             {!hasOnboarding && <SourceBadge label="Dados pendentes" active={false} />}
             {hasOnboarding && !metaConnected && <SourceBadge label="Meta: aguardando leitura" active={false} />}
