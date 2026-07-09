@@ -140,9 +140,15 @@ async function graphGet(
 // ── Agregar valores diários ───────────────────────────────────────────────────
 
 interface InsightValue { value: number; end_time: string }
-interface InsightMetric { name: string; values: InsightValue[] }
+interface InsightMetric {
+  name: string;
+  values?: InsightValue[];
+  total_value?: { value: number };
+}
 
 function sumMetric(metric: InsightMetric): number {
+  // metric_type=total_value returns a single aggregated value instead of time-series
+  if (metric.total_value !== undefined) return metric.total_value.value ?? 0;
   return (metric.values ?? []).reduce((acc, v) => acc + (v.value ?? 0), 0);
 }
 
@@ -271,14 +277,15 @@ export async function GET(request: NextRequest) {
   if (primaryAsset.asset_type === "instagram_business") {
     const igId = primaryAsset.asset_id;
 
-    // Métricas de conta — "impressions" removido: rejeitado pela Graph API v17+
+    // Métricas de conta — metric_type=total_value exigido pela Graph API v17+
     const IG_ACCOUNT_METRICS = "reach,profile_views,website_clicks,views";
     const [accountInsights, accountInfo] = await Promise.all([
       graphGet(`${igId}/insights`, token, {
-        metric: IG_ACCOUNT_METRICS,
-        period: "day",
-        since:  String(since),
-        until:  String(until),
+        metric:      IG_ACCOUNT_METRICS,
+        period:      "day",
+        since:       String(since),
+        until:       String(until),
+        metric_type: "total_value",
       }),
       graphGet(igId, token, {
         fields: "followers_count,username,name",
