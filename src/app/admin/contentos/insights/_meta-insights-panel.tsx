@@ -23,6 +23,8 @@ interface StatusResponse {
   scopes?: string[];
 }
 
+interface AdvancedMetricItem { label: string; value: number }
+
 interface InsightsResponse {
   ok: boolean;
   assetType?: string;
@@ -45,6 +47,12 @@ interface InsightsResponse {
   missingPermissionsLikely?: string[];
   endpoint?: string;
   metricAttempted?: string;
+  advanced?: {
+    demographics?: { gender?: AdvancedMetricItem[]; age?: AdvancedMetricItem[] };
+    locations?: { cities?: AdvancedMetricItem[]; countries?: AdvancedMetricItem[] };
+    activity?: { onlineFollowersByHour?: AdvancedMetricItem[] };
+    unavailable?: string[];
+  };
 }
 
 type Period = "7d" | "15d" | "30d" | "current_month" | "custom";
@@ -366,6 +374,137 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
                   ))}
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Meta respondeu, mas não há dados para esta métrica no período selecionado.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Leitura do público */}
+          {insights.assetType === "instagram_business" && (
+            <AudienceSection advanced={insights.advanced} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Leitura do público ────────────────────────────────────────────────────────
+
+function AudienceBar({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-[11px] text-gray-700">{label}</span>
+        <span className="text-[11px] text-gray-400">{value.toLocaleString("pt-BR")}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function AudienceSection({ advanced }: { advanced?: InsightsResponse["advanced"] }) {
+  const allUnavailable = !advanced || (
+    !advanced.demographics?.gender?.length &&
+    !advanced.demographics?.age?.length &&
+    !advanced.locations?.cities?.length &&
+    !advanced.locations?.countries?.length &&
+    !advanced.activity?.onlineFollowersByHour?.length
+  );
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-4">
+      <p className="text-xs font-black text-gray-700 mb-3">Leitura do público</p>
+
+      {allUnavailable ? (
+        <p className="text-[11px] text-gray-400">
+          Dados de público indisponíveis para esta conta ou período. Contas precisam de pelo menos 100 seguidores e permissão <span className="font-mono">instagram_manage_insights</span>.
+        </p>
+      ) : (
+        <div className="space-y-5">
+          {/* Gênero */}
+          {(advanced?.demographics?.gender?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Gênero</p>
+              <div className="space-y-2">
+                {advanced!.demographics!.gender!.map((item) => (
+                  <AudienceBar
+                    key={item.label}
+                    label={item.label === "F" ? "Feminino" : item.label === "M" ? "Masculino" : item.label}
+                    value={item.value}
+                    max={advanced!.demographics!.gender![0]?.value ?? 1}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Idade */}
+          {(advanced?.demographics?.age?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Faixa etária</p>
+              <div className="space-y-2">
+                {advanced!.demographics!.age!.map((item) => (
+                  <AudienceBar
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    max={advanced!.demographics!.age![0]?.value ?? 1}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cidades */}
+          {(advanced?.locations?.cities?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Principais cidades</p>
+              <div className="space-y-2">
+                {advanced!.locations!.cities!.map((item) => (
+                  <AudienceBar
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    max={advanced!.locations!.cities![0]?.value ?? 1}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Países */}
+          {(advanced?.locations?.countries?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Países</p>
+              <div className="space-y-2">
+                {advanced!.locations!.countries!.map((item) => (
+                  <AudienceBar
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    max={advanced!.locations!.countries![0]?.value ?? 1}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Horários fortes */}
+          {(advanced?.activity?.onlineFollowersByHour?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Horários mais ativos</p>
+              <div className="space-y-2">
+                {advanced!.activity!.onlineFollowersByHour!.map((item) => (
+                  <AudienceBar
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    max={advanced!.activity!.onlineFollowersByHour![0]?.value ?? 1}
+                  />
+                ))}
               </div>
             </div>
           )}

@@ -14,6 +14,7 @@ import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
 import { cn } from "@/lib/utils";
+import { V1_PROGRESS, getDaysRemainingV1, PROJECT_DEADLINE_V1 } from "@/lib/project-status";
 
 // ── Admin notification helpers ────────────────────────────────
 const ADMIN_SEEN_KEY = "lokat_admin_notif_seen_count";
@@ -405,11 +406,14 @@ export function AdminLayoutShell({ children }: Props) {
             {userRole === "super_admin" && (
               <Link
                 href="/admin/status"
-                title="Status do sistema"
+                title={`Status V1 — Prazo ${PROJECT_DEADLINE_V1}`}
                 className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-emerald-600"
               >
                 <Activity className="w-4 h-4" />
-                <span className="text-[10px] font-bold hidden md:inline">Status</span>
+                <div className="hidden md:block leading-none">
+                  <p className="text-[10px] font-black">V1 {V1_PROGRESS}%</p>
+                  <p className="text-[9px] text-gray-400">{getDaysRemainingV1()}d restantes</p>
+                </div>
               </Link>
             )}
 

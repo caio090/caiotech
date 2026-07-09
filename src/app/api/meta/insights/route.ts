@@ -155,6 +155,114 @@ function sumMetric(metric: InsightMetric): number {
   return (metric.values ?? []).reduce((acc, v) => acc + (v.value ?? 0), 0);
 }
 
+// ── Advanced audience insights ────────────────────────────────────────────────
+
+interface AdvancedMetricItem { label: string; value: number }
+
+interface BreakdownMetric {
+  name: string;
+  total_value?: {
+    breakdowns?: Array<{
+      results?: Array<{ dimension_values?: string[]; value?: number }>;
+    }>;
+  };
+}
+
+interface OnlineFollowersMetric {
+  name: string;
+  values?: Array<{ value?: Record<string, number> }>;
+}
+
+function normalizeBreakdown(data: unknown[], metricName: string): AdvancedMetricItem[] {
+  const metric = (data as BreakdownMetric[]).find((m) => m.name === metricName);
+  if (!metric?.total_value?.breakdowns) return [];
+  const items: AdvancedMetricItem[] = [];
+  for (const bd of metric.total_value.breakdowns) {
+    for (const r of bd.results ?? []) {
+      items.push({ label: (r.dimension_values ?? []).join(" · "), value: r.value ?? 0 });
+    }
+  }
+  return items.sort((a, b) => b.value - a.value);
+}
+
+async function fetchAdvancedInsights(igId: string, token: string): Promise<{
+  demographics?: { gender?: AdvancedMetricItem[]; age?: AdvancedMetricItem[] };
+  locations?: { cities?: AdvancedMetricItem[]; countries?: AdvancedMetricItem[] };
+  activity?: { onlineFollowersByHour?: AdvancedMetricItem[] };
+  unavailable?: string[];
+}> {
+  const unavailable: string[] = [];
+
+  // Demographics + Locations (isolated)
+  let demographics: { gender?: AdvancedMetricItem[]; age?: AdvancedMetricItem[] } | undefined;
+  let locations: { cities?: AdvancedMetricItem[]; countries?: AdvancedMetricItem[] } | undefined;
+  try {
+    const res = await graphGet(`${igId}/insights`, token, {
+      metric:      "audience_gender_age,audience_city,audience_country",
+      period:      "lifetime",
+      metric_type: "total_value",
+    });
+    if (!res.error && Array.isArray(res.data)) {
+      const data = res.data as unknown[];
+      const genderAgeRaw = normalizeBreakdown(data, "audience_gender_age");
+      const genderTotals: Record<string, number> = {};
+      const ageTotals:    Record<string, number> = {};
+      for (const item of genderAgeRaw) {
+        const parts  = item.label.split(" · ");
+        const gender = parts[0];
+        const age    = parts[1];
+        if (gender) genderTotals[gender] = (genderTotals[gender] ?? 0) + item.value;
+        if (age)    ageTotals[age]       = (ageTotals[age]       ?? 0) + item.value;
+      }
+      demographics = {
+        gender: Object.entries(genderTotals).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
+        age:    Object.entries(ageTotals).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
+      };
+      locations = {
+        cities:    normalizeBreakdown(data, "audience_city").slice(0, 5),
+        countries: normalizeBreakdown(data, "audience_country").slice(0, 5),
+      };
+    } else {
+      unavailable.push("demographics", "locations");
+    }
+  } catch {
+    unavailable.push("demographics", "locations");
+  }
+
+  // Activity — online followers by hour (isolated)
+  let activity: { onlineFollowersByHour?: AdvancedMetricItem[] } | undefined;
+  try {
+    const res = await graphGet(`${igId}/insights`, token, {
+      metric: "online_followers",
+      period: "lifetime",
+    });
+    if (!res.error && Array.isArray(res.data)) {
+      const data    = res.data as OnlineFollowersMetric[];
+      const ofMetric = data.find((m) => m.name === "online_followers");
+      if (ofMetric?.values?.length) {
+        const totals: Record<string, number> = {};
+        const counts: Record<string, number> = {};
+        for (const day of ofMetric.values) {
+          for (const [h, count] of Object.entries(day.value ?? {})) {
+            totals[h] = (totals[h] ?? 0) + count;
+            counts[h] = (counts[h] ?? 0) + 1;
+          }
+        }
+        const hourly = Object.entries(totals)
+          .map(([h, total]) => ({ label: `${h.padStart(2, "0")}:00`, value: Math.round(total / (counts[h] ?? 1)) }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 8);
+        if (hourly.length > 0) activity = { onlineFollowersByHour: hourly };
+        else unavailable.push("activity");
+      } else { unavailable.push("activity"); }
+    } else { unavailable.push("activity"); }
+  } catch {
+    unavailable.push("activity");
+  }
+
+  return { demographics, locations, activity, ...(unavailable.length ? { unavailable } : {}) };
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 // GET /api/meta/insights?client_id=<uuid>&period=7d|15d|30d|current_month|custom&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
@@ -328,6 +436,8 @@ export async function GET(request: NextRequest) {
     }
     if (followerCount !== null) availableMetrics.push("followers_count");
 
+    const advanced = await fetchAdvancedInsights(igId, token);
+
     return NextResponse.json({
       ok: true,
       provider: "meta",
@@ -351,6 +461,7 @@ export async function GET(request: NextRequest) {
         reason: "not_returned_by_meta",
       })),
       endpoint: `${GRAPH_BASE}/${igId}/insights`,
+      advanced,
     });
   }
 

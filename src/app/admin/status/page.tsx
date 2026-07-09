@@ -1,6 +1,10 @@
 import { PageHeader } from "@/components/page-header";
 import { CheckCircle2, Clock, AlertCircle, Wifi, WifiOff, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import {
+  PROJECT_DEADLINE_V1, V1_PROGRESS, V2_PROGRESS,
+  getDaysRemainingV1, MILESTONES_V1, MILESTONES_V2,
+} from "@/lib/project-status";
 
 type ModuleStatus = "funcional" | "parcial" | "em_breve";
 
@@ -135,6 +139,65 @@ export default function AdminStatusPage() {
         title="Status da V1"
         description="Saúde das integrações e estado dos módulos da LOKAT OS"
       />
+
+      {/* Progresso V1 / V2 */}
+      <div className="mb-8 space-y-4">
+        {/* V1 */}
+        <div className="rounded-2xl border border-emerald-100 bg-white p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">V1 MVP</p>
+              <p className="text-3xl font-black text-gray-900">{V1_PROGRESS}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 mb-0.5">Prazo</p>
+              <p className="text-xs font-bold text-gray-700">{PROJECT_DEADLINE_V1}</p>
+              <p className="text-xs text-emerald-600 font-black mt-0.5">{getDaysRemainingV1()} dias</p>
+            </div>
+          </div>
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-4">
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${V1_PROGRESS}%` }} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-1.5">
+            {MILESTONES_V1.map((m) => (
+              <div key={m.label} className="flex items-center gap-2">
+                {m.status === "done"
+                  ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" strokeWidth={2} />
+                  : m.status === "partial"
+                    ? <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" strokeWidth={2} />
+                    : <Clock className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={2} />}
+                <span className={`text-[11px] ${
+                  m.status === "done" ? "text-gray-600" :
+                  m.status === "partial" ? "text-amber-700" :
+                  "text-gray-400"
+                }`}>{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* V2 */}
+        <div className="rounded-2xl border border-purple-100 bg-white p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">V2</p>
+              <p className="text-3xl font-black text-purple-600">{V2_PROGRESS}%</p>
+            </div>
+            <p className="text-[11px] text-gray-400 pt-1">Planejamento em andamento</p>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
+            <div className="h-full bg-purple-400 rounded-full" style={{ width: `${V2_PROGRESS}%` }} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-1.5">
+            {MILESTONES_V2.map((m) => (
+              <div key={m.label} className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" strokeWidth={2} />
+                <span className="text-[11px] text-gray-400">{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Integrações */}
       <div className="mb-8">

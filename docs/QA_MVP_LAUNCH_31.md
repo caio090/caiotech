@@ -116,6 +116,10 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] Sidebar admin exibe 10 itens (CRM removido — acessível via topbar)
 - [ ] Topbar CRM (ícone Target) visível na navbar admin
 - [ ] Topbar CRM exibe badge vermelho com contagem de leads "new" quando > 0
+- [ ] Topbar Status (ícone Activity) visível para super_admin com "V1 XX%" e dias restantes
+- [ ] `/admin/status` carrega sem erro e exibe progress bars V1 e V2
+- [ ] `/admin/status` — milestones V1 exibem ícone correto por status (done/partial/pending)
+- [ ] `/admin/status` — prazo "2026-07-31" e dias restantes exibidos corretamente
 
 ---
 
