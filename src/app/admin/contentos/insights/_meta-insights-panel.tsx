@@ -29,7 +29,7 @@ interface InsightsResponse {
   username?: string;
   metrics?: {
     reach?: number | null;
-    impressions?: number | null;
+    views?: number | null;
     profile_views?: number | null;
     website_clicks?: number | null;
     followers_count?: number | null;
@@ -137,7 +137,7 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
           <div className="flex-1">
             <p className="text-sm font-bold text-gray-700">Meta ainda não vinculada a este cliente</p>
             <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-              Vincule uma Página Facebook ou Instagram Business para liberar insights de alcance, impressões e seguidores.
+              Vincule uma Página Facebook ou Instagram Business para liberar insights de alcance, visualizações e seguidores.
             </p>
           </div>
         </div>
@@ -336,7 +336,7 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
             {insights.assetType === "instagram_business" && (
               <>
                 <MetricCard icon={TrendingUp}       label="Alcance"           value={fmt(insights.metrics.reach)}          color="text-pink-600 bg-pink-50" />
-                <MetricCard icon={Eye}              label="Impressões"        value={fmt(insights.metrics.impressions)}     color="text-indigo-600 bg-indigo-50" />
+                <MetricCard icon={Eye}              label="Visualizações"     value={fmt(insights.metrics.views)}           color="text-indigo-600 bg-indigo-50" />
                 <MetricCard icon={Users}            label="Seguidores"        value={fmt(insights.metrics.followers_count)} color="text-emerald-600 bg-emerald-50" />
                 <MetricCard icon={Eye}              label="Vis. de perfil"    value={fmt(insights.metrics.profile_views)}  color="text-sky-600 bg-sky-50" />
                 <MetricCard icon={MousePointerClick} label="Cliques no site"  value={fmt(insights.metrics.website_clicks)} color="text-amber-600 bg-amber-50" />

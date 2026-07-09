@@ -271,8 +271,8 @@ export async function GET(request: NextRequest) {
   if (primaryAsset.asset_type === "instagram_business") {
     const igId = primaryAsset.asset_id;
 
-    // Métricas de conta
-    const IG_ACCOUNT_METRICS = "reach,impressions,profile_views,website_clicks";
+    // Métricas de conta — "impressions" removido: rejeitado pela Graph API v17+
+    const IG_ACCOUNT_METRICS = "reach,profile_views,website_clicks,views";
     const [accountInsights, accountInfo] = await Promise.all([
       graphGet(`${igId}/insights`, token, {
         metric: IG_ACCOUNT_METRICS,
@@ -308,7 +308,7 @@ export async function GET(request: NextRequest) {
     const availableMetrics: string[] = [];
     const unavailableMetrics: string[] = [];
 
-    const EXPECTED = ["reach", "impressions", "profile_views", "website_clicks"];
+    const EXPECTED = ["reach", "profile_views", "website_clicks", "views"];
     for (const m of EXPECTED) {
       if (metrics[m] !== undefined && metrics[m] !== null) {
         availableMetrics.push(m);
@@ -328,10 +328,10 @@ export async function GET(request: NextRequest) {
       since,
       until,
       metrics: {
-        reach:          metrics["reach"]         ?? null,
-        impressions:    metrics["impressions"]    ?? null,
-        profile_views:  metrics["profile_views"]  ?? null,
-        website_clicks: metrics["website_clicks"] ?? null,
+        reach:           metrics["reach"]          ?? null,
+        views:           metrics["views"]           ?? null,
+        profile_views:   metrics["profile_views"]  ?? null,
+        website_clicks:  metrics["website_clicks"] ?? null,
         followers_count: followerCount,
       },
       availableMetrics,
