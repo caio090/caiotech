@@ -19,7 +19,7 @@ export const INTEGRATION_STATUS = {
   pending:       { label: "Pendente",            color: "text-blue-700 bg-blue-50 border-blue-100"          },
   not_connected: { label: "Não conectado",       color: "text-gray-500 bg-gray-50 border-gray-100"          },
   planned:       { label: "Planejado",           color: "text-amber-700 bg-amber-50 border-amber-100"       },
-  needs_setup:   { label: "Requer configuração", color: "text-indigo-700 bg-indigo-50 border-indigo-100"    },
+  needs_setup:   { label: "Não configurado",    color: "text-gray-400 bg-gray-50 border-gray-100"          },
   error:         { label: "Erro de conexão",     color: "text-red-700 bg-red-50 border-red-100"             },
 } as const;
 

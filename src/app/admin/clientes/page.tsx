@@ -196,11 +196,8 @@ function Badge({ label, color }: { label: string; color: string }) {
 function ClientBadges({ c }: { c: Client }) {
   return (
     <div className="flex flex-wrap gap-1 mt-1.5">
-      {c.status === "active"     && <Badge label="Ativo"      color="text-emerald-700 bg-emerald-50" />}
-      {c.status === "onboarding" && <Badge label="Onboarding" color="text-blue-700 bg-blue-50" />}
-      {c.has_meta                && <Badge label="Meta"       color="text-indigo-700 bg-indigo-50" />}
-      {c.has_instagram           && <Badge label="Instagram"  color="text-pink-700 bg-pink-50" />}
-      {c.has_diagnostico         && <Badge label="Diagnóstico ok" color="text-violet-700 bg-violet-50" />}
+      {c.status === "active"     && <Badge label="Ativo"          color="text-emerald-700 bg-emerald-50" />}
+      {c.status === "onboarding" && <Badge label="Onboarding"     color="text-blue-700 bg-blue-50" />}
       {!c.has_brief              && <Badge label="Brief pendente" color="text-amber-700 bg-amber-50" />}
     </div>
   );
@@ -691,25 +688,30 @@ function ClientIntegrationsRow({ c }: { c: Client }) {
     { label: "Diagnóstico", ok: !!c.has_diagnostico },
   ];
   return (
-    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50 mt-2">
-      {metaInstagramItems.map(({ label, ok }) => {
-        const cfg = ok ? s.connected : s.needs_setup;
-        const tip = ok ? `${label}: conectado` : `${label}: não configurado — verifique em Conexões`;
-        return (
-          <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
-            {label}
-          </span>
-        );
-      })}
-      {perClientItems.map(({ label, ok }) => {
-        const cfg = ok ? s.connected : s.not_connected;
-        const tip = ok ? `${label}: ok` : `${label}: pendente`;
-        return (
-          <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
-            {label}
-          </span>
-        );
-      })}
+    <div className="pt-2 border-t border-gray-50 mt-2">
+      <p className="text-[9px] text-gray-300 mb-1.5">Conexões identificadas para este cliente</p>
+      <div className="flex flex-wrap gap-1.5">
+        {metaInstagramItems.map(({ label, ok }) => {
+          const cfg = ok ? s.connected : s.needs_setup;
+          const tip = ok
+            ? `${label}: conectado`
+            : `${label}: nenhuma conexão identificada para este cliente — verifique em Conexões`;
+          return (
+            <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
+              {label}
+            </span>
+          );
+        })}
+        {perClientItems.map(({ label, ok }) => {
+          const cfg = ok ? s.connected : s.not_connected;
+          const tip = ok ? `${label}: ok` : `${label}: pendente`;
+          return (
+            <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
+              {label}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

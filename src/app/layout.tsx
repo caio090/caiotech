@@ -15,6 +15,11 @@ export const metadata: Metadata = {
     "gestão de conteúdo", "automação de marketing", "aprovação de conteúdo",
     "social media", "negócios locais", "agência de marketing", "Floriano PI",
   ],
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
   openGraph: {
     title:       "LOKAT OS | Marketing, CRM e conteúdo com IA",
     description: "Planeje campanhas, leads, aprovações, relatórios e atendimento em uma única plataforma com IA para agências e negócios locais.",

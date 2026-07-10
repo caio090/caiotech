@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -183,13 +183,14 @@ const DIGITAL_MENU_PROVIDERS = [
   // futuros: { slug: "anotaai", name: "Anota AI" }, { slug: "deliverydireto", name: "Delivery Direto" }
 ] as const;
 
-function DigitalMenuModal({ onClose, onSaved, clients }: {
+function DigitalMenuModal({ onClose, onSaved, clients, preselectedClientId }: {
   onClose: () => void;
   onSaved: () => void;
   clients: ClientOption[];
+  preselectedClientId?: string;
 }) {
   const [providerSlug, setProviderSlug] = useState<string>(DIGITAL_MENU_PROVIDERS[0].slug);
-  const [clientId,    setClientId]    = useState("");
+  const [clientId,    setClientId]    = useState(preselectedClientId ?? "");
   const [connName,    setConnName]    = useState("");
   const [token,       setToken]       = useState("");
   const [apiBaseUrl,  setApiBaseUrl]  = useState("");
@@ -660,9 +661,11 @@ function DigitalMenuEditModal({ conn, onClose, onSaved }: {
 // ── Componente principal ───────────────────────────────────────
 function ConexoesContent() {
   const searchParams = useSearchParams();
-  const flashOk   = searchParams.get("meta_ok");
-  const flashWarn = searchParams.get("meta_warn");
-  const flashErr  = searchParams.get("meta_error");
+  const router = useRouter();
+  const flashOk    = searchParams.get("meta_ok");
+  const flashWarn  = searchParams.get("meta_warn");
+  const flashErr   = searchParams.get("meta_error");
+  const clientParam = searchParams.get("client");
 
   const [aiData,    setAiData]    = useState<AiResponse>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -712,15 +715,13 @@ function ConexoesContent() {
 
   useEffect(() => { void loadOlaConnections(); }, [loadOlaConnections]);
 
-  // Carrega lista de clientes quando modal OlaClick é aberto OU Meta está conectada
+  // Carrega lista de clientes sempre no mount (usado no seletor de cliente e modais)
   useEffect(() => {
-    if (olaClients.length > 0) return;
-    if (!showOlaModal && !insights?.ok) return;
     void fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((d: { clients?: ClientOption[] }) => setOlaClients(d.clients ?? []))
       .catch(() => undefined);
-  }, [showOlaModal, insights?.ok, olaClients.length]);
+  }, []);
 
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
@@ -864,6 +865,36 @@ function ConexoesContent() {
     <div>
       <PageHeader title="Conexões" description="Integrações externas — configure por cliente" />
 
+      {/* ── Seletor de cliente ──────────────────────────────── */}
+      {olaClients.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Cliente:</span>
+          <button
+            onClick={() => router.replace("/admin/conexoes")}
+            className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+              !clientParam
+                ? "bg-gray-900 text-white border-transparent"
+                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            Todos
+          </button>
+          {olaClients.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => router.replace(`/admin/conexoes?client=${c.id}`)}
+              className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                clientParam === c.id
+                  ? "bg-indigo-600 text-white border-transparent"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {c.company_name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Flash messages */}
       {flashOk && (
         <div className="max-w-2xl mb-4 p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-2.5">
@@ -915,9 +946,24 @@ function ConexoesContent() {
       <div className="max-w-2xl mb-4 p-3.5 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-700 flex items-start gap-2">
         <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
         <span>
-          As integrações abaixo são da plataforma LOKAT OS. Para Meta/Instagram, cada ativo (Página ou conta) deve ser{" "}
-          <strong>vinculado individualmente ao cliente</strong> correspondente na seção "Ativos encontrados na Meta".
-          A conexão da Duh Lanches aparece por ser o primeiro cliente conectado — não é uma conexão global.
+          {clientParam && olaClients.length > 0 ? (
+            <>
+              Consultando conexões de{" "}
+              <strong>{olaClients.find((c) => c.id === clientParam)?.company_name ?? "cliente selecionado"}</strong>.
+              {" "}Selecione <strong>Todos</strong> no seletor acima para ver todas as conexões da plataforma.
+            </>
+          ) : olaClients.length > 0 ? (
+            <>
+              Selecione um cliente para visualizar e gerenciar suas conexões.
+              {" "}Para Meta/Instagram, cada ativo deve ser{" "}
+              <strong>vinculado individualmente ao cliente</strong> na seção "Ativos encontrados na Meta".
+            </>
+          ) : (
+            <>
+              As integrações abaixo são da plataforma LOKAT OS. Para Meta/Instagram, cada ativo deve ser{" "}
+              <strong>vinculado individualmente ao cliente</strong> correspondente na seção "Ativos encontrados na Meta".
+            </>
+          )}
         </span>
       </div>
 
@@ -1513,7 +1559,10 @@ function ConexoesContent() {
 
         {/* ══ Cardápio Digital / OlaClick ═════════════════════ */}
         {(() => {
-          const hasConns = olaConnections.length > 0;
+          const visibleConns = clientParam
+            ? olaConnections.filter((c) => c.client_id === clientParam)
+            : olaConnections;
+          const hasConns = visibleConns.length > 0;
           return (
             <div className={`bg-white rounded-2xl border p-5 ${hasConns ? "border-orange-100" : "border-gray-100"}`}>
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -1529,7 +1578,7 @@ function ConexoesContent() {
                 {olaLoading
                   ? <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Verificando…</span>
                   : hasConns
-                    ? <StatusBadge ok={true} label={`${olaConnections.length} conexão${olaConnections.length > 1 ? "ões" : ""}`} />
+                    ? <StatusBadge ok={true} label={`${visibleConns.length} conexão${visibleConns.length > 1 ? "ões" : ""}`} />
                     : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
                 }
               </div>
@@ -1557,6 +1606,14 @@ function ConexoesContent() {
                 ))}
               </div>
 
+              {/* Aviso quando filtrado por cliente sem conexão */}
+              {!hasConns && clientParam && olaConnections.length > 0 && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  Este cliente não tem conexão de Cardápio Digital. Clique em <strong>Conectar Cardápio Digital</strong> abaixo para adicionar.
+                </div>
+              )}
+
               {/* Lista de conexões existentes */}
               {hasConns && (
                 <div className="mb-4 space-y-2">
@@ -1569,7 +1626,7 @@ function ConexoesContent() {
                     </p>
                   </div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Conexões ativas</p>
-                  {olaConnections.map((conn) => (
+                  {visibleConns.map((conn) => (
                     <div key={conn.id} className="p-3 bg-orange-50 border border-orange-100 rounded-xl">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
@@ -1686,6 +1743,7 @@ function ConexoesContent() {
           onClose={() => setShowOlaModal(false)}
           onSaved={() => { setShowOlaModal(false); void loadOlaConnections(); }}
           clients={olaClients}
+          preselectedClientId={clientParam ?? undefined}
         />
       )}
 
