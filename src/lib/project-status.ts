@@ -1,5 +1,5 @@
 export const PROJECT_DEADLINE_V1 = "2026-07-31";
-export const V1_PROGRESS = 82;
+export const V1_PROGRESS = 81;
 export const V2_PROGRESS = 12;
 
 export function getDaysRemainingV1(): number {
@@ -28,7 +28,7 @@ export const MILESTONES_V1: Milestone[] = [
   { label: "Operacional base",                                     status: "partial" },
   { label: "Agente IA no CRM — geração local",                     status: "partial" },
   { label: "Relatórios por cliente — estrutura base",              status: "partial" },
-  { label: "Classificação administrativa de contas e leads",       status: "partial" },
+  { label: "Classificação de contas e leads — interface e persistência em correção", status: "partial" },
   { label: "Conexões por cliente — seletor e contexto visual",     status: "partial" },
   { label: "Central de Contas — acesso e gestão de perfis",        status: "partial" },
   { label: "Billing / Financeiro MVP",                             status: "partial" },

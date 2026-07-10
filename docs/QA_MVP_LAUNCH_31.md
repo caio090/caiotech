@@ -261,4 +261,52 @@ O modal conversacional (`LeadConversationModal`) usa opções fixas nos passos d
 
 ---
 
+## Sprint P0 — Classificação e persistência (2026-07-10)
+
+### Conta (profiles.account_type)
+
+- [ ] Modal de classificação abre ao clicar "Classificar" em um usuário de teste
+- [ ] Salvar retorna HTTP 200 sem erro de schema cache
+- [ ] Refresh da página mantém o tipo salvo
+- [ ] Role do usuário não muda após classificar
+- [ ] account_status não muda após classificar
+- [ ] Tipo inválido retorna 422 (testar via curl/Postman)
+- [ ] ID inexistente retorna 404
+- [ ] Usuário sem admin retorna 401/403
+- [ ] Modal não fecha como sucesso quando a requisição falha
+- [ ] Mensagem de erro aparece dentro do modal em caso de falha
+
+### Lead (launch_waitlist.account_type)
+
+- [ ] Select inline na Central de Leads (/admin/super/leads) muda tipo de lead da waitlist
+- [ ] Refresh da página mantém o tipo escolhido
+- [ ] Status do lead (new/contacted etc.) não muda após classificar tipo
+- [ ] Nenhum cliente é criado, nenhum convite é enviado
+- [ ] Registro legado (admin_signups_view) mostra badge read-only, sem select
+- [ ] Em erro de servidor: select reverte ao valor anterior, mensagem visível na tela
+- [ ] Select inline no CRM principal (/admin/leads) aparece para todos os registros
+- [ ] CRM principal (/admin/leads): classificação persiste após refresh
+
+### REC OS — Banner
+
+- [ ] Selecionar Framee no seletor de cliente de Conexões e navegar para REC OS Insights via URL mostra "Visualizando: Framee"
+- [ ] Navegar de Duh para Framee via ?client= atualiza o banner no topo da REC OS
+- [ ] Banner nunca mostra nome de cliente anterior quando outro está carregado pela URL
+
+### Meta / Conexões por cliente
+
+- [ ] Selecionar Duh no seletor: badge Meta mostra "Ativo" (se ativo vinculado) ou "Sem ativos" (se sem ativo)
+- [ ] Selecionar Framee: badge Meta não mostra "Conectado" global
+- [ ] Selecionar Framee: aparece bloco "Ativos de Framee: Nenhuma Página/Instagram vinculada"
+- [ ] Sem cliente selecionado: badge Meta mostra "OAuth global" quando plataforma conectada
+- [ ] @duh.lanches não aparece em bloco de outro cliente
+
+### Status
+
+- [ ] /admin/status mostra V1 = 81% enquanto persistência não confirmada em produção
+- [ ] V1 só volta a 82% após os testes de persistência acima passarem em produção
+- [ ] Milestones "Classificação de contas e leads" e "Conexões por cliente" marcados como partial
+
+---
+
 *Atualizar após cada deploy ou sessão de testes.*
