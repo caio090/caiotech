@@ -30,6 +30,7 @@ export const configs: Record<SidebarVariant, {
     logoColor: "bg-indigo-600",
     title: "LOKAT OS",
     nav: [
+      { href: "/admin/inicio",            label: "Início",           icon: Home },
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/operacional",       label: "Operacional",      icon: KanbanSquare },

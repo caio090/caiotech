@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/page-header";
 import {
   Users, Zap, ClipboardList, Calendar, Bot, AlertTriangle,
   RefreshCw, MessageSquare, ChevronRight, Lock, ListOrdered,
-  Target, Clock,
+  Target, Clock, X,
 } from "lucide-react";
 import Link from "next/link";
+import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
 
 type WaitlistEntry = {
   id: string;
@@ -115,6 +116,70 @@ const STATUS_COLOR: Record<string, string> = {
   archived:  "bg-gray-100 text-gray-500",
 };
 
+const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  cliente_lokat:    { label: "Cliente Lokat",     color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  cliente_agencia:  { label: "Cliente de agência", color: "bg-blue-50 text-blue-700 border-blue-100" },
+  agencia_parceira: { label: "Agência parceira",   color: "bg-purple-50 text-purple-700 border-purple-100" },
+  autonomo:         { label: "Autônomo",           color: "bg-amber-50 text-amber-700 border-amber-100" },
+  lead:             { label: "Lead",               color: "bg-gray-50 text-gray-600 border-gray-200" },
+  interno_lokat:    { label: "Interno Lokat",      color: "bg-emerald-50 text-emerald-700 border-emerald-100" },
+  operacional:      { label: "Operacional",        color: "bg-sky-50 text-sky-700 border-sky-100" },
+  agency:           { label: "Agência parceira",   color: "bg-purple-50 text-purple-700 border-purple-100" },
+  agencia:          { label: "Agência parceira",   color: "bg-purple-50 text-purple-700 border-purple-100" },
+  business:         { label: "Cliente Lokat",      color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  local_business:   { label: "Cliente Lokat",      color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  professional:     { label: "Autônomo",           color: "bg-amber-50 text-amber-700 border-amber-100" },
+  interested:       { label: "Lead",               color: "bg-gray-50 text-gray-600 border-gray-200" },
+  novo_cadastro:    { label: "Lead",               color: "bg-gray-50 text-gray-600 border-gray-200" },
+};
+
+function getAccountTypeBadge(type: string | null | undefined): { label: string; color: string } {
+  if (!type) return { label: "Lead", color: "bg-gray-50 text-gray-600 border-gray-200" };
+  const key = type.toLowerCase();
+  return ACCOUNT_TYPE_CONFIG[key] ?? { label: type, color: "bg-gray-50 text-gray-500 border-gray-100" };
+}
+
+const AGENT_TONES = [
+  { key: "consultivo",     label: "Consultivo" },
+  { key: "direto",         label: "Direto" },
+  { key: "qualificacao",   label: "Qualificação" },
+  { key: "agressivo_leve", label: "Agressivo leve" },
+  { key: "reativacao",     label: "Reativação" },
+];
+
+const AGENT_OBJECTIVES = [
+  { key: "qualificar",         label: "Qualificar" },
+  { key: "agendar_demo",       label: "Agendar demo" },
+  { key: "converter_beta",     label: "Converter p/ beta" },
+  { key: "converter_cliente",  label: "Converter p/ cliente" },
+  { key: "encaminhar_agencia", label: "Encaminhar agência" },
+  { key: "followup",           label: "Marcar follow-up" },
+];
+
+function generateAgenteSuggestion(lead: WaitlistEntry, tone: string, objective: string): string {
+  const src   = getSourceLabel(lead.source);
+  const stage = STATUS_LABEL[lead.status] ?? lead.status;
+  const first = lead.name.split(" ")[0] ?? lead.name;
+  const toneMsg: Record<string, string> = {
+    consultivo:      `"Olá ${first}! Tenho interesse em entender melhor o seu negócio. Podemos conversar rapidamente?"`,
+    direto:          `"Olá ${first}! Quero te mostrar como a Lokat OS organiza toda a operação em um lugar. Posso apresentar em 15 minutos?"`,
+    qualificacao:    `"Olá ${first}! Uma pergunta rápida: seu maior gargalo hoje é produção de conteúdo, gestão de clientes ou equipe?"`,
+    agressivo_leve:  `"Olá ${first}! Estamos nas últimas vagas do beta exclusivo. Ainda tem interesse em garantir sua entrada?"`,
+    reativacao:      `"Olá ${first}! Tivemos um contato anterior e gostaria de retomar. Tem novidades no seu negócio?"`,
+  };
+  const objNext: Record<string, string> = {
+    qualificar:         "Aguardar resposta da pergunta de qualificação antes de avançar.",
+    agendar_demo:       "Enviar link do calendário ou solicitar horário disponível.",
+    converter_beta:     "Enviar link de cadastro beta com código exclusivo.",
+    converter_cliente:  "Preparar proposta comercial personalizada.",
+    encaminhar_agencia: "Identificar agência parceira compatível e fazer a conexão.",
+    followup:           "Agendar lembrete de follow-up para 3 dias.",
+  };
+  const msg  = toneMsg[tone]  ?? `"Olá ${first}! Gostaria de conversar sobre como a Lokat OS pode ajudar o seu negócio."`;
+  const next = objNext[objective] ?? "Definir próximo passo com o lead.";
+  return `Lead: ${lead.name}\nOrigem: ${src}  ·  Etapa: ${stage}\n\nMensagem sugerida:\n${msg}\n\nPróximo passo: ${next}`;
+}
+
 const PIPELINE_STAGES = [
   { key: "new",       label: "Novo",      color: "bg-blue-50 border-blue-200 text-blue-700" },
   { key: "contacted", label: "Contatado", color: "bg-yellow-50 border-yellow-200 text-yellow-700" },
@@ -144,6 +209,10 @@ export default function AdminLeadsPage() {
   const [srcFilter,    setSrcFilter]    = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAiInfo,   setShowAiInfo]   = useState(false);
+  const [agenteLead,   setAgenteLead]   = useState<WaitlistEntry | null>(null);
+  const [agenteTone,   setAgenteTone]   = useState("consultivo");
+  const [agenteObj,    setAgenteObj]    = useState("agendar_demo");
+  const [agenteResult, setAgenteResult] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -351,7 +420,7 @@ export default function AdminLeadsPage() {
                 <th className="text-left px-4 py-3 font-semibold">Nome / Contato</th>
                 <th className="text-left px-4 py-3 font-semibold">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold">Intenção</th>
-                <th className="text-left px-4 py-3 font-semibold">Perfil</th>
+                <th className="text-left px-4 py-3 font-semibold" title="Classificação visual">Tipo</th>
                 <th className="text-left px-4 py-3 font-semibold">Etapa</th>
                 <th className="text-left px-4 py-3 font-semibold">Criado em</th>
                 <th className="text-right px-4 py-3 font-semibold">Ação</th>
@@ -359,12 +428,13 @@ export default function AdminLeadsPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((e) => {
-                const phone  = e.phone?.replace(/\D/g, "") ?? "";
-                const wa     = phone
+                const phone    = e.phone?.replace(/\D/g, "") ?? "";
+                const wa       = phone
                   ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${e.name}! Obrigado pelo interesse na Lokat OS.`)}`
                   : null;
-                const srcLbl = getSourceLabel(e.source);
-                const srcCls = SOURCE_COLOR[srcLbl] ?? "bg-gray-50 text-gray-500 border-gray-100";
+                const srcLbl   = getSourceLabel(e.source);
+                const srcCls   = SOURCE_COLOR[srcLbl] ?? "bg-gray-50 text-gray-500 border-gray-100";
+                const accBadge = getAccountTypeBadge(e.account_type);
                 return (
                   <tr key={e.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-4 py-3">
@@ -380,20 +450,35 @@ export default function AdminLeadsPage() {
                     <td className="px-4 py-3 text-[10px] text-gray-500 max-w-[160px]">
                       <p className="line-clamp-2">{getIntentLabel(e.interest)}</p>
                     </td>
-                    <td className="px-4 py-3 text-[10px] text-gray-600">
-                      <p>{getProfileLabel(e.account_type)}</p>
-                      {e.segment && <p className="text-gray-400 mt-0.5">{e.segment}</p>}
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${accBadge.color}`}>
+                        {accBadge.label}
+                      </span>
+                      {e.segment && <p className="text-[10px] text-gray-400 mt-1">{e.segment}</p>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${STATUS_COLOR[e.status] ?? "bg-gray-50 text-gray-500"}`}>
                         {STATUS_LABEL[e.status] ?? e.status}
                       </span>
+                      {e.status === "accepted" && (
+                        <p className="text-[9px] text-emerald-600 font-semibold mt-1">OS ativo</p>
+                      )}
+                      {e.status === "invited" && (
+                        <p className="text-[9px] text-purple-500 font-medium mt-1">Convite enviado</p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-[10px] text-gray-400 whitespace-nowrap">
                       {new Date(e.created_at).toLocaleDateString("pt-BR")}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => { setAgenteLead(e); setAgenteTone("consultivo"); setAgenteObj("agendar_demo"); setAgenteResult(""); }}
+                          title="Agente IA"
+                          className="p-1.5 rounded-lg hover:bg-violet-50 text-violet-400 transition-colors"
+                        >
+                          <Bot className="w-4 h-4" />
+                        </button>
                         {wa && (
                           <a
                             href={wa}
@@ -489,6 +574,159 @@ export default function AdminLeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Agente IA modal */}
+      {agenteLead && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setAgenteLead(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-violet-100 rounded-lg flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-violet-600" strokeWidth={1.5} />
+                </div>
+                <p className="text-sm font-bold text-gray-800">Agente IA comercial</p>
+              </div>
+              <button
+                onClick={() => setAgenteLead(null)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                <p className="text-xs font-bold text-gray-800">{agenteLead.name}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    getSourceLabel(agenteLead.source),
+                    STATUS_LABEL[agenteLead.status] ?? agenteLead.status,
+                    ...(agenteLead.interest ? [getIntentLabel(agenteLead.interest)] : []),
+                  ].map((tag) => (
+                    <span key={tag} className="text-[10px] bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-lg">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3 pt-1.5 border-t border-gray-200 mt-1.5">
+                  <div>
+                    <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">Empresa / Nicho</p>
+                    <p className="text-[10px] text-gray-700 font-semibold">{agenteLead.segment ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">Acesso OS</p>
+                    <p className={`text-[10px] font-semibold ${agenteLead.status === "accepted" ? "text-emerald-600" : agenteLead.status === "invited" ? "text-purple-600" : "text-gray-400"}`}>
+                      {agenteLead.status === "accepted" ? "Ativo" : agenteLead.status === "invited" ? "Convidado" : "Sem acesso"}
+                    </p>
+                  </div>
+                  {agenteLead.city && (
+                    <div>
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wide">Cidade</p>
+                      <p className="text-[10px] text-gray-700 font-semibold">{agenteLead.city}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lead convertido — contexto de conta */}
+              {(agenteLead.status === "invited" || agenteLead.status === "accepted") && (() => {
+                const planned = getPlannedIntegrations(agenteLead.account_type);
+                const accBadge = getAccountTypeBadge(agenteLead.account_type);
+                return (
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Lead convertido</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${accBadge.color}`}>
+                        {accBadge.label}
+                      </span>
+                      <span className={`text-[10px] font-semibold ${agenteLead.status === "accepted" ? "text-emerald-600" : "text-purple-600"}`}>
+                        {agenteLead.status === "accepted" ? "• OS ativo" : "• Convite enviado"}
+                      </span>
+                    </div>
+                    {planned.length > 0 && (
+                      <div>
+                        <p className="text-[9px] text-indigo-500 font-medium mb-1">Integrações planejadas para este perfil:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {planned.map((key) => {
+                            const t = INTEGRATION_TYPES.find((t) => t.key === key);
+                            return t ? (
+                              <span key={key} className="text-[9px] font-medium text-indigo-600 bg-white border border-indigo-100 px-1.5 py-0.5 rounded-md">
+                                {t.label}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">Tom da abordagem</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {AGENT_TONES.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAgenteTone(key)}
+                      className={`text-[11px] font-medium px-3 py-2 rounded-xl border transition-colors text-left ${
+                        agenteTone === key
+                          ? "bg-violet-600 text-white border-violet-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-violet-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">Objetivo</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {AGENT_OBJECTIVES.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAgenteObj(key)}
+                      className={`text-[11px] font-medium px-3 py-2 rounded-xl border transition-colors text-left ${
+                        agenteObj === key
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-indigo-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setAgenteResult(generateAgenteSuggestion(agenteLead, agenteTone, agenteObj))}
+                className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+              >
+                <Bot className="w-4 h-4" />
+                Gerar abordagem
+              </button>
+
+              {agenteResult && (
+                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide mb-2">Sugestão gerada</p>
+                  <pre className="text-[11px] text-violet-900 whitespace-pre-wrap font-sans leading-relaxed">
+                    {agenteResult}
+                  </pre>
+                  <p className="text-[9px] text-violet-400 mt-2">Sugestão local baseada nos dados do lead. Revise antes de usar.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

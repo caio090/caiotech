@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Flag, Sparkles, CheckSquare, CalendarDays, Users, KanbanSquare,
+  Flag, Sparkles, CheckSquare, CalendarDays, Users, KanbanSquare, Target, Activity,
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -8,19 +8,21 @@ import { VideoBackground } from "@/components/video-background";
 import { SmartStartInput } from "@/components/smart-start-input";
 
 const SHORTCUTS = [
-  { href: "/admin/contentos/campanhas",  label: "Criar campanha",   icon: Flag },
-  { href: "/admin/contentos",            label: "Abrir REC OS",     icon: Sparkles },
-  { href: "/admin/contentos/aprovacoes", label: "Ver aprovações",   icon: CheckSquare },
-  { href: "/admin/contentos/calendario", label: "Ver calendário",   icon: CalendarDays },
-  { href: "/admin/clientes",             label: "Ver clientes",     icon: Users },
-  { href: "/admin/operacional",          label: "Operacional",      icon: KanbanSquare },
+  { href: "/admin/leads",               label: "CRM",              icon: Target },
+  { href: "/admin/contentos",           label: "Abrir REC OS",     icon: Sparkles },
+  { href: "/admin/contentos/campanhas", label: "Nova campanha",    icon: Flag },
+  { href: "/admin/clientes",            label: "Clientes",         icon: Users },
+  { href: "/admin/operacional",         label: "Operacional",      icon: KanbanSquare },
+  { href: "/admin/contentos/aprovacoes",label: "Aprovações",       icon: CheckSquare },
+  { href: "/admin/status",              label: "Status V1",        icon: Activity },
+  { href: "/admin/contentos/calendario",label: "Calendário",       icon: CalendarDays },
 ];
 
-// MOCK VISUAL — cards ilustrativos, sem dado real ainda. Fase futura conecta em dados reais (aprovações, tarefas etc.).
+// MOCK VISUAL — cards ilustrativos, sem dado real ainda.
 const RECENT_WORK = [
-  { label: "Campanha — Verão 2026",       meta: "Cliente: Duh Lanches · em produção", icon: Flag },
-  { label: "3 aprovações pendentes",      meta: "Aguardando revisão do cliente",       icon: CheckSquare },
-  { label: "Calendário desta semana",     meta: "5 conteúdos agendados",               icon: CalendarDays },
+  { label: "Leads com atenção",        meta: "Leads novos aguardando contato",    icon: Target },
+  { label: "Aprovações pendentes",     meta: "Aguardando revisão do cliente",     icon: CheckSquare },
+  { label: "Calendário desta semana",  meta: "Conteúdos agendados para a semana", icon: CalendarDays },
 ];
 
 function getGreeting(): string {
@@ -70,7 +72,7 @@ export default async function AdminInicioPage() {
               {getGreeting()}{firstName ? `, ${firstName}` : ""}.
             </h1>
             <p className="text-sm md:text-base text-indigo-100/70 mt-3 mb-6">
-              O que vamos criar ou organizar hoje?
+              Central inteligente — Marketing, CRM e conteúdo em um só lugar.
             </p>
 
             <SmartStartInput />

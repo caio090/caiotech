@@ -1,5 +1,5 @@
 export const PROJECT_DEADLINE_V1 = "2026-07-31";
-export const V1_PROGRESS = 75;
+export const V1_PROGRESS = 81;
 export const V2_PROGRESS = 12;
 
 export function getDaysRemainingV1(): number {
@@ -18,15 +18,22 @@ export const MILESTONES_V1: Milestone[] = [
   { label: "Landing pública e pré-acesso",           status: "done"    },
   { label: "Login e autenticação por role",          status: "done"    },
   { label: "Portal Admin base",                      status: "done"    },
-  { label: "CRM básico — origem, intenção e badge",  status: "done"    },
-  { label: "Waitlist e captura de leads",            status: "done"    },
-  { label: "Meta Insights básico",                   status: "done"    },
-  { label: "Meta Insights avançado",                 status: "partial" },
-  { label: "REC OS base",                            status: "partial" },
-  { label: "Operacional base",                       status: "partial" },
-  { label: "Central de Contas — classificação real", status: "pending" },
-  { label: "Billing / Financeiro MVP",               status: "partial" },
-  { label: "QA final e polish para venda",           status: "pending" },
+  { label: "CRM básico — origem, intenção, badge e tipo", status: "done"    },
+  { label: "Waitlist e captura de leads",                 status: "done"    },
+  { label: "Início / Central IA — sidebar",               status: "done"    },
+  { label: "Meta Insights básico",                        status: "done"    },
+  { label: "SEO público e metadados",                     status: "done"    },
+  { label: "Meta Insights avançado",                      status: "partial" },
+  { label: "REC OS base",                                 status: "partial" },
+  { label: "Operacional base",                            status: "partial" },
+  { label: "Agente IA no CRM — geração local",            status: "partial" },
+  { label: "Relatórios por cliente — estrutura base",     status: "partial" },
+  { label: "Conexões por cliente — bloco por cliente",     status: "partial" },
+  { label: "Central de Contas — classificação e acesso",  status: "partial" },
+  { label: "Billing / Financeiro MVP",                    status: "partial" },
+  { label: "Integrações por cliente — contexto e estados", status: "partial" },
+  { label: "Rastreabilidade lead → cliente",              status: "pending" },
+  { label: "QA final e polish para venda",                status: "pending" },
 ];
 
 export const MILESTONES_V2: Milestone[] = [

@@ -10,6 +10,7 @@ import {
   Bell, UserX, ListOrdered,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,13 +45,31 @@ type AccountFilter =
   | "sem_perfil"
   | "bloqueado";
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  agencia:          "Agência",
-  empresa:          "Empresa",
-  invited_client:   "Cliente convidado",
-  diagnostic_only:  "Diagnóstico",
-  super_admin:      "Super Admin",
+const ACCOUNT_TYPE_BADGE_CONFIG: Record<string, { label: string; cls: string }> = {
+  // Canonical new types
+  interno_lokat:    { label: "Interno Lokat",      cls: "bg-emerald-50 text-emerald-700" },
+  agencia_parceira: { label: "Agência parceira",   cls: "bg-purple-50 text-purple-700" },
+  cliente_direto:   { label: "Cliente direto",     cls: "bg-indigo-50 text-indigo-700" },
+  cliente_agencia:  { label: "Cliente de agência", cls: "bg-blue-50 text-blue-700" },
+  autonomo:         { label: "Autônomo",           cls: "bg-amber-50 text-amber-700" },
+  lead:             { label: "Lead",               cls: "bg-gray-100 text-gray-600" },
+  operacional:      { label: "Operacional",        cls: "bg-sky-50 text-sky-700" },
+  teste:            { label: "Teste",              cls: "bg-slate-100 text-slate-600" },
+  // Legacy DB values
+  agencia:          { label: "Agência",            cls: "bg-purple-50 text-purple-700" },
+  empresa:          { label: "Empresa",            cls: "bg-indigo-50 text-indigo-700" },
+  invited_client:   { label: "Cliente convidado",  cls: "bg-blue-50 text-blue-700" },
+  diagnostic_only:  { label: "Lead / Diagnóstico", cls: "bg-amber-50 text-amber-700" },
+  super_admin:      { label: "Super Admin",        cls: "bg-emerald-50 text-emerald-700" },
+  freelancer:       { label: "Autônomo",           cls: "bg-amber-50 text-amber-700" },
+  social_media:     { label: "Social Media",       cls: "bg-sky-50 text-sky-700" },
 };
+
+function getAccountTypeBadge(type: string | null): { label: string; cls: string } {
+  if (!type) return { label: "—", cls: "bg-gray-50 text-gray-400" };
+  const cfg = ACCOUNT_TYPE_BADGE_CONFIG[type.toLowerCase()];
+  return cfg ?? { label: type, cls: "bg-gray-50 text-gray-500" };
+}
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   active:          { label: "Ativo",       cls: "bg-emerald-50 text-emerald-700" },
@@ -363,7 +382,7 @@ export default function PlatformAccountsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {["Nome / E-mail", "Tipo", "Vínculo", "Origem", "Status", "Cadastro / Acesso", "Ações"].map((h) => (
+                  {["Nome / E-mail", "Tipo", "Vínculo", "Portal OS", "Integrações", "Status", "Cadastro / Acesso", "Ações"].map((h) => (
                     <th key={h} className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -382,9 +401,17 @@ export default function PlatformAccountsPage() {
                         <p className="text-[11px] text-gray-400">{a.email ?? "—"}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-gray-600">
-                          {a.account_type ? (ACCOUNT_TYPE_LABELS[a.account_type] ?? a.account_type) : <span className="text-gray-300">—</span>}
-                        </span>
+                        {(() => {
+                          const badge = getAccountTypeBadge(a.account_type);
+                          return (
+                            <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
+                        {a.role && a.role !== "user" && (
+                          <p className="text-[9px] text-gray-400 mt-0.5">{a.role}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {a.company_name ? (
@@ -397,6 +424,42 @@ export default function PlatformAccountsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] font-semibold ${sourceCfg.cls}`}>{sourceCfg.label}</span>
+                      </td>
+                      {/* Portal OS */}
+                      <td className="px-4 py-3">
+                        {a.role === "cliente" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Ativo
+                          </span>
+                        ) : a.source === "auth+profile+client" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                            <Shield className="w-2.5 h-2.5" /> Admin OS
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-300">—</span>
+                        )}
+                      </td>
+                      {/* Integrações planejadas */}
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const planned = getPlannedIntegrations(a.account_type);
+                          if (planned.length === 0) return <span className="text-[10px] text-gray-300">—</span>;
+                          return (
+                            <div className="flex flex-wrap gap-0.5">
+                              {planned.slice(0, 3).map((key) => {
+                                const t = INTEGRATION_TYPES.find((t) => t.key === key);
+                                return t ? (
+                                  <span key={key} className="text-[9px] font-medium text-gray-500 bg-gray-50 border border-gray-100 px-1 py-0.5 rounded">
+                                    {t.label.split(" / ")[0]}
+                                  </span>
+                                ) : null;
+                              })}
+                              {planned.length > 3 && (
+                                <span className="text-[9px] text-gray-400">+{planned.length - 3}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCfg.cls}`}>

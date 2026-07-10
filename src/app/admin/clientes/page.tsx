@@ -9,6 +9,7 @@ import {
 import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isClientVisible } from "@/lib/client-visibility";
+import { INTEGRATION_STATUS } from "@/lib/integrations";
 
 // ── Modal Novo Cliente ─────────────────────────────────────────
 interface NewClientForm {
@@ -675,6 +676,44 @@ function EditModal({
   );
 }
 
+// ── Integrações por cliente ────────────────────────────────────
+// Meta e Instagram: derivados de client_meta_assets (per-client quando SQL 37 rodado).
+// Quando falso, pode ser "não configurado" (SQL 37 não rodado) ou de fato não conectado.
+// Brief e Diagnóstico: per-client real via client_context e onboarding_profiles.
+function ClientIntegrationsRow({ c }: { c: Client }) {
+  const s = INTEGRATION_STATUS;
+  const metaInstagramItems: { label: string; ok: boolean }[] = [
+    { label: "Meta",      ok: !!c.has_meta      },
+    { label: "Instagram", ok: !!c.has_instagram },
+  ];
+  const perClientItems: { label: string; ok: boolean }[] = [
+    { label: "Brief",       ok: !!c.has_brief       },
+    { label: "Diagnóstico", ok: !!c.has_diagnostico },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50 mt-2">
+      {metaInstagramItems.map(({ label, ok }) => {
+        const cfg = ok ? s.connected : s.needs_setup;
+        const tip = ok ? `${label}: conectado` : `${label}: não configurado — verifique em Conexões`;
+        return (
+          <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
+            {label}
+          </span>
+        );
+      })}
+      {perClientItems.map(({ label, ok }) => {
+        const cfg = ok ? s.connected : s.not_connected;
+        const tip = ok ? `${label}: ok` : `${label}: pendente`;
+        return (
+          <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
+            {label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Card de cliente ────────────────────────────────────────────
 function ClientCard({
   c,
@@ -767,6 +806,7 @@ function ClientCard({
           </div>
         )}
       </div>
+      <ClientIntegrationsRow c={c} />
     </div>
   );
 }

@@ -27,6 +27,17 @@ function markAdminSeen(total: number) {
   localStorage.setItem(ADMIN_SEEN_KEY, String(total));
 }
 
+// ── CRM badge helpers ─────────────────────────────────────────
+const CRM_SEEN_KEY = "lokat_crm_seen_at";
+function getCrmSeenAt(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(CRM_SEEN_KEY) ?? "0", 10);
+}
+function markCrmSeen() {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CRM_SEEN_KEY, String(Date.now()));
+}
+
 interface AdminNotif {
   type: "team_request" | "approval";
   title: string;
@@ -81,9 +92,15 @@ export function AdminLayoutShell({ children }: Props) {
     let cancelled = false;
     fetch("/api/admin/waitlist")
       .then((r) => r.json())
-      .then((d: { ok?: boolean; entries?: Array<{ status: string }> }) => {
+      .then((d: { ok?: boolean; entries?: Array<{ status: string; created_at?: string }> }) => {
         if (cancelled || !d.ok) return;
-        const count = (d.entries ?? []).filter((e) => e.status === "new").length;
+        const seenAt = getCrmSeenAt();
+        const count = (d.entries ?? []).filter((e) => {
+          if (e.status !== "new") return false;
+          if (!seenAt) return true;
+          const leadTime = e.created_at ? new Date(e.created_at).getTime() : 0;
+          return leadTime > seenAt;
+        }).length;
         if (!cancelled) setNewLeadCount(count);
       })
       .catch(() => {});
@@ -392,6 +409,7 @@ export function AdminLayoutShell({ children }: Props) {
             <Link
               href="/admin/leads"
               title="CRM — Leads"
+              onClick={() => { markCrmSeen(); setNewLeadCount(0); }}
               className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
             >
               <Target className="w-4 h-4" />
