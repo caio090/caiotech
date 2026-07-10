@@ -122,6 +122,49 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] `/admin/status` — prazo "2026-07-31" e dias restantes exibidos corretamente
 - [ ] `/admin/status` não exibe textos técnicos crus (SQL, auth.admin, fallback, profiles, scopes internos ou detalhes de infraestrutura)
 - [ ] Meta Insights avançado exibe todos os 5 blocos (Gênero, Faixa etária, Cidades, Países, Horários) — com dados reais se disponíveis, ou estado vazio amigável se não
+- [ ] Sidebar admin primeiro item é "Início" apontando para /admin/inicio
+- [ ] /admin/inicio atalhos incluem CRM e Status V1
+- [ ] CRM badge desaparece ao clicar no link CRM (não aguarda próximo reload)
+- [ ] Leads novos criados APÓS última visita ao CRM aparecem no badge; leads antigos não
+- [ ] Coluna "Tipo" no CRM exibe badges coloridos (Cliente Lokat, Agência parceira, etc.) em vez de texto cru
+- [ ] Botão Agente IA (ícone robô) visível em cada linha da tabela CRM
+- [ ] Modal Agente IA abre com dados do lead (nome, origem, etapa, intenção)
+- [ ] Modal Agente IA tem seletor de Tom (5 opções) e Objetivo (6 opções)
+- [ ] Botão "Gerar abordagem" produz sugestão local com mensagem e próximo passo
+- [ ] Clicar fora do modal Agente IA fecha o modal
+- [ ] Sugestão gerada tem aviso "Sugestão local — revise antes de usar"
+- [ ] Title do browser/Google: "LOKAT OS | Marketing, CRM e conteúdo com IA"
+- [ ] Meta description visível no HTML source: contém "campanhas, leads, aprovações"
+- [ ] OG title correto no HTML source
+- [ ] Favicon visível no navegador (ícone L roxo/escuro, não genérico Next.js/Vercel)
+- [ ] GrowthOS/FinanceOS não aparecem em metadata pública (title/description/OG)
+- [ ] ContentOS não aparece como nome público em metadata
+- [ ] /admin/relatorios > card "Relatório de Conteúdo" CTA leva para /admin/relatorios/conteudo, não para home da REC OS
+- [ ] /admin/relatorios/conteudo carrega sem erro e exibe estado vazio honesto
+- [ ] /admin/relatorios/conteudo tem link de volta para Dados & Insights
+- [ ] /admin/conexoes exibe banner explicando contexto por cliente
+- [ ] /admin/conexoes título exibe "Conexões — Integrações externas — configure por cliente"
+- [ ] Trocar cliente na vinculação de ativos Meta atualiza qual cliente está sendo vinculado
+- [ ] Duh Lanches aparece como conexão do cliente Duh, não como conexão global da plataforma
+- [ ] /admin/super/accounts — coluna "Tipo" exibe badges coloridos (Interno Lokat, Agência parceira, Cliente direto, etc.) em vez de texto cru
+- [ ] /admin/super/accounts — tipo "diagnostic_only" exibe "Lead / Diagnóstico" e não o valor bruto do banco
+- [ ] /admin/super/accounts — role aparece como linha secundária abaixo do badge de tipo quando relevante
+- [ ] /admin/clientes — cada card de cliente exibe bloco de integrações com badges Meta, Instagram, Brief, Diagnóstico
+- [ ] /admin/clientes — badges de integração exibem cor diferente para conectado vs. não conectado
+- [ ] /admin/leads — lead com status "accepted" exibe "OS ativo" abaixo do badge de etapa
+- [ ] /admin/leads — lead com status "invited" exibe "Convite enviado" abaixo do badge de etapa
+- [ ] Modal Agente IA exibe bloco de contexto com Empresa/Nicho, Acesso OS e Cidade (quando disponível)
+- [ ] /admin/clientes — badge Meta exibe "Não configurado" (cinza/índigo) quando has_meta=false, não "Não conectado"
+- [ ] /admin/clientes — badge Instagram exibe "Não configurado" quando has_instagram=false
+- [ ] /admin/clientes — badge Brief exibe "Pendente" quando has_brief=false
+- [ ] /admin/clientes — badge Diagnóstico exibe "Pendente" quando has_diagnostico=false
+- [ ] Nenhum cliente herda badge "Meta conectado" de outro cliente (verificar Duh Lanches vs. outros)
+- [ ] /admin/super/accounts — coluna "Portal OS" exibe "Ativo" apenas para role=cliente; não para admin/agencia
+- [ ] /admin/super/accounts — coluna "Integrações" exibe apenas tipos planejados para o account_type do usuário
+- [ ] "OS ativo" no CRM é derivado de launch_waitlist.status = 'accepted', não de client_id real (anotar limitação)
+- [ ] "Convite enviado" no CRM é derivado de launch_waitlist.status = 'invited' (confirmado derivado de dados reais)
+- [ ] Modal Agente IA exibe bloco "Lead convertido" somente quando status = invited ou accepted
+- [ ] Integrações planejadas no modal Agente IA são baseadas em account_type, não em conexões reais
 
 ---
 
