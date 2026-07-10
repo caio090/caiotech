@@ -121,8 +121,9 @@ export default function LeadsPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [filter, setFilter]     = useState<string>("all");
-  const [updating, setUpdating]       = useState<string | null>(null);
+  const [updating, setUpdating]         = useState<string | null>(null);
   const [typeUpdating, setTypeUpdating] = useState<string | null>(null);
+  const [typeError, setTypeError]       = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,14 +174,26 @@ export default function LeadsPage() {
   }
 
   async function updateAccountType(id: string, account_type: string | null) {
+    const prevType = leads.find((l) => l.id === id)?.account_type ?? null;
     setTypeUpdating(id);
+    setTypeError(null);
+    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type } : l));
     try {
-      await fetch("/api/admin/waitlist", {
+      const res = await fetch("/api/admin/waitlist", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, account_type }),
       });
-      setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type } : l));
+      const data = await res.json() as { ok: boolean; message?: string; code?: string };
+      if (!res.ok || !data.ok) {
+        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type: prevType } : l));
+        setTypeError(data.message ?? `Erro ${res.status}`);
+        setTimeout(() => setTypeError(null), 4000);
+      }
+    } catch {
+      setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type: prevType } : l));
+      setTypeError("Erro de conexão.");
+      setTimeout(() => setTypeError(null), 4000);
     } finally {
       setTypeUpdating(null);
     }
@@ -291,6 +304,12 @@ export default function LeadsPage() {
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {typeError && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-2 text-xs text-red-700 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          {typeError}
         </div>
       )}
 

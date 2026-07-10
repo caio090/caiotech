@@ -99,12 +99,19 @@ export async function PATCH(req: NextRequest) {
   }
 
   const admin = createRequiredSupabaseAdminClient();
-  const { error } = await admin.from("launch_waitlist").update(update).eq("id", id);
+  const { data: updated, error } = await admin
+    .from("launch_waitlist")
+    .update(update)
+    .eq("id", id)
+    .select("id, account_type, status");
   if (error) {
     return NextResponse.json({ ok: false, code: "db_error", message: error.message }, { status: 500 });
   }
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ ok: false, code: "not_found", message: "Registro não encontrado na waitlist." }, { status: 404 });
+  }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, entry: updated[0] });
 }
 
 export async function DELETE(req: NextRequest) {

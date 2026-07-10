@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
+import { CANONICAL_ACCOUNT_TYPES } from "@/lib/account-types";
 
 type WaitlistEntry = {
   id: string;
@@ -208,11 +209,13 @@ export default function AdminLeadsPage() {
   const [error,        setError]        = useState<string | null>(null);
   const [srcFilter,    setSrcFilter]    = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [showAiInfo,   setShowAiInfo]   = useState(false);
-  const [agenteLead,   setAgenteLead]   = useState<WaitlistEntry | null>(null);
-  const [agenteTone,   setAgenteTone]   = useState("consultivo");
-  const [agenteObj,    setAgenteObj]    = useState("agendar_demo");
-  const [agenteResult, setAgenteResult] = useState("");
+  const [showAiInfo,    setShowAiInfo]    = useState(false);
+  const [agenteLead,    setAgenteLead]    = useState<WaitlistEntry | null>(null);
+  const [agenteTone,    setAgenteTone]    = useState("consultivo");
+  const [agenteObj,     setAgenteObj]     = useState("agendar_demo");
+  const [agenteResult,  setAgenteResult]  = useState("");
+  const [typeUpdating,  setTypeUpdating]  = useState<string | null>(null);
+  const [typeError,     setTypeError]     = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,6 +270,32 @@ export default function AdminLeadsPage() {
     { label: "Typebot",      icon: Bot,           count: bySrc["Typebot"] ?? 0,     color: "text-emerald-600", bg: "bg-emerald-50", srcKey: "Typebot"     },
     { label: "Sem follow-up",icon: AlertTriangle, count: semFollowUp,               color: "text-red-600",     bg: "bg-red-50",     srcKey: "_new"        },
   ];
+
+  async function updateAccountType(id: string, account_type: string | null) {
+    const prevType = entries.find((e) => e.id === id)?.account_type ?? null;
+    setTypeUpdating(id);
+    setTypeError(null);
+    setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: account_type ?? "" } : e));
+    try {
+      const res = await fetch("/api/admin/waitlist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, account_type }),
+      });
+      const data = await res.json() as { ok: boolean; message?: string; code?: string };
+      if (!res.ok || !data.ok) {
+        setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType ?? "" } : e));
+        setTypeError(data.message ?? `Erro ${res.status}`);
+        setTimeout(() => setTypeError(null), 4000);
+      }
+    } catch {
+      setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType ?? "" } : e));
+      setTypeError("Erro de conexão.");
+      setTimeout(() => setTypeError(null), 4000);
+    } finally {
+      setTypeUpdating(null);
+    }
+  }
 
   function handleKpiClick(srcKey: string) {
     if (srcKey === "_new") {
@@ -345,6 +374,12 @@ export default function AdminLeadsPage() {
       </div>
 
       {/* Error */}
+      {typeError && (
+        <div className="mb-3 bg-red-50 border border-red-100 rounded-xl px-4 py-2 text-xs text-red-700 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          {typeError}
+        </div>
+      )}
       {error && (
         <div className="mb-5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
@@ -451,9 +486,18 @@ export default function AdminLeadsPage() {
                       <p className="line-clamp-2">{getIntentLabel(e.interest)}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${accBadge.color}`}>
-                        {accBadge.label}
-                      </span>
+                      <select
+                        value={e.account_type ?? ""}
+                        disabled={typeUpdating === e.id}
+                        onChange={(ev) => void updateAccountType(e.id, ev.target.value || null)}
+                        title="Classificar tipo comercial"
+                        className="text-[10px] border border-gray-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-indigo-400 bg-white disabled:opacity-60 transition-colors max-w-[130px]"
+                      >
+                        <option value="">Não classificado</option>
+                        {CANONICAL_ACCOUNT_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
                       {e.segment && <p className="text-[10px] text-gray-400 mt-1">{e.segment}</p>}
                     </td>
                     <td className="px-4 py-3">

@@ -93,10 +93,7 @@ export async function PATCH(
   // ── Update apenas account_type — role e auth intactos ─────────
   const { error: updateErr } = await admin
     .from("profiles")
-    .update({
-      account_type:  isNull ? null : account_type,
-      updated_at:    new Date().toISOString(),
-    } as Record<string, unknown>)
+    .update({ account_type: isNull ? null : account_type } as Record<string, unknown>)
     .eq("id", id);
 
   if (updateErr) {
