@@ -790,6 +790,15 @@ function ConexoesContent() {
   const sqlOk  = metaTested && !metaStatus?.sqlPending;
   const conn   = insights?.connection;
 
+  // Ativos vinculados ao cliente selecionado (separação global vs por cliente)
+  const clientLinkedAssets = clientParam && assets?.assets
+    ? assets.assets.filter(
+        (a) => a.link?.client_id === clientParam || a.instagram?.link?.client_id === clientParam
+      )
+    : null;
+  const clientHasAssets = clientLinkedAssets !== null && clientLinkedAssets.length > 0;
+  const selectedClientName = clientParam ? (olaClients.find((c) => c.id === clientParam)?.company_name ?? "cliente selecionado") : null;
+
   const isDomainError = Boolean(
     flashErr &&
     (flashErr.toLowerCase().includes("domain") ||
@@ -799,11 +808,15 @@ function ConexoesContent() {
      flashErr.toLowerCase().includes("não está incluído"))
   );
 
-  // Cor do badge Meta
+  // Cor do badge Meta — quando cliente selecionado, reflete ativos por cliente
   const metaColor = (): "gray" | "red" | "emerald" | "amber" | "blue" => {
     if (!metaTested) return "gray";
     if (!metaStatus?.ok) return "red";
-    if (isConnected && insightReason !== "token_expired") return "emerald";
+    if (isConnected && insightReason !== "token_expired") {
+      // Com cliente selecionado: verde apenas se tiver ativo vinculado
+      if (clientParam) return accountsTested ? (clientHasAssets ? "emerald" : "blue") : "blue";
+      return "emerald";
+    }
     if (insightReason === "token_expired") return "red";
     if (metaStatus?.sqlPending) return "amber";
     return "blue";
@@ -1020,7 +1033,13 @@ function ConexoesContent() {
               {isLoading && !insightsTested
                 ? <><Loader2 className="w-3 h-3 animate-spin" /> Verificando</>
                 : isConnected
-                  ? <><CheckCircle2 className="w-3 h-3" /> Conectado</>
+                  ? clientParam
+                    ? accountsTested
+                      ? clientHasAssets
+                        ? <><CheckCircle2 className="w-3 h-3" /> Ativo</>
+                        : <><Clock className="w-3 h-3" /> Sem ativos</>
+                      : <><Loader2 className="w-3 h-3 animate-spin" /> Verificando ativos</>
+                    : <><CheckCircle2 className="w-3 h-3" /> OAuth global</>
                   : !metaStatus?.ok
                     ? <><XCircle className="w-3 h-3" /> Vars faltando</>
                     : metaStatus?.sqlPending
@@ -1071,6 +1090,23 @@ function ConexoesContent() {
                   </p>
                 )}
               </div>
+
+              {/* ── Status de ativos por cliente ── */}
+              {clientParam && accountsTested && (
+                <div className={`mb-4 p-3 rounded-xl text-xs flex items-start gap-2 ${clientHasAssets ? "bg-emerald-50 border border-emerald-100 text-emerald-800" : "bg-amber-50 border border-amber-100 text-amber-800"}`}>
+                  {clientHasAssets
+                    ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-500" />
+                    : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+                  }
+                  <span>
+                    <strong>Ativos de {selectedClientName}:</strong>{" "}
+                    {clientHasAssets
+                      ? `${clientLinkedAssets!.length} ativo${clientLinkedAssets!.length !== 1 ? "s" : ""} vinculado${clientLinkedAssets!.length !== 1 ? "s" : ""}.`
+                      : "Nenhuma Página ou conta do Instagram vinculada a este cliente. O OAuth acima é da plataforma LOKAT OS, não deste cliente."
+                    }
+                  </span>
+                </div>
+              )}
 
               {/* ── Ativos encontrados na Meta ── */}
               <div className="mb-4">

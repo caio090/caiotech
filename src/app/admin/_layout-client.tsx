@@ -12,7 +12,7 @@ import { MobileBottomNav } from "@/components/mobile-nav";
 import { LokatVoicePanel } from "@/components/lokat-voice-panel";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
-import { ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
+import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
 import { cn } from "@/lib/utils";
 import { V1_PROGRESS, getDaysRemainingV1, PROJECT_DEADLINE_V1 } from "@/lib/project-status";
 
@@ -244,19 +244,27 @@ export function AdminLayoutShell({ children }: Props) {
       setActiveClientName(null);
       return;
     }
-    const storedName = localStorage.getItem(ACTIVE_CLIENT_NAME_KEY);
-    if (storedName) {
-      setActiveClientName(storedName);
-      return;
+    // URL ?client= is the authoritative source — always check it first
+    const urlParams   = new URLSearchParams(window.location.search);
+    const urlClientId = urlParams.get("client");
+    const storedClientId = localStorage.getItem(ACTIVE_CLIENT_KEY);
+
+    if (urlClientId && urlClientId === storedClientId) {
+      // URL matches stored ID — use stored name directly
+      const storedName = localStorage.getItem(ACTIVE_CLIENT_NAME_KEY);
+      if (storedName) { setActiveClientName(storedName); return; }
     }
-    // Name not in localStorage — try to resolve from URL ?client= param
-    const urlParams  = new URLSearchParams(window.location.search);
-    const clientIdFromUrl = urlParams.get("client") ?? localStorage.getItem("lokat_active_client_id");
-    if (!clientIdFromUrl) return;
-    fetch(`/api/admin/clients/${clientIdFromUrl}`)
+
+    // No URL client and nothing in storage — nothing to show
+    const clientIdToResolve = urlClientId ?? storedClientId;
+    if (!clientIdToResolve) { setActiveClientName(null); return; }
+
+    // Resolve name from server (URL client differs from stored, or name missing)
+    fetch(`/api/admin/clients/${clientIdToResolve}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { company_name?: string } | null) => {
         if (data?.company_name) {
+          localStorage.setItem(ACTIVE_CLIENT_KEY, clientIdToResolve);
           localStorage.setItem(ACTIVE_CLIENT_NAME_KEY, data.company_name);
           setActiveClientName(data.company_name);
         }
