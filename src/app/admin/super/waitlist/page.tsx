@@ -6,6 +6,7 @@ import {
   Clock, CheckCircle2, Mail, Phone, MapPin, Tag, Filter,
   RefreshCw, Copy, Check, UserCheck, Archive, Send, Users, Trash2, AlertTriangle,
 } from "lucide-react";
+import { getAccountTypeBadge } from "@/lib/account-types";
 
 type WaitlistEntry = {
   id: string;
@@ -316,9 +317,14 @@ export default function WaitlistPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold text-gray-700">
-                        {ACCOUNT_LABEL[e.account_type] ?? e.account_type}
-                      </span>
+                      {(() => {
+                        const badge = getAccountTypeBadge(e.account_type);
+                        return (
+                          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
                       {e.city && <div className="flex items-center gap-1"><MapPin className="w-3 h-3" />{e.city}</div>}

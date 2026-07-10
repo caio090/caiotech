@@ -4,6 +4,7 @@ import {
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { CANONICAL_ACCOUNT_TYPE_VALUES } from "@/lib/account-types";
 
 const ALLOWED_ROLES = new Set(["super_admin", "admin"]);
 
@@ -75,17 +76,27 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, code: "service_role_missing" }, { status: 503 });
   }
 
-  let body: { id?: string; status?: string; notes?: string; beta_months_granted?: number };
+  let body: { id?: string; status?: string; notes?: string; beta_months_granted?: number; account_type?: string | null };
   try { body = await req.json(); }
   catch { return NextResponse.json({ ok: false, code: "invalid_payload" }, { status: 400 }); }
 
-  const { id, status, notes, beta_months_granted } = body;
+  const { id, status, notes, beta_months_granted, account_type } = body;
   if (!id) return NextResponse.json({ ok: false, code: "missing_id" }, { status: 400 });
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (status) update.status = status;
   if (notes !== undefined) update.notes = notes;
   if (beta_months_granted !== undefined) update.beta_months_granted = beta_months_granted;
+  if ("account_type" in body) {
+    if (account_type !== null && account_type !== undefined &&
+        !(CANONICAL_ACCOUNT_TYPE_VALUES as readonly string[]).includes(account_type as string)) {
+      return NextResponse.json({
+        ok: false, code: "invalid_account_type",
+        message: `Valor inválido. Aceitos: ${CANONICAL_ACCOUNT_TYPE_VALUES.join(", ")}.`,
+      }, { status: 422 });
+    }
+    update.account_type = account_type ?? null;
+  }
 
   const admin = createRequiredSupabaseAdminClient();
   const { error } = await admin.from("launch_waitlist").update(update).eq("id", id);

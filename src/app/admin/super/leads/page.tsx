@@ -7,6 +7,7 @@ import {
   Mail, Send, UserCheck, Archive, Trash2, Phone, MapPin, Tag,
 } from "lucide-react";
 import type { UnifiedLead } from "@/app/api/admin/leads/route";
+import { CANONICAL_ACCOUNT_TYPES, getAccountTypeBadge } from "@/lib/account-types";
 
 type ApiResponse = {
   ok: boolean;
@@ -120,7 +121,8 @@ export default function LeadsPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [filter, setFilter]     = useState<string>("all");
-  const [updating, setUpdating] = useState<string | null>(null);
+  const [updating, setUpdating]       = useState<string | null>(null);
+  const [typeUpdating, setTypeUpdating] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,6 +169,20 @@ export default function LeadsPage() {
       await load();
     } finally {
       setUpdating(null);
+    }
+  }
+
+  async function updateAccountType(id: string, account_type: string | null) {
+    setTypeUpdating(id);
+    try {
+      await fetch("/api/admin/waitlist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, account_type }),
+      });
+      setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type } : l));
+    } finally {
+      setTypeUpdating(null);
     }
   }
 
@@ -322,8 +338,43 @@ export default function LeadsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
-                      {l.account_type && <div className="flex items-center gap-1"><Tag className="w-3 h-3" />{ACCOUNT_LABEL[l.account_type] ?? l.account_type}</div>}
-                      {l.role && <div className="text-gray-400">{ROLE_LABEL[l.role] ?? l.role}</div>}
+                      {l.source === "waitlist" ? (
+                        <div>
+                          <select
+                            value={l.account_type ?? ""}
+                            disabled={typeUpdating === l.id}
+                            onChange={(e) => void updateAccountType(l.id, e.target.value || null)}
+                            title="Classificar tipo comercial"
+                            className="text-[10px] border border-gray-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-indigo-400 bg-white disabled:opacity-60 transition-colors max-w-[130px]"
+                          >
+                            <option value="">Não classificado</option>
+                            {CANONICAL_ACCOUNT_TYPES.map((t) => (
+                              <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                          </select>
+                          {l.account_type && (() => {
+                            const badge = getAccountTypeBadge(l.account_type);
+                            return (
+                              <span className={`inline-flex items-center mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div>
+                          {(() => {
+                            const badge = getAccountTypeBadge(l.account_type);
+                            return (
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                                <Tag className="w-2.5 h-2.5" />
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                      {l.role && <div className="text-gray-400 mt-0.5">{ROLE_LABEL[l.role] ?? l.role}</div>}
                       {l.segment && <div className="text-gray-400 mt-0.5">{l.segment}</div>}
                     </td>
                     <td className="px-4 py-3">

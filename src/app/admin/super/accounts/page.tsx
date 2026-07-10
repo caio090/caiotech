@@ -11,8 +11,20 @@ import {
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
+import {
+  CANONICAL_ACCOUNT_TYPES,
+  getAccountTypeBadge as getAccountTypeBadgeLib,
+} from "@/lib/account-types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ClassifyModal {
+  id:           string;
+  name:         string | null;
+  email:        string | null;
+  role:         string | null;
+  currentType:  string | null;
+}
 
 interface Account {
   id: string;
@@ -45,30 +57,8 @@ type AccountFilter =
   | "sem_perfil"
   | "bloqueado";
 
-const ACCOUNT_TYPE_BADGE_CONFIG: Record<string, { label: string; cls: string }> = {
-  // Canonical new types
-  interno_lokat:    { label: "Interno Lokat",      cls: "bg-emerald-50 text-emerald-700" },
-  agencia_parceira: { label: "Agência parceira",   cls: "bg-purple-50 text-purple-700" },
-  cliente_direto:   { label: "Cliente direto",     cls: "bg-indigo-50 text-indigo-700" },
-  cliente_agencia:  { label: "Cliente de agência", cls: "bg-blue-50 text-blue-700" },
-  autonomo:         { label: "Autônomo",           cls: "bg-amber-50 text-amber-700" },
-  lead:             { label: "Lead",               cls: "bg-gray-100 text-gray-600" },
-  operacional:      { label: "Operacional",        cls: "bg-sky-50 text-sky-700" },
-  teste:            { label: "Teste",              cls: "bg-slate-100 text-slate-600" },
-  // Legacy DB values
-  agencia:          { label: "Agência",            cls: "bg-purple-50 text-purple-700" },
-  empresa:          { label: "Empresa",            cls: "bg-indigo-50 text-indigo-700" },
-  invited_client:   { label: "Cliente convidado",  cls: "bg-blue-50 text-blue-700" },
-  diagnostic_only:  { label: "Lead / Diagnóstico", cls: "bg-amber-50 text-amber-700" },
-  super_admin:      { label: "Super Admin",        cls: "bg-emerald-50 text-emerald-700" },
-  freelancer:       { label: "Autônomo",           cls: "bg-amber-50 text-amber-700" },
-  social_media:     { label: "Social Media",       cls: "bg-sky-50 text-sky-700" },
-};
-
 function getAccountTypeBadge(type: string | null): { label: string; cls: string } {
-  if (!type) return { label: "—", cls: "bg-gray-50 text-gray-400" };
-  const cfg = ACCOUNT_TYPE_BADGE_CONFIG[type.toLowerCase()];
-  return cfg ?? { label: type, cls: "bg-gray-50 text-gray-500" };
+  return getAccountTypeBadgeLib(type);
 }
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
@@ -151,6 +141,10 @@ export default function PlatformAccountsPage() {
   const [filter,       setFilter]       = useState<AccountFilter>("todos");
   const [actionTarget, setActionTarget] = useState<string | null>(null);
   const [actionMsg,    setActionMsg]    = useState<{ id: string; ok: boolean; text: string } | null>(null);
+  const [classifyModal, setClassifyModal] = useState<ClassifyModal | null>(null);
+  const [classifyType,  setClassifyType]  = useState<string>("");
+  const [classifySaving, setClassifySaving] = useState(false);
+  const [classifyErr,   setClassifyErr]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -220,6 +214,40 @@ export default function PlatformAccountsPage() {
     } finally {
       setActionTarget(null);
       setTimeout(() => setActionMsg(null), 3000);
+    }
+  }
+
+  function openClassifyModal(a: Account) {
+    setClassifyModal({ id: a.id, name: a.name, email: a.email, role: a.role, currentType: a.account_type });
+    setClassifyType(a.account_type ?? "");
+    setClassifyErr(null);
+  }
+
+  async function handleClassifySave() {
+    if (!classifyModal) return;
+    setClassifySaving(true);
+    setClassifyErr(null);
+    try {
+      const res = await fetch(`/api/admin/accounts/${classifyModal.id}/classification`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_type: classifyType || null }),
+      });
+      const data = await res.json() as { ok: boolean; code?: string; message?: string };
+      if (!res.ok || !data.ok) {
+        setClassifyErr(data.message ?? `Erro ${res.status}`);
+        return;
+      }
+      setAccounts((prev) =>
+        prev.map((a) => a.id === classifyModal.id ? { ...a, account_type: classifyType || null } : a),
+      );
+      setActionMsg({ id: classifyModal.id, ok: true, text: `Tipo atualizado para "${classifyType || "Não classificado"}".` });
+      setTimeout(() => setActionMsg(null), 3000);
+      setClassifyModal(null);
+    } catch {
+      setClassifyErr("Erro de conexão. Tente novamente.");
+    } finally {
+      setClassifySaving(false);
     }
   }
 
@@ -474,7 +502,12 @@ export default function PlatformAccountsPage() {
                         <p className="text-[10px] text-gray-400">acesso {fmtRelative(a.last_sign_in_at)}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <button
+                            onClick={() => openClassifyModal(a)}
+                            className="text-[10px] font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
+                            title="Classificar tipo de conta"
+                          >Classificar</button>
                           {noProfile ? (
                             <span className="text-[10px] text-gray-300" title="Crie ou repare o profile antes de alterar status">Sem perfil</span>
                           ) : a.account_status !== "blocked" && a.account_status !== "suspended" ? (
@@ -518,6 +551,83 @@ export default function PlatformAccountsPage() {
         {" · "}Bloqueio/suspensão é status interno — não remove acesso ao auth.
         {" · "}Contas sem empresa ou agência são normais para super_admin e diagnóstico.
       </p>
+
+      {/* ── Classification modal ─────────────────────────────────────────────── */}
+      {classifyModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setClassifyModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md mx-4 p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-1">Classificar conta</h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Altera <code className="text-[10px] bg-gray-50 px-1 rounded">profiles.account_type</code> — sem alterar role ou acesso.
+            </p>
+
+            {/* Account info */}
+            <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 space-y-0.5">
+              <p className="text-xs font-semibold text-gray-800">{classifyModal.name ?? <span className="italic text-gray-400">sem nome</span>}</p>
+              <p className="text-[11px] text-gray-400">{classifyModal.email ?? "—"}</p>
+              {classifyModal.role && classifyModal.role !== "user" && (
+                <p className="text-[10px] text-indigo-500">role: {classifyModal.role}</p>
+              )}
+              <p className="text-[10px] text-gray-400 pt-1">
+                Tipo atual:{" "}
+                <span className="font-semibold text-gray-600">
+                  {getAccountTypeBadge(classifyModal.currentType).label}
+                </span>
+              </p>
+            </div>
+
+            {/* Select */}
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Novo tipo</label>
+            <select
+              value={classifyType}
+              onChange={(e) => setClassifyType(e.target.value)}
+              disabled={classifySaving}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors bg-white disabled:opacity-60 mb-1.5"
+            >
+              <option value="">Não classificado</option>
+              {CANONICAL_ACCOUNT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+
+            {classifyType && (() => {
+              const match = CANONICAL_ACCOUNT_TYPES.find((t) => t.value === classifyType);
+              return match ? (
+                <p className="text-[10px] text-gray-400 mb-4">
+                  Preview:{" "}
+                  <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${match.cls}`}>
+                    {match.label}
+                  </span>
+                </p>
+              ) : null;
+            })()}
+
+            {classifyErr && (
+              <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{classifyErr}</p>
+            )}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setClassifyModal(null)}
+                disabled={classifySaving}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void handleClassifySave()}
+                disabled={classifySaving}
+                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors disabled:opacity-60"
+              >
+                {classifySaving ? "Salvando…" : "Salvar classificação"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
