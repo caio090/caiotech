@@ -165,6 +165,21 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] "Convite enviado" no CRM é derivado de launch_waitlist.status = 'invited' (confirmado derivado de dados reais)
 - [ ] Modal Agente IA exibe bloco "Lead convertido" somente quando status = invited ou accepted
 - [ ] Integrações planejadas no modal Agente IA são baseadas em account_type, não em conexões reais
+- [ ] Favicon exibe ícone L roxo/escuro (não triângulo Vercel) após remoção de src/app/favicon.ico
+- [ ] /admin/super/accounts — coluna "Tipo" exibe "Não classificado" para contas com account_type null/nao_definido (não texto cru)
+- [ ] /admin/super/accounts — botão "Classificar" em cada linha abre modal de classificação
+- [ ] Modal classificação salva account_type via PATCH /api/admin/accounts/[id]/classification (sem alterar role)
+- [ ] /admin/clientes — badges Meta/Instagram coloridos aparecem APENAS quando has_meta/has_instagram=true; false → "Não configurado" cinza
+- [ ] /admin/clientes — badge needs_setup usa cor cinza neutra (não indigo)
+- [ ] /admin/super/leads — coluna "Tipo" exibe select inline para leads da waitlist; legados somente leitura
+- [ ] /admin/super/leads — mudar tipo no select salva imediatamente via PATCH /api/admin/waitlist
+- [ ] /admin/super/waitlist — coluna "Tipo" usa badges coloridos (Não classificado para null/nao_definido)
+- [ ] /admin/conexoes — seletor de cliente aparece no topo quando há clientes cadastrados
+- [ ] /admin/conexoes — selecionar cliente filtra conexões OlaClick para aquele cliente
+- [ ] /admin/conexoes — URL atualiza para ?client=<id> ao selecionar cliente
+- [ ] /admin/conexoes — banner contextual muda texto ao selecionar cliente específico
+- [ ] /admin/conexoes — cliente sem OlaClick mostra mensagem "nenhuma conexão" em vez de lista vazia
+- [ ] /admin/conexoes — "Conectar Cardápio Digital" com cliente selecionado pré-preenche o cliente no modal
 
 ---
 
