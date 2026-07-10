@@ -862,7 +862,7 @@ function ConexoesContent() {
 
   return (
     <div>
-      <PageHeader title="Conexoes" description="Integracoes externas da LOKAT OS" />
+      <PageHeader title="Conexões" description="Integrações externas — configure por cliente" />
 
       {/* Flash messages */}
       {flashOk && (
@@ -911,6 +911,15 @@ function ConexoesContent() {
           </div>
         </div>
       )}
+
+      <div className="max-w-2xl mb-4 p-3.5 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-700 flex items-start gap-2">
+        <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+        <span>
+          As integrações abaixo são da plataforma LOKAT OS. Para Meta/Instagram, cada ativo (Página ou conta) deve ser{" "}
+          <strong>vinculado individualmente ao cliente</strong> correspondente na seção "Ativos encontrados na Meta".
+          A conexão da Duh Lanches aparece por ser o primeiro cliente conectado — não é uma conexão global.
+        </span>
+      </div>
 
       <div className="max-w-2xl space-y-4">
 

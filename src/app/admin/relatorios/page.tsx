@@ -166,7 +166,7 @@ export default function AdminRelatoriosPage() {
           color="bg-pink-50 text-pink-600"
           fonte="Meta/Instagram · REC OS"
           status={metaLinked === true ? "em_preparacao" : "aguardando"}
-          cta={{ label: "Ir para REC OS Insights", href: "/admin/contentos/insights" }}
+          cta={{ label: "Ver relatório de conteúdo →", href: "/admin/relatorios/conteudo" }}
           items={[
             { label: "Alcance e impressões (Instagram)",    ready: metaLinked === true },
             { label: "Engajamento por post",                ready: false },
