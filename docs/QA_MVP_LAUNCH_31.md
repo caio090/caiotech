@@ -120,6 +120,8 @@ Marcar cada item como `[x]` ao testar. Testar em produção (`https://www.lokat.
 - [ ] `/admin/status` carrega sem erro e exibe progress bars V1 e V2
 - [ ] `/admin/status` — milestones V1 exibem ícone correto por status (done/partial/pending)
 - [ ] `/admin/status` — prazo "2026-07-31" e dias restantes exibidos corretamente
+- [ ] `/admin/status` não exibe textos técnicos crus (SQL, auth.admin, fallback, profiles, scopes internos ou detalhes de infraestrutura)
+- [ ] Meta Insights avançado exibe todos os 5 blocos (Gênero, Faixa etária, Cidades, Países, Horários) — com dados reais se disponíveis, ou estado vazio amigável se não
 
 ---
 

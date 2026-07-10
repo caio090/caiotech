@@ -40,11 +40,11 @@ const MODULES: Module[] = [
   { name: "Portal da Agência",  desc: "/agency/home criado — em integração com planos e limites", status: "parcial", notes: "Limites de clientes por plano: em ajuste" },
   { name: "Billing / Planos",   desc: "Planos, cupons e trial configurados — gateway em breve",   status: "parcial", notes: "Pagamentos automáticos: próxima fase" },
   { name: "Diagnóstico mobile", desc: "Responsividade em ajuste — overflow identificado",         status: "parcial", notes: "Fix de viewport mobile: em andamento" },
-  { name: "Central de Contas",  desc: "Session client + triple fallback para role. Fallback para profiles quando auth.admin.listUsers() falhar. SQLs 70/71/72/74 aplicados.", status: "parcial", notes: "Exibe em modo de contingência se service role não autorizar listUsers. Rodar SQL 74 se waitlist vazia." },
-  { name: "Pré-acesso / Waitlist Beta", desc: "/pre-acesso + /api/launch/waitlist + painel /admin/super/waitlist. SQL 73 aplicado. LAUNCH_MODE em waitlist.", status: "parcial", notes: "SQL 73 aplicado. Validar inscrições reais. Rodar SQL 74 se painel mostrar 0 registros após inscrição." },
+  { name: "Central de Contas",         desc: "Classificação real de perfis em andamento: interno Lokat, agência parceira, cliente direto, cliente de agência, operacional e lead.", status: "parcial", notes: "Classificação de perfis em desenvolvimento ativo." },
+  { name: "Pré-acesso / Waitlist Beta", desc: "Captação de interessados funcionando com origem, intenção e acompanhamento comercial. Próximo passo: refinar prioridade e segmentação.", status: "funcional" },
   { name: "Motion / Microinterações",   desc: "hover e active:scale nos CTAs da landing e planos. prefers-reduced-motion respeitado via Tailwind.", status: "parcial", notes: "Cards hover e animações de seção: próxima fase." },
-  { name: "/rec Mobile",        desc: "Layout responsivo ajustado — nav colapsada, grids em coluna única, textos legíveis, fallback de vídeo com erro", status: "funcional" },
-  { name: "Meta Insights",      desc: "API Graph configurada — insights dependem de permissão da conta", status: "parcial", notes: "Scope instagram_basic + pages_read_engagement pendentes" },
+  { name: "/rec Mobile",        desc: "Layout responsivo ajustado — navegação colapsada, grids em coluna única, textos legíveis e tratamento de erros de vídeo", status: "funcional" },
+  { name: "Meta Insights",      desc: "Conexão Meta configurada — insights ativos, dados avançados de público dependem das permissões da conta", status: "parcial", notes: "Dados avançados dependem das permissões conectadas." },
   { name: "Cardápio Digital",   desc: "Faturamento real funcionando — paginação e produtos detalhados em breve", status: "parcial", notes: "Paginação além 50 pedidos: próxima fase" },
 
   // Em breve
@@ -85,7 +85,7 @@ const INTEGRATIONS = [
   },
   {
     name: "OpenAI / Busca IA",
-    desc: "Dashboard search com gpt-4o-mini + fallback por palavras-chave",
+    desc: "Dashboard search com IA + busca por palavras-chave",
     statusKey: "openai",
     status: "em_teste",
     href: "/admin/configuracoes",

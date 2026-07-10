@@ -405,111 +405,125 @@ function AudienceBar({ label, value, max }: { label: string; value: number; max:
   );
 }
 
+function AudienceEmpty({ msg }: { msg: string }) {
+  return <p className="text-[11px] text-gray-400">{msg}</p>;
+}
+
 function AudienceSection({ advanced }: { advanced?: InsightsResponse["advanced"] }) {
-  const allUnavailable = !advanced || (
-    !advanced.demographics?.gender?.length &&
-    !advanced.demographics?.age?.length &&
-    !advanced.locations?.cities?.length &&
-    !advanced.locations?.countries?.length &&
-    !advanced.activity?.onlineFollowersByHour?.length
-  );
+  const hasUnavailable = (advanced?.unavailable?.length ?? 0) > 0;
+
+  const gender    = advanced?.demographics?.gender    ?? [];
+  const age       = advanced?.demographics?.age       ?? [];
+  const cities    = advanced?.locations?.cities       ?? [];
+  const countries = advanced?.locations?.countries    ?? [];
+  const hours     = advanced?.activity?.onlineFollowersByHour ?? [];
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4">
-      <p className="text-xs font-black text-gray-700 mb-3">Leitura do público</p>
+      <p className="text-xs font-black text-gray-700 mb-1">Leitura do público</p>
 
-      {allUnavailable ? (
-        <p className="text-[11px] text-gray-400">
-          Dados de público indisponíveis para esta conta ou período. Contas precisam de pelo menos 100 seguidores e permissão <span className="font-mono">instagram_manage_insights</span>.
+      {hasUnavailable && (
+        <p className="text-[10px] text-gray-400 mb-4">
+          Alguns dados avançados dependem da disponibilidade da conta e das permissões conectadas.
         </p>
-      ) : (
-        <div className="space-y-5">
-          {/* Gênero */}
-          {(advanced?.demographics?.gender?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Gênero</p>
-              <div className="space-y-2">
-                {advanced!.demographics!.gender!.map((item) => (
-                  <AudienceBar
-                    key={item.label}
-                    label={item.label === "F" ? "Feminino" : item.label === "M" ? "Masculino" : item.label}
-                    value={item.value}
-                    max={advanced!.demographics!.gender![0]?.value ?? 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+      )}
 
-          {/* Idade */}
-          {(advanced?.demographics?.age?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Faixa etária</p>
-              <div className="space-y-2">
-                {advanced!.demographics!.age!.map((item) => (
-                  <AudienceBar
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    max={advanced!.demographics!.age![0]?.value ?? 1}
-                  />
-                ))}
-              </div>
+      <div className="space-y-5 mt-3">
+        {/* Gênero */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Gênero</p>
+          {gender.length > 0 ? (
+            <div className="space-y-2">
+              {gender.map((item) => (
+                <AudienceBar
+                  key={item.label}
+                  label={item.label === "F" ? "Feminino" : item.label === "M" ? "Masculino" : item.label}
+                  value={item.value}
+                  max={gender[0]?.value ?? 1}
+                />
+              ))}
             </div>
-          )}
-
-          {/* Cidades */}
-          {(advanced?.locations?.cities?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Principais cidades</p>
-              <div className="space-y-2">
-                {advanced!.locations!.cities!.map((item) => (
-                  <AudienceBar
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    max={advanced!.locations!.cities![0]?.value ?? 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Países */}
-          {(advanced?.locations?.countries?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Países</p>
-              <div className="space-y-2">
-                {advanced!.locations!.countries!.map((item) => (
-                  <AudienceBar
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    max={advanced!.locations!.countries![0]?.value ?? 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Horários fortes */}
-          {(advanced?.activity?.onlineFollowersByHour?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Horários mais ativos</p>
-              <div className="space-y-2">
-                {advanced!.activity!.onlineFollowersByHour!.map((item) => (
-                  <AudienceBar
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    max={advanced!.activity!.onlineFollowersByHour![0]?.value ?? 1}
-                  />
-                ))}
-              </div>
-            </div>
+          ) : (
+            <AudienceEmpty msg="Dados de gênero ainda indisponíveis para esta conta ou período." />
           )}
         </div>
-      )}
+
+        {/* Faixa etária */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Faixa etária</p>
+          {age.length > 0 ? (
+            <div className="space-y-2">
+              {age.map((item) => (
+                <AudienceBar
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  max={age[0]?.value ?? 1}
+                />
+              ))}
+            </div>
+          ) : (
+            <AudienceEmpty msg="Dados de idade ainda indisponíveis para esta conta ou período." />
+          )}
+        </div>
+
+        {/* Cidades */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Principais cidades</p>
+          {cities.length > 0 ? (
+            <div className="space-y-2">
+              {cities.map((item) => (
+                <AudienceBar
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  max={cities[0]?.value ?? 1}
+                />
+              ))}
+            </div>
+          ) : (
+            <AudienceEmpty msg="Dados de cidades ainda indisponíveis para esta conta ou período." />
+          )}
+        </div>
+
+        {/* Países */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Países</p>
+          {countries.length > 0 ? (
+            <div className="space-y-2">
+              {countries.map((item) => (
+                <AudienceBar
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  max={countries[0]?.value ?? 1}
+                />
+              ))}
+            </div>
+          ) : (
+            <AudienceEmpty msg="Dados de países ainda indisponíveis para esta conta ou período." />
+          )}
+        </div>
+
+        {/* Horários ativos */}
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Horários mais ativos</p>
+          {hours.length > 0 ? (
+            <div className="space-y-2">
+              {hours.map((item) => (
+                <AudienceBar
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  max={hours[0]?.value ?? 1}
+                />
+              ))}
+            </div>
+          ) : (
+            <AudienceEmpty msg="Dados de horários ainda indisponíveis para esta conta ou período." />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
