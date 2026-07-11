@@ -1123,6 +1123,57 @@ function ConexoesContent() {
                 </div>
               )}
 
+              {/* ── Ativos vinculados por cliente ── */}
+              {accountsTested && assets?.ok && (assets?.assets ?? []).some(a => a.link || a.instagram?.link) && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Ativos vinculados aos clientes</p>
+                  <div className="rounded-xl border border-gray-100 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Cliente</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Página Facebook</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Instagram Business</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const rows: { clientId: string; clientName: string; fbPage: string | null; igAccount: string | null }[] = [];
+                          for (const asset of (assets?.assets ?? [])) {
+                            if (asset.link) {
+                              const existing = rows.find(r => r.clientId === asset.link!.client_id);
+                              if (existing) { existing.fbPage = asset.name; }
+                              else rows.push({ clientId: asset.link.client_id, clientName: asset.link.client_name ?? asset.link.client_id.slice(0,8), fbPage: asset.name, igAccount: asset.instagram?.link ? (asset.instagram.name ?? asset.instagram.username ?? "IG") : null });
+                            }
+                            if (asset.instagram?.link && !rows.some(r => r.clientId === asset.instagram!.link!.client_id)) {
+                              rows.push({ clientId: asset.instagram.link.client_id, clientName: asset.instagram.link.client_name ?? asset.instagram.link.client_id.slice(0,8), fbPage: null, igAccount: asset.instagram.name ?? asset.instagram.username ?? "IG" });
+                            }
+                          }
+                          return rows.map(row => {
+                            const complete = !!row.fbPage && !!row.igAccount;
+                            const partial  = !!row.fbPage || !!row.igAccount;
+                            return (
+                              <tr key={row.clientId} className="border-b border-gray-50 last:border-0">
+                                <td className="px-3 py-2 font-medium text-gray-800">{row.clientName}</td>
+                                <td className="px-3 py-2 text-gray-600">{row.fbPage ?? <span className="text-gray-300">—</span>}</td>
+                                <td className="px-3 py-2 text-gray-600">{row.igAccount ?? <span className="text-gray-300">—</span>}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${complete ? "text-emerald-700 bg-emerald-50 border-emerald-100" : partial ? "text-amber-700 bg-amber-50 border-amber-100" : "text-gray-400 bg-gray-50 border-gray-100"}`}>
+                                    {complete ? <CheckCircle2 className="w-3 h-3" /> : partial ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                    {complete ? "Completo" : partial ? "Parcial" : "Não configurado"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* ── Ativos encontrados na Meta ── */}
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
