@@ -1025,8 +1025,14 @@ function ConexoesContent() {
                 <AtSign className={`w-5 h-5 ${colorIcon[metaColor()]}`} strokeWidth={1.5} />
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-800">Meta / Instagram</p>
-                <p className="text-xs text-gray-400">Instagram Business, Paginas e Anuncios</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {clientParam ? "Conexão Meta da plataforma" : "Meta / Instagram"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {clientParam
+                    ? "OAuth da LOKAT OS — não representa a conexão de um cliente específico"
+                    : "Instagram Business, Paginas e Anuncios"}
+                </p>
               </div>
             </div>
             <span className={`inline-flex items-center gap-1 text-xs font-medium border px-2 py-0.5 rounded-full flex-shrink-0 ${colorBadge[metaColor()]}`}>
@@ -1056,8 +1062,15 @@ function ConexoesContent() {
               <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl mb-4 space-y-2.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <p className="text-xs font-bold text-emerald-800">Conta conectada com sucesso</p>
+                  <p className="text-xs font-bold text-emerald-800">
+                    {clientParam ? "OAuth da plataforma LOKAT OS conectado" : "Conta conectada com sucesso"}
+                  </p>
                 </div>
+                {clientParam && (
+                  <p className="text-[11px] text-emerald-700 leading-snug">
+                    Esta conexão é da plataforma LOKAT OS. Os ativos de cada cliente aparecem abaixo, separados por vínculo.
+                  </p>
+                )}
 
                 {conn?.instagram_username && (
                   <div className="flex items-center gap-2 text-xs text-emerald-800">

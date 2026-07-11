@@ -679,9 +679,9 @@ function EditModal({
 // Brief e Diagnóstico: per-client real via client_context e onboarding_profiles.
 function ClientIntegrationsRow({ c }: { c: Client }) {
   const s = INTEGRATION_STATUS;
-  const metaInstagramItems: { label: string; ok: boolean }[] = [
-    { label: "Meta",      ok: !!c.has_meta      },
-    { label: "Instagram", ok: !!c.has_instagram },
+  const metaInstagramItems = [
+    { label: "Meta",      ok: !!c.has_meta,      tipOn: "Meta: Página vinculada a este cliente", tipOff: "Meta: Nenhuma Página vinculada — configure em Conexões" },
+    { label: "Instagram", ok: !!c.has_instagram, tipOn: "Instagram: conta Business vinculada",   tipOff: "Instagram: Nenhuma conta vinculada — configure em Conexões" },
   ];
   const perClientItems: { label: string; ok: boolean }[] = [
     { label: "Brief",       ok: !!c.has_brief       },
@@ -691,17 +691,17 @@ function ClientIntegrationsRow({ c }: { c: Client }) {
     <div className="pt-2 border-t border-gray-50 mt-2">
       <p className="text-[9px] text-gray-300 mb-1.5">Conexões identificadas para este cliente</p>
       <div className="flex flex-wrap gap-1.5">
-        {metaInstagramItems.map(({ label, ok }) => {
-          const cfg = ok ? s.connected : s.needs_setup;
-          const tip = ok
-            ? `${label}: conectado`
-            : `${label}: nenhuma conexão identificada para este cliente — verifique em Conexões`;
-          return (
-            <span key={label} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${cfg.color}`} title={tip}>
-              {label}
-            </span>
-          );
-        })}
+        {metaInstagramItems.map(({ label, ok, tipOn, tipOff }) => (
+          <span
+            key={label}
+            title={ok ? tipOn : tipOff}
+            className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+              ok ? s.connected.color : s.needs_setup.color
+            }`}
+          >
+            {label}&nbsp;·&nbsp;{ok ? "Conectado" : "Não configurado"}
+          </span>
+        ))}
         {perClientItems.map(({ label, ok }) => {
           const cfg = ok ? s.connected : s.not_connected;
           const tip = ok ? `${label}: ok` : `${label}: pendente`;
