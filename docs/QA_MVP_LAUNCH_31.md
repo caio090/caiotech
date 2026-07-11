@@ -303,9 +303,68 @@ O modal conversacional (`LeadConversationModal`) usa opções fixas nos passos d
 
 ### Status
 
-- [ ] /admin/status mostra V1 = 81% enquanto persistência não confirmada em produção
-- [ ] V1 só volta a 82% após os testes de persistência acima passarem em produção
-- [ ] Milestones "Classificação de contas e leads" e "Conexões por cliente" marcados como partial
+- [x] /admin/status mostra V1 = 81%
+- [x] Classificação de conta: milestone "done" após QA aprovado em produção (2026-07-10)
+- [ ] Classificação de leads: V1 só sobe para 82% após QA de lead com domínio correto passar em produção
+- [ ] Milestones "Classificação de leads" e "Conexões por cliente" marcados como partial
+
+---
+
+## Sprint P0/P1 — Domínio do lead e coerência Meta (2026-07-10)
+
+### Perfil do lead (launch_waitlist.account_type)
+
+**Constraint real do banco:** `CHECK (account_type IN ('agency', 'business', 'professional', 'interested'))` — NOT NULL, default 'interested'.
+
+- [ ] Seletor em /admin/leads mostra apenas: Agência, Empresa, Profissional, Interessado
+- [ ] Seletor em /admin/super/leads mostra os mesmos 4 valores (sem tipos de conta do profiles)
+- [ ] "Tipo de conta" não aparece como label nessas telas — usar "Perfil do lead"
+- [ ] "Teste" não aparece como opção de perfil de lead
+- [ ] Selecionar "Agência" → salvar → refresh → persiste "Agência"
+- [ ] Selecionar "Empresa" → salvar → refresh → persiste "Empresa"
+- [ ] Status do lead não muda após alterar perfil
+- [ ] Nenhum cliente criado, nenhum convite enviado ao alterar perfil
+- [ ] Se servidor retornar 422 (perfil inválido): select reverte para valor anterior, mensagem amigável visível
+- [ ] Mensagem de erro NÃO exibe nome da constraint nem SQL do Postgres
+- [ ] Registros legados (admin_signups_view) continuam somente leitura
+- [ ] Agente IA exibe "Perfil: Agência" (não "Tipo de conta: Cliente direto")
+- [ ] Registro "Teste Modal Produção" NÃO deve ter "teste" como account_type no banco
+
+### Cards de clientes — Meta/Instagram
+
+- [ ] Duh Lanches: badge mostra "Meta · Conectado" se has_meta=true
+- [ ] Duh Lanches: badge mostra "Instagram · Conectado" se has_instagram=true
+- [ ] Framee: badge mostra "Meta · Não configurado" (cinza)
+- [ ] Framee: badge mostra "Instagram · Não configurado" (cinza)
+- [ ] Opelokat: mesma regra da Framee
+- [ ] Resumo superior ("X com Meta") e badges dos cards usam a mesma fonte de dados
+- [ ] Nenhum badge verde de Meta/Instagram sem ativo real vinculado
+
+### Tela Conexões — Meta global vs cliente
+
+- [ ] Sem cliente selecionado: título "Meta / Instagram", badge "OAuth global"
+- [ ] Com cliente selecionado: título muda para "Conexão Meta da plataforma"
+- [ ] Com cliente selecionado: texto muda de "Conta conectada com sucesso" para "OAuth da plataforma LOKAT OS conectado"
+- [ ] Nota explicativa aparece informando que a conexão é da plataforma, não do cliente
+- [ ] Bloco "Ativos de {cliente}" permanece separado e correto
+- [ ] Framee sem ativo: "Nenhuma Página ou conta do Instagram vinculada a este cliente"
+- [ ] Opelokat sem ativo: mesma mensagem
+- [ ] @duh.lanches não aparece em bloco de Framee ou Opelokat
+
+### Matriz de coerência
+
+| Cliente | Meta badge em /clientes | Instagram badge em /clientes | Ativos em /conexoes | OAuth global |
+|---|---|---|---|---|
+| Duh Lanches | Conectado | Conectado ou Não configurado | Exibe ativos reais | Sim |
+| Framee | Não configurado | Não configurado | "Nenhum ativo" | Sim |
+| Opelokat | Não configurado | Não configurado | "Nenhum ativo" | Sim |
+
+### Status
+
+- [ ] V1 = 81 mantido até QA de classificação de leads passar em produção
+- [ ] V2 = 12 inalterado
+- [ ] Milestone "Classificação de leads — domínio separado de contas em correção" marcado como partial
+- [ ] Milestone "Classificação de contas — persistência validada em produção" marcado como done
 
 ---
 
