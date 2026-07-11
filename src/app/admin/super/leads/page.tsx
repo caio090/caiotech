@@ -7,7 +7,8 @@ import {
   Mail, Send, UserCheck, Archive, Trash2, Phone, MapPin, Tag,
 } from "lucide-react";
 import type { UnifiedLead } from "@/app/api/admin/leads/route";
-import { CANONICAL_ACCOUNT_TYPES, getAccountTypeBadge } from "@/lib/account-types";
+import { getAccountTypeBadge } from "@/lib/account-types";
+import { LEAD_PROFILE_TYPES, getLeadProfileBadge } from "@/lib/lead-profile-types";
 
 type ApiResponse = {
   ok: boolean;
@@ -173,8 +174,8 @@ export default function LeadsPage() {
     }
   }
 
-  async function updateAccountType(id: string, account_type: string | null) {
-    const prevType = leads.find((l) => l.id === id)?.account_type ?? null;
+  async function updateLeadProfile(id: string, account_type: string) {
+    const prevType = leads.find((l) => l.id === id)?.account_type ?? "interested";
     setTypeUpdating(id);
     setTypeError(null);
     setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type } : l));
@@ -184,15 +185,17 @@ export default function LeadsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, account_type }),
       });
-      const data = await res.json() as { ok: boolean; message?: string; code?: string };
+      const data = await res.json() as { ok: boolean; message?: string; code?: string; entry?: { account_type: string } };
       if (!res.ok || !data.ok) {
         setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type: prevType } : l));
-        setTypeError(data.message ?? `Erro ${res.status}`);
+        setTypeError(data.message ?? "Não foi possível atualizar o perfil do lead.");
         setTimeout(() => setTypeError(null), 4000);
+      } else if (data.entry?.account_type) {
+        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type: data.entry!.account_type } : l));
       }
     } catch {
       setLeads((prev) => prev.map((l) => l.id === id ? { ...l, account_type: prevType } : l));
-      setTypeError("Erro de conexão.");
+      setTypeError("Não foi possível atualizar o perfil do lead.");
       setTimeout(() => setTypeError(null), 4000);
     } finally {
       setTypeUpdating(null);
@@ -327,7 +330,7 @@ export default function LeadsPage() {
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-semibold">Nome / Contato</th>
-                <th className="text-left px-4 py-3 font-semibold">Tipo / Perfil</th>
+                <th className="text-left px-4 py-3 font-semibold" title="Perfil comercial do contato — não cria conta ou acesso">Perfil do lead</th>
                 <th className="text-left px-4 py-3 font-semibold">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold">Cidade</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
@@ -360,21 +363,20 @@ export default function LeadsPage() {
                       {l.source === "waitlist" ? (
                         <div>
                           <select
-                            value={l.account_type ?? ""}
+                            value={l.account_type ?? "interested"}
                             disabled={typeUpdating === l.id}
-                            onChange={(e) => void updateAccountType(l.id, e.target.value || null)}
-                            title="Classificar tipo comercial"
+                            onChange={(e) => void updateLeadProfile(l.id, e.target.value)}
+                            title="Perfil comercial do lead"
                             className="text-[10px] border border-gray-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-indigo-400 bg-white disabled:opacity-60 transition-colors max-w-[130px]"
                           >
-                            <option value="">Não classificado</option>
-                            {CANONICAL_ACCOUNT_TYPES.map((t) => (
+                            {LEAD_PROFILE_TYPES.map((t) => (
                               <option key={t.value} value={t.value}>{t.label}</option>
                             ))}
                           </select>
                           {l.account_type && (() => {
-                            const badge = getAccountTypeBadge(l.account_type);
+                            const badge = getLeadProfileBadge(l.account_type);
                             return (
-                              <span className={`inline-flex items-center mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                              <span className={`inline-flex items-center mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${badge.cls}`}>
                                 {badge.label}
                               </span>
                             );

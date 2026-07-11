@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
-import { CANONICAL_ACCOUNT_TYPES } from "@/lib/account-types";
+import { LEAD_PROFILE_TYPES, getLeadProfileBadge } from "@/lib/lead-profile-types";
 
 type WaitlistEntry = {
   id: string;
@@ -271,26 +271,28 @@ export default function AdminLeadsPage() {
     { label: "Sem follow-up",icon: AlertTriangle, count: semFollowUp,               color: "text-red-600",     bg: "bg-red-50",     srcKey: "_new"        },
   ];
 
-  async function updateAccountType(id: string, account_type: string | null) {
-    const prevType = entries.find((e) => e.id === id)?.account_type ?? null;
+  async function updateLeadProfile(id: string, account_type: string) {
+    const prevType = entries.find((e) => e.id === id)?.account_type ?? "interested";
     setTypeUpdating(id);
     setTypeError(null);
-    setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: account_type ?? "" } : e));
+    setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type } : e));
     try {
       const res = await fetch("/api/admin/waitlist", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, account_type }),
       });
-      const data = await res.json() as { ok: boolean; message?: string; code?: string };
+      const data = await res.json() as { ok: boolean; message?: string; code?: string; entry?: { account_type: string } };
       if (!res.ok || !data.ok) {
-        setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType ?? "" } : e));
-        setTypeError(data.message ?? `Erro ${res.status}`);
+        setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType } : e));
+        setTypeError(data.message ?? "Não foi possível atualizar o perfil do lead.");
         setTimeout(() => setTypeError(null), 4000);
+      } else if (data.entry?.account_type) {
+        setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: data.entry!.account_type } : e));
       }
     } catch {
-      setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType ?? "" } : e));
-      setTypeError("Erro de conexão.");
+      setEntries((prev) => prev.map((e) => e.id === id ? { ...e, account_type: prevType } : e));
+      setTypeError("Não foi possível atualizar o perfil do lead.");
       setTimeout(() => setTypeError(null), 4000);
     } finally {
       setTypeUpdating(null);
@@ -455,7 +457,7 @@ export default function AdminLeadsPage() {
                 <th className="text-left px-4 py-3 font-semibold">Nome / Contato</th>
                 <th className="text-left px-4 py-3 font-semibold">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold">Intenção</th>
-                <th className="text-left px-4 py-3 font-semibold" title="Classificação visual">Tipo</th>
+                <th className="text-left px-4 py-3 font-semibold" title="Perfil comercial do contato — não cria conta ou acesso">Perfil do lead</th>
                 <th className="text-left px-4 py-3 font-semibold">Etapa</th>
                 <th className="text-left px-4 py-3 font-semibold">Criado em</th>
                 <th className="text-right px-4 py-3 font-semibold">Ação</th>
@@ -467,9 +469,8 @@ export default function AdminLeadsPage() {
                 const wa       = phone
                   ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${e.name}! Obrigado pelo interesse na Lokat OS.`)}`
                   : null;
-                const srcLbl   = getSourceLabel(e.source);
-                const srcCls   = SOURCE_COLOR[srcLbl] ?? "bg-gray-50 text-gray-500 border-gray-100";
-                const accBadge = getAccountTypeBadge(e.account_type);
+                const srcLbl = getSourceLabel(e.source);
+                const srcCls = SOURCE_COLOR[srcLbl] ?? "bg-gray-50 text-gray-500 border-gray-100";
                 return (
                   <tr key={e.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-4 py-3">
@@ -487,14 +488,13 @@ export default function AdminLeadsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <select
-                        value={e.account_type ?? ""}
+                        value={e.account_type ?? "interested"}
                         disabled={typeUpdating === e.id}
-                        onChange={(ev) => void updateAccountType(e.id, ev.target.value || null)}
-                        title="Classificar tipo comercial"
+                        onChange={(ev) => void updateLeadProfile(e.id, ev.target.value)}
+                        title="Perfil comercial do lead"
                         className="text-[10px] border border-gray-200 rounded-lg px-1.5 py-0.5 outline-none focus:border-indigo-400 bg-white disabled:opacity-60 transition-colors max-w-[130px]"
                       >
-                        <option value="">Não classificado</option>
-                        {CANONICAL_ACCOUNT_TYPES.map((t) => (
+                        {LEAD_PROFILE_TYPES.map((t) => (
                           <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
                       </select>
@@ -680,14 +680,14 @@ export default function AdminLeadsPage() {
 
               {/* Lead convertido — contexto de conta */}
               {(agenteLead.status === "invited" || agenteLead.status === "accepted") && (() => {
-                const planned = getPlannedIntegrations(agenteLead.account_type);
-                const accBadge = getAccountTypeBadge(agenteLead.account_type);
+                const planned    = getPlannedIntegrations(agenteLead.account_type);
+                const leadBadge  = getLeadProfileBadge(agenteLead.account_type);
                 return (
                   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-2">
                     <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Lead convertido</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${accBadge.color}`}>
-                        {accBadge.label}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${leadBadge.cls}`}>
+                        Perfil: {leadBadge.label}
                       </span>
                       <span className={`text-[10px] font-semibold ${agenteLead.status === "accepted" ? "text-emerald-600" : "text-purple-600"}`}>
                         {agenteLead.status === "accepted" ? "• OS ativo" : "• Convite enviado"}

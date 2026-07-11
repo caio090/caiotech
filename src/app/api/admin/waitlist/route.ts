@@ -4,7 +4,7 @@ import {
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
-import { CANONICAL_ACCOUNT_TYPE_VALUES } from "@/lib/account-types";
+import { LEAD_PROFILE_TYPE_VALUES } from "@/lib/lead-profile-types";
 
 const ALLOWED_ROLES = new Set(["super_admin", "admin"]);
 
@@ -88,14 +88,19 @@ export async function PATCH(req: NextRequest) {
   if (notes !== undefined) update.notes = notes;
   if (beta_months_granted !== undefined) update.beta_months_granted = beta_months_granted;
   if ("account_type" in body) {
-    if (account_type !== null && account_type !== undefined &&
-        !(CANONICAL_ACCOUNT_TYPE_VALUES as readonly string[]).includes(account_type as string)) {
+    if (account_type === null || account_type === undefined || account_type === "") {
       return NextResponse.json({
         ok: false, code: "invalid_account_type",
-        message: `Valor inválido. Aceitos: ${CANONICAL_ACCOUNT_TYPE_VALUES.join(", ")}.`,
+        message: "Perfil do lead inválido para a configuração atual.",
       }, { status: 422 });
     }
-    update.account_type = account_type ?? null;
+    if (!LEAD_PROFILE_TYPE_VALUES.includes(account_type as string)) {
+      return NextResponse.json({
+        ok: false, code: "invalid_account_type",
+        message: "Perfil do lead inválido para a configuração atual.",
+      }, { status: 422 });
+    }
+    update.account_type = account_type;
   }
 
   const admin = createRequiredSupabaseAdminClient();
@@ -105,7 +110,12 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id)
     .select("id, account_type, status");
   if (error) {
-    return NextResponse.json({ ok: false, code: "db_error", message: error.message }, { status: 500 });
+    const isConstraint = error.message?.includes("violates check constraint") || error.code === "23514";
+    const isNotNull    = error.message?.includes("null value") || error.code === "23502";
+    const msg = (isConstraint || isNotNull)
+      ? "Perfil do lead inválido para a configuração atual."
+      : "Erro ao atualizar registro.";
+    return NextResponse.json({ ok: false, code: "db_error", message: msg }, { status: 500 });
   }
   if (!updated || updated.length === 0) {
     return NextResponse.json({ ok: false, code: "not_found", message: "Registro não encontrado na waitlist." }, { status: 404 });
