@@ -1837,8 +1837,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const execDeadline = Date.now() + MAX_EXECUTION_MS;
-    const fetchResult  = await fetchAllOrders(baseUrl, safeToken, start, end, execDeadline);
+    const requestStart       = Date.now();
+    const execDeadline       = requestStart + MAX_EXECUTION_MS;
+    const providerFetchStart = requestStart;
+    const fetchResult        = await fetchAllOrders(baseUrl, safeToken, start, end, execDeadline);
+    const providerFetchMs    = Date.now() - providerFetchStart;
 
     if (!fetchResult.ok) {
       return NextResponse.json({
@@ -1857,8 +1860,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { orders, pagination, debugShape, rateLimitInfo, windowDiag } = fetchResult;
-    const completeness = classifyCompleteness(pagination);
+    const completeness     = classifyCompleteness(pagination);
+    const aggregationStart = Date.now();
     let metrics = computeMetrics(orders);
+    const aggregationMs    = Date.now() - aggregationStart;
     let detailStats: DetailFetchStats | null = null;
     let topProductsResult: TopProductsResult | null = null;
 
@@ -1983,6 +1988,15 @@ export async function GET(request: NextRequest) {
       detailStats,
       windowDiag,
       cacheHit: false,
+      timings: {
+        providerFetchMs,
+        aggregationMs,
+        totalDurationMs: Date.now() - requestStart,
+        requestsMade:    windowDiag?.requestsMade ?? pagination?.pagesFetched ?? 1,
+        daysFetched:     windowDiag?.dailyFallbackUsed ? windowDiag.totalWindows : null,
+        cacheSource:     "none" as const,
+        fallbackUsed:    windowDiag?.dailyFallbackUsed ?? false,
+      },
       topProductsEndpoint: topProductsResult
         ? { used: topProductsResult.ok, providerEndpoint: topProductsResult.providerEndpoint, reason: topProductsResult.reason, message: topProductsResult.message }
         : null,
