@@ -126,6 +126,10 @@ interface ReportData {
   faturamentoPorDiaSemana?: Record<string, number>; pedidosPorDiaSemana?: Record<string, number>;
   pedidosPorHora?: Record<string, number>; faturamentoPorHora?: Record<string, number>;
   concentracaoPorFaixa?: Record<string, { orders: number; revenue: number }>;
+  timings?: {
+    providerFetchMs: number; aggregationMs: number; totalDurationMs: number;
+    requestsMade: number; daysFetched: number | null; cacheSource: string; fallbackUsed: boolean;
+  } | null;
 }
 
 // ── Formatters ───────────────────────────────────────────────────────────────
@@ -500,6 +504,12 @@ function InsightsPanel({ report, prevReport }: { report: ReportData; prevReport:
             <span style={{ fontSize: 12, color: "var(--lk-text)", lineHeight: 1.5 }}>{ins.text}</span>
           </div>
         ))}
+      </div>
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--lk-border)", display: "flex", alignItems: "flex-start", gap: 7 }}>
+        <Info size={11} style={{ color: "var(--lk-muted)", marginTop: 1, flexShrink: 0 }} />
+        <span style={{ fontSize: 11, color: "var(--lk-muted)", lineHeight: 1.5 }}>
+          Estes destaques refletem exclusivamente pedidos registrados no OlaClick. Não é possível atribuir pedidos a campanhas sem cupom, UTM ou link rastreável na origem do pedido.
+        </span>
       </div>
     </div>
   );
@@ -1497,6 +1507,18 @@ export default function FaturamentoPage() {
                         <span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Snapshot:</span>{" "}
                         {{saved:"Salvo com sucesso", not_configured:"Tabela não configurada", skipped:"Ignorado (sem dados)", skipped_incomplete:"Não salvo — coleta incompleta", error:"Erro ao salvar snapshot"}[report.snapshotPersistence]}
                       </p>
+                    )}
+
+                    {report.timings && (
+                      <>
+                        <hr style={{ border: "none", borderTop: "1px solid var(--lk-border)", margin: "4px 0" }} />
+                        <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Coleta provider:</span> {report.timings.providerFetchMs}ms</p>
+                        <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Agregação:</span> {report.timings.aggregationMs}ms</p>
+                        <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Total do servidor:</span> {report.timings.totalDurationMs}ms</p>
+                        <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Requisições feitas:</span> {report.timings.requestsMade}</p>
+                        {report.timings.daysFetched !== null && <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Dias coletados:</span> {report.timings.daysFetched}</p>}
+                        {report.timings.fallbackUsed && <p style={{ color: "#fbbf24" }}>Fallback diário usado nesta coleta.</p>}
+                      </>
                     )}
 
                     <div style={{ marginTop: 8, paddingTop: 10, borderTop: "1px solid var(--lk-border)" }}>
