@@ -368,4 +368,73 @@ O modal conversacional (`LeadConversationModal`) usa opções fixas nos passos d
 
 ---
 
+## Sprint — Cardápio Digital, Meta e Relatórios (2026-07-10)
+
+### OlaClick — Completude da coleta
+
+- [ ] /admin/relatorios/faturamento com 7 dias mostra badge "Dados parciais" quando retornar exatamente 50 pedidos
+- [ ] Badge "Dados completos" aparece somente quando paginação confirmada ou providerTotal verificado
+- [ ] KPI label "Faturamento dos pedidos carregados" aparece quando completeness !== "complete"
+- [ ] KPI label "Pedidos retornados" aparece quando completeness !== "complete"
+- [ ] "Faturamento total" e "Total de pedidos" aparecem somente quando completeness = "complete"
+- [ ] Aviso de dados parciais explica que os KPIs refletem apenas os pedidos carregados
+- [ ] Top Produtos não aparece quando itens não estão disponíveis na resposta
+- [ ] Mensagem de motivo da indisponibilidade de produtos é visível
+- [ ] Diagnóstico API (colapsível) mostra completeness, páginas buscadas e limit detectado
+- [ ] Período "Hoje" com 0 pedidos mostra estado vazio correto (não badge parcial)
+
+### Meta Insights — Interpretação e qualidade
+
+- [ ] Bloco "Leitura do período" aparece quando há métricas disponíveis e alcance > 0
+- [ ] Recomendação "alto alcance, zero cliques" aparece corretamente
+- [ ] Recomendação NÃO aparece quando não há dados suficientes para gerar uma
+- [ ] Bloco "Qualidade dos dados" aparece ao final das métricas disponíveis
+- [ ] Badge "Meta: disponível" aparece em verde quando insights carregaram ok
+- [ ] Badge "Público: indisponível" aparece em cinza quando demographics estão vazios
+- [ ] Badge "Atribuição campanha→pedido: não configurada" sempre aparece
+- [ ] "Horários com maior atividade dos seguidores" usa texto + nota explicativa de métrica
+- [ ] Nota de horários menciona "online_followers" e "não indica necessariamente o melhor horário"
+- [ ] Quando TODOS os dados de público estão vazios: bloco compacto único (não 5 seções vazias)
+- [ ] Quando alguns dados disponíveis: seções individuais com mensagem de vazio aparecem
+- [ ] Nenhuma recomendação com denominador zero (divisão por zero não ocorre)
+
+### REC OS vs. Relatórios — Motor compartilhado
+
+- [ ] /admin/contentos/insights?client=<id> exibe MetaInsightsPanel (modo operacional)
+- [ ] /admin/relatorios/conteudo exibe seletor de cliente + MetaInsightsPanel (modo relatório)
+- [ ] Ambas as rotas buscam de /api/meta/insights com o mesmo client_id
+- [ ] Trocar cliente em /relatorios/conteudo atualiza os insights sem recarregar a página
+- [ ] "Ver relatório de conteúdo →" em /relatorios NÃO redireciona para REC OS — leva para /relatorios/conteudo
+- [ ] "Ver Meta Insights (REC OS)" foi removido de /relatorios/conteudo (substituído pela view direta)
+- [ ] MetaInsightsPanel em /relatorios/conteudo mostra o mesmo alcance/visualizações que /contentos/insights para o mesmo cliente/período
+- [ ] Período selecionado em um módulo não afeta o outro (cada um tem estado independente)
+
+### Sidebar — Tooltip fluido
+
+- [ ] Hover em qualquer ícone da sidebar admin exibe o nome do módulo à direita
+- [ ] Tooltip aparece sem deslocar o conteúdo principal
+- [ ] Tooltip aparece sem corte por overflow do nav
+- [ ] Foco via teclado (Tab) em um item ativa o tooltip
+- [ ] Sair do foco (Tab para próximo) oculta o tooltip do anterior
+- [ ] Mover mouse rapidamente entre itens não deixa tooltips presos
+- [ ] Tooltip não aparece para outros elementos que não sejam itens de nav
+- [ ] Sidebar testada nos variants: admin, client, contentos, operacional
+- [ ] Sidebar com transparent=true (tela Início) funciona igual
+
+### Campanha → Pedido — Estado neutro
+
+- [ ] Bloco de atribuição (quando implementado) usa "gerou" somente com atribuição real
+- [ ] Sem atribuição configurada: nenhum texto afirma que campanha gerou pedidos
+- [ ] Estado "Atribuição campanha→pedido: não configurada" visível em qualidade dos dados
+
+### Status
+
+- [ ] V1 = 81 mantido nesta sprint (sem mudança de percentual sem QA de leads)
+- [ ] V2 = 12 inalterado
+- [ ] Milestone "Cardápio Digital/OlaClick" marcado como partial
+- [ ] Milestone "Meta Insights" marcado como partial
+- [ ] Milestone "Relatórios" marcado como partial
+
+---
+
 *Atualizar após cada deploy ou sessão de testes.*

@@ -36,8 +36,12 @@ interface DigitalMenuStatus {
 }
 
 interface PaginationInfo {
-  used: boolean; pagesFetched: number; totalReturned: number;
+  used: boolean;
+  paginationMode: "envelope" | "page_size_fallback" | "single_page" | "operational_only";
+  pagesFetched: number; totalReturned: number;
   providerTotal: number | null; limitDetected: number | null; hasMore: boolean;
+  dedup: { rawCount: number; uniqueCount: number; duplicateCount: number; missingIdCount: number };
+  dateFilterRespected: boolean | null;
 }
 
 interface DebugShape {
@@ -47,13 +51,17 @@ interface DebugShape {
   detectedLimit: number | null; hasNextPage: boolean | null;
 }
 
+type OrderFetchCompleteness = "complete" | "partial" | "operational_only" | "unknown" | "error";
+type SnapshotPersistence   = "saved" | "not_configured" | "skipped" | "error";
+
 interface OrdersResult {
   ok: boolean;
   reason?: string; code?: string; message?: string;
   connectionFound?: boolean; provider?: string;
   baseUrlResolved?: boolean; endpoint?: string;
   httpStatus?: number | null; providerErrorMessage?: string | null;
-  snapshotWarning?: string | null;
+  snapshotPersistence?: SnapshotPersistence;
+  completeness?: OrderFetchCompleteness;
   pagination?: PaginationInfo;
   debugShape?: DebugShape;
   data?: {
@@ -81,7 +89,8 @@ interface ReportData {
   pedidos_recentes:       { id: string; date: string | null; status: string; total: number }[];
   pagination?:            PaginationInfo;
   debugShape?:            DebugShape;
-  snapshotWarning?:       string | null;
+  snapshotPersistence?:   SnapshotPersistence;
+  completeness?:          OrderFetchCompleteness;
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -105,6 +114,41 @@ function fmtDay(ymd: string) {
     const [y, m, d] = ymd.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   } catch { return ymd; }
+}
+
+// ── Badge de qualidade dos dados ───────────────────────────────────────────────
+
+function DataQualityBadge({ completeness }: { completeness?: OrderFetchCompleteness }) {
+  if (completeness === "complete") {
+    return (
+      <div className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+        <CheckCircle2 className="w-3 h-3" />
+        Dados completos
+      </div>
+    );
+  }
+  if (completeness === "partial") {
+    return (
+      <div className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+        <Info className="w-3 h-3" />
+        Dados parciais
+      </div>
+    );
+  }
+  if (completeness === "operational_only") {
+    return (
+      <div className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">
+        <Info className="w-3 h-3" />
+        Modo operacional
+      </div>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-100">
+      <Info className="w-3 h-3" />
+      Completude não confirmada
+    </div>
+  );
 }
 
 // ── Sub-componentes ────────────────────────────────────────────────────────────
@@ -283,7 +327,8 @@ export default function FaturamentoPage() {
         pedidos_recentes:       parsed?.pedidos_recentes       ?? [],
         pagination:             d.pagination,
         debugShape:             d.debugShape,
-        snapshotWarning:        d.snapshotWarning,
+        snapshotPersistence:        d.snapshotPersistence,
+        completeness:           d.completeness,
       });
       setLastSync(new Date().toISOString());
     } catch {
@@ -346,13 +391,27 @@ export default function FaturamentoPage() {
   });
   void autoRefreshNow; // referência para evitar lint
 
-  // Aviso de período idêntico — se 50 pedidos e sem paginação detectada
+  // Aviso de dados parciais — paginação não detectada com count suspeito, ou completeness explícita
   const samePeriodsWarning = report
     && report.total_pedidos > 0
-    && report.pagination
-    && !report.pagination.used
-    && report.pagination.limitDetected !== null
-    && report.total_pedidos === report.pagination.limitDetected;
+    && (
+      report.completeness === "partial"
+      || report.completeness === "unknown"
+      || report.completeness === "operational_only"
+      || (
+        report.pagination
+        && !report.pagination.used
+        && report.pagination.limitDetected !== null
+        && report.total_pedidos === report.pagination.limitDetected
+      )
+    );
+
+  // Labels condicionais baseados na completude dos dados
+  const isComplete = report?.completeness === "complete";
+  const labelFaturamento = isComplete ? "Faturamento total" : "Faturamento dos pedidos carregados";
+  const labelPedidos     = isComplete ? "Total de pedidos"  : "Pedidos retornados";
+  const labelTicket      = isComplete ? "Ticket médio"      : "Ticket médio dos pedidos carregados";
+  const labelMelhoresDias = isComplete ? "Melhores dias de venda" : "Dias com maior volume (amostra parcial)";
 
   return (
     <div>
@@ -548,22 +607,28 @@ export default function FaturamentoPage() {
             </div>
           )}
 
-          {/* Aviso paginação/limite */}
-          {samePeriodsWarning && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>A API retornou exatamente <strong>{report.total_pedidos}</strong> pedidos — pode ser o limite por página do provider. Períodos diferentes podem ter retornado o mesmo conjunto se houver paginação não detectada.</span>
-            </div>
-          )}
+          {/* Badge de qualidade + aviso parcial */}
+          <div className="flex flex-wrap items-center gap-3">
+            <DataQualityBadge completeness={report.completeness} />
+            {samePeriodsWarning && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex-1 min-w-0">
+                <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>
+                  A API retornou <strong>{report.total_pedidos}</strong> pedidos sem confirmar completude — pode ser o limite por página do provider.
+                  {" "}Os KPIs abaixo refletem apenas os pedidos carregados, não necessariamente o total do período.
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Cards principais */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard icon={DollarSign}   label="Faturamento total" value={fmtBRL(report.faturamento_total)}
-              sub={`Fonte: Cardápio Digital`} color="bg-emerald-50 text-emerald-600" />
-            <StatCard icon={ShoppingCart} label="Total de pedidos"  value={fmtCount(report.total_pedidos)}
+            <StatCard icon={DollarSign}   label={labelFaturamento} value={fmtBRL(report.faturamento_total)}
+              sub="Fonte: Cardápio Digital" color="bg-emerald-50 text-emerald-600" />
+            <StatCard icon={ShoppingCart} label={labelPedidos}     value={fmtCount(report.total_pedidos)}
               sub={report.pagination?.pagesFetched && report.pagination.pagesFetched > 1 ? `${report.pagination.pagesFetched} páginas buscadas` : undefined}
               color="bg-blue-50 text-blue-600" />
-            <StatCard icon={TrendingUp}   label="Ticket médio"      value={fmtBRL(report.ticket_medio)} color="bg-violet-50 text-violet-600" />
+            <StatCard icon={TrendingUp}   label={labelTicket}      value={fmtBRL(report.ticket_medio)} color="bg-violet-50 text-violet-600" />
           </div>
 
           {/* Comparação com período anterior */}
@@ -754,10 +819,22 @@ export default function FaturamentoPage() {
                 {report.pagination && (
                   <>
                     <p><span className="font-semibold text-gray-700">Paginação detectada:</span> {report.pagination.used ?? report.debugShape?.hasPagination ? "Sim" : "Não"}</p>
+                    <p><span className="font-semibold text-gray-700">Modo de paginação:</span> {report.pagination.paginationMode}</p>
                     {report.pagination.pagesFetched > 0 && <p><span className="font-semibold text-gray-700">Páginas buscadas:</span> {report.pagination.pagesFetched}</p>}
                     {report.pagination.providerTotal !== null && <p><span className="font-semibold text-gray-700">Total informado pelo provider:</span> {report.pagination.providerTotal}</p>}
                     {report.pagination.limitDetected !== null && <p><span className="font-semibold text-gray-700">Limite detectado por página:</span> {report.pagination.limitDetected}</p>}
                     {report.pagination.hasMore && <p className="text-amber-600 font-semibold">⚠ Há mais pedidos além do retornado (limite de segurança atingido).</p>}
+                    {report.pagination.dedup && (
+                      <p>
+                        <span className="font-semibold text-gray-700">Deduplicação:</span>{" "}
+                        {report.pagination.dedup.uniqueCount} únicos de {report.pagination.dedup.rawCount} brutos
+                        {report.pagination.dedup.duplicateCount > 0 && ` · ${report.pagination.dedup.duplicateCount} duplicados removidos`}
+                        {report.pagination.dedup.missingIdCount > 0 && ` · ${report.pagination.dedup.missingIdCount} sem ID`}
+                      </p>
+                    )}
+                    {report.pagination.dateFilterRespected !== null && (
+                      <p><span className="font-semibold text-gray-700">Filtro de data respeitado:</span> {report.pagination.dateFilterRespected ? "Sim" : "Não confirmado"}</p>
+                    )}
                   </>
                 )}
                 {report.debugShape && (
@@ -772,8 +849,14 @@ export default function FaturamentoPage() {
                     )}
                   </>
                 )}
-                {report.snapshotWarning && (
-                  <p className="text-amber-600"><span className="font-semibold">Snapshot:</span> {report.snapshotWarning}</p>
+                {report.snapshotPersistence && (
+                  <p className={report.snapshotPersistence === "saved" ? "text-emerald-600" : report.snapshotPersistence === "error" ? "text-red-500" : "text-gray-400"}>
+                    <span className="font-semibold">Snapshot:</span>{" "}
+                    {report.snapshotPersistence === "saved"           && "Salvo com sucesso"}
+                    {report.snapshotPersistence === "not_configured"  && "Tabela não configurada"}
+                    {report.snapshotPersistence === "skipped"         && "Ignorado (sem dados)"}
+                    {report.snapshotPersistence === "error"           && "Erro ao salvar snapshot"}
+                  </p>
                 )}
                 <div className="flex items-center gap-2 text-[10px] text-gray-300 pt-2 border-t border-gray-50">
                   <Clock className="w-3 h-3" /> Última sincronização: {fmtDate(lastSync)}

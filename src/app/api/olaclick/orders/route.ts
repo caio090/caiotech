@@ -3,6 +3,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveOlaClickBaseUrl } from "@/lib/olaclick";
 import { getActiveDigitalMenuConnection } from "@/lib/digital-menu/server";
 
+import type { OrderFetchCompleteness, SnapshotPersistence } from "@/lib/digital-menu/analytics-types";
+export type { OrderFetchCompleteness };
+
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
@@ -21,31 +24,47 @@ interface DebugShape {
 }
 
 interface PaginationInfo {
-  used:          boolean;
-  pagesFetched:  number;
-  totalReturned: number;
-  providerTotal: number | null;
-  limitDetected: number | null;
-  hasMore:       boolean;
+  used:           boolean;
+  paginationMode: "envelope" | "page_size_fallback" | "single_page" | "operational_only";
+  pagesFetched:   number;
+  totalReturned:  number;
+  providerTotal:  number | null;
+  limitDetected:  number | null;
+  hasMore:        boolean;
+  dedup: {
+    rawCount:       number;
+    uniqueCount:    number;
+    duplicateCount: number;
+    missingIdCount: number;
+  };
+  dateFilterRespected: boolean | null;
+}
+
+interface DetailFetchStats {
+  detailRequestsAttempted: number;
+  detailRequestsSucceeded: number;
+  detailRequestsFailed:    number;
+  abortedDueTo:            "rate_limited" | "not_found" | null;
 }
 
 interface OrderMetrics {
-  faturamento_total:      number;
-  total_pedidos:          number;
-  ticket_medio:           number | null;
-  pedidos_por_status:     Record<string, number> | null;
-  produtos_mais_vendidos: { name: string; qty: number }[] | null;
-  topItemsUnavailable:    boolean;
-  topItemsReason:         string | null;
-  melhores_dias:          { date: string; revenue: number; orders: number }[] | null;
-  pedidos_recentes:       { id: string; date: string | null; status: string; total: number }[];
+  faturamento_total:       number;
+  total_pedidos:           number;
+  ticket_medio:            number | null;
+  pedidos_por_status:      Record<string, number> | null;
+  produtos_mais_vendidos:  { name: string; qty: number }[] | null;
+  topItemsUnavailable:     boolean;
+  topItemsReason:          string | null;
+  topProductsCompleteness: "complete" | "partial" | "unavailable";
+  melhores_dias:           { date: string; revenue: number; orders: number }[] | null;
+  pedidos_recentes:        { id: string; date: string | null; status: string; total: number }[];
 }
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
 
 function resolveDateRange(period: PeriodKey): { start: string; end: string } {
-  const now    = new Date();
-  const toYMD  = (d: Date) => d.toISOString().split("T")[0];
+  const now   = new Date();
+  const toYMD = (d: Date) => d.toISOString().split("T")[0];
   if (period === "hoje")   return { start: toYMD(now), end: toYMD(now) };
   if (period === "7dias")  { const s = new Date(now); s.setDate(s.getDate() - 6);  return { start: toYMD(s), end: toYMD(now) }; }
   if (period === "15dias") { const s = new Date(now); s.setDate(s.getDate() - 14); return { start: toYMD(s), end: toYMD(now) }; }
@@ -84,11 +103,15 @@ function extractOrders(raw: unknown): Record<string, unknown>[] | null {
   if (Array.isArray(raw)) return raw as Record<string, unknown>[];
   if (raw && typeof raw === "object") {
     const r = raw as Record<string, unknown>;
-    for (const key of ["orders", "data", "results", "items"]) {
+    for (const key of ["data", "orders", "results", "items"]) {
       if (Array.isArray(r[key])) return r[key] as Record<string, unknown>[];
     }
   }
   return null;
+}
+
+function extractOrderId(order: Record<string, unknown>): string {
+  return String(order["id"] ?? order["order_id"] ?? order["uuid"] ?? order["code"] ?? order["number"] ?? "");
 }
 
 function detectNextPage(
@@ -98,7 +121,27 @@ function detectNextPage(
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { nextPage: null, providerTotal: null, perPage: null };
   const r = raw as Record<string, unknown>;
 
-  // Laravel-style: { meta: { current_page, last_page, per_page, total } }
+  // OlaClick native: { pagination: { current_page, per_page, total, has_more } }
+  const pag = r["pagination"] as Record<string, unknown> | undefined;
+  if (pag && typeof pag === "object") {
+    const hasMore = pag["has_more"] === true;
+    const total   = typeof pag["total"]    === "number" ? pag["total"]    : null;
+    const perPage = typeof pag["per_page"] === "number" ? pag["per_page"] : null;
+    // Derive last_page from total/per_page when not explicit
+    const lastPage =
+      typeof pag["last_page"]   === "number" ? pag["last_page"]   :
+      typeof pag["total_pages"] === "number" ? pag["total_pages"] :
+      (total !== null && perPage !== null && perPage > 0) ? Math.ceil(total / perPage) : null;
+    let next: number | null = null;
+    if (hasMore) {
+      next = currentPage + 1;
+    } else if (lastPage !== null && currentPage < lastPage) {
+      next = currentPage + 1;
+    }
+    return { nextPage: next, providerTotal: total, perPage };
+  }
+
+  // Laravel meta: { meta: { current_page, last_page, per_page, total } }
   const meta = r["meta"] as Record<string, unknown> | undefined;
   if (meta && typeof meta === "object") {
     const lastPage = typeof meta["last_page"] === "number" ? meta["last_page"] : null;
@@ -108,18 +151,7 @@ function detectNextPage(
     return { nextPage: next, providerTotal: total, perPage };
   }
 
-  // { pagination: { page, total_pages | last_page, per_page, total } }
-  const pag = r["pagination"] as Record<string, unknown> | undefined;
-  if (pag && typeof pag === "object") {
-    const totalPages = (typeof pag["total_pages"] === "number" ? pag["total_pages"]
-                      : typeof pag["last_page"]   === "number" ? pag["last_page"] : null);
-    const total    = typeof pag["total"]    === "number" ? pag["total"]    : null;
-    const perPage  = typeof pag["per_page"] === "number" ? pag["per_page"] : null;
-    const next     = totalPages !== null && currentPage < totalPages ? currentPage + 1 : null;
-    return { nextPage: next, providerTotal: total, perPage };
-  }
-
-  // { links: { next } } or { next_page } or { next: "url" }
+  // Link-based: { links: { next } } | { next_page } | { next: "url" }
   const links = r["links"] as Record<string, unknown> | undefined;
   if (links?.["next"] != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null };
   if (r["next_page"]  != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null };
@@ -144,12 +176,12 @@ function buildDebugShape(
   if (Array.isArray(rawJson)) listKeyUsed = "array";
   else if (rawJson && typeof rawJson === "object") {
     const r = rawJson as Record<string, unknown>;
-    for (const key of ["orders", "data", "results", "items"]) {
+    for (const key of ["data", "orders", "results", "items"]) {
       if (Array.isArray(r[key])) { listKeyUsed = key; break; }
     }
   }
 
-  const firstOrder    = pageOrders[0] ?? null;
+  const firstOrder     = pageOrders[0] ?? null;
   const firstOrderKeys = firstOrder ? Object.keys(firstOrder) : [];
   const rawItems = firstOrder
     ? (firstOrder["items"] ?? firstOrder["order_items"] ?? firstOrder["products"] ?? firstOrder["cart"] ?? firstOrder["lines"])
@@ -171,10 +203,52 @@ function buildDebugShape(
   };
 }
 
-// ── Busca paginada ─────────────────────────────────────────────────────────────
+// ── Completude da coleta ───────────────────────────────────────────────────────
 
-const MAX_PAGES  = 10;
-const MAX_ORDERS = 500;
+// Tamanhos de página comuns que, sem envelope, sugerem que pode haver mais pedidos.
+const SUSPICIOUS_LIMITS = new Set([10, 15, 20, 25, 30, 50, 100, 200]);
+
+function classifyCompleteness(pagination: PaginationInfo): OrderFetchCompleteness {
+  if (pagination.paginationMode === "operational_only") return "operational_only";
+
+  // Provider confirmou total e carregamos tudo
+  if (pagination.providerTotal !== null && pagination.dedup.uniqueCount >= pagination.providerTotal) return "complete";
+
+  // Paginamos e não há mais páginas → completo
+  if (pagination.used && !pagination.hasMore) return "complete";
+
+  // Truncamento comprovado: safety limits ou provider confirmou que há mais
+  if (pagination.hasMore) return "partial";
+  if (pagination.providerTotal !== null && pagination.dedup.uniqueCount < pagination.providerTotal) return "partial";
+
+  // Número redondo sem envelope: não é possível afirmar truncamento
+  return "unknown";
+}
+
+// ── Detecção de filtro de data ─────────────────────────────────────────────────
+
+function detectDateFilterRespected(
+  orders: Record<string, unknown>[],
+  start: string,
+  end: string,
+): boolean | null {
+  let checked = 0;
+  let outOfRange = 0;
+  for (const o of orders.slice(0, Math.min(orders.length, 10))) {
+    const d = extractDate(o);
+    if (d) {
+      checked++;
+      if (d < start || d > end) outOfRange++;
+    }
+  }
+  if (checked === 0) return null;
+  return outOfRange === 0;
+}
+
+// ── Busca paginada com deduplicação ───────────────────────────────────────────
+
+const MAX_PAGES  = 20;
+const MAX_ORDERS = 1000;
 
 async function fetchAllOrders(
   baseUrl: string,
@@ -183,23 +257,36 @@ async function fetchAllOrders(
   start: string,
   end: string,
 ): Promise<
-  | { ok: true;  orders: Record<string, unknown>[]; pagination: PaginationInfo; debugShape: DebugShape }
+  | { ok: true;  orders: Record<string, unknown>[]; pagination: PaginationInfo; debugShape: DebugShape; rateLimitInfo: RateLimitInfo }
   | { ok: false; code: string; reason: string; message: string; httpStatus: number | null; providerErrorMessage: string | null }
 > {
-  const allOrders: Record<string, unknown>[] = [];
-  let pagesFetched  = 0;
-  let currentPage   = 1;
-  let providerTotal: number | null = null;
-  let limitDetected: number | null = null;
-  let hasMore       = false;
-  let usedPagination = false;
-  let debugShape: DebugShape | null = null;
+  // Deduplicação: key = order ID (ou sintético para pedidos sem ID)
+  const orderMap     = new Map<string, Record<string, unknown>>();
+  let rawCount       = 0;
+  let duplicateCount = 0;
+  let missingIdCount = 0;
 
-  while (currentPage <= MAX_PAGES && allOrders.length < MAX_ORDERS) {
+  let pagesFetched      = 0;
+  let currentPage       = 1;
+  let providerTotal:    number | null = null;
+  let limitDetected:    number | null = null;
+  let hasMore           = false;
+  let paginationMode:   PaginationInfo["paginationMode"] = "single_page";
+  let envelopeDetected  = false;
+  let gotNewBeyondPage1 = false;
+  let page1Count        = 0;
+  let debugShape: DebugShape | null = null;
+  let rateLimitInfo: RateLimitInfo = { limit: null, remaining: null, reset: null, guard: false };
+
+  while (currentPage <= MAX_PAGES && orderMap.size < MAX_ORDERS) {
     const url = new URL(`${baseUrl}${endpoint}`);
     url.searchParams.set("filter[start_date]", start);
     url.searchParams.set("filter[end_date]",   end);
-    if (currentPage > 1) url.searchParams.set("page", String(currentPage));
+    // OlaClick documentado: page[number] — também envia page= para retrocompatibilidade
+    if (currentPage > 1) {
+      url.searchParams.set("page[number]", String(currentPage));
+      url.searchParams.set("page",         String(currentPage));
+    }
 
     let response: Response;
     try {
@@ -209,7 +296,8 @@ async function fetchAllOrders(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown";
-      return { ok: false,
+      return {
+        ok: false,
         code: "provider_network_error", reason: "network_error",
         httpStatus: null,
         providerErrorMessage: msg.slice(0, 200).replace(/[A-Za-z0-9_\-]{31,}/g, "[REDACTED]"),
@@ -217,16 +305,28 @@ async function fetchAllOrders(
       };
     }
 
+    // Ler rate limit antes de verificar sucesso (headers estão em qualquer status)
+    const rl = parseRateLimitHeaders(response);
+    rateLimitInfo = { ...rl, guard: false };
+
     if (!response.ok) {
       const cls  = classifyProviderError(response.status);
       const body = await safeProviderBody(response);
       return { ok: false, ...cls, httpStatus: response.status, providerErrorMessage: body };
     }
 
+    // Proteção proativa: parar se restam menos de 5 requisições na cota
+    if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining < 5 && pagesFetched > 0) {
+      hasMore = true;
+      rateLimitInfo.guard = true;
+      break;
+    }
+
     let rawJson: unknown;
     try { rawJson = await response.json(); }
     catch {
-      return { ok: false,
+      return {
+        ok: false,
         code: "provider_unexpected_response", reason: "unexpected_response",
         httpStatus: response.status, providerErrorMessage: null,
         message: "A API respondeu, mas em formato diferente do esperado.",
@@ -235,7 +335,7 @@ async function fetchAllOrders(
 
     const pageOrders = extractOrders(rawJson) ?? [];
 
-    // Coleta chaves de paginação para debugShape
+    // Chaves de paginação para debugShape
     const paginationKeys: string[] = [];
     if (rawJson && typeof rawJson === "object" && !Array.isArray(rawJson)) {
       const r = rawJson as Record<string, unknown>;
@@ -247,38 +347,90 @@ async function fetchAllOrders(
     }
 
     const { nextPage, providerTotal: pt, perPage: pp } = detectNextPage(rawJson, currentPage);
-    if (pt !== null) providerTotal = pt;
-    if (pp !== null) limitDetected = pp;
+    if (pt !== null) { providerTotal = pt; envelopeDetected = true; }
+    if (pp !== null) { limitDetected = pp; envelopeDetected = true; }
+    if (nextPage !== null) envelopeDetected = true;
 
     if (pagesFetched === 0) {
+      page1Count = pageOrders.length;
       debugShape = buildDebugShape(rawJson, pageOrders, nextPage, pp, paginationKeys);
+      if (envelopeDetected) paginationMode = "envelope";
     }
 
-    allOrders.push(...pageOrders);
+    // Deduplicação desta página
+    const mapSizeBefore = orderMap.size;
+    for (const order of pageOrders) {
+      rawCount++;
+      const oid = extractOrderId(order);
+      if (!oid) {
+        missingIdCount++;
+        orderMap.set(`__noid_${rawCount}`, order);
+      } else if (orderMap.has(oid)) {
+        duplicateCount++;
+      } else {
+        orderMap.set(oid, order);
+      }
+    }
+    const newFromThisPage = orderMap.size - mapSizeBefore;
     pagesFetched++;
 
-    if (nextPage === null || pageOrders.length === 0) {
+    // Detectar page param ignorado: página 2+ devolveu só duplicatas com conteúdo
+    if (currentPage > 1 && newFromThisPage === 0 && pageOrders.length > 0) {
+      paginationMode = "operational_only";
       hasMore = false;
       break;
     }
-    usedPagination = true;
-    hasMore = allOrders.length < (providerTotal ?? Infinity);
-    currentPage = nextPage;
+    if (currentPage > 1 && newFromThisPage > 0) gotNewBeyondPage1 = true;
+
+    // Decidir próxima iteração
+    if (nextPage !== null) {
+      paginationMode = "envelope";
+      hasMore = orderMap.size < (providerTotal ?? Infinity);
+      currentPage = nextPage;
+    } else if (pageOrders.length === 0) {
+      hasMore = false;
+      break;
+    } else if (!envelopeDetected && paginationMode === "single_page" && SUSPICIOUS_LIMITS.has(pageOrders.length)) {
+      // Tentar page 2 por tamanho suspeito (fallback)
+      paginationMode = "page_size_fallback";
+      hasMore = false;
+      currentPage = 2;
+    } else if (paginationMode === "page_size_fallback") {
+      const expectedSize = limitDetected ?? page1Count;
+      if (pageOrders.length >= expectedSize) {
+        currentPage++;
+      } else {
+        hasMore = false;
+        break;
+      }
+    } else {
+      hasMore = false;
+      break;
+    }
   }
 
-  if (allOrders.length >= MAX_ORDERS || currentPage > MAX_PAGES) hasMore = true;
+  // Safety limits atingidos
+  if (orderMap.size >= MAX_ORDERS || pagesFetched >= MAX_PAGES) hasMore = true;
+
+  const allOrders = Array.from(orderMap.values());
+  const dedup = { rawCount, uniqueCount: orderMap.size, duplicateCount, missingIdCount };
+  const dateFilterRespected = allOrders.length > 0 ? detectDateFilterRespected(allOrders, start, end) : null;
 
   return {
     ok: true,
     orders: allOrders,
     pagination: {
-      used:          usedPagination,
+      used:           pagesFetched > 1 && paginationMode !== "operational_only",
+      paginationMode,
       pagesFetched,
-      totalReturned: allOrders.length,
+      totalReturned:  orderMap.size,
       providerTotal,
       limitDetected,
       hasMore,
+      dedup,
+      dateFilterRespected,
     },
+    rateLimitInfo,
     debugShape: debugShape ?? {
       topLevelType: "unknown", topLevelKeys: [], listKeyUsed: "unknown",
       totalReturned: 0, firstOrderKeys: [], firstItemKeys: [], paginationKeys: [],
@@ -343,15 +495,13 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     for (const item of items) {
       const name = String(item["name"] ?? item["product_name"] ?? item["title"] ?? item["description"] ?? "Produto desconhecido");
       const qty  = typeof item["quantity"] === "number" ? item["quantity"]
-                 : typeof item["qty"]      === "number" ? item["qty"]
-                 : 1;
+                 : typeof item["qty"]      === "number" ? item["qty"] : 1;
       itemCounts[name] = (itemCounts[name] ?? 0) + (qty as number);
     }
   }
 
   const total_pedidos = orders.length;
   const ticket_medio  = total_pedidos > 0 ? faturamento_total / total_pedidos : null;
-
   const pedidos_por_status = Object.keys(statusMap).length > 0 ? statusMap : null;
 
   const produtos_mais_vendidos = hasAnyItems
@@ -366,7 +516,7 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     : null;
 
   const pedidos_recentes = orders.slice(0, 10).map((order) => ({
-    id:     String(order["id"] ?? order["order_id"] ?? order["uuid"] ?? order["code"] ?? order["number"] ?? ""),
+    id:     extractOrderId(order),
     date:   extractDate(order),
     status: extractStatus(order),
     total:  extractTotal(order),
@@ -378,44 +528,172 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     ticket_medio,
     pedidos_por_status,
     produtos_mais_vendidos,
-    topItemsUnavailable: !hasAnyItems,
-    topItemsReason: !hasAnyItems ? "Os itens/produtos não vieram na resposta do endpoint /v1/orders." : null,
+    topItemsUnavailable:     !hasAnyItems,
+    topItemsReason:          !hasAnyItems ? "Os itens/produtos não vieram na resposta do endpoint /v1/orders." : null,
+    topProductsCompleteness: hasAnyItems ? "complete" : "unavailable",
     melhores_dias,
     pedidos_recentes,
   };
 }
 
-// ── Busca detalhes de pedidos individuais ─────────────────────────────────────
+// ── Rate limit ────────────────────────────────────────────────────────────────
 
-const MAX_ORDER_DETAILS = 50;
+interface RateLimitInfo {
+  limit:     number | null;
+  remaining: number | null;
+  reset:     number | null;
+  guard:     boolean; // paginação interrompida para proteger cota
+}
 
-async function fetchOrderDetails(
+function parseRateLimitHeaders(response: Response): RateLimitInfo {
+  const h = (name: string) =>
+    response.headers.get(name) ??
+    response.headers.get(`X-${name}`) ??
+    response.headers.get(name.toLowerCase()) ?? null;
+  const toInt = (s: string | null) => (s ? parseInt(s, 10) : null);
+  return {
+    limit:     toInt(h("RateLimit-Limit")),
+    remaining: toInt(h("RateLimit-Remaining")),
+    reset:     toInt(h("RateLimit-Reset")),
+    guard:     false,
+  };
+}
+
+// ── Top Produtos via endpoint oficial ─────────────────────────────────────────
+
+interface TopProduct {
+  productId: string | null;
+  name:      string;
+  quantity:  number;
+  revenue:   number | null;
+  modifiers: unknown[] | null;
+  category:  string | null;
+}
+
+interface TopProductsResult {
+  ok:               boolean;
+  products:         TopProduct[] | null;
+  providerEndpoint: string;
+  reason:           "scope_missing" | "not_found" | "error" | null;
+  message:          string | null;
+}
+
+async function fetchProductsSold(
+  baseUrl: string,
+  token:   string,
+  start:   string,
+  end:     string,
+): Promise<TopProductsResult> {
+  const endpoint = "/v1/orders/products-sold";
+  const url = new URL(`${baseUrl}${endpoint}`);
+  url.searchParams.set("filter[start_date]", start);
+  url.searchParams.set("filter[end_date]",   end);
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      headers: { "x-api-key": token, "accept": "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Erro de rede ao buscar produtos vendidos." };
+  }
+
+  if (response.status === 404) {
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "not_found",
+      message: "Endpoint /v1/orders/products-sold não disponível nesta conta." };
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "scope_missing",
+      message: "Permissão insuficiente para acessar produtos vendidos. Verifique o scope do token." };
+  }
+  if (!response.ok) {
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error",
+      message: `Erro ${response.status} ao buscar produtos vendidos.` };
+  }
+
+  let rawJson: unknown;
+  try { rawJson = await response.json(); }
+  catch {
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Resposta inválida do endpoint de produtos vendidos." };
+  }
+
+  const items: unknown[] = Array.isArray(rawJson) ? rawJson
+    : (rawJson && typeof rawJson === "object")
+      ? ((rawJson as Record<string, unknown>)["data"] as unknown[] | undefined ?? [])
+      : [];
+
+  const products: TopProduct[] = (items as Record<string, unknown>[])
+    .map((i) => ({
+      productId: i["product_id"] != null ? String(i["product_id"]) : i["id"] != null ? String(i["id"]) : null,
+      name:      String(i["name"] ?? i["product_name"] ?? i["title"] ?? i["description"] ?? "Produto desconhecido"),
+      quantity:  typeof i["quantity"] === "number" ? i["quantity"] : typeof i["qty"] === "number" ? i["qty"] : 0,
+      revenue:   typeof i["revenue"]       === "number" ? i["revenue"]
+               : typeof i["total_revenue"] === "number" ? i["total_revenue"]
+               : typeof i["amount"]        === "number" ? i["amount"] : null,
+      modifiers: Array.isArray(i["modifiers"]) ? i["modifiers"] : null,
+      category:  typeof i["category"]      === "string" ? i["category"]
+               : typeof i["category_name"] === "string" ? i["category_name"] : null,
+    }))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 10);
+
+  return { ok: true, products, providerEndpoint: endpoint, reason: null, message: null };
+}
+
+// ── Busca detalhes concorrente ─────────────────────────────────────────────────
+
+const MAX_ORDER_DETAILS  = 20;
+const DETAIL_CONCURRENCY = 3;
+
+async function fetchOrderDetailsBatched(
   baseUrl: string,
   token:   string,
   orderIds: string[],
-): Promise<Record<string, unknown>[]> {
+): Promise<{ details: Record<string, unknown>[]; stats: DetailFetchStats }> {
+  const stats: DetailFetchStats = {
+    detailRequestsAttempted: 0,
+    detailRequestsSucceeded: 0,
+    detailRequestsFailed:    0,
+    abortedDueTo:            null,
+  };
+
+  const ids = orderIds.filter(Boolean).slice(0, MAX_ORDER_DETAILS);
   const results: Record<string, unknown>[] = [];
-  const ids = orderIds.slice(0, MAX_ORDER_DETAILS);
-  for (const id of ids) {
-    if (!id) continue;
-    try {
-      const url = `${baseUrl}/v1/orders/${encodeURIComponent(id)}`;
-      const r = await fetch(url, {
-        headers: { "x-api-key": token, "accept": "application/json" },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!r.ok) {
-        // 404 confirma que endpoint de detalhe não existe — aborta
-        if (r.status === 404) break;
-        continue;
+
+  for (let i = 0; i < ids.length; i += DETAIL_CONCURRENCY) {
+    if (stats.abortedDueTo) break;
+    const batch = ids.slice(i, i + DETAIL_CONCURRENCY);
+    stats.detailRequestsAttempted += batch.length;
+
+    const batchResults = await Promise.allSettled(
+      batch.map(async (id) => {
+        const url = `${baseUrl}/v1/orders/${encodeURIComponent(id)}`;
+        const r = await fetch(url, {
+          headers: { "x-api-key": token, "accept": "application/json" },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (r.status === 429) { const e = new Error("rate_limited"); e.name = "RateLimitError"; throw e; }
+        if (r.status === 404) { const e = new Error("not_found");    e.name = "NotFoundError";  throw e; }
+        if (!r.ok) throw new Error(`http_${r.status}`);
+        return await r.json() as unknown;
+      })
+    );
+
+    for (const result of batchResults) {
+      if (result.status === "fulfilled") {
+        stats.detailRequestsSucceeded++;
+        const v = result.value;
+        if (v && typeof v === "object" && !Array.isArray(v)) results.push(v as Record<string, unknown>);
+      } else {
+        stats.detailRequestsFailed++;
+        if (result.reason?.name === "RateLimitError") { stats.abortedDueTo = "rate_limited"; }
+        if (result.reason?.name === "NotFoundError")  { stats.abortedDueTo = "not_found";    }
       }
-      const detail = await r.json() as unknown;
-      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-        results.push(detail as Record<string, unknown>);
-      }
-    } catch { continue; }
+    }
   }
-  return results;
+
+  return { details: results, stats };
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────────
@@ -427,7 +705,6 @@ export async function GET(request: NextRequest) {
   const clientId = params.get("client_id");
   if (!clientId) return NextResponse.json({ ok: false, reason: "missing_client_id" }, { status: 400 });
 
-  // Período personalizado: start_date + end_date têm prioridade sobre period
   const rawStart = params.get("start_date");
   const rawEnd   = params.get("end_date");
   const YMD_RE   = /^\d{4}-\d{2}-\d{2}$/;
@@ -507,61 +784,102 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { orders, pagination, debugShape } = fetchResult;
+    const { orders, pagination, debugShape, rateLimitInfo } = fetchResult;
+    const completeness = classifyCompleteness(pagination);
     let metrics = computeMetrics(orders);
+    let detailStats: DetailFetchStats | null = null;
+    let topProductsResult: TopProductsResult | null = null;
 
-    // Se itens não vieram no listing, tenta detalhe individual (até 50 pedidos)
-    if (metrics.topItemsUnavailable && orders.length > 0) {
-      const ids = orders.slice(0, MAX_ORDER_DETAILS).map((o) =>
-        String(o["id"] ?? o["order_id"] ?? o["uuid"] ?? o["code"] ?? o["number"] ?? ""),
-      ).filter(Boolean);
+    // ── Top Produtos: tentar endpoint oficial primeiro ──────────────────────
+    if (!fetchResult.rateLimitInfo.guard) {
+      const safeTokenProd = sanitizeHeaderValue(conn.access_token);
+      topProductsResult = await fetchProductsSold(baseUrl, safeTokenProd, start, end);
+
+      if (topProductsResult.ok && (topProductsResult.products?.length ?? 0) > 0) {
+        // Usar dados do endpoint dedicado
+        metrics.produtos_mais_vendidos = (topProductsResult.products ?? []).map((p) => ({
+          name: p.name,
+          qty:  p.quantity,
+        }));
+        metrics.topItemsUnavailable     = false;
+        metrics.topItemsReason          = null;
+        metrics.topProductsCompleteness = "complete";
+      }
+    }
+
+    // ── Fallback: enriquecimento por detalhe individual (máx 20, concorrente) ─
+    if (metrics.topItemsUnavailable && orders.length > 0 && !fetchResult.rateLimitInfo.guard) {
+      const ids = orders
+        .slice(0, MAX_ORDER_DETAILS)
+        .map(extractOrderId)
+        .filter(Boolean);
 
       if (ids.length > 0) {
-        const safeToken = sanitizeHeaderValue(conn.access_token);
-        const details = await fetchOrderDetails(baseUrl, safeToken, ids);
-        if (details.length > 0) {
-          // Mescla itens dos detalhes nos pedidos originais
+        const safeTokenDetail = sanitizeHeaderValue(conn.access_token);
+        const { details, stats } = await fetchOrderDetailsBatched(baseUrl, safeTokenDetail, ids);
+        detailStats = stats;
+
+        if (details.length > 0 && stats.abortedDueTo !== "not_found") {
           const enriched = orders.map((o, idx) => {
             const det = details[idx];
             if (!det) return o;
             const detItems = extractItems(det);
-            if (detItems.length > 0) return { ...o, items: detItems };
-            return o;
+            return detItems.length > 0 ? { ...o, items: detItems } : o;
           });
           metrics = computeMetrics(enriched);
+
           if (!metrics.topItemsUnavailable) {
             metrics.topItemsReason = null;
+            metrics.topProductsCompleteness =
+              stats.detailRequestsSucceeded >= ids.length ? "complete" : "partial";
           } else {
-            metrics.topItemsReason = "Endpoint de detalhe de pedido retornou dados, mas sem itens identificáveis.";
+            metrics.topItemsReason = "Endpoint de detalhe retornou dados, mas sem itens identificáveis.";
+            metrics.topProductsCompleteness = "unavailable";
           }
+        } else if (stats.abortedDueTo === "not_found") {
+          metrics.topItemsReason = "Endpoint /v1/orders/{id} retornou 404. Use /v1/orders/products-sold como fonte principal.";
+          metrics.topProductsCompleteness = "unavailable";
+        } else if (stats.abortedDueTo === "rate_limited") {
+          metrics.topItemsReason = "Rate limit atingido ao buscar detalhes.";
+          metrics.topProductsCompleteness = "partial";
         } else {
-          metrics.topItemsReason = "Produtos mais vendidos indisponíveis: a API de listagem não retornou itens e o endpoint de detalhe de pedido não está disponível ou retornou 404.";
+          metrics.topItemsReason = "Itens não disponíveis na listagem nem nos detalhes.";
+          metrics.topProductsCompleteness = "unavailable";
         }
       }
     }
 
-    // Snapshot — falha silenciosamente se tabela não existir
-    let snapshotWarning: string | null = null;
-    try {
-      const { error: snapErr } = await supabase.from("client_business_snapshots").insert({
-        client_id:          clientId,
-        source_type:        "digital_menu",
-        period_start:       start,
-        period_end:         end,
-        total_revenue:      metrics.faturamento_total,
-        total_orders:       metrics.total_pedidos,
-        average_ticket:     metrics.ticket_medio,
-        best_selling_items: metrics.produtos_mais_vendidos ?? [],
-        best_days:          metrics.melhores_dias ?? [],
-        opportunities:      [],
-        confidence_score:   metrics.total_pedidos > 0 ? 0.8 : 0.1,
-      });
-      if (snapErr && snapErr.code !== "42P01") {
-        snapshotWarning = `Snapshot não salvo: ${snapErr.message}`;
-      } else if (snapErr?.code === "42P01") {
-        snapshotWarning = "Snapshot não salvo porque tabela ainda não existe.";
+    // Snapshot — falha explícita e categorizada, sem bloquear o relatório
+    let snapshotPersistence: SnapshotPersistence = "skipped";
+    if (metrics.total_pedidos > 0) {
+      try {
+        const { error: snapErr } = await supabase.from("client_business_snapshots").insert({
+          client_id:          clientId,
+          source_type:        "digital_menu",
+          period_start:       start,
+          period_end:         end,
+          total_revenue:      metrics.faturamento_total,
+          total_orders:       metrics.total_pedidos,
+          average_ticket:     metrics.ticket_medio,
+          best_selling_items: metrics.produtos_mais_vendidos ?? [],
+          best_days:          metrics.melhores_dias ?? [],
+          opportunities:      [],
+          confidence_score:   metrics.total_pedidos > 0 ? 0.8 : 0.1,
+        });
+        if (!snapErr) {
+          snapshotPersistence = "saved";
+        } else if (snapErr.code === "42P01") {
+          snapshotPersistence = "not_configured";
+          console.warn("[olaclick/orders] snapshot skipped — table client_business_snapshots not found");
+        } else {
+          snapshotPersistence = "error";
+          console.warn("[olaclick/orders] snapshot error:", snapErr.code);
+        }
+      } catch {
+        snapshotPersistence = "error";
+        console.warn("[olaclick/orders] snapshot exception");
       }
-    } catch { /* silencioso */ }
+    }
 
     return NextResponse.json({
       ok:           true,
@@ -570,20 +888,27 @@ export async function GET(request: NextRequest) {
       provider:     conn.provider,
       baseUrlResolved: true,
       endpoint:     ENDPOINT,
+      completeness,
+      snapshotPersistence,
       message:      metrics.total_pedidos === 0 ? "Nenhum pedido encontrado no período." : undefined,
-      snapshotWarning,
       pagination,
+      rateLimitInfo,
       debugShape,
+      detailStats,
+      topProductsEndpoint: topProductsResult
+        ? { used: topProductsResult.ok, providerEndpoint: topProductsResult.providerEndpoint, reason: topProductsResult.reason, message: topProductsResult.message }
+        : null,
       data: {
-        faturamento_total:      metrics.faturamento_total,
-        total_pedidos:          metrics.total_pedidos,
-        ticket_medio:           metrics.ticket_medio,
-        pedidos_por_status:     metrics.pedidos_por_status,
-        produtos_mais_vendidos: metrics.produtos_mais_vendidos,
-        topItemsUnavailable:    metrics.topItemsUnavailable,
-        topItemsReason:         metrics.topItemsReason,
-        melhores_dias:          metrics.melhores_dias,
-        pedidos_recentes:       metrics.pedidos_recentes,
+        faturamento_total:       metrics.faturamento_total,
+        total_pedidos:           metrics.total_pedidos,
+        ticket_medio:            metrics.ticket_medio,
+        pedidos_por_status:      metrics.pedidos_por_status,
+        produtos_mais_vendidos:  metrics.produtos_mais_vendidos,
+        topItemsUnavailable:     metrics.topItemsUnavailable,
+        topItemsReason:          metrics.topItemsReason,
+        topProductsCompleteness: metrics.topProductsCompleteness,
+        melhores_dias:           metrics.melhores_dias,
+        pedidos_recentes:        metrics.pedidos_recentes,
       },
     });
   } catch {

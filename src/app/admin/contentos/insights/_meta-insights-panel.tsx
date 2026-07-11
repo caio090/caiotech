@@ -6,6 +6,7 @@ import {
   Users, Eye, MousePointerClick, TrendingUp, Info, Link2, ChevronDown,
 } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { generateInterpretation } from "@/lib/meta/interpretation";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -72,9 +73,38 @@ function fmt(n: number | null | undefined): string {
   return String(n);
 }
 
+// ── Qualidade dos dados Meta ──────────────────────────────────────────────────
+
+function MetaDataQuality({ insights }: { insights: InsightsResponse }) {
+  const demographicsOk = (
+    (insights.advanced?.demographics?.gender?.length ?? 0) > 0 ||
+    (insights.advanced?.demographics?.age?.length ?? 0) > 0
+  );
+  return (
+    <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 space-y-2">
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Qualidade dos dados</p>
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-emerald-50 text-emerald-700 border-emerald-100">
+          Meta: disponível
+        </span>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+          demographicsOk
+            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            : "bg-gray-100 text-gray-400 border-gray-200"
+        }`}>
+          Público: {demographicsOk ? "disponível" : "indisponível"}
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-gray-100 text-gray-400 border-gray-200">
+          Atribuição campanha→pedido: não configurada
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function MetaInsightsPanel({ clientId }: { clientId: string }) {
+export function MetaInsightsPanel({ clientId, mode = "operational" }: { clientId: string; mode?: "operational" | "report" }) {
   const [period, setPeriod]       = useState<Period>("7d");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate]     = useState("");
@@ -340,6 +370,22 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
       {/* Métricas reais */}
       {insights?.ok && insights.metrics && (
         <div className="space-y-3">
+          {/* Interpretação estratégica */}
+          {(() => {
+            const lines = generateInterpretation(insights.metrics);
+            if (lines.length === 0) return null;
+            return (
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wide">Leitura do período</p>
+                {lines.map((l, i) => (
+                  <p key={i} className="text-xs text-indigo-700 flex items-start gap-2">
+                    <span className="text-indigo-300 mt-0.5 flex-shrink-0">·</span>{l}
+                  </p>
+                ))}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {insights.assetType === "instagram_business" && (
               <>
@@ -382,6 +428,9 @@ export function MetaInsightsPanel({ clientId }: { clientId: string }) {
           {insights.assetType === "instagram_business" && (
             <AudienceSection advanced={insights.advanced} />
           )}
+
+          {/* Qualidade dos dados */}
+          <MetaDataQuality insights={insights} />
         </div>
       )}
     </div>
@@ -410,23 +459,31 @@ function AudienceEmpty({ msg }: { msg: string }) {
 }
 
 function AudienceSection({ advanced }: { advanced?: InsightsResponse["advanced"] }) {
-  const hasUnavailable = (advanced?.unavailable?.length ?? 0) > 0;
-
   const gender    = advanced?.demographics?.gender    ?? [];
   const age       = advanced?.demographics?.age       ?? [];
   const cities    = advanced?.locations?.cities       ?? [];
   const countries = advanced?.locations?.countries    ?? [];
   const hours     = advanced?.activity?.onlineFollowersByHour ?? [];
 
+  const allEmpty = gender.length === 0 && age.length === 0 &&
+    cities.length === 0 && countries.length === 0 && hours.length === 0;
+
+  if (allEmpty) {
+    return (
+      <div className="rounded-2xl border border-gray-100 bg-white p-4">
+        <p className="text-xs font-black text-gray-700 mb-1">Leitura do público</p>
+        <p className="text-[11px] text-gray-400 leading-relaxed">
+          Dados de público ainda indisponíveis para esta conta. Depende de permissões Meta
+          e tempo de vínculo da conta (geralmente disponível após 100 seguidores e permissão
+          <span className="font-mono mx-1">instagram_manage_insights</span>concedida).
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4">
       <p className="text-xs font-black text-gray-700 mb-1">Leitura do público</p>
-
-      {hasUnavailable && (
-        <p className="text-[10px] text-gray-400 mb-4">
-          Alguns dados avançados dependem da disponibilidade da conta e das permissões conectadas.
-        </p>
-      )}
 
       <div className="space-y-5 mt-3">
         {/* Gênero */}
@@ -505,9 +562,14 @@ function AudienceSection({ advanced }: { advanced?: InsightsResponse["advanced"]
           )}
         </div>
 
-        {/* Horários ativos */}
+        {/* Horários com maior atividade dos seguidores */}
         <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Horários mais ativos</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+            Horários com maior atividade dos seguidores
+          </p>
+          <p className="text-[10px] text-gray-300 mb-2 leading-snug">
+            Baseado em seguidores online (online_followers). Não indica necessariamente o melhor horário para publicar.
+          </p>
           {hours.length > 0 ? (
             <div className="space-y-2">
               {hours.map((item) => (

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, Target, FolderOpen, BarChart3,
@@ -148,17 +149,41 @@ interface AppSidebarProps {
 
 export function AppSidebar({ variant, userName = "Usuário", userRole = "", onSignOut, badges, hideRoutes, transparent }: AppSidebarProps) {
   const pathname = usePathname();
-  const config = configs[variant];
+  const config   = configs[variant];
+
+  const [tooltip, setTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const showTooltip = useCallback((label: string, e: React.MouseEvent | React.FocusEvent) => {
+    clearTimeout(hideTimer.current);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTooltip({ label, x: rect.right + 8, y: rect.top + rect.height / 2 });
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    hideTimer.current = setTimeout(() => setTooltip(null), 80);
+  }, []);
 
   return (
     <aside
       className={cn(
-        "w-16 flex flex-col items-center h-full flex-shrink-0 transition-colors",
+        "w-16 flex flex-col items-center h-full flex-shrink-0 transition-colors relative",
         transparent
           ? "bg-black/25 backdrop-blur-md border-r border-white/10"
           : "bg-slate-900"
       )}
     >
+      {/* Tooltip fluido — posição fixa para não ser cortado por overflow */}
+      {tooltip && (
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={{ left: tooltip.x, top: tooltip.y, transform: "translateY(-50%)" }}
+        >
+          <div className="bg-slate-800 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-lg whitespace-nowrap border border-slate-700">
+            {tooltip.label}
+          </div>
+        </div>
+      )}
       <div className="py-4 border-b border-slate-800 w-full flex justify-center">
         <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black", config.logoColor)} title={config.title}>
           {config.logo}
@@ -173,8 +198,12 @@ export function AppSidebar({ variant, userName = "Usuário", userRole = "", onSi
             <Link
               key={href}
               href={href}
-              title={label}
+              aria-label={label}
               data-active={active ? "true" : "false"}
+              onMouseEnter={(e) => showTooltip(label, e)}
+              onMouseLeave={hideTooltip}
+              onFocus={(e) => showTooltip(label, e)}
+              onBlur={hideTooltip}
               className={cn(
                 "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all",
                 active
