@@ -114,6 +114,7 @@ interface OrderMetrics {
   pedidosPorHora:          Record<string, number>;
   faturamentoPorHora:      Record<string, number>;
   concentracaoPorFaixa:    Record<string, { orders: number; revenue: number }>;
+  faturamentoPorDia:       { date: string; revenue: number; orders: number }[];
 }
 
 interface RateLimitInfo {
@@ -584,6 +585,10 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
         .map(([date, v]) => ({ date, ...v }))
     : null;
 
+  const faturamentoPorDia = Object.entries(dayMap)
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([date, v]) => ({ date, ...v }));
+
   const pedidos_recentes = orders.slice(0, 10).map((order) => ({
     id:     extractOrderId(order),
     date:   extractDate(order),
@@ -617,6 +622,7 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     pedidosPorHora:          hourOrdMap,
     faturamentoPorHora:      hourRevMap,
     concentracaoPorFaixa:    faixaMap,
+    faturamentoPorDia,
   };
 }
 
@@ -2022,6 +2028,7 @@ export async function GET(request: NextRequest) {
         pedidosPorHora:          metrics.pedidosPorHora,
         faturamentoPorHora:      metrics.faturamentoPorHora,
         concentracaoPorFaixa:    metrics.concentracaoPorFaixa,
+        faturamentoPorDia:       metrics.faturamentoPorDia,
       },
     };
 
@@ -2036,8 +2043,17 @@ export async function GET(request: NextRequest) {
     }
     inflight.delete(cacheKey);
 
+    const serverTiming = [
+      `olaclick;dur=${providerFetchMs}`,
+      `aggregation;dur=${aggregationMs}`,
+      `total;dur=${Date.now() - requestStart}`,
+    ].join(", ");
+
     return NextResponse.json(responseBody, {
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Server-Timing": serverTiming,
+      },
     });
   } catch (err) {
     const rejectInflight = inflightReject as ((e: unknown) => void) | null;
