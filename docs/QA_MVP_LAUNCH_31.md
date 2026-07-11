@@ -437,4 +437,55 @@ O modal conversacional (`LeadConversationModal`) usa opções fixas nos passos d
 
 ---
 
+---
+
+## Sprint 2026-07-11 — Correção OlaClick: Coleta por Janelas Temporais
+
+### Funcionalidade principal
+
+- [ ] Selecionar "Últimos 7 dias" para Duh → retorna MAIS de 50 pedidos únicos
+- [ ] Selecionar "Últimos 30 dias" para Duh → retorna MAIS de 50 pedidos únicos
+- [ ] O faturamento não está duplicado (pedidos únicos = Map por ID)
+- [ ] A seção "Qualidade da coleta" aparece acima dos cards principais
+- [ ] O badge de qualidade exibe "X pedidos coletados de Y informados"
+- [ ] Seção de diagnóstico (colapsível) exibe janelas processadas e modo de coleta
+
+### Paginação e windowing
+
+- [ ] Diagnóstico exibe `paginationFallbackReason: "repeated_page"` ou `"requested_page_ignored"`
+- [ ] Campo `datetimeFiltersSupported` exibe `true` ou `false` (não null)
+- [ ] `dailyFallbackUsed` exibe corretamente se datetime foi ignorado
+- [ ] `requestsMade` é proporcional ao período (7d < 30d)
+
+### Cache
+
+- [ ] Segundo refresh em < 5 min: `cacheHit: true` no diagnóstico
+- [ ] `?force_refresh=1` na URL: nova coleta (não usa cache)
+- [ ] Após 5+ min: novo fetch executado (cache expirado)
+
+### Completude e comparação
+
+- [ ] Quando complete=partial: KPIs usam labels condicionais (ex: "Pedidos retornados")
+- [ ] Comparação com período anterior não aparece quando completeness !== "complete"
+- [ ] Snapshot não é salvo quando completeness !== "complete" (snapshotPersistence = "skipped_incomplete")
+
+### Segurança
+
+- [ ] Token não aparece em nenhuma resposta JSON da API
+- [ ] Header Authorization não aparece em logs visíveis
+- [ ] `authMode` na resposta mostra apenas "bearer" ou "x_api_key" (nunca o token)
+
+### Build
+
+- [ ] `npm run build` compila sem erros TypeScript
+- [ ] Nenhuma tela existente quebrou
+
+### Status
+
+- [ ] V1 = 81 (aguarda QA de produção para aumentar)
+- [ ] V2 = 12 inalterado
+- [ ] Milestone "Cardápio Digital/OlaClick" atualizado para reflect windowing
+
+---
+
 *Atualizar após cada deploy ou sessão de testes.*

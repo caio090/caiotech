@@ -63,6 +63,25 @@ interface DebugShape {
 type OrderFetchCompleteness = "complete" | "partial" | "operational_only" | "unknown" | "error";
 type SnapshotPersistence   = "saved" | "not_configured" | "skipped" | "skipped_incomplete" | "error";
 
+interface WindowFetchDiagnostics {
+  totalWindows:             number;
+  resolvedWindows:          number;
+  partialWindows:           number;
+  failedWindows:            number;
+  datetimeFiltersSupported: boolean | null;
+  dailyFallbackUsed:        boolean;
+  requestsMade:             number;
+  targetTotal:              number | null;
+  rawCount:                 number;
+  uniqueCount:              number;
+  duplicateCount:           number;
+  missingIdCount:           number;
+  rateLimitStopped:         boolean;
+  executionMs:              number;
+  paginationFallbackReason: "repeated_page" | "requested_page_ignored" | "none";
+  authMode:                 "bearer" | "x_api_key";
+}
+
 interface OrdersResult {
   ok: boolean;
   reason?: string; code?: string; message?: string;
@@ -73,6 +92,8 @@ interface OrdersResult {
   completeness?: OrderFetchCompleteness;
   pagination?: PaginationInfo;
   debugShape?: DebugShape;
+  windowDiag?: WindowFetchDiagnostics | null;
+  cacheHit?: boolean;
   data?: {
     faturamento_total:      number | null;
     total_pedidos:          number | null;
@@ -100,6 +121,8 @@ interface ReportData {
   debugShape?:            DebugShape;
   snapshotPersistence?:   SnapshotPersistence;
   completeness?:          OrderFetchCompleteness;
+  windowDiag?:            WindowFetchDiagnostics | null;
+  cacheHit?:              boolean;
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -336,8 +359,10 @@ export default function FaturamentoPage() {
         pedidos_recentes:       parsed?.pedidos_recentes       ?? [],
         pagination:             d.pagination,
         debugShape:             d.debugShape,
-        snapshotPersistence:        d.snapshotPersistence,
+        snapshotPersistence:    d.snapshotPersistence,
         completeness:           d.completeness,
+        windowDiag:             d.windowDiag ?? null,
+        cacheHit:               d.cacheHit ?? false,
       });
       setLastSync(new Date().toISOString());
     } catch {
@@ -634,10 +659,42 @@ export default function FaturamentoPage() {
             <StatCard icon={DollarSign}   label={labelFaturamento} value={fmtBRL(report.faturamento_total)}
               sub="Fonte: Cardápio Digital" color="bg-emerald-50 text-emerald-600" />
             <StatCard icon={ShoppingCart} label={labelPedidos}     value={fmtCount(report.total_pedidos)}
-              sub={report.pagination?.pagesFetched && report.pagination.pagesFetched > 1 ? `${report.pagination.pagesFetched} páginas buscadas` : undefined}
+              sub={
+                report.windowDiag
+                  ? `${report.windowDiag.uniqueCount} únicos · ${report.windowDiag.totalWindows} janelas`
+                  : report.pagination?.pagesFetched && report.pagination.pagesFetched > 1
+                    ? `${report.pagination.pagesFetched} páginas buscadas`
+                    : undefined
+              }
               color="bg-blue-50 text-blue-600" />
             <StatCard icon={TrendingUp}   label={labelTicket}      value={fmtBRL(report.ticket_medio)} color="bg-violet-50 text-violet-600" />
           </div>
+
+          {/* Qualidade da coleta (windowing) */}
+          {report.windowDiag && (
+            <div className={`flex items-start gap-2 p-3 border rounded-xl text-xs ${
+              report.completeness === "complete"
+                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                : report.completeness === "partial"
+                ? "bg-amber-50 border-amber-100 text-amber-700"
+                : "bg-orange-50 border-orange-100 text-orange-700"
+            }`}>
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                {report.windowDiag.targetTotal !== null
+                  ? `${fmtCount(report.windowDiag.uniqueCount)} pedidos coletados de ${fmtCount(report.windowDiag.targetTotal)} informados`
+                  : `${fmtCount(report.windowDiag.uniqueCount)} pedidos coletados`}
+                {" · "}
+                {report.windowDiag.dailyFallbackUsed
+                  ? `${report.windowDiag.totalWindows} dias processados`
+                  : `${report.windowDiag.totalWindows} janelas processadas`}
+                {report.windowDiag.rateLimitStopped && " · Coleta interrompida por limite do provider"}
+                {report.completeness === "complete" && " · Dados completos"}
+                {report.completeness === "partial" && !report.windowDiag.rateLimitStopped && " · Coleta parcial — alguns dias com mais de 50 pedidos"}
+                {report.cacheHit && " · Resultado em cache"}
+              </span>
+            </div>
+          )}
 
           {/* Comparação com período anterior */}
           {prevReport && period !== "personalizado" && report.total_pedidos > 0 && (
@@ -837,7 +894,7 @@ export default function FaturamentoPage() {
             </SectionCard>
           )}
 
-          {/* Diagnóstico API — colapsível */}
+          {/* Diagnóstico técnico da integração — colapsível */}
           <div className="border border-gray-100 rounded-2xl overflow-hidden">
             <button
               onClick={() => setShowDiag((v) => !v)}
@@ -845,7 +902,7 @@ export default function FaturamentoPage() {
             >
               <div className="flex items-center gap-2">
                 <Info className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-xs font-semibold text-gray-600">Diagnóstico da API</span>
+                <span className="text-xs font-semibold text-gray-600">Diagnóstico técnico da integração</span>
               </div>
               <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showDiag ? "rotate-90" : ""}`} />
             </button>
@@ -853,49 +910,60 @@ export default function FaturamentoPage() {
               <div className="p-5 space-y-2 text-[11px] text-gray-500 bg-white">
                 <p><span className="font-semibold text-gray-700">Endpoint:</span> /v1/orders</p>
                 <p><span className="font-semibold text-gray-700">Período enviado:</span> {PERIODS.find(p => p.value === period)?.label}</p>
-                <p><span className="font-semibold text-gray-700">Pedidos retornados:</span> {report.total_pedidos}</p>
+                <p><span className="font-semibold text-gray-700">Pedidos únicos retornados:</span> {report.total_pedidos}</p>
+                {report.cacheHit && <p className="text-indigo-600 font-semibold">Resultado servido do cache (TTL 5 min). Use force_refresh=1 para forçar nova coleta.</p>}
+
+                {/* Windowing diagnostics */}
+                {report.windowDiag && (
+                  <>
+                    <div className="pt-1 border-t border-gray-50">
+                      <p className="font-semibold text-gray-700 mb-1">Coleta por janelas temporais</p>
+                      <p><span className="font-semibold text-gray-700">Motivo do fallback:</span> {report.windowDiag.paginationFallbackReason === "repeated_page" ? "Página 2 repetiu a página 1" : report.windowDiag.paginationFallbackReason === "requested_page_ignored" ? "Provider ignorou page[number]" : "—"}</p>
+                      <p><span className="font-semibold text-gray-700">Datetime ISO aceito:</span> {report.windowDiag.datetimeFiltersSupported === null ? "—" : report.windowDiag.datetimeFiltersSupported ? "Sim" : "Não — usando fallback diário"}</p>
+                      <p><span className="font-semibold text-gray-700">Fallback diário usado:</span> {report.windowDiag.dailyFallbackUsed ? "Sim" : "Não"}</p>
+                      <p><span className="font-semibold text-gray-700">Janelas:</span> {report.windowDiag.totalWindows} total · {report.windowDiag.resolvedWindows} resolvidas · {report.windowDiag.partialWindows} parciais · {report.windowDiag.failedWindows} falhas</p>
+                      <p><span className="font-semibold text-gray-700">Requisições realizadas:</span> {report.windowDiag.requestsMade}</p>
+                      {report.windowDiag.targetTotal !== null && <p><span className="font-semibold text-gray-700">Total informado pelo provider:</span> {report.windowDiag.targetTotal}</p>}
+                      <p><span className="font-semibold text-gray-700">Dedup:</span> {report.windowDiag.uniqueCount} únicos de {report.windowDiag.rawCount} brutos · {report.windowDiag.duplicateCount} removidos{report.windowDiag.missingIdCount > 0 ? ` · ${report.windowDiag.missingIdCount} sem ID` : ""}</p>
+                      {report.windowDiag.rateLimitStopped && <p className="text-amber-600 font-semibold">⚠ Coleta interrompida por rate limit do provider.</p>}
+                      <p><span className="font-semibold text-gray-700">Auth mode:</span> {report.windowDiag.authMode}</p>
+                      <p><span className="font-semibold text-gray-700">Tempo de coleta:</span> {report.windowDiag.executionMs}ms</p>
+                    </div>
+                  </>
+                )}
+
                 {report.pagination && (
                   <>
-                    <p><span className="font-semibold text-gray-700">Paginação detectada:</span> {report.pagination.used ?? report.debugShape?.hasPagination ? "Sim" : "Não"}</p>
-                    <p><span className="font-semibold text-gray-700">Modo de paginação:</span> {report.pagination.paginationMode}</p>
+                    <div className="pt-1 border-t border-gray-50">
+                      <p className="font-semibold text-gray-700 mb-1">Paginação</p>
+                    </div>
+                    <p><span className="font-semibold text-gray-700">Modo:</span> {report.pagination.paginationMode}</p>
                     <p>
                       <span className="font-semibold text-gray-700">Convenção usada:</span>{" "}
                       {report.pagination.conventionUsed}
                       {" · "}
                       <span className="text-amber-600">não verificada</span>
-                      {" — rodar /api/olaclick/orders/convention-diagnostic para confirmar"}
                     </p>
-                    {report.pagination.pagesFetched > 0 && <p><span className="font-semibold text-gray-700">Páginas buscadas:</span> {report.pagination.pagesFetched}</p>}
+                    {report.pagination.pagesFetched > 0 && <p><span className="font-semibold text-gray-700">Requisições:</span> {report.pagination.pagesFetched}</p>}
                     {report.pagination.providerReportedTotalRaw !== null && (
                       <p>
-                        <span className="font-semibold text-gray-700">Total bruto reportado pelo provider:</span>{" "}
+                        <span className="font-semibold text-gray-700">Total reportado:</span>{" "}
                         {report.pagination.providerReportedTotalRaw}
                         {" · "}
                         <span className={`font-semibold ${report.pagination.providerTotalScope === "filtered_period" ? "text-emerald-600" : "text-amber-600"}`}>
                           escopo: {report.pagination.providerTotalScope ?? "unknown"}
                         </span>
-                        {report.pagination.providerTotalScope !== "filtered_period" && (
-                          <span className="text-gray-400"> (não usado na completude)</span>
-                        )}
                       </p>
                     )}
-                    {report.pagination.limitDetected !== null && <p><span className="font-semibold text-gray-700">Limite detectado por página:</span> {report.pagination.limitDetected}</p>}
-                    {report.pagination.hasMore && <p className="text-amber-600 font-semibold">⚠ Há mais pedidos além do retornado (limite de segurança atingido).</p>}
+                    {report.pagination.hasMore && <p className="text-amber-600 font-semibold">⚠ Há mais pedidos além do retornado.</p>}
                     {report.pagination.dedup && (
                       <p>
-                        <span className="font-semibold text-gray-700">Deduplicação:</span>{" "}
+                        <span className="font-semibold text-gray-700">Dedup:</span>{" "}
                         {report.pagination.dedup.uniqueCount} únicos de {report.pagination.dedup.rawCount} brutos
-                        {report.pagination.dedup.duplicateCount > 0 && ` · ${report.pagination.dedup.duplicateCount} duplicados removidos`}
+                        {report.pagination.dedup.duplicateCount > 0 && ` · ${report.pagination.dedup.duplicateCount} removidos`}
                         {report.pagination.dedup.missingIdCount > 0 && ` · ${report.pagination.dedup.missingIdCount} sem ID`}
                       </p>
                     )}
-                    <p>
-                      <span className="font-semibold text-gray-700">Pedidos retornados no período:</span>{" "}
-                      {report.pagination.returnedOrdersWithinRequestedRange === null ? "—" : report.pagination.returnedOrdersWithinRequestedRange ? "Sim (amostra)" : "Não (fora do período)"}
-                    </p>
-                    <p className="text-gray-400">
-                      <span className="font-semibold">Completude do filtro de data confirmada:</span> Não — prova requer comparação entre períodos
-                    </p>
                   </>
                 )}
                 {report.debugShape && (
@@ -904,9 +972,6 @@ export default function FaturamentoPage() {
                     <p><span className="font-semibold text-gray-700">Itens/produtos disponíveis:</span> {report.topItemsUnavailable ? "Não" : "Sim"}</p>
                     {report.debugShape.firstOrderKeys.length > 0 && (
                       <p><span className="font-semibold text-gray-700">Campos do pedido:</span> {report.debugShape.firstOrderKeys.join(", ")}</p>
-                    )}
-                    {report.debugShape.firstItemKeys.length > 0 && (
-                      <p><span className="font-semibold text-gray-700">Campos do item:</span> {report.debugShape.firstItemKeys.join(", ")}</p>
                     )}
                   </>
                 )}
@@ -921,11 +986,48 @@ export default function FaturamentoPage() {
                     {report.snapshotPersistence === "saved"              && "Salvo com sucesso"}
                     {report.snapshotPersistence === "not_configured"     && "Tabela não configurada"}
                     {report.snapshotPersistence === "skipped"            && "Ignorado (sem dados)"}
-                    {report.snapshotPersistence === "skipped_incomplete" && "Não salvo — coleta completa do período ainda não confirmada"}
+                    {report.snapshotPersistence === "skipped_incomplete" && "Não salvo — coleta incompleta"}
                     {report.snapshotPersistence === "error"              && "Erro ao salvar snapshot"}
                   </p>
                 )}
-                <div className="flex items-center gap-2 text-[10px] text-gray-300 pt-2 border-t border-gray-50">
+
+                {/* Botão copiar diagnóstico */}
+                <div className="pt-2 border-t border-gray-50">
+                  <button
+                    onClick={() => {
+                      const lines: string[] = [
+                        `Diagnóstico OlaClick — ${new Date().toISOString()}`,
+                        `Endpoint: /v1/orders`,
+                        `Período: ${PERIODS.find(p => p.value === period)?.label ?? period}`,
+                        `Pedidos únicos: ${report.total_pedidos}`,
+                        `Completude: ${report.completeness ?? "—"}`,
+                      ];
+                      if (report.windowDiag) {
+                        lines.push(`Coleta: ${report.windowDiag.uniqueCount} únicos de ${report.windowDiag.targetTotal ?? "?"} informados`);
+                        lines.push(`Janelas: ${report.windowDiag.totalWindows} total, ${report.windowDiag.resolvedWindows} resolvidas, ${report.windowDiag.partialWindows} parciais`);
+                        lines.push(`Fallback paginação: ${report.windowDiag.paginationFallbackReason}`);
+                        lines.push(`Datetime ISO suportado: ${report.windowDiag.datetimeFiltersSupported ?? "?"}`);
+                        lines.push(`Fallback diário: ${report.windowDiag.dailyFallbackUsed}`);
+                        lines.push(`Requisições: ${report.windowDiag.requestsMade}`);
+                        lines.push(`Dedup: ${report.windowDiag.rawCount} brutos → ${report.windowDiag.uniqueCount} únicos (${report.windowDiag.duplicateCount} removidos)`);
+                        lines.push(`Rate limit parou: ${report.windowDiag.rateLimitStopped}`);
+                        lines.push(`Tempo: ${report.windowDiag.executionMs}ms`);
+                      }
+                      if (report.pagination) {
+                        lines.push(`Modo paginação: ${report.pagination.paginationMode}`);
+                        lines.push(`Total provider: ${report.pagination.providerReportedTotalRaw ?? "—"} (escopo: ${report.pagination.providerTotalScope ?? "—"})`);
+                      }
+                      void navigator.clipboard.writeText(lines.join("\n")).then(() => {
+                        alert("Diagnóstico sanitizado copiado.");
+                      });
+                    }}
+                    className="text-[10px] text-indigo-500 hover:text-indigo-700 underline"
+                  >
+                    Copiar diagnóstico para suporte
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-[10px] text-gray-300 pt-1">
                   <Clock className="w-3 h-3" /> Última sincronização: {fmtDate(lastSync)}
                 </div>
               </div>
