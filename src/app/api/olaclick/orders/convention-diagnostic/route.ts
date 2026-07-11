@@ -402,9 +402,10 @@ export async function GET(request: NextRequest) {
 
   // Resumo por convenção
   const summary: Record<PaginationConvention, boolean | null> = {
-    json_api: null,
-    classic:  null,
-    offset:   null,
+    json_api:   null,
+    classic:    null,
+    offset:     null,
+    page_limit: null,
   };
   for (const r of results) {
     if (r.requestedPage === 2 && r.paginates !== null) {

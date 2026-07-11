@@ -12,13 +12,14 @@ export const maxDuration = 60;
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const MAX_REQUESTS             = 90;
-const MAX_UNIQUE_ORDERS        = 5000;
+const MAX_REQUESTS             = 200;
+const MAX_UNIQUE_ORDERS        = 10_000;
 const MIN_RATE_LIMIT_REMAINING = 5;
 const MAX_WINDOW_DEPTH         = 12;
 const MIN_WINDOW_MINUTES       = 15;
 const CACHE_TTL_MS             = 5 * 60 * 1000;
-const MAX_EXECUTION_MS         = 50_000;
+const MAX_EXECUTION_MS         = 55_000;
+const RETRY_TRANSIENT          = new Set([408, 429, 500, 502, 503, 504]);
 export const DEFAULT_PAGE_SIZE = 50;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ export const DEFAULT_PAGE_SIZE = 50;
 type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
 type AuthMode  = "bearer" | "x_api_key";
 
-export type PaginationConvention = "json_api" | "classic" | "offset";
+export type PaginationConvention = "json_api" | "classic" | "offset" | "page_limit";
 
 interface DebugShape {
   topLevelType:   "array" | "object" | "unknown";
@@ -71,6 +72,13 @@ interface DetailFetchStats {
   abortedDueTo:            "rate_limited" | "not_found" | null;
 }
 
+interface HeatmapCell {
+  weekday: number; // 0=Sun … 6=Sat (Fortaleza UTC-3)
+  hour:    number; // 0–23
+  orders:  number;
+  revenue: number;
+}
+
 interface OrderMetrics {
   faturamento_total:       number;
   total_pedidos:           number;
@@ -82,6 +90,16 @@ interface OrderMetrics {
   topProductsCompleteness: "complete" | "partial" | "unavailable";
   melhores_dias:           { date: string; revenue: number; orders: number }[] | null;
   pedidos_recentes:        { id: string; date: string | null; status: string; total: number }[];
+  // Tarefa I
+  heatmap:                 HeatmapCell[];
+  // Tarefa J
+  pedidosPorServiceType:   Record<string, number>;
+  pedidosPorSource:        Record<string, number>;
+  totalDescontos:          number;
+  totalTaxasEntrega:       number;
+  totalGorjetas:           number;
+  faturamentoPorDiaSemana: Record<string, number>;
+  pedidosPorDiaSemana:     Record<string, number>;
 }
 
 interface RateLimitInfo {
@@ -174,6 +192,9 @@ export function buildOrdersPaginationParams(
   if (convention === "json_api") {
     params.set("page[number]", String(page));
     params.set("page[size]",   String(pageSize));
+  } else if (convention === "page_limit") {
+    params.set("page",  String(page));
+    params.set("limit", String(pageSize));
   } else if (convention === "classic") {
     params.set("page",     String(page));
     params.set("per_page", String(pageSize));
@@ -379,11 +400,44 @@ function extractItems(order: Record<string, unknown>): Record<string, unknown>[]
   return [];
 }
 
+const WEEKDAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+function extractCreatedAtFull(order: Record<string, unknown>): Date | null {
+  const raw = order["created_at"] ?? order["createdAt"] ?? order["date"]
+            ?? order["order_date"] ?? order["created"]  ?? order["timestamp"];
+  if (!raw) return null;
+  try { return new Date(String(raw)); } catch { return null; }
+}
+
+// OlaClick stores timestamps in UTC; Fortaleza = UTC-3, no DST
+function toFortalezaLocal(d: Date): { weekday: number; hour: number } {
+  const ms = d.getTime() - 3 * 60 * 60 * 1000;
+  const local = new Date(ms);
+  return { weekday: local.getUTCDay(), hour: local.getUTCHours() };
+}
+
+function extractNumericField(order: Record<string, unknown>, ...keys: string[]): number {
+  for (const k of keys) {
+    const v = order[k];
+    if (typeof v === "number") return v;
+    if (typeof v === "string") { const n = parseFloat(v); if (!isNaN(n)) return n; }
+  }
+  return 0;
+}
+
 function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
   let faturamento_total = 0;
-  const statusMap:  Record<string, number> = {};
-  const itemCounts: Record<string, number> = {};
-  const dayMap:     Record<string, { revenue: number; orders: number }> = {};
+  let totalDescontos    = 0;
+  let totalTaxasEntrega = 0;
+  let totalGorjetas     = 0;
+  const statusMap:      Record<string, number> = {};
+  const itemCounts:     Record<string, number> = {};
+  const dayMap:         Record<string, { revenue: number; orders: number }> = {};
+  const serviceTypeMap: Record<string, number> = {};
+  const sourceMap:      Record<string, number> = {};
+  const heatmapMap:     Record<string, HeatmapCell>  = {};
+  const weekdayRevMap:  Record<string, number> = {};
+  const weekdayOrdMap:  Record<string, number> = {};
   let hasAnyItems = false;
 
   for (const order of orders) {
@@ -392,12 +446,35 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     const date   = extractDate(order);
 
     faturamento_total += total;
+    totalDescontos    += extractNumericField(order, "discount", "discount_amount", "total_discount", "coupon_discount");
+    totalTaxasEntrega += extractNumericField(order, "delivery_fee", "shipping_fee", "shipping", "freight");
+    totalGorjetas     += extractNumericField(order, "tip", "gratuity", "tip_amount");
+
     statusMap[status] = (statusMap[status] ?? 0) + 1;
+
+    const serviceType = String(order["service_type"] ?? order["type"] ?? "desconhecido");
+    serviceTypeMap[serviceType] = (serviceTypeMap[serviceType] ?? 0) + 1;
+
+    const source = String(order["source"] ?? order["channel"] ?? order["origin"] ?? "desconhecido");
+    sourceMap[source] = (sourceMap[source] ?? 0) + 1;
 
     if (date) {
       if (!dayMap[date]) dayMap[date] = { revenue: 0, orders: 0 };
       dayMap[date].revenue += total;
       dayMap[date].orders  += 1;
+    }
+
+    const createdAt = extractCreatedAtFull(order);
+    if (createdAt) {
+      const { weekday, hour } = toFortalezaLocal(createdAt);
+      const cellKey = `${weekday}:${hour}`;
+      if (!heatmapMap[cellKey]) heatmapMap[cellKey] = { weekday, hour, orders: 0, revenue: 0 };
+      heatmapMap[cellKey].orders  += 1;
+      heatmapMap[cellKey].revenue += total;
+
+      const wName = WEEKDAY_NAMES[weekday];
+      weekdayRevMap[wName] = (weekdayRevMap[wName] ?? 0) + total;
+      weekdayOrdMap[wName] = (weekdayOrdMap[wName] ?? 0) + 1;
     }
 
     const items = extractItems(order);
@@ -432,6 +509,10 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     total:  extractTotal(order),
   }));
 
+  const heatmap = Object.values(heatmapMap).sort((a, b) =>
+    a.weekday !== b.weekday ? a.weekday - b.weekday : a.hour - b.hour
+  );
+
   return {
     faturamento_total,
     total_pedidos,
@@ -443,6 +524,14 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     topProductsCompleteness: hasAnyItems ? "complete" : "unavailable",
     melhores_dias,
     pedidos_recentes,
+    heatmap,
+    pedidosPorServiceType:   serviceTypeMap,
+    pedidosPorSource:        sourceMap,
+    totalDescontos,
+    totalTaxasEntrega,
+    totalGorjetas,
+    faturamentoPorDiaSemana: weekdayRevMap,
+    pedidosPorDiaSemana:     weekdayOrdMap,
   };
 }
 
@@ -464,8 +553,8 @@ async function probeAuthMode(
   const url = new URL(`${baseUrl}/v1/orders`);
   url.searchParams.set("filter[start_date]", start);
   url.searchParams.set("filter[end_date]",   end);
-  url.searchParams.set("page[number]", "1");
-  url.searchParams.set("page[size]",   "1");
+  url.searchParams.set("page",  "1");
+  url.searchParams.set("limit", "1");
 
   try {
     const r = await fetch(url.toString(), {
@@ -502,9 +591,9 @@ async function fetchOnePage(
   const url = new URL(`${baseUrl}/v1/orders`);
   url.searchParams.set("filter[start_date]", start);
   url.searchParams.set("filter[end_date]",   end);
-  url.searchParams.set("page[number]",        String(page));
-  url.searchParams.set("page[size]",          String(pageSize));
-  url.searchParams.set("sort",               "-created_at");
+  url.searchParams.set("page",  String(page));
+  url.searchParams.set("limit", String(pageSize));
+  url.searchParams.set("sort",  "-created_at");
 
   let response: Response;
   try {
@@ -824,43 +913,93 @@ async function fetchOrdersByWindowing(
       if (Date.now() >= execDeadline) { timedOut = true; break; }
 
       totalWindows++;
-      const r = await fetchOnePage(baseUrl, token, authMode, day, day, 1, DEFAULT_PAGE_SIZE);
-      requestsMade++;
-      if (r.rateLimitInfo.remaining !== null) rateLimitInfo = r.rateLimitInfo;
 
-      if (!r.ok) {
-        if (r.httpStatus === 429) { rateLimitStopped = true; }
+      // page 1
+      const r1 = await fetchOnePage(baseUrl, token, authMode, day, day, 1, DEFAULT_PAGE_SIZE);
+      requestsMade++;
+      if (r1.rateLimitInfo.remaining !== null) rateLimitInfo = r1.rateLimitInfo;
+
+      if (!r1.ok) {
+        if (r1.httpStatus === 429) { rateLimitStopped = true; }
         failedWindows++;
         continue;
       }
 
       if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining < MIN_RATE_LIMIT_REMAINING) {
-        addOrdersToMap(r.orders, orderMap, counters);
+        addOrdersToMap(r1.orders, orderMap, counters);
         resolvedWindows++;
         rateLimitStopped = true;
         break;
       }
 
-      if (!debugShape && r.rawJson) {
+      if (!debugShape && r1.rawJson) {
         const paginationKeys: string[] = [];
-        if (r.rawJson && typeof r.rawJson === "object" && !Array.isArray(r.rawJson)) {
-          const rj = r.rawJson as Record<string, unknown>;
+        if (r1.rawJson && typeof r1.rawJson === "object" && !Array.isArray(r1.rawJson)) {
+          const rj = r1.rawJson as Record<string, unknown>;
           if (rj["pagination"]) paginationKeys.push("pagination");
         }
-        debugShape = buildDebugShape(r.rawJson, r.orders, null, r.perPage, paginationKeys);
+        debugShape = buildDebugShape(r1.rawJson, r1.orders, null, r1.perPage, paginationKeys);
       }
 
-      if (r.total !== null && (providerReportedTotal === null || r.total > providerReportedTotal)) {
-        providerReportedTotal = r.total;
+      const dayTotal = r1.total ?? r1.orders.length;
+      if (r1.total !== null && (providerReportedTotal === null || r1.total > providerReportedTotal)) {
+        providerReportedTotal = r1.total;
       }
 
-      addOrdersToMap(r.orders, orderMap, counters);
+      addOrdersToMap(r1.orders, orderMap, counters);
 
-      const dayTotal = r.total ?? r.orders.length;
-      if (dayTotal > DEFAULT_PAGE_SIZE) {
-        partialWindows++;
-      } else {
+      const totalDayPages = dayTotal > DEFAULT_PAGE_SIZE ? Math.ceil(dayTotal / DEFAULT_PAGE_SIZE) : 1;
+
+      if (totalDayPages <= 1) {
         resolvedWindows++;
+        continue;
+      }
+
+      // pages 2..N within the same day
+      let dayResolved = r1.orders.length >= dayTotal;
+      const page1Ids = new Set(r1.orders.map((o: { id?: string | number }) => String(o.id ?? "")));
+
+      for (let p = 2; p <= totalDayPages; p++) {
+        if (rateLimitStopped || timedOut || requestsMade >= MAX_REQUESTS || orderMap.size >= MAX_UNIQUE_ORDERS) break;
+        if (Date.now() >= execDeadline) { timedOut = true; break; }
+
+        const rp = await fetchOnePage(baseUrl, token, authMode, day, day, p, DEFAULT_PAGE_SIZE);
+        requestsMade++;
+        if (rp.rateLimitInfo.remaining !== null) rateLimitInfo = rp.rateLimitInfo;
+
+        if (!rp.ok) {
+          if (rp.httpStatus === 429) { rateLimitStopped = true; }
+          break;
+        }
+
+        if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining < MIN_RATE_LIMIT_REMAINING) {
+          addOrdersToMap(rp.orders, orderMap, counters);
+          rateLimitStopped = true;
+          break;
+        }
+
+        if (rp.orders.length === 0) break;
+
+        // detect if page param is ignored (server keeps returning page 1 content)
+        if (p === 2) {
+          const overlap = rp.orders.filter((o: { id?: string | number }) => page1Ids.has(String(o.id ?? ""))).length;
+          if (overlap === rp.orders.length && rp.orders.length > 0) {
+            // pagination not working for this day — stop inner loop
+            break;
+          }
+        }
+
+        addOrdersToMap(rp.orders, orderMap, counters);
+        if (orderMap.size >= dayTotal || rp.orders.length < DEFAULT_PAGE_SIZE) {
+          dayResolved = true;
+          break;
+        }
+      }
+
+      if (dayResolved || timedOut || rateLimitStopped) {
+        resolvedWindows++;
+      } else {
+        partialWindows++;
       }
     }
   }
@@ -888,8 +1027,8 @@ async function fetchOrdersByWindowing(
 
 // ── Standard pagination (when it works) ───────────────────────────────────────
 
-const MAX_PAGES  = 20;
-const MAX_ORDERS = 1000;
+const MAX_PAGES  = 150;
+const MAX_ORDERS = 10_000;
 
 async function fetchWithPagination(
   baseUrl:  string,
@@ -924,7 +1063,7 @@ async function fetchWithPagination(
     const url = new URL(`${baseUrl}/v1/orders`);
     url.searchParams.set("filter[start_date]", start);
     url.searchParams.set("filter[end_date]",   end);
-    buildOrdersPaginationParams("json_api", currentPage, DEFAULT_PAGE_SIZE, url.searchParams);
+    buildOrdersPaginationParams("page_limit", currentPage, DEFAULT_PAGE_SIZE, url.searchParams);
     url.searchParams.set("sort", "-created_at");
     lastRequestedPage = currentPage;
 
@@ -1068,7 +1207,7 @@ async function fetchWithPagination(
     pagination: {
       used:               pagesFetched > 1 && paginationMode !== "operational_only",
       paginationMode,
-      conventionUsed:     "json_api",
+      conventionUsed:     "page_limit",
       conventionVerified: false,
       pagesFetched,
       totalReturned:      orderMap.size,
@@ -1178,7 +1317,7 @@ async function fetchAllOrders(
   const windowPagination: PaginationInfo = {
     used:               uniqueCount > DEFAULT_PAGE_SIZE,
     paginationMode:     windowingPaginationMode,
-    conventionUsed:     "json_api",
+    conventionUsed:     "page_limit",
     conventionVerified: false,
     pagesFetched:       wResult.requestsMade,
     totalReturned:      uniqueCount,
@@ -1646,6 +1785,14 @@ export async function GET(request: NextRequest) {
         topProductsCompleteness: metrics.topProductsCompleteness,
         melhores_dias:           metrics.melhores_dias,
         pedidos_recentes:        metrics.pedidos_recentes,
+        heatmap:                 metrics.heatmap,
+        pedidosPorServiceType:   metrics.pedidosPorServiceType,
+        pedidosPorSource:        metrics.pedidosPorSource,
+        totalDescontos:          metrics.totalDescontos,
+        totalTaxasEntrega:       metrics.totalTaxasEntrega,
+        totalGorjetas:           metrics.totalGorjetas,
+        faturamentoPorDiaSemana: metrics.faturamentoPorDiaSemana,
+        pedidosPorDiaSemana:     metrics.pedidosPorDiaSemana,
       },
     };
 

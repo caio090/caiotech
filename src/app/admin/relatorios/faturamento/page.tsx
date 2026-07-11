@@ -104,6 +104,14 @@ interface OrdersResult {
     topItemsReason:         string | null;
     melhores_dias:          { date: string; revenue: number; orders: number }[] | null;
     pedidos_recentes:       { id: string; date: string | null; status: string; total: number }[];
+    heatmap?:               { weekday: number; hour: number; orders: number; revenue: number }[];
+    pedidosPorServiceType?: Record<string, number>;
+    pedidosPorSource?:      Record<string, number>;
+    totalDescontos?:        number;
+    totalTaxasEntrega?:     number;
+    totalGorjetas?:         number;
+    faturamentoPorDiaSemana?: Record<string, number>;
+    pedidosPorDiaSemana?:   Record<string, number>;
   };
 }
 
@@ -123,6 +131,14 @@ interface ReportData {
   completeness?:          OrderFetchCompleteness;
   windowDiag?:            WindowFetchDiagnostics | null;
   cacheHit?:              boolean;
+  heatmap?:               { weekday: number; hour: number; orders: number; revenue: number }[];
+  pedidosPorServiceType?: Record<string, number>;
+  pedidosPorSource?:      Record<string, number>;
+  totalDescontos?:        number;
+  totalTaxasEntrega?:     number;
+  totalGorjetas?:         number;
+  faturamentoPorDiaSemana?: Record<string, number>;
+  pedidosPorDiaSemana?:   Record<string, number>;
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -363,6 +379,14 @@ export default function FaturamentoPage() {
         completeness:           d.completeness,
         windowDiag:             d.windowDiag ?? null,
         cacheHit:               d.cacheHit ?? false,
+        heatmap:                parsed?.heatmap,
+        pedidosPorServiceType:  parsed?.pedidosPorServiceType,
+        pedidosPorSource:       parsed?.pedidosPorSource,
+        totalDescontos:         parsed?.totalDescontos,
+        totalTaxasEntrega:      parsed?.totalTaxasEntrega,
+        totalGorjetas:          parsed?.totalGorjetas,
+        faturamentoPorDiaSemana: parsed?.faturamentoPorDiaSemana,
+        pedidosPorDiaSemana:    parsed?.pedidosPorDiaSemana,
       });
       setLastSync(new Date().toISOString());
     } catch {
@@ -891,6 +915,135 @@ export default function FaturamentoPage() {
                   </tbody>
                 </table>
               </div>
+            </SectionCard>
+          )}
+
+          {/* KPIs adicionais */}
+          {(report.totalDescontos || report.totalTaxasEntrega || report.totalGorjetas ||
+            report.pedidosPorServiceType || report.pedidosPorSource) && (
+            <SectionCard title="Composição do faturamento" icon={DollarSign}>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {(report.totalDescontos ?? 0) > 0 && (
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400 font-medium">Descontos</p>
+                    <p className="text-sm font-bold text-red-600">{fmtBRL(report.totalDescontos ?? 0)}</p>
+                  </div>
+                )}
+                {(report.totalTaxasEntrega ?? 0) > 0 && (
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400 font-medium">Taxas de entrega</p>
+                    <p className="text-sm font-bold text-gray-700">{fmtBRL(report.totalTaxasEntrega ?? 0)}</p>
+                  </div>
+                )}
+                {(report.totalGorjetas ?? 0) > 0 && (
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400 font-medium">Gorjetas</p>
+                    <p className="text-sm font-bold text-emerald-600">{fmtBRL(report.totalGorjetas ?? 0)}</p>
+                  </div>
+                )}
+              </div>
+              {report.pedidosPorServiceType && Object.keys(report.pedidosPorServiceType).length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Tipo de serviço</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(report.pedidosPorServiceType).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                      <span key={k} className="inline-flex items-center gap-1 text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full">
+                        {k} <span className="font-bold">{v}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {report.pedidosPorSource && Object.keys(report.pedidosPorSource).length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Canal</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(report.pedidosPorSource).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                      <span key={k} className="inline-flex items-center gap-1 text-[11px] bg-gray-50 text-gray-600 border border-gray-100 px-2 py-0.5 rounded-full">
+                        {k} <span className="font-bold">{v}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* Faturamento por dia da semana */}
+          {report.faturamentoPorDiaSemana && Object.keys(report.faturamentoPorDiaSemana).length > 0 && (
+            <SectionCard title="Faturamento por dia da semana" icon={BarChart3}>
+              {(() => {
+                const days = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+                const entries = days.map(d => ({ day: d, revenue: report.faturamentoPorDiaSemana?.[d] ?? 0, orders: report.pedidosPorDiaSemana?.[d] ?? 0 })).filter(e => e.revenue > 0 || e.orders > 0);
+                const maxRev = Math.max(...entries.map(e => e.revenue), 1);
+                return (
+                  <div className="space-y-2">
+                    {entries.map(({ day, revenue, orders }) => (
+                      <div key={day} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-16 flex-shrink-0 font-medium">{day.slice(0, 3)}</span>
+                        <div className="flex-1 bg-gray-50 rounded-full h-2 overflow-hidden">
+                          <div className="h-2 bg-indigo-400 rounded-full" style={{ width: `${(revenue / maxRev) * 100}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 w-20 text-right flex-shrink-0">{fmtBRL(revenue)}</span>
+                        <span className="text-[10px] text-gray-400 w-12 text-right flex-shrink-0">{orders}p</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </SectionCard>
+          )}
+
+          {/* Mapa de horários dos pedidos */}
+          {report.heatmap && report.heatmap.length > 0 && (
+            <SectionCard title="Mapa de horários dos pedidos" icon={Clock}>
+              {(() => {
+                const cells = report.heatmap;
+                const maxOrders = Math.max(...cells.map(c => c.orders), 1);
+                const days = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+                const hours = Array.from({ length: 24 }, (_, i) => i);
+                const cellMap: Record<string, { orders: number; revenue: number }> = {};
+                for (const c of cells) cellMap[`${c.weekday}:${c.hour}`] = { orders: c.orders, revenue: c.revenue };
+                return (
+                  <div className="overflow-x-auto">
+                    <div style={{ minWidth: "600px" }}>
+                      {/* Hour labels */}
+                      <div className="flex mb-1">
+                        <div className="w-8 flex-shrink-0" />
+                        {hours.map(h => (
+                          <div key={h} className="flex-1 text-center text-[9px] text-gray-400 font-mono">
+                            {h % 3 === 0 ? `${h}h` : ""}
+                          </div>
+                        ))}
+                      </div>
+                      {days.map((day, wd) => (
+                        <div key={wd} className="flex items-center gap-0 mb-0.5">
+                          <div className="w-8 flex-shrink-0 text-[10px] text-gray-400 font-medium">{day}</div>
+                          {hours.map(h => {
+                            const c = cellMap[`${wd}:${h}`];
+                            const intensity = c ? Math.round((c.orders / maxOrders) * 5) : 0;
+                            const colors = ["bg-gray-50","bg-indigo-50","bg-indigo-100","bg-indigo-200","bg-indigo-400","bg-indigo-600"];
+                            return (
+                              <div
+                                key={h}
+                                title={c ? `${day} ${h}h — ${c.orders} pedido${c.orders !== 1 ? "s" : ""} · ${fmtBRL(c.revenue)}` : undefined}
+                                className={`flex-1 aspect-square rounded-sm mx-px ${colors[intensity]} transition-colors`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 mt-2 justify-end">
+                        <span className="text-[10px] text-gray-400">Menos</span>
+                        {["bg-gray-50","bg-indigo-50","bg-indigo-100","bg-indigo-200","bg-indigo-400","bg-indigo-600"].map((c, i) => (
+                          <div key={i} className={`w-3 h-3 rounded-sm ${c} border border-gray-100`} />
+                        ))}
+                        <span className="text-[10px] text-gray-400">Mais</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </SectionCard>
           )}
 
