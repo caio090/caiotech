@@ -107,6 +107,7 @@ interface OrdersResult {
     faturamentoPorDiaSemana?: Record<string, number>; pedidosPorDiaSemana?: Record<string, number>;
     pedidosPorHora?: Record<string, number>; faturamentoPorHora?: Record<string, number>;
     concentracaoPorFaixa?: Record<string, { orders: number; revenue: number }>;
+    faturamentoPorDia?: { date: string; revenue: number; orders: number }[];
   };
 }
 
@@ -126,10 +127,21 @@ interface ReportData {
   faturamentoPorDiaSemana?: Record<string, number>; pedidosPorDiaSemana?: Record<string, number>;
   pedidosPorHora?: Record<string, number>; faturamentoPorHora?: Record<string, number>;
   concentracaoPorFaixa?: Record<string, { orders: number; revenue: number }>;
+  faturamentoPorDia?: { date: string; revenue: number; orders: number }[];
   timings?: {
     providerFetchMs: number; aggregationMs: number; totalDurationMs: number;
     requestsMade: number; daysFetched: number | null; cacheSource: string; fallbackUsed: boolean;
   } | null;
+}
+
+interface ProductEntry {
+  id: string | null; name: string; quantity: number;
+  revenue: number | null; category: string | null; share: number;
+}
+interface ProductsResult {
+  ok: boolean; completeness: "complete" | "partial" | "unavailable";
+  products: ProductEntry[]; totalQuantity: number; cacheHit?: boolean;
+  diagnostics?: { cacheHit: boolean; endpoint: string; errorCode: string | null; errorMessage: string | null; rawItemCount: number | null; firstItemKeys: string[] | null };
 }
 
 // ── Formatters ───────────────────────────────────────────────────────────────
@@ -158,16 +170,20 @@ function translateStatus(s: string): string {
   const MAP: Record<string, string> = {
     DELIVERED: "Entregue", DELIVERING: "Em entrega", PREPARING: "Preparando",
     READY: "Pronto", CANCELLED: "Cancelado", CANCELED: "Cancelado",
-    PENDING: "Pendente", CONFIRMED: "Confirmado",
+    PENDING: "Pendente", CONFIRMED: "Confirmado", FINALIZED: "Finalizado",
+    REJECTED: "Recusado", ACCEPTED: "Aceito", SCHEDULED: "Agendado",
+    UNKNOWN: "Desconhecido",
   };
   return MAP[s.toUpperCase()] ?? s;
 }
 function translateServiceType(s: string): string {
+  const norm = s.toUpperCase();
   const MAP: Record<string, string> = {
-    delivery: "Entrega", pickup: "Retirada", dine_in: "Consumo no local", onsite: "Consumo no local",
-    DELIVERY: "Entrega", PICKUP: "Retirada", DINE_IN: "Consumo no local", ONSITE: "Consumo no local",
+    DELIVERY: "Entrega", PICKUP: "Retirada", TAKEAWAY: "Retirada",
+    DINE_IN: "Consumo no local", ONSITE: "Consumo no local",
+    INBOUND: "Pedido recebido", UNKNOWN: "Desconhecido",
   };
-  return MAP[s] ?? s;
+  return MAP[norm] ?? s;
 }
 function translateSource(s: string): string {
   const MAP: Record<string, string> = {
@@ -560,6 +576,7 @@ function buildReportFromData(d: OrdersResult): ReportData {
     faturamentoPorDiaSemana: p?.faturamentoPorDiaSemana, pedidosPorDiaSemana: p?.pedidosPorDiaSemana,
     pedidosPorHora: p?.pedidosPorHora, faturamentoPorHora: p?.faturamentoPorHora,
     concentracaoPorFaixa: p?.concentracaoPorFaixa,
+    faturamentoPorDia: p?.faturamentoPorDia,
   };
 }
 
@@ -605,6 +622,13 @@ export default function FaturamentoPage() {
   const [clientsLoading,   setClientsLoading]   = useState(false);
   const [clientsError,     setClientsError]     = useState<string | null>(null);
   const [clientsLoaded,    setClientsLoaded]    = useState(false);
+  const [productsSortBy,   setProductsSortBy]   = useState<"quantity" | "revenue">("quantity");
+  const [productsData,     setProductsData]     = useState<ProductsResult | null>(null);
+  const [productsLoading,  setProductsLoading]  = useState(false);
+  const [productsError,    setProductsError]    = useState<string | null>(null);
+  const [productsKey,      setProductsKey]      = useState<string | null>(null);
+  const [productsLastFetch, setProductsLastFetch] = useState<string | null>(null);
+  const [revChartTooltip,  setRevChartTooltip]   = useState<number | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
   const requestIdRef        = useRef(0);
 
@@ -744,6 +768,36 @@ export default function FaturamentoPage() {
     } catch { setPrevReport(null); }
     finally { setLoadingPrev(false); }
   }, [clientId, period, report?.completeness]);
+
+  // ── Products tab: lazy load on demand ────────────────────────────────────────
+  const loadProducts = useCallback(async (force = false) => {
+    const dates = periodDates(period, customStart, customEnd);
+    if (!clientId || !dates) return;
+    const key = `${clientId}:${dates.start}:${dates.end}`;
+    if (!force && productsKey === key && productsData) return;
+    setProductsLoading(true);
+    setProductsError(null);
+    const ctrl = new AbortController();
+    try {
+      const url = `/api/olaclick/products-sold?client_id=${clientId}&start_date=${dates.start}&end_date=${dates.end}${force ? "&force_refresh=1" : ""}`;
+      const r = await fetch(url, { signal: ctrl.signal });
+      const d = await r.json() as ProductsResult;
+      setProductsData(d);
+      setProductsKey(key);
+      setProductsLastFetch(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") setProductsError("Não foi possível carregar os produtos agora.");
+    } finally {
+      setProductsLoading(false);
+    }
+    return () => ctrl.abort();
+  }, [clientId, period, customStart, customEnd, productsKey, productsData]);
+
+  useEffect(() => {
+    if (activeTab === "products" && clientId) {
+      void loadProducts();
+    }
+  }, [activeTab, clientId, period, customStart, customEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-refresh ────────────────────────────────────────────────────────────
   const { refresh: autoRefreshNow } = useAutoRefresh({
@@ -1169,6 +1223,96 @@ export default function FaturamentoPage() {
                     </motion.div>
                   )}
 
+                  {/* ── Green revenue evolution chart ─────────────────────── */}
+                  {report.faturamentoPorDia && report.faturamentoPorDia.length > 1 && (() => {
+                    const dias = report.faturamentoPorDia!;
+                    const maxRev = Math.max(...dias.map(d => d.revenue), 1);
+                    const W = 560, H = 140, PAD = { t: 12, r: 8, b: 28, l: 52 };
+                    const cw = W - PAD.l - PAD.r;
+                    const ch = H - PAD.t - PAD.b;
+                    const pts = dias.map((d, i) => ({
+                      x: PAD.l + (i / (dias.length - 1)) * cw,
+                      y: PAD.t + ch - (d.revenue / maxRev) * ch,
+                      ...d,
+                    }));
+                    const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+                    const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(1)},${(PAD.t + ch).toFixed(1)} L${pts[0].x.toFixed(1)},${(PAD.t + ch).toFixed(1)} Z`;
+                    const bestIdx = dias.reduce((bi, d, i) => d.revenue > dias[bi].revenue ? i : bi, 0);
+                    return (
+                      <motion.div variants={fadeUp} style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, padding: "18px 20px", overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                          <TrendingUp size={14} style={{ color: "#34d399" }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)" }}>Evolução do faturamento</span>
+                          <span style={{ fontSize: 10, color: "var(--lk-muted)", marginLeft: "auto" }}>{dias.length} dias</span>
+                        </div>
+                        <div style={{ overflowX: "auto" }}>
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 300, maxHeight: 160, display: "block" }}
+                            onMouseLeave={() => setRevChartTooltip(null)}>
+                            <defs>
+                              <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#34d399" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+                              </linearGradient>
+                              <style>{`@keyframes drawLine { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } } @media (prefers-reduced-motion: reduce) { .rev-line { animation: none !important; stroke-dasharray: none !important; } }`}</style>
+                            </defs>
+                            {/* Y-axis labels */}
+                            {[0, 0.5, 1].map(frac => {
+                              const yPos = PAD.t + ch - frac * ch;
+                              return (
+                                <g key={frac}>
+                                  <line x1={PAD.l - 4} y1={yPos} x2={W - PAD.r} y2={yPos} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                                  <text x={PAD.l - 6} y={yPos + 4} textAnchor="end" fontSize="9" fill="rgba(255,255,255,0.3)">
+                                    {(maxRev * frac / 1000).toFixed(0)}k
+                                  </text>
+                                </g>
+                              );
+                            })}
+                            {/* Area */}
+                            <path d={areaPath} fill="url(#greenGrad)" />
+                            {/* Line */}
+                            <path className="rev-line" d={linePath} fill="none" stroke="#34d399" strokeWidth="2"
+                              strokeDasharray="2000" style={{ animation: "drawLine 0.7s ease-out forwards" }} />
+                            {/* Best day marker */}
+                            <circle cx={pts[bestIdx].x} cy={pts[bestIdx].y} r="4" fill="#10b981" stroke="var(--lk-card)" strokeWidth="2" />
+                            {/* X-axis dates */}
+                            {pts.filter((_, i) => {
+                              const step = Math.max(1, Math.floor(dias.length / 6));
+                              return i % step === 0 || i === dias.length - 1;
+                            }).map((p) => (
+                              <text key={p.date} x={p.x} y={H - 4} textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.3)">
+                                {fmtDay(p.date)}
+                              </text>
+                            ))}
+                            {/* Hover areas */}
+                            {pts.map((p, i) => (
+                              <rect key={i} x={p.x - (cw / dias.length) / 2} y={PAD.t} width={cw / dias.length} height={ch}
+                                fill="transparent" style={{ cursor: "crosshair" }}
+                                onMouseEnter={() => setRevChartTooltip(i)} />
+                            ))}
+                            {/* Tooltip */}
+                            {revChartTooltip !== null && (() => {
+                              const tp = pts[revChartTooltip];
+                              const td = dias[revChartTooltip];
+                              const tw = 130, th = 44;
+                              const tx = Math.min(tp.x - tw / 2, W - PAD.r - tw);
+                              const ty = tp.y - th - 8 < PAD.t ? tp.y + 10 : tp.y - th - 8;
+                              return (
+                                <g>
+                                  <line x1={tp.x} y1={PAD.t} x2={tp.x} y2={PAD.t + ch} stroke="rgba(52,211,153,0.3)" strokeWidth="1" strokeDasharray="3,3" />
+                                  <circle cx={tp.x} cy={tp.y} r="4" fill="#34d399" stroke="var(--lk-card)" strokeWidth="2" />
+                                  <rect x={tx} y={ty} width={tw} height={th} rx="6" fill="rgba(19,19,26,0.95)" stroke="rgba(52,211,153,0.3)" strokeWidth="1" />
+                                  <text x={tx + tw / 2} y={ty + 14} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.5)">{fmtDay(td.date)}</text>
+                                  <text x={tx + tw / 2} y={ty + 28} textAnchor="middle" fontSize="11" fontWeight="700" fill="#34d399">{fmtBRL(td.revenue)}</text>
+                                  <text x={tx + tw / 2} y={ty + 40} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.4)">{td.orders} pedidos</text>
+                                </g>
+                              );
+                            })()}
+                          </svg>
+                        </div>
+                      </motion.div>
+                    );
+                  })()}
+
                   {/* Best days */}
                   {report.melhores_dias && report.melhores_dias.length > 0 && (
                     <motion.div variants={fadeUp} style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, padding: "18px 20px" }}>
@@ -1400,39 +1544,124 @@ export default function FaturamentoPage() {
 
               {/* ══ TAB: Produtos ══════════════════════════════════════════ */}
               {activeTab === "products" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                  {report.produtos_mais_vendidos && report.produtos_mais_vendidos.length > 0 ? (
-                    <motion.div variants={fadeUp} style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, padding: "18px 20px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                        <TrendingUp size={14} style={{ color: "var(--lk-muted)" }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)" }}>Produtos mais vendidos</span>
+                <motion.div variants={fadeUp} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                  {/* Header row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <TrendingUp size={14} style={{ color: "var(--lk-muted)" }} />
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--lk-text)" }}>Ranking de Produtos</span>
+                      {productsLastFetch && (
+                        <span style={{ fontSize: 10, color: "var(--lk-muted)" }}>· atualizado às {productsLastFetch}</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {/* Sort toggle */}
+                      <div style={{ display: "flex", border: "1px solid var(--lk-border)", borderRadius: 8, overflow: "hidden" }}>
+                        {([["quantity", "Mais vendidos"], ["revenue", "Maior faturamento"]] as const).map(([v, l]) => (
+                          <button key={v} onClick={() => setProductsSortBy(v)}
+                            style={{ padding: "5px 12px", fontSize: 11, fontWeight: 600, background: productsSortBy === v ? "rgba(123,110,246,0.18)" : "transparent", color: productsSortBy === v ? "var(--lk-accent)" : "var(--lk-muted)", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>
+                            {l}
+                          </button>
+                        ))}
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {report.produtos_mais_vendidos.slice(0, 10).map((p, i) => {
-                          const maxQty = report.produtos_mais_vendidos![0].qty || 1;
+                      <button
+                        onClick={() => void loadProducts(true)}
+                        disabled={productsLoading}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", fontSize: 11, fontWeight: 600, background: "rgba(255,255,255,0.05)", border: "1px solid var(--lk-border)", borderRadius: 8, color: "var(--lk-muted)", cursor: productsLoading ? "not-allowed" : "pointer" }}>
+                        <RotateCcw size={11} style={{ animation: productsLoading ? "spin 1s linear infinite" : undefined }} />
+                        Atualizar produtos
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Loading skeleton */}
+                  {productsLoading && !productsData && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} style={{ height: 44, borderRadius: 10, background: "rgba(255,255,255,0.04)", animation: "pulse 1.5s ease-in-out infinite" }} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {productsError && (
+                    <div style={{ padding: "20px", textAlign: "center", background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14 }}>
+                      <p style={{ fontSize: 12, color: "#f87171" }}>{productsError}</p>
+                    </div>
+                  )}
+
+                  {/* Ranked list */}
+                  {productsData && !productsError && (() => {
+                    const RANK_COLORS = ["#f87171", "#fb923c", "#fbbf24", "#34d399", "#34d399",
+                                         "#34d399", "#34d399", "#34d399", "#34d399", "#34d399"];
+                    const sorted = [...(productsData.products ?? [])].sort((a, b) =>
+                      productsSortBy === "revenue"
+                        ? (b.revenue ?? 0) - (a.revenue ?? 0)
+                        : b.quantity - a.quantity
+                    );
+                    const maxVal = sorted.length > 0
+                      ? (productsSortBy === "revenue" ? (sorted[0].revenue ?? 0) : sorted[0].quantity)
+                      : 1;
+
+                    if (sorted.length === 0) {
+                      return (
+                        <div style={{ padding: "40px 20px", textAlign: "center", background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14 }}>
+                          <TrendingUp size={32} style={{ color: "var(--lk-border)", margin: "0 auto 12px" }} />
+                          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)", marginBottom: 6 }}>
+                            {productsData.ok ? "Nenhum produto encontrado no período." : "Ranking indisponível"}
+                          </p>
+                          {productsData.diagnostics?.errorMessage && (
+                            <p style={{ fontSize: 12, color: "var(--lk-muted)", maxWidth: 360, margin: "0 auto" }}>
+                              {productsData.diagnostics.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, overflow: "hidden" }}>
+                        {sorted.map((p, i) => {
+                          const val = productsSortBy === "revenue" ? (p.revenue ?? 0) : p.quantity;
+                          const barW = maxVal > 0 ? (val / maxVal) * 100 : 0;
                           return (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span style={{ width: 20, height: 20, borderRadius: 6, background: "rgba(123,110,246,0.15)", color: "var(--lk-accent)", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
-                              <span style={{ flex: 1, fontSize: 13, color: "var(--lk-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                              <div style={{ width: 80, height: 4, background: "rgba(255,255,255,0.04)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
-                                <div style={{ height: "100%", width: `${(p.qty / maxQty) * 100}%`, background: "var(--lk-accent)", borderRadius: 2 }} />
+                            <div key={p.id ?? i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < sorted.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}>
+                              {/* Rank badge */}
+                              <span style={{ width: 22, height: 22, borderRadius: 6, background: `${RANK_COLORS[i]}22`, color: RANK_COLORS[i], fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                {i + 1}
+                              </span>
+                              {/* Name + category */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--lk-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
+                                {p.category && <p style={{ fontSize: 10, color: "var(--lk-muted)", marginTop: 1 }}>{p.category}</p>}
                               </div>
-                              <span style={{ fontSize: 13, fontWeight: 800, color: "var(--lk-text)", flexShrink: 0, minWidth: 30, textAlign: "right" }}>{p.qty}</span>
+                              {/* Bar */}
+                              <div style={{ width: 80, flexShrink: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                                <div style={{ height: 3, background: "rgba(255,255,255,0.04)", borderRadius: 2, overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${barW}%`, background: RANK_COLORS[i], borderRadius: 2, transition: "width 0.4s ease" }} />
+                                </div>
+                                <span style={{ fontSize: 9, color: "var(--lk-muted)", textAlign: "right" }}>{p.share}%</span>
+                              </div>
+                              {/* Stats */}
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <p style={{ fontSize: 13, fontWeight: 800, color: "var(--lk-text)" }}>{p.quantity}×</p>
+                                {p.revenue != null && <p style={{ fontSize: 10, color: "var(--lk-muted)" }}>{fmtBRL(p.revenue)}</p>}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div variants={fadeUp} style={{ padding: "40px 20px", textAlign: "center", background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14 }}>
-                      <TrendingUp size={32} style={{ color: "var(--lk-border)", margin: "0 auto 12px" }} />
-                      <p style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)", marginBottom: 6 }}>Produtos não disponíveis</p>
-                      <p style={{ fontSize: 12, color: "var(--lk-muted)", maxWidth: 320, margin: "0 auto" }}>
-                        {report.topItemsReason ?? "Os itens não vieram na resposta do endpoint /v1/orders."}
-                      </p>
-                    </motion.div>
+                    );
+                  })()}
+
+                  {/* Cache/completeness note */}
+                  {productsData && (
+                    <p style={{ fontSize: 10, color: "var(--lk-muted)", textAlign: "right" }}>
+                      {productsData.cacheHit ? "Dados em cache (10 min)." : "Dados diretos do provider."}
+                      {productsData.completeness === "partial" && " · Dados parciais."}
+                    </p>
                   )}
-                </div>
+                </motion.div>
               )}
 
               {/* ══ TAB: Diagnóstico ═══════════════════════════════════════ */}
