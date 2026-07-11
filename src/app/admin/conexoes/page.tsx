@@ -692,6 +692,7 @@ function ConexoesContent() {
   const [olaConnections, setOlaConnections] = useState<DigitalMenuConnectionRow[]>([]);
   const [olaLoading,     setOlaLoading]     = useState(false);
   const [olaEnv,         setOlaEnv]         = useState<{ hasBaseUrl: boolean } | null>(null);
+  const [olaModalClientId, setOlaModalClientId] = useState<string | undefined>(undefined);
 
   const [assets,        setAssets]        = useState<AssetsResponse>(null);
   const [linkingKey,    setLinkingKey]    = useState<string | null>(null); // "fb:{pageId}" ou "ig:{igId}"
@@ -1612,6 +1613,7 @@ function ConexoesContent() {
             ? olaConnections.filter((c) => c.client_id === clientParam)
             : olaConnections;
           const hasConns = visibleConns.length > 0;
+          const connectedClientCount = new Set(olaConnections.map((c) => c.client_id)).size;
           return (
             <div className={`bg-white rounded-2xl border p-5 ${hasConns ? "border-orange-100" : "border-gray-100"}`}>
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -1627,7 +1629,9 @@ function ConexoesContent() {
                 {olaLoading
                   ? <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Verificando…</span>
                   : hasConns
-                    ? <StatusBadge ok={true} label={`${visibleConns.length} conexão${visibleConns.length > 1 ? "ões" : ""}`} />
+                    ? clientParam
+                      ? <StatusBadge ok={true} label={`${visibleConns.length} conexão${visibleConns.length > 1 ? "ões" : ""}`} />
+                      : <StatusBadge ok={true} label={`${connectedClientCount} de ${olaClients.length} clientes`} />
                     : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
                 }
               </div>
@@ -1643,13 +1647,13 @@ function ConexoesContent() {
               <div className="grid grid-cols-3 gap-2 mb-4 pt-3 border-t border-gray-50">
                 {[
                   { label: "Cardápio",    ok: hasConns },
-                  { label: "Pedidos",     ok: false, soon: true },
-                  { label: "Faturamento", ok: false, soon: true },
-                ].map(({ label, ok, soon }) => (
+                  { label: "Pedidos",     ok: hasConns },
+                  { label: "Faturamento", ok: hasConns },
+                ].map(({ label, ok }) => (
                   <div key={label} className="p-2.5 bg-gray-50 rounded-xl">
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
                     <p className={`text-xs font-medium ${ok ? "text-emerald-600" : "text-gray-400"}`}>
-                      {ok ? "Disponível" : soon ? "Em breve" : "Conectar"}
+                      {ok ? "Disponível" : "Conectar"}
                     </p>
                   </div>
                 ))}
@@ -1663,10 +1667,67 @@ function ConexoesContent() {
                 </div>
               )}
 
-              {/* Lista de conexões existentes */}
-              {hasConns && (
+              {/* Multi-client hub — grid quando todos, lista quando filtrado */}
+              {!clientParam ? (
+                <div className="mb-4 space-y-3">
+                  {olaClients.length > 0 && (
+                    <p className="text-xs text-gray-500">
+                      <strong className="text-gray-800">{connectedClientCount} de {olaClients.length}</strong>{" "}
+                      clientes com Cardápio Digital conectado
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {olaClients.map((client) => {
+                      const clientConns = olaConnections.filter((c) => c.client_id === client.id);
+                      const hasClientConn = clientConns.length > 0;
+                      return (
+                        <div key={client.id} className={`p-3 rounded-xl border ${hasClientConn ? "bg-orange-50 border-orange-100" : "bg-gray-50 border-gray-100"}`}>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs font-semibold truncate ${hasClientConn ? "text-orange-800" : "text-gray-600"}`}>
+                                {client.company_name}
+                              </p>
+                              {hasClientConn ? (
+                                <p className="text-[10px] text-orange-600 mt-0.5">
+                                  {clientConns[0].connection_name} · {(clientConns[0].provider ?? "olaclick").toUpperCase()}
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-gray-400 mt-0.5">Sem conexão</p>
+                              )}
+                            </div>
+                            {hasClientConn
+                              ? <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full flex-shrink-0"><CheckCircle2 className="w-2.5 h-2.5" /> Ativo</span>
+                              : <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded-full flex-shrink-0"><Clock className="w-2.5 h-2.5" /> Não conectado</span>
+                            }
+                          </div>
+                          {hasClientConn ? (
+                            <div className="flex items-center justify-between mt-1.5">
+                              <p className="text-[10px] text-orange-500 font-mono">…{clientConns[0].token_last_four ?? "****"}</p>
+                              <button
+                                onClick={() => setEditingConn(clientConns[0])}
+                                className="text-[10px] font-medium text-orange-600 hover:text-orange-800 bg-white border border-orange-100 hover:border-orange-200 px-2 py-0.5 rounded-full transition-colors"
+                              >
+                                Gerenciar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setOlaModalClientId(client.id); setShowOlaModal(true); }}
+                              className="mt-1.5 text-[10px] font-medium text-gray-500 hover:text-orange-600 transition-colors"
+                            >
+                              + Conectar
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {olaClients.length === 0 && (
+                      <p className="text-xs text-gray-400 col-span-2 py-2">Nenhum cliente cadastrado.</p>
+                    )}
+                  </div>
+                </div>
+              ) : hasConns ? (
                 <div className="mb-4 space-y-2">
-                  {/* Info: OlaClick sempre tem URL padrão */}
                   <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700">
                     <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-500" />
                     <p>
@@ -1690,7 +1751,6 @@ function ConexoesContent() {
                             {conn.connection_name}
                             {conn.token_last_four && <span className="font-mono ml-1 opacity-60">…{conn.token_last_four}</span>}
                           </p>
-                          {/* URL da API */}
                           <p className="text-[10px] mt-1">
                             {conn.api_base_url
                               ? <span className="text-orange-600">URL personalizada ✓</span>
@@ -1718,11 +1778,11 @@ function ConexoesContent() {
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setShowOlaModal(true)}
+                  onClick={() => { setOlaModalClientId(clientParam ?? undefined); setShowOlaModal(true); }}
                   className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors ${
                     hasConns
                       ? "text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100"
@@ -1789,10 +1849,10 @@ function ConexoesContent() {
       {/* Modal nova conexão */}
       {showOlaModal && (
         <DigitalMenuModal
-          onClose={() => setShowOlaModal(false)}
-          onSaved={() => { setShowOlaModal(false); void loadOlaConnections(); }}
+          onClose={() => { setShowOlaModal(false); setOlaModalClientId(undefined); }}
+          onSaved={() => { setShowOlaModal(false); setOlaModalClientId(undefined); void loadOlaConnections(); }}
           clients={olaClients}
-          preselectedClientId={clientParam ?? undefined}
+          preselectedClientId={olaModalClientId}
         />
       )}
 
