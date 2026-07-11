@@ -231,6 +231,15 @@ export async function GET() {
     enrichment.briefs = contextsRes.error ? "unavailable" : "success";
     if (contextsRes.error) warnings.push({ code: "client_context_unavailable", feature: "brief" });
 
+    // olaclick connections (optional — table may not exist yet)
+    const olaRes = await supabase.from("olaclick_connections").select("client_id, status").eq("status", "active");
+    const olaClientIds = new Set<string>();
+    if (!olaRes.error) {
+      (olaRes.data ?? []).forEach((r: { client_id: string; status: string }) => {
+        if (r.client_id) olaClientIds.add(r.client_id);
+      });
+    }
+
     // meta assets (SQL 37 optional)
     const assetsRes = await supabase.from("client_meta_assets").select("client_id, asset_type");
     let metaClientIds     = new Set<string>();
@@ -261,6 +270,7 @@ export async function GET() {
       has_instagram:   useAssets ? instagramClientIds.has(c.id) : false,
       has_diagnostico: diagIds.has(c.id),
       has_brief:       briefIds.has(c.id),
+      has_olaclick:    olaClientIds.has(c.id),
     }));
 
     // ── 6. Diagnostics (admin-only, safe — no values, only booleans) ─────────

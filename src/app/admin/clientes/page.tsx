@@ -10,6 +10,8 @@ import { getClientLimitByPlan } from "@/lib/account-permissions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isClientVisible } from "@/lib/client-visibility";
 import { INTEGRATION_STATUS } from "@/lib/integrations";
+import { DigitalMenuConnectionModal, type DigitalMenuClientOption } from "@/components/integrations/digital-menu-connection-modal";
+import { UtensilsCrossed } from "lucide-react";
 
 // ── Modal Novo Cliente ─────────────────────────────────────────
 interface NewClientForm {
@@ -153,6 +155,7 @@ interface Client {
   has_instagram?: boolean;
   has_diagnostico?: boolean;
   has_brief?: boolean;
+  has_olaclick?: boolean;
 }
 
 type DeleteMode = "archive" | "hard";
@@ -682,6 +685,7 @@ function ClientIntegrationsRow({ c }: { c: Client }) {
   const metaInstagramItems = [
     { label: "Meta",      ok: !!c.has_meta,      tipOn: "Meta: Página vinculada a este cliente", tipOff: "Meta: Nenhuma Página vinculada — configure em Conexões" },
     { label: "Instagram", ok: !!c.has_instagram, tipOn: "Instagram: conta Business vinculada",   tipOff: "Instagram: Nenhuma conta vinculada — configure em Conexões" },
+    { label: "Cardápio Digital", ok: !!c.has_olaclick, tipOn: "Cardápio Digital: conexão OlaClick ativa", tipOff: "Cardápio Digital: sem conexão OlaClick" },
   ];
   const perClientItems: { label: string; ok: boolean }[] = [
     { label: "Brief",       ok: !!c.has_brief       },
@@ -723,6 +727,7 @@ function ClientCard({
   onArchive,
   onHardDelete,
   onInvite,
+  onConnectOlaClick,
   isAdmin,
   canHardDelete,
   selectionMode,
@@ -735,6 +740,7 @@ function ClientCard({
   onArchive: (c: Client) => void;
   onHardDelete: (c: Client) => void;
   onInvite: (c: Client) => void;
+  onConnectOlaClick: (c: Client) => void;
   isAdmin: boolean;
   canHardDelete: boolean;
   selectionMode: boolean;
@@ -779,6 +785,9 @@ function ClientCard({
           </button>
           <button onClick={() => onEdit(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Editar cliente">
             <Edit2 className="w-3.5 h-3.5" /> Editar
+          </button>
+          <button onClick={() => onConnectOlaClick(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors" title={c.has_olaclick ? "Gerenciar Cardápio Digital" : "Conectar Cardápio Digital"}>
+            <UtensilsCrossed className="w-3.5 h-3.5" /> {c.has_olaclick ? "Cardápio" : "Conectar"}
           </button>
           {isAdmin && (
             <>
@@ -873,6 +882,7 @@ export default function AdminClientesPage() {
   const [trashOpen,    setTrashOpen]    = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [trashItems,   setTrashItems]   = useState<TrashItem[]>([]);
+  const [olaModalClient, setOlaModalClient] = useState<Client | null>(null);
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
@@ -1342,6 +1352,7 @@ export default function AdminClientesPage() {
               onArchive={(client) => setDeleteModal({ mode: "archive", clients: [client] })}
               onHardDelete={(client) => setDeleteModal({ mode: "hard", clients: [client] })}
               onInvite={setInvitingClient}
+              onConnectOlaClick={setOlaModalClient}
             />
           ))}
         </div>
@@ -1375,6 +1386,14 @@ export default function AdminClientesPage() {
         />
       )}
       {deleteModal && <DeleteModal state={deleteModal} onConfirm={handleDelete} onCancel={() => setDeleteModal(null)} loading={actionLoading} />}
+      {olaModalClient && (
+        <DigitalMenuConnectionModal
+          clients={clients.map((c): DigitalMenuClientOption => ({ id: c.id, company_name: c.company_name ?? "", email: c.email }))}
+          preselectedClientId={olaModalClient.id}
+          onClose={() => setOlaModalClient(null)}
+          onSaved={() => { setOlaModalClient(null); void fetchClients(); }}
+        />
+      )}
       {trashOpen && (
         <TrashModal
           items={trashItems}

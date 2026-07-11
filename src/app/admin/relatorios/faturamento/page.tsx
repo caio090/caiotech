@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingCart, RefreshCw, Loader2, AlertCircle, CheckCircle2,
@@ -629,8 +630,11 @@ export default function FaturamentoPage() {
   const [productsKey,      setProductsKey]      = useState<string | null>(null);
   const [productsLastFetch, setProductsLastFetch] = useState<string | null>(null);
   const [revChartTooltip,  setRevChartTooltip]   = useState<number | null>(null);
-  const activeControllerRef = useRef<AbortController | null>(null);
-  const requestIdRef        = useRef(0);
+  const activeControllerRef    = useRef<AbortController | null>(null);
+  const requestIdRef           = useRef(0);
+  const prevClientIdRef        = useRef("");
+  const lastLoadedContextRef   = useRef<string | null>(null);
+  const router                 = useRouter();
 
   // ── Load clients (with proper error handling) ──────────────────────────────
   const loadClients = useCallback(async () => {
@@ -650,8 +654,26 @@ export default function FaturamentoPage() {
       const list = (body.clients as ClientOption[] | undefined) ?? [];
       setClients(list);
       setClientsLoaded(true);
-      if (list.length > 0) setClientId(list[0].id);
-      else setClientsError("Nenhum cliente cadastrado encontrado.");
+      if (list.length > 0) {
+        const urlClient = new URLSearchParams(window.location.search).get("client");
+        const urlPeriod = new URLSearchParams(window.location.search).get("period") as PeriodKey | null;
+        const urlTab    = new URLSearchParams(window.location.search).get("tab") as TabKey | null;
+        const urlStart  = new URLSearchParams(window.location.search).get("start");
+        const urlEnd    = new URLSearchParams(window.location.search).get("end");
+        const savedCid  = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("lokat:last-sales-report-client") : null;
+
+        const preferred =
+          (urlClient && list.find(c => c.id === urlClient)) ? urlClient :
+          (savedCid  && list.find(c => c.id === savedCid))  ? savedCid  :
+          list[0].id;
+
+        setClientId(preferred);
+        prevClientIdRef.current = preferred;
+        if (urlPeriod && PERIODS.map(p => p.value).includes(urlPeriod)) setPeriod(urlPeriod);
+        if (urlTab    && (["overview","schedule","orders","products","diagnostics"] as string[]).includes(urlTab)) setActiveTab(urlTab);
+        if (urlPeriod === "personalizado" && urlStart) setCustomStart(urlStart);
+        if (urlPeriod === "personalizado" && urlEnd)   setCustomEnd(urlEnd);
+      } else setClientsError("Nenhum cliente cadastrado encontrado.");
     } catch { setClientsError("Erro de rede ao carregar clientes."); }
     finally { setClientsLoading(false); }
   }, []);
@@ -670,6 +692,27 @@ export default function FaturamentoPage() {
   }, []);
 
   useEffect(() => { if (clientId) void loadStatus(clientId); }, [clientId, loadStatus]);
+
+  // ── Clear stale data when client changes ──────────────────────────────────
+  useEffect(() => {
+    if (!clientId) { prevClientIdRef.current = ""; return; }
+    if (prevClientIdRef.current === clientId) return;
+    const prevId = prevClientIdRef.current;
+    prevClientIdRef.current = clientId;
+    if (!prevId) return; // first selection — don't clear
+
+    if (activeControllerRef.current) { activeControllerRef.current.abort(); activeControllerRef.current = null; }
+    ++requestIdRef.current;
+
+    setReport(null); setPrevReport(null);
+    setProductsData(null); setProductsKey(null); setProductsError(null); setProductsLastFetch(null);
+    setError(null); setApiDiag(null); setCacheLabel(null);
+    setMissingBaseUrl(false); setSyncPhase(null); setLastSync(null);
+    setActiveTab("overview");
+    lastLoadedContextRef.current = null;
+
+    try { sessionStorage.setItem("lokat:last-sales-report-client", clientId); } catch { /* quota */ }
+  }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load report ────────────────────────────────────────────────────────────
   const loadReport = useCallback(async (forceRefresh = false) => {
@@ -773,7 +816,8 @@ export default function FaturamentoPage() {
   const loadProducts = useCallback(async (force = false) => {
     const dates = periodDates(period, customStart, customEnd);
     if (!clientId || !dates) return;
-    const key = `${clientId}:${dates.start}:${dates.end}`;
+    const connectionId = status?.connection?.id ?? "";
+    const key = `${clientId}:${connectionId}:${dates.start}:${dates.end}:products-v1`;
     if (!force && productsKey === key && productsData) return;
     setProductsLoading(true);
     setProductsError(null);
@@ -791,7 +835,7 @@ export default function FaturamentoPage() {
       setProductsLoading(false);
     }
     return () => ctrl.abort();
-  }, [clientId, period, customStart, customEnd, productsKey, productsData]);
+  }, [clientId, period, customStart, customEnd, status, productsKey, productsData]);
 
   useEffect(() => {
     if (activeTab === "products" && clientId) {
@@ -799,10 +843,34 @@ export default function FaturamentoPage() {
     }
   }, [activeTab, clientId, period, customStart, customEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Auto-load report when client + connection are ready ───────────────────
+  useEffect(() => {
+    if (!clientId || loadingStatus || !status?.ok || !status?.connection) return;
+    const dates = periodDates(period, customStart, customEnd);
+    if (!dates) return;
+    const connectionId = status.connection.id ?? "";
+    const contextKey = `${clientId}:${connectionId}:${dates.start}:${dates.end}:v4`;
+    if (lastLoadedContextRef.current === contextKey) return;
+    lastLoadedContextRef.current = contextKey;
+    void loadReport();
+  }, [clientId, period, customStart, customEnd, status, loadingStatus, loadReport]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sync URL when client / period / tab change ────────────────────────────
+  useEffect(() => {
+    if (!clientId) return;
+    const p = new URLSearchParams();
+    p.set("client", clientId);
+    if (period !== "7dias") p.set("period", period);
+    if (activeTab !== "overview") p.set("tab", activeTab);
+    if (period === "personalizado" && customStart) p.set("start", customStart);
+    if (period === "personalizado" && customEnd)   p.set("end", customEnd);
+    router.replace(`/admin/relatorios/faturamento?${p.toString()}`);
+  }, [clientId, period, activeTab, customStart, customEnd, router]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Auto-refresh ────────────────────────────────────────────────────────────
   const { refresh: autoRefreshNow } = useAutoRefresh({
     enabled: !!clientId && !!(status?.ok && status?.connection),
-    intervalMs: 300_000, onRefresh: loadReport, refreshOnMount: false,
+    intervalMs: 900_000, onRefresh: loadReport, refreshOnMount: false,
   });
   void autoRefreshNow;
 
@@ -855,6 +923,14 @@ export default function FaturamentoPage() {
 
   return (
     <div style={{ maxWidth: 1600, width: "100%" }}>
+      <style>{`
+        .report-tabs-scroll {
+          display: flex; overflow-x: auto; overflow-y: hidden;
+          scrollbar-width: none; -ms-overflow-style: none;
+          overscroll-behavior-x: contain;
+        }
+        .report-tabs-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+      `}</style>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 24 }}>
@@ -890,7 +966,7 @@ export default function FaturamentoPage() {
               }}
             >
               {loading ? <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <RefreshCw size={14} />}
-              Sincronizar
+              Atualizar dados
             </button>
           </div>
         </div>
@@ -1086,7 +1162,7 @@ export default function FaturamentoPage() {
           </div>
 
           {/* ── Tabs ─────────────────────────────────────────────────────── */}
-          <div style={{ display: "flex", borderBottom: "1px solid var(--lk-border)", marginBottom: 24, gap: 2, overflowX: "auto" }}>
+          <div className="report-tabs-scroll" style={{ borderBottom: "1px solid var(--lk-border)", marginBottom: 24, gap: 2 }}>
             {TABS.map(tab => (
               <button
                 key={tab.key}

@@ -10,6 +10,7 @@ import {
   ShieldCheck, CalendarDays, User, Globe, Layers,
   UtensilsCrossed, X, Eye, EyeOff, ShieldAlert, Lock, ChevronDown,
 } from "lucide-react";
+import { DigitalMenuConnectionModal } from "@/components/integrations/digital-menu-connection-modal";
 
 // ── Tipos ──────────────────────────────────────────────────────
 type MetaStatusResponse = {
@@ -1848,7 +1849,7 @@ function ConexoesContent() {
 
       {/* Modal nova conexão */}
       {showOlaModal && (
-        <DigitalMenuModal
+        <DigitalMenuConnectionModal
           onClose={() => { setShowOlaModal(false); setOlaModalClientId(undefined); }}
           onSaved={() => { setShowOlaModal(false); setOlaModalClientId(undefined); void loadOlaConnections(); }}
           clients={olaClients}
