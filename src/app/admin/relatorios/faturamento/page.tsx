@@ -675,7 +675,7 @@ export default function FaturamentoPage() {
     }
 
     setCacheLabel(null); setLoading(true); setError(null);
-    setReport(null); setPrevReport(null); setMissingBaseUrl(false); setApiDiag(null);
+    setPrevReport(null); setMissingBaseUrl(false); setApiDiag(null);
     setSyncPhase("Preparando sincronização");
 
     try {
@@ -957,8 +957,8 @@ export default function FaturamentoPage() {
         </motion.div>
       )}
 
-      {/* ── Loading state ──────────────────────────────────────────────────── */}
-      {loading && (
+      {/* ── Loading state (first load — no existing report) ───────────────── */}
+      {loading && !report && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "10px 14px", background: "rgba(123,110,246,0.08)", border: "1px solid rgba(123,110,246,0.2)", borderRadius: 12 }}>
             <Loader2 size={13} style={{ color: "var(--lk-accent)", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
@@ -994,8 +994,26 @@ export default function FaturamentoPage() {
       )}
 
       {/* ── Report ─────────────────────────────────────────────────────────── */}
-      {report && !loading && (
+      {report && (
         <motion.div initial="initial" animate="animate" variants={stagger}>
+
+          {/* Updating in background banner */}
+          {loading && (
+            <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(123,110,246,0.07)", border: "1px solid rgba(123,110,246,0.18)", borderRadius: 10 }}>
+              <Loader2 size={12} style={{ color: "var(--lk-accent)", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: "var(--lk-accent)", fontWeight: 500 }}>{syncPhase ?? "Atualizando dados…"}</span>
+            </div>
+          )}
+
+          {/* Rate limit warning */}
+          {report.windowDiag?.rateLimitStopped && (
+            <div style={{ marginBottom: 14, display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 10 }}>
+              <AlertCircle size={13} style={{ color: "#fbbf24", flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 12, color: "#fbbf24" }}>
+                <strong>Coleta interrompida por rate limit.</strong> Os dados abaixo representam apenas parte do período. Use &quot;Forçar atualização&quot; em horário de menor volume ou aguarde alguns minutos.
+              </span>
+            </div>
+          )}
 
           {/* Quality + partial warning */}
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 16 }}>
