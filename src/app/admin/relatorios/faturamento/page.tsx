@@ -280,6 +280,11 @@ export default function FaturamentoPage() {
   const [loadingStatus,   setLoadingStatus]   = useState(false);
   const [loadingPrev,     setLoadingPrev]     = useState(false);
   const [error,           setError]           = useState<string | null>(null);
+  const [clientsLoading,  setClientsLoading]  = useState(false);
+  const [clientsError,    setClientsError]    = useState<string | null>(null);
+  const [clientsErrorCode,setClientsErrorCode]= useState<string | null>(null);
+  const [clientsDiag,     setClientsDiag]     = useState<Record<string, unknown> | null>(null);
+  const [clientsLoaded,   setClientsLoaded]   = useState(false);
   const [apiDiag,         setApiDiag]         = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
   const [missingBaseUrl,  setMissingBaseUrl]  = useState(false);
   const [lastSync,        setLastSync]        = useState<string | null>(null);
@@ -291,17 +296,46 @@ export default function FaturamentoPage() {
   const requestIdRef        = useRef(0);
 
   // Carrega lista de clientes
-  useEffect(() => {
-    void (async () => {
-      try {
-        const r = await fetch("/api/admin/clients");
-        if (!r.ok) return;
-        const d = await r.json() as { clients?: ClientOption[] };
-        setClients(d.clients ?? []);
-        if (d.clients && d.clients.length > 0) setClientId(d.clients[0].id);
-      } catch { /* silent */ }
-    })();
+  const loadClients = useCallback(async () => {
+    setClientsLoading(true);
+    setClientsError(null);
+    setClientsErrorCode(null);
+    setClientsDiag(null);
+    try {
+      const r = await fetch("/api/admin/clients");
+      let body: Record<string, unknown> = {};
+      try { body = await r.json() as Record<string, unknown>; } catch { /* JSON parse failed */ }
+
+      if (body.diagnostics) setClientsDiag(body.diagnostics as Record<string, unknown>);
+
+      if (!r.ok) {
+        const code = (body.code as string | null) ?? null;
+        setClientsErrorCode(code);
+        if (r.status === 401) {
+          setClientsError("Sessão da preview não reconhecida. Abra /login nesta URL de preview para autenticar.");
+        } else if (r.status === 403) {
+          setClientsError("Seu usuário não possui permissão para carregar clientes nesta preview.");
+        } else if (r.status === 404) {
+          setClientsError("Perfil administrativo não encontrado para este usuário.");
+        } else {
+          setClientsError("Não foi possível carregar os clientes. Consulte o diagnóstico técnico abaixo.");
+        }
+        return;
+      }
+
+      const list = (body.clients as ClientOption[] | undefined) ?? [];
+      setClients(list);
+      setClientsLoaded(true);
+      if (list.length > 0) setClientId(list[0].id);
+      else setClientsError("Nenhum cliente cadastrado foi encontrado.");
+    } catch {
+      setClientsError("Erro de rede ao carregar clientes. Verifique a conexão e tente novamente.");
+    } finally {
+      setClientsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { void loadClients(); }, [loadClients]);
 
   // Carrega status da conexão
   const loadStatus = useCallback(async (cid: string) => {
@@ -655,6 +689,72 @@ export default function FaturamentoPage() {
         <div className="mb-4 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
           <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
           Período personalizado: {fmtDay(customStart)} até {fmtDay(customEnd)}
+        </div>
+      )}
+
+      {/* Erro / loading ao carregar clientes */}
+      {clientsLoading && !clientsLoaded && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-400">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando lista de clientes…
+        </div>
+      )}
+      {clientsError && !clientsLoading && (
+        <div className="mb-5 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700 p-3.5 space-y-2.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold">{clientsError}</p>
+              {clientsErrorCode === "unauthenticated" && (
+                <p className="mt-1">
+                  <Link href="/login" className="underline font-bold">Ir para /login desta preview →</Link>
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => void loadClients()}
+            className="flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl hover:bg-amber-200 transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" /> Tentar carregar clientes novamente
+          </button>
+          {clientsDiag && (
+            <details className="text-[10px] text-amber-600">
+              <summary className="cursor-pointer font-semibold select-none">Diagnóstico da lista de clientes</summary>
+              <div className="mt-1.5 space-y-0.5 pl-2 border-l border-amber-200">
+                {typeof clientsDiag.authenticated === "boolean" && (
+                  <p><span className="font-semibold">Autenticado:</span> {clientsDiag.authenticated ? "Sim" : "Não"}</p>
+                )}
+                {typeof clientsDiag.profileFound === "boolean" && (
+                  <p><span className="font-semibold">Perfil encontrado:</span> {clientsDiag.profileFound ? "Sim" : "Não"}</p>
+                )}
+                {clientsDiag.role !== undefined && (
+                  <p><span className="font-semibold">Role:</span> {String(clientsDiag.role) || "—"}</p>
+                )}
+                {clientsDiag.clientsQuery !== undefined && (
+                  <p><span className="font-semibold">Query clientes:</span> {String(clientsDiag.clientsQuery)}</p>
+                )}
+                {typeof clientsDiag.clientsCount === "number" && (
+                  <p><span className="font-semibold">Quantidade:</span> {clientsDiag.clientsCount}</p>
+                )}
+                {!!(clientsDiag.enrichment && typeof clientsDiag.enrichment === "object") && (
+                  <div>
+                    <p className="font-semibold mt-1">Enriquecimento:</p>
+                    {Object.entries(clientsDiag.enrichment as Record<string, string>).map(([k, v]) => (
+                      <p key={k} className="pl-2">· {k}: <span className={v === "success" ? "text-emerald-600" : "text-amber-500"}>{v}</span></p>
+                    ))}
+                  </div>
+                )}
+                {!!(clientsDiag.environment && typeof clientsDiag.environment === "object") && (
+                  <div>
+                    <p className="font-semibold mt-1">Ambiente:</p>
+                    {Object.entries(clientsDiag.environment as Record<string, boolean>).map(([k, v]) => (
+                      <p key={k} className="pl-2">· {k}: <span className={v ? "text-emerald-600" : "text-red-500"}>{v ? "✓" : "✗"}</span></p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
         </div>
       )}
 

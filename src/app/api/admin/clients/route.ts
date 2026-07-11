@@ -132,23 +132,51 @@ function buildOwnershipInsert(
 // GET /api/admin/clients
 // Retorna lista de clientes reais com badges derivados de dados relacionados.
 export async function GET() {
+  // Step tracking — available in catch for server-side logging only
+  let _authenticated = false;
+  let _role = "";
+
   try {
     const supabase = await createServerSupabaseClient();
 
+    // ── 1. Auth ──────────────────────────────────────────────────────────────
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, code: "unauthenticated", message: "Sessão não encontrada." },
+        { status: 401 },
+      );
+    }
+    _authenticated = true;
 
+    // ── 2. Profile ───────────────────────────────────────────────────────────
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, plan")
       .eq("id", user.id)
       .maybeSingle();
 
-    const role = (profile as { role?: string } | null)?.role ?? "";
-    const isAdmin = CLIENT_DELETE_ROLES.has(role);
+    const role    = (profile as { role?: string } | null)?.role ?? "";
     const userPlan = (profile as { plan?: string } | null)?.plan ?? null;
+    _role = role;
 
-    // Busca clientes
+    if (!profile) {
+      return NextResponse.json(
+        { ok: false, code: "profile_not_found", message: "Perfil administrativo não encontrado." },
+        { status: 404 },
+      );
+    }
+
+    // ── 3. Role check ────────────────────────────────────────────────────────
+    const isAdmin = CLIENT_DELETE_ROLES.has(role);
+    if (!isAdmin) {
+      return NextResponse.json(
+        { ok: false, code: "forbidden", message: "Usuário sem permissão para listar clientes." },
+        { status: 403 },
+      );
+    }
+
+    // ── 4. Clients query (primary — failure is hard) ──────────────────────
     let clientsResult = await supabase
       .from("clients")
       .select("id, company_name, responsible_name, email, phone, segment, status, deleted_at, archived_at")
@@ -158,69 +186,120 @@ export async function GET() {
       .order("company_name");
 
     if (clientsResult.error && isMissingColumnError(clientsResult.error)) {
-      const fallbackClientsResult = await supabase
+      const fallback = await supabase
         .from("clients")
         .select("id, company_name, responsible_name, email, phone, segment, status")
         .in("status", CLIENT_VISIBLE_STATUSES)
         .order("company_name");
-      clientsResult = fallbackClientsResult as typeof clientsResult;
+      clientsResult = fallback as typeof clientsResult;
     }
 
-    const { data: clients, error } = clientsResult;
-    if (error) throw error;
+    const { data: clients, error: clientsError } = clientsResult;
+    if (clientsError) {
+      console.error("[api/admin/clients GET] clients query failed", {
+        step: "clients_query",
+        supabaseCode: clientsError.code,
+        authenticated: _authenticated,
+        role,
+      });
+      return NextResponse.json(
+        { ok: false, code: "clients_query_failed", message: "Não foi possível carregar os clientes." },
+        { status: 500 },
+      );
+    }
 
-    // Busca diagnósticos / briefs
-    const { data: diagnoses } = await supabase.from("onboarding_profiles").select("client_id");
+    const visibleClients = (clients ?? []).filter(isVisibleClientRecord);
+    const clientsCount   = visibleClients.length;
+
+    // ── 5. Auxiliary queries (failures produce warnings, not empty clients) ─
+    const warnings: { code: string; feature: string }[]      = [];
+    const enrichment: Record<string, string>                  = {};
+
+    // diagnoses
+    const diagRes = await supabase.from("onboarding_profiles").select("client_id");
+    const diagIds = new Set(
+      (diagRes.error ? [] : (diagRes.data ?? [])).map((d: { client_id: string }) => d.client_id),
+    );
+    enrichment.diagnoses = diagRes.error ? "unavailable" : "success";
+    if (diagRes.error) warnings.push({ code: "diagnoses_unavailable", feature: "diagnostico" });
+
+    // briefs
     const contextsRes = await supabase.from("client_context").select("client_id");
-    const contexts = contextsRes.error ? null : contextsRes.data;
+    const briefIds = new Set(
+      (contextsRes.error ? [] : (contextsRes.data ?? [])).map((c: { client_id: string }) => c.client_id),
+    );
+    enrichment.briefs = contextsRes.error ? "unavailable" : "success";
+    if (contextsRes.error) warnings.push({ code: "client_context_unavailable", feature: "brief" });
 
-    const diagIds  = new Set((diagnoses ?? []).map((d) => d.client_id));
-    const briefIds = new Set((contexts ?? []).map((c: { client_id: string }) => c.client_id));
-
-    // Tenta buscar vínculos client_meta_assets (SQL 37)
-    const assetsRes = await supabase
-      .from("client_meta_assets")
-      .select("client_id, asset_type");
-
-    let metaClientIds    = new Set<string>();
+    // meta assets (SQL 37 optional)
+    const assetsRes = await supabase.from("client_meta_assets").select("client_id, asset_type");
+    let metaClientIds     = new Set<string>();
     let instagramClientIds = new Set<string>();
     let useAssets = false;
 
     if (!assetsRes.error) {
       useAssets = true;
+      enrichment.metaAssets = "success";
       (assetsRes.data ?? []).forEach((a: { client_id: string; asset_type: string }) => {
-        if (a.asset_type === "facebook_page")     metaClientIds.add(a.client_id);
+        if (a.asset_type === "facebook_page")      metaClientIds.add(a.client_id);
         if (a.asset_type === "instagram_business") instagramClientIds.add(a.client_id);
       });
     } else {
-      // SQL 37 não rodado — heurística: se há conexão Meta ativa no sistema
+      enrichment.metaAssets = "unavailable";
+      warnings.push({ code: "meta_assets_unavailable", feature: "meta" });
       const metaConnsRes = await supabase
-        .from("meta_connections")
-        .select("id")
-        .eq("status", "active")
-        .eq("is_active", true)
-        .limit(1);
+        .from("meta_connections").select("id").eq("status", "active").eq("is_active", true).limit(1);
       if (!metaConnsRes.error && (metaConnsRes.data ?? []).length > 0) {
-        // Marca todos como potencialmente com meta até SQL 37 ser rodado
-        // (campo informativo, não crítico)
-        metaClientIds    = new Set<string>();
+        metaClientIds     = new Set<string>();
         instagramClientIds = new Set<string>();
       }
     }
 
-    const visibleClients = (clients ?? []).filter(isVisibleClientRecord);
-
     const enriched = visibleClients.map((c) => ({
       ...c,
-      has_meta:        useAssets ? metaClientIds.has(c.id)     : false,
+      has_meta:        useAssets ? metaClientIds.has(c.id)      : false,
       has_instagram:   useAssets ? instagramClientIds.has(c.id) : false,
       has_diagnostico: diagIds.has(c.id),
       has_brief:       briefIds.has(c.id),
     }));
 
-    return NextResponse.json({ clients: enriched, isAdmin, role, plan: userPlan });
+    // ── 6. Diagnostics (admin-only, safe — no values, only booleans) ─────────
+    const diagnostics = {
+      authenticated: true,
+      profileFound:  true,
+      role,
+      clientsQuery:  "success",
+      clientsCount,
+      enrichment,
+      environment: {
+        supabaseUrlConfigured:  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+        supabaseAnonConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      },
+    };
+
+    const body: Record<string, unknown> = {
+      ok:      true,
+      clients: enriched,
+      isAdmin,
+      role,
+      plan:    userPlan,
+    };
+    if (clientsCount === 0) { body.empty = true; body.code = "no_clients"; }
+    if (warnings.length > 0) body.warnings = warnings;
+    body.diagnostics = diagnostics; // always for admin (role already gated above)
+
+    return NextResponse.json(body);
+
   } catch {
-    return NextResponse.json({ clients: [], isAdmin: false });
+    console.error("[api/admin/clients GET] unexpected error", {
+      step: "unexpected",
+      authenticated: _authenticated,
+      role: _role || null,
+    });
+    return NextResponse.json(
+      { ok: false, code: "clients_query_failed", message: "Não foi possível carregar os clientes." },
+      { status: 500 },
+    );
   }
 }
 
