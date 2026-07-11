@@ -6,6 +6,9 @@ import { getActiveDigitalMenuConnection } from "@/lib/digital-menu/server";
 import type { OrderFetchCompleteness, SnapshotPersistence, ProviderTotalScope } from "@/lib/digital-menu/analytics-types";
 export type { OrderFetchCompleteness };
 
+export const dynamic  = "force-dynamic";
+export const revalidate = 0;
+
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 type PeriodKey = "hoje" | "7dias" | "15dias" | "30dias" | "mes_atual";
@@ -42,6 +45,8 @@ interface PaginationInfo {
   };
   returnedOrdersWithinRequestedRange: boolean | null;  // os pedidos retornados estão no período?
   dateFilterCompletenessConfirmed:    false;            // sempre false — não temos prova de completude do filtro
+  lastRequestedPage:   number;         // última página que solicitamos ao provider
+  providerCurrentPage: number | null;  // current_page reportado pelo provider na última página
 }
 
 interface DetailFetchStats {
@@ -145,16 +150,17 @@ function extractOrderId(order: Record<string, unknown>): string {
 function detectNextPage(
   raw: unknown,
   currentPage: number,
-): { nextPage: number | null; providerTotal: number | null; perPage: number | null } {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { nextPage: null, providerTotal: null, perPage: null };
+): { nextPage: number | null; providerTotal: number | null; perPage: number | null; providerCurrentPage: number | null } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { nextPage: null, providerTotal: null, perPage: null, providerCurrentPage: null };
   const r = raw as Record<string, unknown>;
 
   // OlaClick native: { pagination: { current_page, per_page, total, has_more } }
   const pag = r["pagination"] as Record<string, unknown> | undefined;
   if (pag && typeof pag === "object") {
-    const hasMore = pag["has_more"] === true;
-    const total   = typeof pag["total"]    === "number" ? pag["total"]    : null;
-    const perPage = typeof pag["per_page"] === "number" ? pag["per_page"] : null;
+    const hasMore             = pag["has_more"] === true;
+    const total               = typeof pag["total"]        === "number" ? pag["total"]        : null;
+    const perPage             = typeof pag["per_page"]     === "number" ? pag["per_page"]     : null;
+    const currentPageReported = typeof pag["current_page"] === "number" ? pag["current_page"] : null;
     // Derive last_page from total/per_page when not explicit
     const lastPage =
       typeof pag["last_page"]   === "number" ? pag["last_page"]   :
@@ -166,7 +172,7 @@ function detectNextPage(
     } else if (lastPage !== null && currentPage < lastPage) {
       next = currentPage + 1;
     }
-    return { nextPage: next, providerTotal: total, perPage };
+    return { nextPage: next, providerTotal: total, perPage, providerCurrentPage: currentPageReported };
   }
 
   // Laravel meta: { meta: { current_page, last_page, per_page, total } }
@@ -176,16 +182,16 @@ function detectNextPage(
     const total    = typeof meta["total"]     === "number" ? meta["total"]     : null;
     const perPage  = typeof meta["per_page"]  === "number" ? meta["per_page"]  : null;
     const next     = lastPage !== null && currentPage < lastPage ? currentPage + 1 : null;
-    return { nextPage: next, providerTotal: total, perPage };
+    return { nextPage: next, providerTotal: total, perPage, providerCurrentPage: null };
   }
 
   // Link-based: { links: { next } } | { next_page } | { next: "url" }
   const links = r["links"] as Record<string, unknown> | undefined;
-  if (links?.["next"] != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null };
-  if (r["next_page"]  != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null };
-  if (r["next"] != null && typeof r["next"] === "string") return { nextPage: currentPage + 1, providerTotal: null, perPage: null };
+  if (links?.["next"] != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null, providerCurrentPage: null };
+  if (r["next_page"]  != null) return { nextPage: currentPage + 1, providerTotal: null, perPage: null, providerCurrentPage: null };
+  if (r["next"] != null && typeof r["next"] === "string") return { nextPage: currentPage + 1, providerTotal: null, perPage: null, providerCurrentPage: null };
 
-  return { nextPage: null, providerTotal: null, perPage: null };
+  return { nextPage: null, providerTotal: null, perPage: null, providerCurrentPage: null };
 }
 
 function buildDebugShape(
@@ -324,6 +330,8 @@ async function fetchAllOrders(
   let page1Count        = 0;
   let debugShape: DebugShape | null = null;
   let rateLimitInfo: RateLimitInfo = { limit: null, remaining: null, reset: null, guard: false };
+  let lastRequestedPage        = 1;
+  let lastProviderCurrentPage: number | null = null;
 
   while (currentPage <= MAX_PAGES && orderMap.size < MAX_ORDERS) {
     const url = new URL(`${baseUrl}${endpoint}`);
@@ -331,11 +339,14 @@ async function fetchAllOrders(
     url.searchParams.set("filter[end_date]",   end);
     // Uma única convenção por vez — nunca misturar json_api com classic
     buildOrdersPaginationParams(convention, currentPage, DEFAULT_PAGE_SIZE, url.searchParams);
+    url.searchParams.set("sort", "-created_at");
+    lastRequestedPage = currentPage;
 
     let response: Response;
     try {
       response = await fetch(url.toString(), {
         headers: { "x-api-key": token, "accept": "application/json" },
+        cache: "no-store",
         signal: AbortSignal.timeout(10000),
       });
     } catch (err) {
@@ -390,7 +401,8 @@ async function fetchAllOrders(
       if (r["next"])       paginationKeys.push("next");
     }
 
-    const { nextPage, providerTotal: pt, perPage: pp } = detectNextPage(rawJson, currentPage);
+    const { nextPage, providerTotal: pt, perPage: pp, providerCurrentPage: pcp } = detectNextPage(rawJson, currentPage);
+    if (pcp !== null) lastProviderCurrentPage = pcp;
     if (pt !== null) {
       providerReportedTotalRaw = pt;
       // Escopo inicial: unknown — será reclassificado quando houver comparação entre períodos
@@ -423,6 +435,13 @@ async function fetchAllOrders(
     }
     const newFromThisPage = orderMap.size - mapSizeBefore;
     pagesFetched++;
+
+    // Detectar page param ignorado: provider reportou current_page menor que o solicitado
+    if (currentPage > 1 && pcp !== null && pcp < currentPage) {
+      paginationMode = "operational_only";
+      hasMore = false;
+      break;
+    }
 
     // Detectar page param ignorado: página 2+ devolveu só duplicatas com conteúdo
     if (currentPage > 1 && newFromThisPage === 0 && pageOrders.length > 0) {
@@ -484,6 +503,8 @@ async function fetchAllOrders(
       dedup,
       returnedOrdersWithinRequestedRange,
       dateFilterCompletenessConfirmed: false,
+      lastRequestedPage,
+      providerCurrentPage: lastProviderCurrentPage,
     },
     rateLimitInfo,
     debugShape: debugShape ?? {
@@ -651,6 +672,7 @@ async function fetchProductsSold(
   try {
     response = await fetch(url.toString(), {
       headers: { "x-api-key": token, "accept": "application/json" },
+      cache: "no-store",
       signal: AbortSignal.timeout(10000),
     });
   } catch {
@@ -766,6 +788,7 @@ async function fetchOrderDetailsBatched(
         const url = `${baseUrl}/v1/orders/${encodeURIComponent(id)}`;
         const r = await fetch(url, {
           headers: { "x-api-key": token, "accept": "application/json" },
+          cache: "no-store",
           signal: AbortSignal.timeout(6000),
         });
         if (r.status === 429) { const e = new Error("rate_limited"); e.name = "RateLimitError"; throw e; }
@@ -991,6 +1014,13 @@ export async function GET(request: NextRequest) {
       ok:           true,
       period:       periodLabel,
       date_range:   { start, end },
+      requestedPagination: {
+        pageNumber: 1,
+        pageSize:   DEFAULT_PAGE_SIZE,
+        sort:       "-created_at",
+        startDate:  start,
+        endDate:    end,
+      },
       provider:     conn.provider,
       baseUrlResolved: true,
       endpoint:     ENDPOINT,
@@ -1016,7 +1046,7 @@ export async function GET(request: NextRequest) {
         melhores_dias:           metrics.melhores_dias,
         pedidos_recentes:        metrics.pedidos_recentes,
       },
-    });
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return NextResponse.json({ ok: false, reason: "error", stage: "unexpected" }, { status: 500 });
   }

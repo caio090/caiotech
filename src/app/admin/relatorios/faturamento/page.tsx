@@ -49,6 +49,8 @@ interface PaginationInfo {
   dedup: { rawCount: number; uniqueCount: number; duplicateCount: number; missingIdCount: number };
   returnedOrdersWithinRequestedRange: boolean | null;
   dateFilterCompletenessConfirmed:    false;
+  lastRequestedPage?:   number;
+  providerCurrentPage?: number | null;
 }
 
 interface DebugShape {
