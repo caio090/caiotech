@@ -73,10 +73,23 @@ interface DetailFetchStats {
 }
 
 interface HeatmapCell {
-  weekday: number; // 0=Sun … 6=Sat (Fortaleza UTC-3)
+  weekday: number; // 0=Sun … 6=Sat (Fortaleza)
   hour:    number; // 0–23
   orders:  number;
   revenue: number;
+}
+
+interface DailyCollectionResult {
+  date:                 string;
+  providerTotal:        number | null;
+  expectedPages:        number;
+  pagesFetched:         number;
+  uniqueOrders:         number;
+  duplicateOrders:      number;
+  failedPages:          number;
+  repeatedPageDetected: boolean;
+  endedNaturally:       boolean;
+  complete:             boolean;
 }
 
 interface OrderMetrics {
@@ -90,9 +103,7 @@ interface OrderMetrics {
   topProductsCompleteness: "complete" | "partial" | "unavailable";
   melhores_dias:           { date: string; revenue: number; orders: number }[] | null;
   pedidos_recentes:        { id: string; date: string | null; status: string; total: number }[];
-  // Tarefa I
   heatmap:                 HeatmapCell[];
-  // Tarefa J
   pedidosPorServiceType:   Record<string, number>;
   pedidosPorSource:        Record<string, number>;
   totalDescontos:          number;
@@ -100,6 +111,9 @@ interface OrderMetrics {
   totalGorjetas:           number;
   faturamentoPorDiaSemana: Record<string, number>;
   pedidosPorDiaSemana:     Record<string, number>;
+  pedidosPorHora:          Record<string, number>;
+  faturamentoPorHora:      Record<string, number>;
+  concentracaoPorFaixa:    Record<string, { orders: number; revenue: number }>;
 }
 
 interface RateLimitInfo {
@@ -126,6 +140,9 @@ export interface WindowFetchDiagnostics {
   executionMs:              number;
   paginationFallbackReason: "repeated_page" | "requested_page_ignored" | "none";
   authMode:                 AuthMode;
+  dailyDiagnostics:         DailyCollectionResult[];
+  completeDays:             number;
+  partialDays:              number;
 }
 
 interface PageFetchResult {
@@ -384,8 +401,13 @@ function extractDate(order: Record<string, unknown>): string | null {
   const raw = order["created_at"] ?? order["createdAt"] ?? order["date"]
             ?? order["order_date"] ?? order["created"]  ?? order["timestamp"];
   if (!raw) return null;
-  try { return new Date(String(raw)).toISOString().split("T")[0]; }
-  catch { return null; }
+  const s = String(raw);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // already YYYY-MM-DD
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    return toFortalezaParts(d).localDateKey;
+  } catch { return null; }
 }
 
 function extractStatus(order: Record<string, unknown>): string {
@@ -402,27 +424,71 @@ function extractItems(order: Record<string, unknown>): Record<string, unknown>[]
 
 const WEEKDAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
+// Module-level formatter — America/Fortaleza (UTC-3, no DST)
+const _fortalezaFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Fortaleza",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+
+interface FortalezaParts {
+  year: number; month: number; day: number;
+  weekday: number; // 0=Sun…6=Sat
+  hour: number; minute: number;
+  localDateKey: string; // YYYY-MM-DD
+}
+
+function toFortalezaParts(ts: Date): FortalezaParts {
+  const parts = _fortalezaFmt.formatToParts(ts);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? "0";
+  const year   = parseInt(get("year"),   10);
+  const month  = parseInt(get("month"),  10);
+  const day    = parseInt(get("day"),    10);
+  const hour   = parseInt(get("hour"),   10);
+  const minute = parseInt(get("minute"), 10);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return {
+    year, month, day, weekday, hour, minute,
+    localDateKey: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
+}
+
 function extractCreatedAtFull(order: Record<string, unknown>): Date | null {
   const raw = order["created_at"] ?? order["createdAt"] ?? order["date"]
             ?? order["order_date"] ?? order["created"]  ?? order["timestamp"];
   if (!raw) return null;
-  try { return new Date(String(raw)); } catch { return null; }
-}
-
-// OlaClick stores timestamps in UTC; Fortaleza = UTC-3, no DST
-function toFortalezaLocal(d: Date): { weekday: number; hour: number } {
-  const ms = d.getTime() - 3 * 60 * 60 * 1000;
-  const local = new Date(ms);
-  return { weekday: local.getUTCDay(), hour: local.getUTCHours() };
+  try { const d = new Date(String(raw)); return isNaN(d.getTime()) ? null : d; } catch { return null; }
 }
 
 function extractNumericField(order: Record<string, unknown>, ...keys: string[]): number {
   for (const k of keys) {
     const v = order[k];
-    if (typeof v === "number") return v;
-    if (typeof v === "string") { const n = parseFloat(v); if (!isNaN(n)) return n; }
+    if (typeof v === "number" && isFinite(v)) return v;
+    if (typeof v === "string") { const n = parseFloat(v); if (isFinite(n)) return n; }
   }
   return 0;
+}
+
+function normalizeServiceType(raw: unknown): string {
+  const s = String(raw ?? "").toLowerCase().replace(/[-_\s]/g, "");
+  if (!s || s === "undefined" || s === "null") return "desconhecido";
+  if (s.includes("delivery") || s === "entrega") return "delivery";
+  if (s.includes("pickup") || s.includes("retirada") || s.includes("balcao") || s.includes("balcão")) return "pickup";
+  if (s.includes("dinein") || s.includes("local") || s.includes("mesa")) return "dine_in";
+  return s;
+}
+
+function normalizeSource(raw: unknown): string {
+  const s = String(raw ?? "").toLowerCase().trim();
+  if (!s || s === "undefined" || s === "null") return "desconhecido";
+  return s;
+}
+
+function getTimeFaixa(hour: number): "madrugada" | "manha" | "tarde" | "noite" {
+  if (hour < 6)  return "madrugada";
+  if (hour < 12) return "manha";
+  if (hour < 18) return "tarde";
+  return "noite";
 }
 
 function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
@@ -435,9 +501,17 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
   const dayMap:         Record<string, { revenue: number; orders: number }> = {};
   const serviceTypeMap: Record<string, number> = {};
   const sourceMap:      Record<string, number> = {};
-  const heatmapMap:     Record<string, HeatmapCell>  = {};
+  const heatmapMap:     Record<string, HeatmapCell> = {};
   const weekdayRevMap:  Record<string, number> = {};
   const weekdayOrdMap:  Record<string, number> = {};
+  const hourOrdMap:     Record<string, number> = {};
+  const hourRevMap:     Record<string, number> = {};
+  const faixaMap: Record<string, { orders: number; revenue: number }> = {
+    madrugada: { orders: 0, revenue: 0 },
+    manha:     { orders: 0, revenue: 0 },
+    tarde:     { orders: 0, revenue: 0 },
+    noite:     { orders: 0, revenue: 0 },
+  };
   let hasAnyItems = false;
 
   for (const order of orders) {
@@ -447,15 +521,15 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
 
     faturamento_total += total;
     totalDescontos    += extractNumericField(order, "discount", "discount_amount", "total_discount", "coupon_discount");
-    totalTaxasEntrega += extractNumericField(order, "delivery_fee", "shipping_fee", "shipping", "freight");
+    totalTaxasEntrega += extractNumericField(order, "delivery_fee", "shipping_fee", "delivery_price", "shipping", "freight");
     totalGorjetas     += extractNumericField(order, "tip", "gratuity", "tip_amount");
 
     statusMap[status] = (statusMap[status] ?? 0) + 1;
 
-    const serviceType = String(order["service_type"] ?? order["type"] ?? "desconhecido");
+    const serviceType = normalizeServiceType(order["service_type"] ?? order["type"]);
     serviceTypeMap[serviceType] = (serviceTypeMap[serviceType] ?? 0) + 1;
 
-    const source = String(order["source"] ?? order["channel"] ?? order["origin"] ?? "desconhecido");
+    const source = normalizeSource(order["source"] ?? order["channel"] ?? order["origin"]);
     sourceMap[source] = (sourceMap[source] ?? 0) + 1;
 
     if (date) {
@@ -466,7 +540,7 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
 
     const createdAt = extractCreatedAtFull(order);
     if (createdAt) {
-      const { weekday, hour } = toFortalezaLocal(createdAt);
+      const { weekday, hour } = toFortalezaParts(createdAt);
       const cellKey = `${weekday}:${hour}`;
       if (!heatmapMap[cellKey]) heatmapMap[cellKey] = { weekday, hour, orders: 0, revenue: 0 };
       heatmapMap[cellKey].orders  += 1;
@@ -475,6 +549,14 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
       const wName = WEEKDAY_NAMES[weekday];
       weekdayRevMap[wName] = (weekdayRevMap[wName] ?? 0) + total;
       weekdayOrdMap[wName] = (weekdayOrdMap[wName] ?? 0) + 1;
+
+      const hKey = String(hour);
+      hourOrdMap[hKey] = (hourOrdMap[hKey] ?? 0) + 1;
+      hourRevMap[hKey] = (hourRevMap[hKey] ?? 0) + total;
+
+      const faixa = getTimeFaixa(hour);
+      faixaMap[faixa].orders  += 1;
+      faixaMap[faixa].revenue += total;
     }
 
     const items = extractItems(order);
@@ -532,6 +614,9 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     totalGorjetas,
     faturamentoPorDiaSemana: weekdayRevMap,
     pedidosPorDiaSemana:     weekdayOrdMap,
+    pedidosPorHora:          hourOrdMap,
+    faturamentoPorHora:      hourRevMap,
+    concentracaoPorFaixa:    faixaMap,
   };
 }
 
@@ -641,6 +726,42 @@ async function fetchOnePage(
   };
 }
 
+// ── Retry helper ──────────────────────────────────────────────────────────────
+
+async function fetchOnePageWithRetry(
+  baseUrl:      string,
+  token:        string,
+  authMode:     AuthMode,
+  start:        string,
+  end:          string,
+  page:         number,
+  pageSize:     number,
+  execDeadline: number,
+): Promise<PageFetchResult & { attemptCount: number }> {
+  const r1 = await fetchOnePage(baseUrl, token, authMode, start, end, page, pageSize);
+
+  if (r1.ok) return { ...r1, attemptCount: 1 };
+  if (r1.httpStatus !== null && !RETRY_TRANSIENT.has(r1.httpStatus)) {
+    return { ...r1, attemptCount: 1 };
+  }
+  // No retry if not enough time remains (need at least 3s for the retry round-trip)
+  if (Date.now() + 3000 >= execDeadline) return { ...r1, attemptCount: 1 };
+
+  let delayMs = 300 + Math.random() * 200;
+  if (r1.httpStatus === 429) {
+    const resetEpoch = r1.rateLimitInfo.reset;
+    const waitMs = resetEpoch ? Math.max(0, resetEpoch * 1000 - Date.now()) : 1000;
+    if (Date.now() + waitMs + 2000 >= execDeadline) return { ...r1, attemptCount: 1 };
+    delayMs = waitMs + Math.random() * 100;
+  }
+
+  await new Promise((res) => setTimeout(res, delayMs));
+  if (Date.now() >= execDeadline) return { ...r1, attemptCount: 1 };
+
+  const r2 = await fetchOnePage(baseUrl, token, authMode, start, end, page, pageSize);
+  return { ...r2, attemptCount: 2 };
+}
+
 // ── Cache ──────────────────────────────────────────────────────────────────────
 
 function getCacheKey(clientId: string, start: string, end: string): string {
@@ -667,6 +788,16 @@ function setCache(key: string, data: unknown): void {
   for (const [k, v] of store.entries()) {
     if (Date.now() - v.timestamp > CACHE_TTL_MS) store.delete(k);
   }
+}
+
+// ── In-flight dedup (best-effort per warm instance) ───────────────────────────
+
+type InflightMap = Map<string, Promise<Record<string, unknown>>>;
+
+function getInflightMap(): InflightMap {
+  const g = globalThis as Record<string, unknown>;
+  if (!g["__olaclick_inflight"]) g["__olaclick_inflight"] = new Map<string, Promise<Record<string, unknown>>>();
+  return g["__olaclick_inflight"] as InflightMap;
 }
 
 // ── Window helpers ─────────────────────────────────────────────────────────────
@@ -747,6 +878,7 @@ interface WindowingResult {
   dailyFallbackUsed:        boolean;
   providerTotalScope:       ProviderTotalScope;
   providerReportedTotal:    number | null;
+  dailyDiagnostics:         DailyCollectionResult[];
   debugShape:               DebugShape | null;
 }
 
@@ -793,6 +925,7 @@ async function fetchOrdersByWindowing(
   let providerTotalScope: ProviderTotalScope = "unknown";
   let providerReportedTotal: number | null   = initialTotal;
   let debugShape: DebugShape | null          = null;
+  const dailyDiagnostics: DailyCollectionResult[] = [];
 
   // ── Step 1: Probe datetime precision ──────────────────────────────────────
   // Split period in half and check if totals differ from the full period
@@ -914,14 +1047,23 @@ async function fetchOrdersByWindowing(
 
       totalWindows++;
 
-      // page 1
-      const r1 = await fetchOnePage(baseUrl, token, authMode, day, day, 1, DEFAULT_PAGE_SIZE);
-      requestsMade++;
+      const dayDiag: DailyCollectionResult = {
+        date: day, providerTotal: null,
+        expectedPages: 1, pagesFetched: 0,
+        uniqueOrders: 0, duplicateOrders: 0, failedPages: 0,
+        repeatedPageDetected: false, endedNaturally: false, complete: false,
+      };
+
+      // page 1 with retry
+      const r1 = await fetchOnePageWithRetry(baseUrl, token, authMode, day, day, 1, DEFAULT_PAGE_SIZE, execDeadline);
+      requestsMade += r1.attemptCount;
       if (r1.rateLimitInfo.remaining !== null) rateLimitInfo = r1.rateLimitInfo;
 
       if (!r1.ok) {
         if (r1.httpStatus === 429) { rateLimitStopped = true; }
         failedWindows++;
+        dayDiag.failedPages++;
+        dailyDiagnostics.push(dayDiag);
         continue;
       }
 
@@ -929,6 +1071,9 @@ async function fetchOrdersByWindowing(
         addOrdersToMap(r1.orders, orderMap, counters);
         resolvedWindows++;
         rateLimitStopped = true;
+        dayDiag.pagesFetched = 1;
+        dayDiag.uniqueOrders = r1.orders.length;
+        dailyDiagnostics.push(dayDiag);
         break;
       }
 
@@ -942,16 +1087,25 @@ async function fetchOrdersByWindowing(
       }
 
       const dayTotal = r1.total ?? r1.orders.length;
+      dayDiag.providerTotal = r1.total;
       if (r1.total !== null && (providerReportedTotal === null || r1.total > providerReportedTotal)) {
         providerReportedTotal = r1.total;
       }
 
+      const mapSizeBefore = orderMap.size;
       addOrdersToMap(r1.orders, orderMap, counters);
+      dayDiag.pagesFetched   = 1;
+      dayDiag.uniqueOrders   = orderMap.size - mapSizeBefore;
+      dayDiag.duplicateOrders = r1.orders.length - dayDiag.uniqueOrders;
 
       const totalDayPages = dayTotal > DEFAULT_PAGE_SIZE ? Math.ceil(dayTotal / DEFAULT_PAGE_SIZE) : 1;
+      dayDiag.expectedPages = totalDayPages;
 
       if (totalDayPages <= 1) {
+        dayDiag.endedNaturally = true;
+        dayDiag.complete = (dayDiag.failedPages === 0);
         resolvedWindows++;
+        dailyDiagnostics.push(dayDiag);
         continue;
       }
 
@@ -963,44 +1117,69 @@ async function fetchOrdersByWindowing(
         if (rateLimitStopped || timedOut || requestsMade >= MAX_REQUESTS || orderMap.size >= MAX_UNIQUE_ORDERS) break;
         if (Date.now() >= execDeadline) { timedOut = true; break; }
 
-        const rp = await fetchOnePage(baseUrl, token, authMode, day, day, p, DEFAULT_PAGE_SIZE);
-        requestsMade++;
+        const rp = await fetchOnePageWithRetry(baseUrl, token, authMode, day, day, p, DEFAULT_PAGE_SIZE, execDeadline);
+        requestsMade += rp.attemptCount;
         if (rp.rateLimitInfo.remaining !== null) rateLimitInfo = rp.rateLimitInfo;
 
         if (!rp.ok) {
           if (rp.httpStatus === 429) { rateLimitStopped = true; }
+          dayDiag.failedPages++;
           break;
         }
 
         if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining < MIN_RATE_LIMIT_REMAINING) {
           addOrdersToMap(rp.orders, orderMap, counters);
+          dayDiag.pagesFetched++;
           rateLimitStopped = true;
           break;
         }
 
-        if (rp.orders.length === 0) break;
+        if (rp.orders.length === 0) {
+          dayDiag.endedNaturally = true;
+          break;
+        }
 
-        // detect if page param is ignored (server keeps returning page 1 content)
+        // detect if page param is ignored
         if (p === 2) {
           const overlap = rp.orders.filter((o: { id?: string | number }) => page1Ids.has(String(o.id ?? ""))).length;
           if (overlap === rp.orders.length && rp.orders.length > 0) {
-            // pagination not working for this day — stop inner loop
+            dayDiag.repeatedPageDetected = true;
             break;
           }
         }
 
+        const pSizeBefore = orderMap.size;
         addOrdersToMap(rp.orders, orderMap, counters);
-        if (orderMap.size >= dayTotal || rp.orders.length < DEFAULT_PAGE_SIZE) {
+        dayDiag.pagesFetched++;
+        dayDiag.uniqueOrders   += orderMap.size - pSizeBefore;
+        dayDiag.duplicateOrders += rp.orders.length - (orderMap.size - pSizeBefore);
+
+        if (rp.orders.length < DEFAULT_PAGE_SIZE) {
+          dayDiag.endedNaturally = true;
+          dayResolved = true;
+          break;
+        }
+        if (dayDiag.uniqueOrders >= dayTotal) {
           dayResolved = true;
           break;
         }
       }
 
-      if (dayResolved || timedOut || rateLimitStopped) {
+      dayDiag.complete = (
+        dayDiag.failedPages === 0 &&
+        !dayDiag.repeatedPageDetected &&
+        !rateLimitStopped &&
+        !timedOut &&
+        (dayDiag.endedNaturally || dayResolved || dayDiag.pagesFetched >= totalDayPages)
+      );
+
+      if (dayDiag.complete || dayResolved) {
         resolvedWindows++;
       } else {
         partialWindows++;
       }
+
+      dailyDiagnostics.push(dayDiag);
     }
   }
 
@@ -1022,6 +1201,7 @@ async function fetchOrdersByWindowing(
     providerTotalScope,
     providerReportedTotal,
     debugShape,
+    dailyDiagnostics,
   };
 }
 
@@ -1332,6 +1512,9 @@ async function fetchAllOrders(
     providerCurrentPage: null,
   };
 
+  const completeDays  = wResult.dailyDiagnostics.filter(d => d.complete).length;
+  const partialDays   = wResult.dailyDiagnostics.filter(d => !d.complete).length;
+
   const windowDiag: WindowFetchDiagnostics = {
     totalWindows:             wResult.totalWindows,
     resolvedWindows:          wResult.resolvedWindows,
@@ -1349,6 +1532,9 @@ async function fetchAllOrders(
     executionMs:              Date.now() - (execDeadline - MAX_EXECUTION_MS),
     paginationFallbackReason,
     authMode,
+    dailyDiagnostics:         wResult.dailyDiagnostics,
+    completeDays,
+    partialDays,
   };
 
   return {
@@ -1572,6 +1758,10 @@ export async function GET(request: NextRequest) {
     periodLabel       = safePeriod;
   }
 
+  // Hoisted so catch block can call inflightReject on unexpected errors
+  let inflightResolve: ((v: Record<string, unknown>) => void) | null = null;
+  let inflightReject:  ((e: unknown) => void)          | null = null;
+
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -1589,6 +1779,28 @@ export async function GET(request: NextRequest) {
           { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
         );
       }
+    }
+
+    // ── In-flight dedup ───────────────────────────────────────────────────────
+    const inflight = getInflightMap();
+    if (!forceRefresh && inflight.has(cacheKey)) {
+      try {
+        const body = await inflight.get(cacheKey)!;
+        return NextResponse.json(
+          { ...body, cacheHit: true },
+          { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+        );
+      } catch {
+        inflight.delete(cacheKey);
+      }
+    }
+
+    if (!forceRefresh) {
+      const p = new Promise<Record<string, unknown>>((res, rej) => {
+        inflightResolve = res;
+        inflightReject  = rej;
+      });
+      inflight.set(cacheKey, p);
     }
 
     const lookup = await getActiveDigitalMenuConnection(supabase, clientId);
@@ -1793,6 +2005,9 @@ export async function GET(request: NextRequest) {
         totalGorjetas:           metrics.totalGorjetas,
         faturamentoPorDiaSemana: metrics.faturamentoPorDiaSemana,
         pedidosPorDiaSemana:     metrics.pedidosPorDiaSemana,
+        pedidosPorHora:          metrics.pedidosPorHora,
+        faturamentoPorHora:      metrics.faturamentoPorHora,
+        concentracaoPorFaixa:    metrics.concentracaoPorFaixa,
       },
     };
 
@@ -1801,10 +2016,19 @@ export async function GET(request: NextRequest) {
       setCache(cacheKey, responseBody);
     }
 
+    const resolveInflight = inflightResolve as ((v: Record<string, unknown>) => void) | null;
+    if (resolveInflight) {
+      resolveInflight(responseBody as Record<string, unknown>);
+    }
+    inflight.delete(cacheKey);
+
     return NextResponse.json(responseBody, {
       headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
     });
-  } catch {
+  } catch (err) {
+    const rejectInflight = inflightReject as ((e: unknown) => void) | null;
+    if (rejectInflight) rejectInflight(err);
+    getInflightMap().delete(getCacheKey(clientId ?? "", start ?? "", end ?? ""));
     return NextResponse.json({ ok: false, reason: "error", stage: "unexpected" }, { status: 500 });
   }
 }

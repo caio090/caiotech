@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   ShoppingCart, RefreshCw, Loader2, AlertCircle, CheckCircle2,
@@ -63,6 +63,13 @@ interface DebugShape {
 type OrderFetchCompleteness = "complete" | "partial" | "operational_only" | "unknown" | "error";
 type SnapshotPersistence   = "saved" | "not_configured" | "skipped" | "skipped_incomplete" | "error";
 
+interface DailyCollectionResult {
+  date: string; providerTotal: number | null;
+  expectedPages: number; pagesFetched: number;
+  uniqueOrders: number; duplicateOrders: number; failedPages: number;
+  repeatedPageDetected: boolean; endedNaturally: boolean; complete: boolean;
+}
+
 interface WindowFetchDiagnostics {
   totalWindows:             number;
   resolvedWindows:          number;
@@ -80,6 +87,9 @@ interface WindowFetchDiagnostics {
   executionMs:              number;
   paginationFallbackReason: "repeated_page" | "requested_page_ignored" | "none";
   authMode:                 "bearer" | "x_api_key";
+  dailyDiagnostics?:        DailyCollectionResult[];
+  completeDays?:            number;
+  partialDays?:             number;
 }
 
 interface OrdersResult {
@@ -112,6 +122,9 @@ interface OrdersResult {
     totalGorjetas?:         number;
     faturamentoPorDiaSemana?: Record<string, number>;
     pedidosPorDiaSemana?:   Record<string, number>;
+    pedidosPorHora?:        Record<string, number>;
+    faturamentoPorHora?:    Record<string, number>;
+    concentracaoPorFaixa?:  Record<string, { orders: number; revenue: number }>;
   };
 }
 
@@ -139,6 +152,9 @@ interface ReportData {
   totalGorjetas?:         number;
   faturamentoPorDiaSemana?: Record<string, number>;
   pedidosPorDiaSemana?:   Record<string, number>;
+  pedidosPorHora?:        Record<string, number>;
+  faturamentoPorHora?:    Record<string, number>;
+  concentracaoPorFaixa?:  Record<string, { orders: number; revenue: number }>;
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -252,22 +268,27 @@ function StatusBadge({ label }: { label: string }) {
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function FaturamentoPage() {
-  const [clients,       setClients]       = useState<ClientOption[]>([]);
-  const [clientId,      setClientId]      = useState("");
-  const [period,        setPeriod]        = useState<PeriodKey>("7dias");
-  const [customStart,   setCustomStart]   = useState("");
-  const [customEnd,     setCustomEnd]     = useState("");
-  const [customError,   setCustomError]   = useState<string | null>(null);
-  const [status,        setStatus]        = useState<DigitalMenuStatus | null>(null);
-  const [report,        setReport]        = useState<ReportData | null>(null);
-  const [loading,       setLoading]       = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState(false);
-  const [error,         setError]         = useState<string | null>(null);
-  const [apiDiag,       setApiDiag]       = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
-  const [missingBaseUrl,setMissingBaseUrl]= useState(false);
-  const [lastSync,      setLastSync]      = useState<string | null>(null);
-  const [showDiag,      setShowDiag]      = useState(false);
-  const [prevReport,    setPrevReport]    = useState<ReportData | null>(null);
+  const [clients,         setClients]         = useState<ClientOption[]>([]);
+  const [clientId,        setClientId]        = useState("");
+  const [period,          setPeriod]          = useState<PeriodKey>("7dias");
+  const [customStart,     setCustomStart]     = useState("");
+  const [customEnd,       setCustomEnd]       = useState("");
+  const [customError,     setCustomError]     = useState<string | null>(null);
+  const [status,          setStatus]          = useState<DigitalMenuStatus | null>(null);
+  const [report,          setReport]          = useState<ReportData | null>(null);
+  const [loading,         setLoading]         = useState(false);
+  const [loadingStatus,   setLoadingStatus]   = useState(false);
+  const [loadingPrev,     setLoadingPrev]     = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [apiDiag,         setApiDiag]         = useState<{ provider?: string; endpoint?: string; httpStatus?: number | null; providerErrorMessage?: string | null; period?: string } | null>(null);
+  const [missingBaseUrl,  setMissingBaseUrl]  = useState(false);
+  const [lastSync,        setLastSync]        = useState<string | null>(null);
+  const [showDiag,        setShowDiag]        = useState(false);
+  const [prevReport,      setPrevReport]      = useState<ReportData | null>(null);
+  const [syncPhase,       setSyncPhase]       = useState<string | null>(null);
+  const [cacheLabel,      setCacheLabel]      = useState<string | null>(null);
+  const activeControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef        = useRef(0);
 
   // Carrega lista de clientes
   useEffect(() => {
@@ -302,11 +323,64 @@ export default function FaturamentoPage() {
     if (clientId) void loadStatus(clientId);
   }, [clientId, loadStatus]);
 
-  // Carrega relatório
-  const loadReport = useCallback(async () => {
+  // ── sessionStorage helpers ────────────────────────────────────────────────
+  const SS_VERSION  = "v2";
+  const SS_TTL_MS   = 5 * 60 * 1000;
+
+  function ssKey(cid: string, s: string, e: string) {
+    return `lokat:olaclick-report:${SS_VERSION}:${cid}:${s}:${e}`;
+  }
+  function ssRead(cid: string, s: string, e: string): ReportData | null {
+    try {
+      const raw = sessionStorage.getItem(ssKey(cid, s, e));
+      if (!raw) return null;
+      const { savedAt, report: r } = JSON.parse(raw) as { savedAt: number; report: ReportData };
+      if (Date.now() - savedAt > SS_TTL_MS) return null;
+      return r as ReportData;
+    } catch { return null; }
+  }
+  function ssWrite(cid: string, s: string, e: string, r: ReportData) {
+    try {
+      sessionStorage.setItem(ssKey(cid, s, e), JSON.stringify({ savedAt: Date.now(), report: r }));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  function buildReportFromData(d: OrdersResult): ReportData {
+    const parsed = d.data;
+    return {
+      faturamento_total:      parsed?.faturamento_total      ?? 0,
+      total_pedidos:          parsed?.total_pedidos          ?? 0,
+      ticket_medio:           parsed?.ticket_medio           ?? null,
+      pedidos_por_status:     parsed?.pedidos_por_status     ?? null,
+      produtos_mais_vendidos: parsed?.produtos_mais_vendidos ?? null,
+      topItemsUnavailable:    parsed?.topItemsUnavailable    ?? false,
+      topItemsReason:         parsed?.topItemsReason         ?? null,
+      melhores_dias:          parsed?.melhores_dias          ?? null,
+      pedidos_recentes:       parsed?.pedidos_recentes       ?? [],
+      pagination:             d.pagination,
+      debugShape:             d.debugShape,
+      snapshotPersistence:    d.snapshotPersistence,
+      completeness:           d.completeness,
+      windowDiag:             d.windowDiag ?? null,
+      cacheHit:               d.cacheHit ?? false,
+      heatmap:                parsed?.heatmap,
+      pedidosPorServiceType:  parsed?.pedidosPorServiceType,
+      pedidosPorSource:       parsed?.pedidosPorSource,
+      totalDescontos:         parsed?.totalDescontos,
+      totalTaxasEntrega:      parsed?.totalTaxasEntrega,
+      totalGorjetas:          parsed?.totalGorjetas,
+      faturamentoPorDiaSemana: parsed?.faturamentoPorDiaSemana,
+      pedidosPorDiaSemana:    parsed?.pedidosPorDiaSemana,
+      pedidosPorHora:         parsed?.pedidosPorHora,
+      faturamentoPorHora:     parsed?.faturamentoPorHora,
+      concentracaoPorFaixa:   parsed?.concentracaoPorFaixa,
+    };
+  }
+
+  // ── Carrega relatório ─────────────────────────────────────────────────────
+  const loadReport = useCallback(async (forceRefresh = false) => {
     if (!clientId) return;
 
-    // Valida período personalizado antes de disparar a requisição
     if (period === "personalizado") {
       if (!customStart || !customEnd) {
         setCustomError("Informe as duas datas para o período personalizado.");
@@ -319,18 +393,60 @@ export default function FaturamentoPage() {
     }
     setCustomError(null);
 
+    // Abort any previous in-flight request
+    if (activeControllerRef.current) activeControllerRef.current.abort();
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+    const thisRequestId = ++requestIdRef.current;
+
+    // sessionStorage check (only when not force-refreshing)
+    if (!forceRefresh) {
+      // Resolve start/end for the current period to compute ss key
+      let ssStart = customStart, ssEnd = customEnd;
+      if (period !== "personalizado") {
+        const now = new Date();
+        const toYMD = (d: Date) => d.toISOString().split("T")[0];
+        if      (period === "hoje")      { ssStart = ssEnd = toYMD(now); }
+        else if (period === "7dias")     { const s = new Date(now); s.setDate(s.getDate() - 6);  ssStart = toYMD(s); ssEnd = toYMD(now); }
+        else if (period === "15dias")    { const s = new Date(now); s.setDate(s.getDate() - 14); ssStart = toYMD(s); ssEnd = toYMD(now); }
+        else if (period === "30dias")    { const s = new Date(now); s.setDate(s.getDate() - 29); ssStart = toYMD(s); ssEnd = toYMD(now); }
+        else if (period === "mes_atual") { ssStart = toYMD(new Date(now.getFullYear(), now.getMonth(), 1)); ssEnd = toYMD(now); }
+      }
+      if (ssStart && ssEnd) {
+        const cached = ssRead(clientId, ssStart, ssEnd);
+        if (cached) {
+          if (requestIdRef.current !== thisRequestId) return;
+          setReport(cached);
+          setLastSync(new Date().toISOString());
+          const ageMin = Math.round((Date.now() - (Date.now())) / 60000); // 0 = just loaded
+          setCacheLabel(`Resultado armazenado localmente${ageMin > 0 ? ` (${ageMin} min atrás)` : ""}`);
+          return;
+        }
+      }
+    }
+
+    setCacheLabel(null);
     setLoading(true);
     setError(null);
     setReport(null);
+    setPrevReport(null);
     setMissingBaseUrl(false);
     setApiDiag(null);
+    setSyncPhase("Preparando sincronização");
 
     try {
-      const url = period === "personalizado"
+      const base = period === "personalizado"
         ? `/api/olaclick/orders?client_id=${clientId}&start_date=${customStart}&end_date=${customEnd}`
         : `/api/olaclick/orders?client_id=${clientId}&period=${period}`;
-      const r = await fetch(url);
+      const url = forceRefresh ? `${base}&force_refresh=1` : base;
+
+      setSyncPhase("Consultando pedidos");
+      const r = await fetch(url, { signal: controller.signal });
+      setSyncPhase("Consolidando indicadores");
       const d = await r.json() as OrdersResult;
+      setSyncPhase("Finalizando relatório");
+
+      if (requestIdRef.current !== thisRequestId) return; // stale response
 
       if (!d.ok) {
         const diag = { provider: d.provider, endpoint: d.endpoint, httpStatus: d.httpStatus, providerErrorMessage: d.providerErrorMessage, period };
@@ -360,85 +476,75 @@ export default function FaturamentoPage() {
         }
         return;
       }
-      setMissingBaseUrl(false);
 
-      const parsed = d.data;
-      setReport({
-        faturamento_total:      parsed?.faturamento_total      ?? 0,
-        total_pedidos:          parsed?.total_pedidos          ?? 0,
-        ticket_medio:           parsed?.ticket_medio           ?? null,
-        pedidos_por_status:     parsed?.pedidos_por_status     ?? null,
-        produtos_mais_vendidos: parsed?.produtos_mais_vendidos ?? null,
-        topItemsUnavailable:    parsed?.topItemsUnavailable    ?? false,
-        topItemsReason:         parsed?.topItemsReason         ?? null,
-        melhores_dias:          parsed?.melhores_dias          ?? null,
-        pedidos_recentes:       parsed?.pedidos_recentes       ?? [],
-        pagination:             d.pagination,
-        debugShape:             d.debugShape,
-        snapshotPersistence:    d.snapshotPersistence,
-        completeness:           d.completeness,
-        windowDiag:             d.windowDiag ?? null,
-        cacheHit:               d.cacheHit ?? false,
-        heatmap:                parsed?.heatmap,
-        pedidosPorServiceType:  parsed?.pedidosPorServiceType,
-        pedidosPorSource:       parsed?.pedidosPorSource,
-        totalDescontos:         parsed?.totalDescontos,
-        totalTaxasEntrega:      parsed?.totalTaxasEntrega,
-        totalGorjetas:          parsed?.totalGorjetas,
-        faturamentoPorDiaSemana: parsed?.faturamentoPorDiaSemana,
-        pedidosPorDiaSemana:    parsed?.pedidosPorDiaSemana,
-      });
+      setMissingBaseUrl(false);
+      const built = buildReportFromData(d);
+      setReport(built);
       setLastSync(new Date().toISOString());
-    } catch {
+
+      // Write to sessionStorage only for complete/partial results
+      if (built.total_pedidos > 0) {
+        const now2 = new Date();
+        const toYMD = (d2: Date) => d2.toISOString().split("T")[0];
+        let ssS = customStart, ssE = customEnd;
+        if (period !== "personalizado") {
+          if      (period === "hoje")      { ssS = ssE = toYMD(now2); }
+          else if (period === "7dias")     { const s = new Date(now2); s.setDate(s.getDate() - 6);  ssS = toYMD(s); ssE = toYMD(now2); }
+          else if (period === "15dias")    { const s = new Date(now2); s.setDate(s.getDate() - 14); ssS = toYMD(s); ssE = toYMD(now2); }
+          else if (period === "30dias")    { const s = new Date(now2); s.setDate(s.getDate() - 29); ssS = toYMD(s); ssE = toYMD(now2); }
+          else if (period === "mes_atual") { ssS = toYMD(new Date(now2.getFullYear(), now2.getMonth(), 1)); ssE = toYMD(now2); }
+        }
+        if (ssS && ssE) ssWrite(clientId, ssS, ssE, built);
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return; // cancelled — no error shown
+      if (requestIdRef.current !== thisRequestId) return;
       setError("Erro de rede ao buscar faturamento. Verifique conexão e tente novamente.");
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === thisRequestId) {
+        setLoading(false);
+        setSyncPhase(null);
+      }
     }
   }, [clientId, period, customStart, customEnd]);
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isConnected    = status?.ok && status?.connection;
 
-  // Busca período anterior para comparação
+  // Busca período anterior — somente manual, somente quando completeness=complete
   const loadPrevReport = useCallback(async () => {
-    if (!clientId || period === "personalizado") { setPrevReport(null); return; }
+    if (!clientId || period === "personalizado" || report?.completeness !== "complete") {
+      setPrevReport(null); return;
+    }
     const now = new Date();
     const toYMD = (d: Date) => d.toISOString().split("T")[0];
     let days = 7;
-    if (period === "7dias")    days = 7;
-    else if (period === "15dias")  days = 15;
-    else if (period === "30dias")  days = 30;
+    if      (period === "7dias")    days = 7;
+    else if (period === "15dias")   days = 15;
+    else if (period === "30dias")   days = 30;
     else if (period === "mes_atual") {
       const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
       days = Math.ceil((now.getTime() - mStart.getTime()) / 86400000) || 1;
     } else if (period === "hoje") days = 1;
     const prevEnd   = new Date(now); prevEnd.setDate(prevEnd.getDate() - days);
     const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate() - days + 1);
+    setLoadingPrev(true);
     try {
       const r = await fetch(`/api/olaclick/orders?client_id=${clientId}&start_date=${toYMD(prevStart)}&end_date=${toYMD(prevEnd)}`);
       const d = await r.json() as OrdersResult;
       if (d.ok && d.data) {
-        setPrevReport({
-          faturamento_total:      d.data.faturamento_total ?? 0,
-          total_pedidos:          d.data.total_pedidos ?? 0,
-          ticket_medio:           d.data.ticket_medio ?? null,
-          pedidos_por_status:     d.data.pedidos_por_status ?? null,
-          produtos_mais_vendidos: d.data.produtos_mais_vendidos ?? null,
-          topItemsUnavailable:    d.data.topItemsUnavailable ?? false,
-          topItemsReason:         d.data.topItemsReason ?? null,
-          melhores_dias:          d.data.melhores_dias ?? null,
-          pedidos_recentes:       d.data.pedidos_recentes ?? [],
-        });
+        setPrevReport(buildReportFromData(d));
       } else {
         setPrevReport(null);
       }
     } catch { setPrevReport(null); }
-  }, [clientId, period]);
+    finally { setLoadingPrev(false); }
+  }, [clientId, period, report?.completeness]);
 
-  // Dispara comparação sempre que o relatório principal muda
+  // Cancel on unmount
   useEffect(() => {
-    if (report) void loadPrevReport();
-  }, [report, loadPrevReport]);
+    return () => { if (activeControllerRef.current) activeControllerRef.current.abort(); };
+  }, []);
 
   // Auto-refresh a cada 5 minutos
   const { refresh: autoRefreshNow } = useAutoRefresh({
@@ -473,14 +579,24 @@ export default function FaturamentoPage() {
   return (
     <div>
       <PageHeader title="Faturamento" description="Relatório de faturamento — Cardápio Digital">
-        <button
-          onClick={() => void loadReport()}
-          disabled={loading || !isConnected}
-          className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Sincronizar
-        </button>
+        <div className="flex items-center gap-2">
+          {loading && (
+            <button
+              onClick={() => { if (activeControllerRef.current) activeControllerRef.current.abort(); }}
+              className="flex items-center gap-1.5 text-sm font-medium text-gray-600 bg-gray-100 px-3 py-2 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Cancelar
+            </button>
+          )}
+          <button
+            onClick={() => void loadReport(false)}
+            disabled={loading || !isConnected}
+            className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Sincronizar
+          </button>
+        </div>
       </PageHeader>
 
       {/* Seletores */}
@@ -520,7 +636,7 @@ export default function FaturamentoPage() {
               className="py-2 px-3 text-sm border border-gray-200 bg-white rounded-xl outline-none focus:border-indigo-300"
             />
             <button
-              onClick={() => void loadReport()}
+              onClick={() => void loadReport(false)}
               disabled={loading || !isConnected || !customStart || !customEnd}
               className="flex items-center gap-1.5 text-sm font-medium text-white bg-indigo-600 px-3 py-2 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
@@ -619,7 +735,7 @@ export default function FaturamentoPage() {
           <ShoppingCart className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-semibold text-gray-600 mb-1">Nenhum dado ainda</p>
           <p className="text-xs text-gray-400 mb-4">Clique em &quot;Sincronizar&quot; para buscar dados do período.</p>
-          <button onClick={() => void loadReport()} className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+          <button onClick={() => void loadReport(false)} className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
             <RefreshCw className="w-4 h-4" /> Sincronizar agora
           </button>
         </div>
@@ -635,10 +751,26 @@ export default function FaturamentoPage() {
         </div>
       )}
 
-      {/* Loading */}
+      {/* Progress phases */}
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin" /> Buscando dados do Cardápio Digital…
+        <div className="flex flex-col items-center justify-center gap-3 py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+          <div className="text-sm font-medium text-gray-600">{syncPhase ?? "Sincronizando…"}</div>
+          <div className="flex gap-1.5">
+            {["Preparando sincronização","Consultando pedidos","Consolidando indicadores","Finalizando relatório"].map((phase, i) => (
+              <div key={i} className={`h-1.5 w-8 rounded-full transition-colors ${syncPhase === phase ? "bg-indigo-500" : ["Consultando pedidos","Consolidando indicadores","Finalizando relatório"].slice(0, i).includes(syncPhase ?? "") ? "bg-indigo-200" : "bg-gray-100"}`} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cache label */}
+      {cacheLabel && !loading && (
+        <div className="mb-3 flex items-center justify-between text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-1.5">
+          <span><Info className="w-3 h-3 inline mr-1" />{cacheLabel}</span>
+          <button onClick={() => void loadReport(true)} className="underline font-medium ml-2 hover:text-indigo-800">
+            Forçar atualização
+          </button>
         </div>
       )}
 
@@ -776,6 +908,29 @@ export default function FaturamentoPage() {
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* Botão carregar comparação com período anterior */}
+          {report.completeness === "complete" && period !== "personalizado" && report.total_pedidos > 0 && !prevReport && (
+            <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-3">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <TrendingUp className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                Comparação com período anterior disponível
+              </div>
+              {loadingPrev ? (
+                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando…
+                </div>
+              ) : (
+                <button
+                  onClick={() => void loadPrevReport()}
+                  className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition-colors"
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  Carregar comparação com período anterior
+                </button>
+              )}
             </div>
           )}
 
@@ -1047,6 +1202,82 @@ export default function FaturamentoPage() {
             </SectionCard>
           )}
 
+          {/* Concentração por faixa de horário */}
+          {report.concentracaoPorFaixa && Object.keys(report.concentracaoPorFaixa).length > 0 && (
+            <SectionCard title="Concentração por faixa de horário" icon={Clock}>
+              {(() => {
+                const FAIXAS = [
+                  { key: "madrugada", label: "Madrugada", range: "0h–5h",   bg: "bg-slate-50",  text: "text-slate-700"  },
+                  { key: "manha",     label: "Manhã",     range: "6h–11h",  bg: "bg-amber-50",  text: "text-amber-700"  },
+                  { key: "tarde",     label: "Tarde",     range: "12h–17h", bg: "bg-orange-50", text: "text-orange-700" },
+                  { key: "noite",     label: "Noite",     range: "18h–23h", bg: "bg-indigo-50", text: "text-indigo-700" },
+                ];
+                const totalOrders = FAIXAS.reduce((acc, f) => acc + (report.concentracaoPorFaixa?.[f.key]?.orders ?? 0), 0) || 1;
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {FAIXAS.map(({ key, label, range, bg, text }) => {
+                      const entry   = report.concentracaoPorFaixa?.[key];
+                      const orders  = entry?.orders  ?? 0;
+                      const revenue = entry?.revenue ?? 0;
+                      const pct = Math.round((orders / totalOrders) * 100);
+                      return (
+                        <div key={key} className={`rounded-xl p-3 text-center ${bg} ${text}`}>
+                          <p className="text-xs font-bold">{label}</p>
+                          <p className="text-[10px] opacity-60 mt-0.5">{range}</p>
+                          <p className="text-xl font-black mt-2">{orders}</p>
+                          <p className="text-[10px] font-semibold opacity-70">{pct}% dos pedidos</p>
+                          <p className="text-[10px] mt-1 opacity-60">{fmtBRL(revenue)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </SectionCard>
+          )}
+
+          {/* Pedidos e faturamento por hora */}
+          {report.pedidosPorHora && Object.keys(report.pedidosPorHora).length > 0 && (
+            <SectionCard title="Pedidos por hora do dia" icon={Clock}>
+              {(() => {
+                const hours = Array.from({ length: 24 }, (_, i) => i);
+                const maxOrders = Math.max(...hours.map(h => report.pedidosPorHora?.[String(h)] ?? 0), 1);
+                return (
+                  <div className="overflow-x-auto">
+                    <div style={{ minWidth: "520px" }}>
+                      <div className="flex gap-0.5 items-end h-16 mb-1">
+                        {hours.map(h => {
+                          const orders  = report.pedidosPorHora?.[String(h)]  ?? 0;
+                          const revenue = report.faturamentoPorHora?.[String(h)] ?? 0;
+                          const pct = Math.round((orders / maxOrders) * 100);
+                          return (
+                            <div
+                              key={h}
+                              className="flex-1 flex flex-col items-center justify-end"
+                              title={`${h}h — ${orders} ped. · ${fmtBRL(revenue)}`}
+                            >
+                              <div
+                                className="w-full bg-indigo-400 rounded-t-sm transition-all"
+                                style={{ height: `${pct}%`, minHeight: orders > 0 ? "2px" : "0" }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-0.5 border-t border-gray-100 pt-1">
+                        {hours.map(h => (
+                          <div key={h} className="flex-1 text-center text-[9px] text-gray-400 font-mono leading-none">
+                            {h % 4 === 0 ? `${h}h` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </SectionCard>
+          )}
+
           {/* Diagnóstico técnico da integração — colapsível */}
           <div className="border border-gray-100 rounded-2xl overflow-hidden">
             <button
@@ -1081,6 +1312,43 @@ export default function FaturamentoPage() {
                       {report.windowDiag.rateLimitStopped && <p className="text-amber-600 font-semibold">⚠ Coleta interrompida por rate limit do provider.</p>}
                       <p><span className="font-semibold text-gray-700">Auth mode:</span> {report.windowDiag.authMode}</p>
                       <p><span className="font-semibold text-gray-700">Tempo de coleta:</span> {report.windowDiag.executionMs}ms</p>
+                      {(report.windowDiag.completeDays !== undefined || report.windowDiag.partialDays !== undefined) && (
+                        <p><span className="font-semibold text-gray-700">Dias:</span> {report.windowDiag.completeDays ?? 0} completos · {report.windowDiag.partialDays ?? 0} parciais</p>
+                      )}
+                      {report.windowDiag.dailyDiagnostics && report.windowDiag.dailyDiagnostics.length > 0 && (
+                        <div className="overflow-x-auto mt-2">
+                          <table className="w-full text-[10px]">
+                            <thead>
+                              <tr className="text-gray-400 border-b border-gray-100">
+                                <th className="pb-1 text-left font-semibold">Dia</th>
+                                <th className="pb-1 text-right font-semibold">Total</th>
+                                <th className="pb-1 text-right font-semibold">Págs</th>
+                                <th className="pb-1 text-right font-semibold">Únicos</th>
+                                <th className="pb-1 text-right font-semibold">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {report.windowDiag.dailyDiagnostics.map((dd) => (
+                                <tr key={dd.date} className={dd.complete ? "text-gray-500" : "text-amber-600"}>
+                                  <td className="py-0.5 font-mono">{dd.date}</td>
+                                  <td className="py-0.5 text-right">{dd.providerTotal ?? "—"}</td>
+                                  <td className="py-0.5 text-right">{dd.pagesFetched}/{dd.expectedPages}</td>
+                                  <td className="py-0.5 text-right">{dd.uniqueOrders}</td>
+                                  <td className="py-0.5 text-right">
+                                    {dd.complete
+                                      ? <span className="text-emerald-600">✓</span>
+                                      : dd.failedPages > 0
+                                        ? <span className="text-red-500">{dd.failedPages}f</span>
+                                        : dd.repeatedPageDetected
+                                          ? <span className="text-orange-500">rep</span>
+                                          : <span>parcial</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
