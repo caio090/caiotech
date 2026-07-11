@@ -164,15 +164,15 @@ function translateStatus(s: string): string {
 }
 function translateServiceType(s: string): string {
   const MAP: Record<string, string> = {
-    delivery: "Entrega", pickup: "Retirada", dine_in: "Mesa",
-    DELIVERY: "Entrega", PICKUP: "Retirada", DINE_IN: "Mesa",
+    delivery: "Entrega", pickup: "Retirada", dine_in: "Consumo no local", onsite: "Consumo no local",
+    DELIVERY: "Entrega", PICKUP: "Retirada", DINE_IN: "Consumo no local", ONSITE: "Consumo no local",
   };
   return MAP[s] ?? s;
 }
 function translateSource(s: string): string {
   const MAP: Record<string, string> = {
     whatsapp: "WhatsApp", web: "Web", app: "App", pdv: "PDV",
-    ifood: "iFood", totem: "Totem",
+    ifood: "iFood", totem: "Totem", phone: "Telefone", cashier: "Caixa",
   };
   return MAP[s.toLowerCase()] ?? s;
 }
