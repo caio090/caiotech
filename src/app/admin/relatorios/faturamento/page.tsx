@@ -337,10 +337,14 @@ function HeatmapGrid({ heatmap, metric = "orders" }: {
   function intensity(val: number): number {
     return val === 0 ? 0 : Math.max(1, Math.ceil((val / maxVal) * 5));
   }
+  // Warm/hot colormap: empty → vinho → vermelho → laranja → amarelo
   const LEVELS = [
     "rgba(255,255,255,0.03)",
-    "rgba(123,110,246,0.12)", "rgba(123,110,246,0.25)", "rgba(123,110,246,0.42)",
-    "rgba(123,110,246,0.65)", "rgba(123,110,246,0.9)",
+    "rgba(140,20,30,0.40)",
+    "rgba(200,50,30,0.58)",
+    "rgba(230,100,20,0.72)",
+    "rgba(240,165,30,0.85)",
+    "rgba(255,225,55,0.95)",
   ];
 
   return (
@@ -374,8 +378,8 @@ function HeatmapGrid({ heatmap, metric = "orders" }: {
           ))}
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10, justifyContent: "flex-end" }}>
             <span style={{ fontSize: 9, color: "var(--lk-muted)" }}>Menos</span>
-            {LEVELS.map((bg, i) => (
-              <div key={i} style={{ width: 11, height: 11, borderRadius: 2, background: bg, border: "1px solid var(--lk-border)" }} />
+            {LEVELS.map((lvl, i) => (
+              <div key={i} style={{ width: 11, height: 11, borderRadius: 2, background: lvl, border: "1px solid rgba(255,255,255,0.08)" }} />
             ))}
             <span style={{ fontSize: 9, color: "var(--lk-muted)" }}>Mais</span>
           </div>
@@ -786,7 +790,7 @@ export default function FaturamentoPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1600, width: "100%" }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 24 }}>
@@ -1028,7 +1032,7 @@ export default function FaturamentoPage() {
                   {/* KPI cards */}
                   <motion.div
                     initial="initial" animate="animate" variants={stagger}
-                    style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}
+                    style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}
                   >
                     <KpiCard
                       icon={DollarSign}
