@@ -9,10 +9,19 @@ export type OrderFetchCompleteness =
   | "error";            // erro durante coleta
 
 export type SnapshotPersistence =
-  | "saved"             // snapshot salvo com sucesso
-  | "not_configured"    // tabela não existe ainda
-  | "skipped"           // zerou ou condição não atendida
-  | "error";            // erro diferente de 42P01
+  | "saved"               // snapshot salvo com sucesso
+  | "not_configured"      // tabela não existe ainda
+  | "skipped"             // zerou ou condição não atendida
+  | "skipped_incomplete"  // coleta incompleta — snapshot não alimentaria comparação válida
+  | "error";              // erro diferente de 42P01
+
+// Escopo do total reportado pelo provider na paginação
+export type ProviderTotalScope =
+  | "filtered_period"   // confirmado: representa o total do período solicitado
+  | "account_history"   // total de todos os pedidos da conta (ignora filtro de data)
+  | "current_page"      // total da página atual, não do período
+  | "monetary"          // valor monetário, não contagem de pedidos
+  | "unknown";          // não foi possível determinar o escopo
 
 export interface OrderFetchDiagnostics {
   requestedStart:       string;
@@ -24,7 +33,8 @@ export interface OrderFetchDiagnostics {
   pagesFetched:         number;
   paginationMode:       "envelope" | "page_size_fallback" | "single_page" | "operational_only";
   paginationDetected:   boolean;
-  dateFilterRespected:  boolean | null;
+  returnedOrdersWithinRequestedRange: boolean | null;
+  dateFilterCompletenessConfirmed:    false;
   itemsAvailable:       boolean;
   completeness:         OrderFetchCompleteness;
   warning:              string | null;

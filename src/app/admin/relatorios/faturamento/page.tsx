@@ -35,13 +35,20 @@ interface DigitalMenuStatus {
   } | null;
 }
 
+type ProviderTotalScope = "filtered_period" | "account_history" | "current_page" | "monetary" | "unknown";
+
 interface PaginationInfo {
   used: boolean;
   paginationMode: "envelope" | "page_size_fallback" | "single_page" | "operational_only";
+  conventionUsed:    string;
+  conventionVerified: false;
   pagesFetched: number; totalReturned: number;
-  providerTotal: number | null; limitDetected: number | null; hasMore: boolean;
+  providerReportedTotalRaw: number | null;
+  providerTotalScope:       ProviderTotalScope | null;
+  limitDetected: number | null; hasMore: boolean;
   dedup: { rawCount: number; uniqueCount: number; duplicateCount: number; missingIdCount: number };
-  dateFilterRespected: boolean | null;
+  returnedOrdersWithinRequestedRange: boolean | null;
+  dateFilterCompletenessConfirmed:    false;
 }
 
 interface DebugShape {
@@ -52,7 +59,7 @@ interface DebugShape {
 }
 
 type OrderFetchCompleteness = "complete" | "partial" | "operational_only" | "unknown" | "error";
-type SnapshotPersistence   = "saved" | "not_configured" | "skipped" | "error";
+type SnapshotPersistence   = "saved" | "not_configured" | "skipped" | "skipped_incomplete" | "error";
 
 interface OrdersResult {
   ok: boolean;
@@ -411,7 +418,6 @@ export default function FaturamentoPage() {
   const labelFaturamento = isComplete ? "Faturamento total" : "Faturamento dos pedidos carregados";
   const labelPedidos     = isComplete ? "Total de pedidos"  : "Pedidos retornados";
   const labelTicket      = isComplete ? "Ticket médio"      : "Ticket médio dos pedidos carregados";
-  const labelMelhoresDias = isComplete ? "Melhores dias de venda" : "Dias com maior volume (amostra parcial)";
 
   return (
     <div>
@@ -561,7 +567,7 @@ export default function FaturamentoPage() {
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-16 text-center">
           <ShoppingCart className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-semibold text-gray-600 mb-1">Nenhum dado ainda</p>
-          <p className="text-xs text-gray-400 mb-4">Clique em "Sincronizar" para buscar dados do período.</p>
+          <p className="text-xs text-gray-400 mb-4">Clique em &quot;Sincronizar&quot; para buscar dados do período.</p>
           <button onClick={() => void loadReport()} className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
             <RefreshCw className="w-4 h-4" /> Sincronizar agora
           </button>
@@ -632,76 +638,106 @@ export default function FaturamentoPage() {
           </div>
 
           {/* Comparação com período anterior */}
-          {prevReport && period !== "personalizado" && report.total_pedidos > 0 && (() => {
-            const diffFat  = prevReport.faturamento_total > 0
-              ? ((report.faturamento_total - prevReport.faturamento_total) / prevReport.faturamento_total * 100)
-              : null;
-            const diffPed  = prevReport.total_pedidos > 0
-              ? ((report.total_pedidos - prevReport.total_pedidos) / prevReport.total_pedidos * 100)
-              : null;
-            const diffTick = prevReport.ticket_medio && prevReport.ticket_medio > 0 && report.ticket_medio
-              ? ((report.ticket_medio - prevReport.ticket_medio) / prevReport.ticket_medio * 100)
-              : null;
-            const sign = (v: number) => v >= 0 ? "+" : "";
-            const cls  = (v: number) => v >= 0 ? "text-emerald-600" : "text-red-500";
-            return (
-              <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                <p className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" /> Comparação com período anterior
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  {diffFat !== null && (
-                    <div className="text-center">
-                      <p className={`text-base font-black ${cls(diffFat)}`}>{sign(diffFat)}{diffFat.toFixed(1)}%</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Faturamento</p>
-                      <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.faturamento_total)}</p>
-                    </div>
-                  )}
-                  {diffPed !== null && (
-                    <div className="text-center">
-                      <p className={`text-base font-black ${cls(diffPed)}`}>{sign(diffPed)}{diffPed.toFixed(1)}%</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Pedidos</p>
-                      <p className="text-[10px] text-gray-300">{fmtCount(prevReport.total_pedidos)}</p>
-                    </div>
-                  )}
-                  {diffTick !== null && (
-                    <div className="text-center">
-                      <p className={`text-base font-black ${cls(diffTick)}`}>{sign(diffTick)}{diffTick.toFixed(1)}%</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Ticket médio</p>
-                      <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.ticket_medio)}</p>
-                    </div>
-                  )}
-                  {diffFat === null && diffPed === null && diffTick === null && (
-                    <p className="col-span-3 text-xs text-gray-400 text-center">Período anterior sem dados para comparar.</p>
-                  )}
+          {prevReport && period !== "personalizado" && report.total_pedidos > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <p className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Comparação com período anterior
+              </p>
+              {report.completeness !== "complete" || prevReport.completeness !== "complete" ? (
+                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Comparação indisponível enquanto a coleta completa dos dois períodos não for confirmada.
+                    {report.completeness !== "complete" && <> Período atual: <strong>{report.completeness}</strong>.</>}
+                    {prevReport.completeness && prevReport.completeness !== "complete" && <> Período anterior: <strong>{prevReport.completeness}</strong>.</>}
+                  </span>
                 </div>
-              </div>
-            );
-          })()}
+              ) : (() => {
+                const diffFat  = prevReport.faturamento_total > 0
+                  ? ((report.faturamento_total - prevReport.faturamento_total) / prevReport.faturamento_total * 100)
+                  : null;
+                const diffPed  = prevReport.total_pedidos > 0
+                  ? ((report.total_pedidos - prevReport.total_pedidos) / prevReport.total_pedidos * 100)
+                  : null;
+                const diffTick = prevReport.ticket_medio && prevReport.ticket_medio > 0 && report.ticket_medio
+                  ? ((report.ticket_medio - prevReport.ticket_medio) / prevReport.ticket_medio * 100)
+                  : null;
+                const sign = (v: number) => v >= 0 ? "+" : "";
+                const cls  = (v: number) => v >= 0 ? "text-emerald-600" : "text-red-500";
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    {diffFat !== null && (
+                      <div className="text-center">
+                        <p className={`text-base font-black ${cls(diffFat)}`}>{sign(diffFat)}{diffFat.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Faturamento</p>
+                        <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.faturamento_total)}</p>
+                      </div>
+                    )}
+                    {diffPed !== null && (
+                      <div className="text-center">
+                        <p className={`text-base font-black ${cls(diffPed)}`}>{sign(diffPed)}{diffPed.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Pedidos</p>
+                        <p className="text-[10px] text-gray-300">{fmtCount(prevReport.total_pedidos)}</p>
+                      </div>
+                    )}
+                    {diffTick !== null && (
+                      <div className="text-center">
+                        <p className={`text-base font-black ${cls(diffTick)}`}>{sign(diffTick)}{diffTick.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Ticket médio</p>
+                        <p className="text-[10px] text-gray-300">{fmtBRL(prevReport.ticket_medio)}</p>
+                      </div>
+                    )}
+                    {diffFat === null && diffPed === null && diffTick === null && (
+                      <p className="col-span-3 text-xs text-gray-400 text-center">Período anterior sem dados para comparar.</p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
-          {/* Resumo executivo */}
+          {/* Resumo executivo — linguagem condicional à completude */}
           {report.total_pedidos > 0 && (() => {
+            const isComplete   = report.completeness === "complete";
+            const isOperOnly   = report.completeness === "operational_only";
             const statusDominante = report.pedidos_por_status
               ? Object.entries(report.pedidos_por_status).sort((a, b) => b[1] - a[1])[0]?.[0]
               : null;
             const melhorDia = report.melhores_dias?.[0];
             const lines: string[] = [];
-            lines.push(`O período teve ${fmtBRL(report.faturamento_total)} em faturamento com ${fmtCount(report.total_pedidos)} pedido${report.total_pedidos !== 1 ? "s" : ""}.`);
+
+            if (isComplete) {
+              lines.push(`O período teve ${fmtBRL(report.faturamento_total)} em faturamento com ${fmtCount(report.total_pedidos)} pedido${report.total_pedidos !== 1 ? "s" : ""}.`);
+            } else {
+              lines.push(`Nos ${fmtCount(report.total_pedidos)} pedidos retornados pela API, foram identificados ${fmtBRL(report.faturamento_total)} em faturamento.`);
+            }
             if (report.ticket_medio) lines.push(`Ticket médio de ${fmtBRL(report.ticket_medio)}.`);
-            if (statusDominante) lines.push(`Status dominante: ${statusDominante}.`);
-            if (melhorDia) lines.push(`Melhor dia: ${fmtDay(melhorDia.date)}, com ${fmtBRL(melhorDia.revenue)}.`);
-            if (report.pagination && !report.pagination.used && report.pagination.limitDetected && report.total_pedidos === report.pagination.limitDetected) {
-              lines.push(`A API retornou exatamente ${report.total_pedidos} pedidos — pode haver limite de paginação do provider; os dados podem ser parciais.`);
+            if (statusDominante) {
+              lines.push(isComplete
+                ? `Status dominante do período: ${statusDominante}.`
+                : `Status mais frequente entre os pedidos retornados: ${statusDominante}.`);
+            }
+            if (melhorDia) {
+              lines.push(isComplete
+                ? `Melhor dia do período: ${fmtDay(melhorDia.date)}, com ${fmtBRL(melhorDia.revenue)}.`
+                : `Melhor dia entre os pedidos retornados: ${fmtDay(melhorDia.date)}, com ${fmtBRL(melhorDia.revenue)}.`);
             }
             if (report.topItemsUnavailable) {
               lines.push("Produtos mais vendidos indisponíveis: a API não retornou itens nos pedidos.");
             }
+
             return (
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <FileText className="w-4 h-4 text-gray-400" />
                   <p className="text-sm font-bold text-gray-900">Leitura do período</p>
                 </div>
+                {isOperOnly && (
+                  <div className="mb-3 flex items-start gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-xl p-2.5">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    A integração está exibindo os pedidos mais recentes disponíveis. Este resultado não representa necessariamente todo o período selecionado.
+                  </div>
+                )}
                 <ul className="space-y-1.5">
                   {lines.map((l, i) => (
                     <li key={i} className="text-xs text-gray-600 flex items-start gap-2">
@@ -820,8 +856,27 @@ export default function FaturamentoPage() {
                   <>
                     <p><span className="font-semibold text-gray-700">Paginação detectada:</span> {report.pagination.used ?? report.debugShape?.hasPagination ? "Sim" : "Não"}</p>
                     <p><span className="font-semibold text-gray-700">Modo de paginação:</span> {report.pagination.paginationMode}</p>
+                    <p>
+                      <span className="font-semibold text-gray-700">Convenção usada:</span>{" "}
+                      {report.pagination.conventionUsed}
+                      {" · "}
+                      <span className="text-amber-600">não verificada</span>
+                      {" — rodar /api/olaclick/orders/convention-diagnostic para confirmar"}
+                    </p>
                     {report.pagination.pagesFetched > 0 && <p><span className="font-semibold text-gray-700">Páginas buscadas:</span> {report.pagination.pagesFetched}</p>}
-                    {report.pagination.providerTotal !== null && <p><span className="font-semibold text-gray-700">Total informado pelo provider:</span> {report.pagination.providerTotal}</p>}
+                    {report.pagination.providerReportedTotalRaw !== null && (
+                      <p>
+                        <span className="font-semibold text-gray-700">Total bruto reportado pelo provider:</span>{" "}
+                        {report.pagination.providerReportedTotalRaw}
+                        {" · "}
+                        <span className={`font-semibold ${report.pagination.providerTotalScope === "filtered_period" ? "text-emerald-600" : "text-amber-600"}`}>
+                          escopo: {report.pagination.providerTotalScope ?? "unknown"}
+                        </span>
+                        {report.pagination.providerTotalScope !== "filtered_period" && (
+                          <span className="text-gray-400"> (não usado na completude)</span>
+                        )}
+                      </p>
+                    )}
                     {report.pagination.limitDetected !== null && <p><span className="font-semibold text-gray-700">Limite detectado por página:</span> {report.pagination.limitDetected}</p>}
                     {report.pagination.hasMore && <p className="text-amber-600 font-semibold">⚠ Há mais pedidos além do retornado (limite de segurança atingido).</p>}
                     {report.pagination.dedup && (
@@ -832,9 +887,13 @@ export default function FaturamentoPage() {
                         {report.pagination.dedup.missingIdCount > 0 && ` · ${report.pagination.dedup.missingIdCount} sem ID`}
                       </p>
                     )}
-                    {report.pagination.dateFilterRespected !== null && (
-                      <p><span className="font-semibold text-gray-700">Filtro de data respeitado:</span> {report.pagination.dateFilterRespected ? "Sim" : "Não confirmado"}</p>
-                    )}
+                    <p>
+                      <span className="font-semibold text-gray-700">Pedidos retornados no período:</span>{" "}
+                      {report.pagination.returnedOrdersWithinRequestedRange === null ? "—" : report.pagination.returnedOrdersWithinRequestedRange ? "Sim (amostra)" : "Não (fora do período)"}
+                    </p>
+                    <p className="text-gray-400">
+                      <span className="font-semibold">Completude do filtro de data confirmada:</span> Não — prova requer comparação entre períodos
+                    </p>
                   </>
                 )}
                 {report.debugShape && (
@@ -850,12 +909,18 @@ export default function FaturamentoPage() {
                   </>
                 )}
                 {report.snapshotPersistence && (
-                  <p className={report.snapshotPersistence === "saved" ? "text-emerald-600" : report.snapshotPersistence === "error" ? "text-red-500" : "text-gray-400"}>
+                  <p className={
+                    report.snapshotPersistence === "saved"             ? "text-emerald-600"
+                    : report.snapshotPersistence === "error"           ? "text-red-500"
+                    : report.snapshotPersistence === "skipped_incomplete" ? "text-amber-600"
+                    : "text-gray-400"
+                  }>
                     <span className="font-semibold">Snapshot:</span>{" "}
-                    {report.snapshotPersistence === "saved"           && "Salvo com sucesso"}
-                    {report.snapshotPersistence === "not_configured"  && "Tabela não configurada"}
-                    {report.snapshotPersistence === "skipped"         && "Ignorado (sem dados)"}
-                    {report.snapshotPersistence === "error"           && "Erro ao salvar snapshot"}
+                    {report.snapshotPersistence === "saved"              && "Salvo com sucesso"}
+                    {report.snapshotPersistence === "not_configured"     && "Tabela não configurada"}
+                    {report.snapshotPersistence === "skipped"            && "Ignorado (sem dados)"}
+                    {report.snapshotPersistence === "skipped_incomplete" && "Não salvo — coleta completa do período ainda não confirmada"}
+                    {report.snapshotPersistence === "error"              && "Erro ao salvar snapshot"}
                   </p>
                 )}
                 <div className="flex items-center gap-2 text-[10px] text-gray-300 pt-2 border-t border-gray-50">

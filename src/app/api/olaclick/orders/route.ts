@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveOlaClickBaseUrl } from "@/lib/olaclick";
 import { getActiveDigitalMenuConnection } from "@/lib/digital-menu/server";
 
-import type { OrderFetchCompleteness, SnapshotPersistence } from "@/lib/digital-menu/analytics-types";
+import type { OrderFetchCompleteness, SnapshotPersistence, ProviderTotalScope } from "@/lib/digital-menu/analytics-types";
 export type { OrderFetchCompleteness };
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -24,20 +24,24 @@ interface DebugShape {
 }
 
 interface PaginationInfo {
-  used:           boolean;
-  paginationMode: "envelope" | "page_size_fallback" | "single_page" | "operational_only";
-  pagesFetched:   number;
-  totalReturned:  number;
-  providerTotal:  number | null;
-  limitDetected:  number | null;
-  hasMore:        boolean;
+  used:              boolean;
+  paginationMode:    "envelope" | "page_size_fallback" | "single_page" | "operational_only";
+  conventionUsed:    PaginationConvention;   // convenção enviada — não necessariamente verificada
+  conventionVerified: false;                 // sempre false até o diagnóstico confirmar qual funciona
+  pagesFetched:      number;
+  totalReturned:     number;
+  providerReportedTotalRaw: number | null;   // valor bruto — escopo não comprovado
+  providerTotalScope:       ProviderTotalScope | null;
+  limitDetected:     number | null;
+  hasMore:           boolean;
   dedup: {
     rawCount:       number;
     uniqueCount:    number;
     duplicateCount: number;
     missingIdCount: number;
   };
-  dateFilterRespected: boolean | null;
+  returnedOrdersWithinRequestedRange: boolean | null;  // os pedidos retornados estão no período?
+  dateFilterCompletenessConfirmed:    false;            // sempre false — não temos prova de completude do filtro
 }
 
 interface DetailFetchStats {
@@ -95,6 +99,30 @@ function sanitizeHeaderValue(value: string): string {
 }
 function isValidHeaderValue(value: string): boolean {
   return value.length > 0 && /^[\x20-\x7E\x80-\xFF]+$/.test(value);
+}
+
+// ── Convenções de paginação ────────────────────────────────────────────────────
+
+export type PaginationConvention = "json_api" | "classic" | "offset";
+export const DEFAULT_PAGE_SIZE   = 50;
+
+// Aplica UMA convenção por vez — nunca misturar json_api com classic simultaneamente.
+export function buildOrdersPaginationParams(
+  convention: PaginationConvention,
+  page:       number,
+  pageSize:   number,
+  params:     URLSearchParams,
+): void {
+  if (convention === "json_api") {
+    params.set("page[number]", String(page));
+    params.set("page[size]",   String(pageSize));
+  } else if (convention === "classic") {
+    params.set("page",     String(page));
+    params.set("per_page", String(pageSize));
+  } else if (convention === "offset") {
+    params.set("offset", String((page - 1) * pageSize));
+    params.set("limit",  String(pageSize));
+  }
 }
 
 // ── Extração de dados da resposta ──────────────────────────────────────────────
@@ -211,28 +239,46 @@ const SUSPICIOUS_LIMITS = new Set([10, 15, 20, 25, 30, 50, 100, 200]);
 function classifyCompleteness(pagination: PaginationInfo): OrderFetchCompleteness {
   if (pagination.paginationMode === "operational_only") return "operational_only";
 
-  // Provider confirmou total e carregamos tudo
-  if (pagination.providerTotal !== null && pagination.dedup.uniqueCount >= pagination.providerTotal) return "complete";
+  // Qualquer interrupção por rate limit, safety limit ou missão ID bloqueia "complete"
+  const blocksComplete =
+    pagination.hasMore ||                      // rate limit guard ou safety limit
+    pagination.dedup.missingIdCount > 0;       // pedidos sem ID não podem ser rastreados com certeza
 
-  // Paginamos e não há mais páginas → completo
-  if (pagination.used && !pagination.hasMore) return "complete";
+  // Provider confirmou total do período E carregamos tudo sem bloqueios
+  if (
+    !blocksComplete &&
+    pagination.providerTotalScope === "filtered_period" &&
+    pagination.providerReportedTotalRaw !== null &&
+    pagination.dedup.uniqueCount >= pagination.providerReportedTotalRaw
+  ) return "complete";
 
-  // Truncamento comprovado: safety limits ou provider confirmou que há mais
+  // Paginamos com envelope confirmado, não há mais páginas, sem bloqueios
+  if (!blocksComplete && pagination.used && pagination.paginationMode === "envelope" && !pagination.hasMore) return "complete";
+
+  // Truncamento comprovado: safety limits ou provider sinaliza mais páginas
   if (pagination.hasMore) return "partial";
-  if (pagination.providerTotal !== null && pagination.dedup.uniqueCount < pagination.providerTotal) return "partial";
 
-  // Número redondo sem envelope: não é possível afirmar truncamento
+  // Provider reportou total do período e não carregamos tudo
+  if (
+    pagination.providerTotalScope === "filtered_period" &&
+    pagination.providerReportedTotalRaw !== null &&
+    pagination.dedup.uniqueCount < pagination.providerReportedTotalRaw
+  ) return "partial";
+
+  // Número redondo sem envelope confirmado: não é possível afirmar truncamento
   return "unknown";
 }
 
 // ── Detecção de filtro de data ─────────────────────────────────────────────────
-
-function detectDateFilterRespected(
+// Verifica se os pedidos retornados estão dentro do período solicitado.
+// ATENÇÃO: true aqui NÃO significa que o provider entregou todos os pedidos do período.
+// É apenas returnedOrdersWithinRequestedRange — não dateFilterCompletenessConfirmed.
+function checkReturnedOrdersWithinRange(
   orders: Record<string, unknown>[],
-  start: string,
-  end: string,
+  start:  string,
+  end:    string,
 ): boolean | null {
-  let checked = 0;
+  let checked    = 0;
   let outOfRange = 0;
   for (const o of orders.slice(0, Math.min(orders.length, 10))) {
     const d = extractDate(o);
@@ -251,11 +297,12 @@ const MAX_PAGES  = 20;
 const MAX_ORDERS = 1000;
 
 async function fetchAllOrders(
-  baseUrl: string,
-  endpoint: string,
-  token: string,
-  start: string,
-  end: string,
+  baseUrl:     string,
+  endpoint:    string,
+  token:       string,
+  start:       string,
+  end:         string,
+  convention:  PaginationConvention = "json_api",
 ): Promise<
   | { ok: true;  orders: Record<string, unknown>[]; pagination: PaginationInfo; debugShape: DebugShape; rateLimitInfo: RateLimitInfo }
   | { ok: false; code: string; reason: string; message: string; httpStatus: number | null; providerErrorMessage: string | null }
@@ -266,14 +313,14 @@ async function fetchAllOrders(
   let duplicateCount = 0;
   let missingIdCount = 0;
 
-  let pagesFetched      = 0;
-  let currentPage       = 1;
-  let providerTotal:    number | null = null;
-  let limitDetected:    number | null = null;
+  let pagesFetched              = 0;
+  let currentPage               = 1;
+  let providerReportedTotalRaw: number | null = null;
+  let providerTotalScope:       ProviderTotalScope | null = null;
+  let limitDetected:            number | null = null;
   let hasMore           = false;
   let paginationMode:   PaginationInfo["paginationMode"] = "single_page";
   let envelopeDetected  = false;
-  let gotNewBeyondPage1 = false;
   let page1Count        = 0;
   let debugShape: DebugShape | null = null;
   let rateLimitInfo: RateLimitInfo = { limit: null, remaining: null, reset: null, guard: false };
@@ -282,11 +329,8 @@ async function fetchAllOrders(
     const url = new URL(`${baseUrl}${endpoint}`);
     url.searchParams.set("filter[start_date]", start);
     url.searchParams.set("filter[end_date]",   end);
-    // OlaClick documentado: page[number] — também envia page= para retrocompatibilidade
-    if (currentPage > 1) {
-      url.searchParams.set("page[number]", String(currentPage));
-      url.searchParams.set("page",         String(currentPage));
-    }
+    // Uma única convenção por vez — nunca misturar json_api com classic
+    buildOrdersPaginationParams(convention, currentPage, DEFAULT_PAGE_SIZE, url.searchParams);
 
     let response: Response;
     try {
@@ -347,7 +391,13 @@ async function fetchAllOrders(
     }
 
     const { nextPage, providerTotal: pt, perPage: pp } = detectNextPage(rawJson, currentPage);
-    if (pt !== null) { providerTotal = pt; envelopeDetected = true; }
+    if (pt !== null) {
+      providerReportedTotalRaw = pt;
+      // Escopo inicial: unknown — será reclassificado quando houver comparação entre períodos
+      // Se o total for muito maior que o esperado para o período, hint: account_history
+      if (providerTotalScope === null) providerTotalScope = "unknown";
+      envelopeDetected = true;
+    }
     if (pp !== null) { limitDetected = pp; envelopeDetected = true; }
     if (nextPage !== null) envelopeDetected = true;
 
@@ -380,12 +430,11 @@ async function fetchAllOrders(
       hasMore = false;
       break;
     }
-    if (currentPage > 1 && newFromThisPage > 0) gotNewBeyondPage1 = true;
 
     // Decidir próxima iteração
     if (nextPage !== null) {
       paginationMode = "envelope";
-      hasMore = orderMap.size < (providerTotal ?? Infinity);
+      hasMore = orderMap.size < (providerReportedTotalRaw ?? Infinity);
       currentPage = nextPage;
     } else if (pageOrders.length === 0) {
       hasMore = false;
@@ -414,21 +463,27 @@ async function fetchAllOrders(
 
   const allOrders = Array.from(orderMap.values());
   const dedup = { rawCount, uniqueCount: orderMap.size, duplicateCount, missingIdCount };
-  const dateFilterRespected = allOrders.length > 0 ? detectDateFilterRespected(allOrders, start, end) : null;
+  const returnedOrdersWithinRequestedRange = allOrders.length > 0
+    ? checkReturnedOrdersWithinRange(allOrders, start, end)
+    : null;
 
   return {
     ok: true,
     orders: allOrders,
     pagination: {
-      used:           pagesFetched > 1 && paginationMode !== "operational_only",
+      used:               pagesFetched > 1 && paginationMode !== "operational_only",
       paginationMode,
+      conventionUsed:     convention,
+      conventionVerified: false,
       pagesFetched,
-      totalReturned:  orderMap.size,
-      providerTotal,
+      totalReturned:      orderMap.size,
+      providerReportedTotalRaw,
+      providerTotalScope,
       limitDetected,
       hasMore,
       dedup,
-      dateFilterRespected,
+      returnedOrdersWithinRequestedRange,
+      dateFilterCompletenessConfirmed: false,
     },
     rateLimitInfo,
     debugShape: debugShape ?? {
@@ -562,20 +617,23 @@ function parseRateLimitHeaders(response: Response): RateLimitInfo {
 // ── Top Produtos via endpoint oficial ─────────────────────────────────────────
 
 interface TopProduct {
-  productId: string | null;
-  name:      string;
-  quantity:  number;
-  revenue:   number | null;
-  modifiers: unknown[] | null;
-  category:  string | null;
+  productId:       string | null;
+  name:            string;
+  quantity:        number;
+  quantityField:   string | null;  // nome do campo real usado — para auditoria
+  revenue:         number | null;
+  modifiers:       unknown[] | null;
+  category:        string | null;
 }
 
 interface TopProductsResult {
-  ok:               boolean;
-  products:         TopProduct[] | null;
-  providerEndpoint: string;
-  reason:           "scope_missing" | "not_found" | "error" | null;
-  message:          string | null;
+  ok:                  boolean;
+  products:            TopProduct[] | null;
+  providerEndpoint:    string;
+  reason:              "scope_missing" | "not_found" | "error" | null;
+  message:             string | null;
+  rawFirstItemKeys:    string[] | null;  // chaves do primeiro item — para auditoria sem expor valores
+  allQuantitiesZero:   boolean;
 }
 
 async function fetchProductsSold(
@@ -596,26 +654,26 @@ async function fetchProductsSold(
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Erro de rede ao buscar produtos vendidos." };
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Erro de rede ao buscar produtos vendidos.", rawFirstItemKeys: null, allQuantitiesZero: false };
   }
 
   if (response.status === 404) {
     return { ok: false, products: null, providerEndpoint: endpoint, reason: "not_found",
-      message: "Endpoint /v1/orders/products-sold não disponível nesta conta." };
+      message: "Endpoint /v1/orders/products-sold não disponível nesta conta.", rawFirstItemKeys: null, allQuantitiesZero: false };
   }
   if (response.status === 401 || response.status === 403) {
     return { ok: false, products: null, providerEndpoint: endpoint, reason: "scope_missing",
-      message: "Permissão insuficiente para acessar produtos vendidos. Verifique o scope do token." };
+      message: "Permissão insuficiente para acessar produtos vendidos. Verifique o scope do token.", rawFirstItemKeys: null, allQuantitiesZero: false };
   }
   if (!response.ok) {
     return { ok: false, products: null, providerEndpoint: endpoint, reason: "error",
-      message: `Erro ${response.status} ao buscar produtos vendidos.` };
+      message: `Erro ${response.status} ao buscar produtos vendidos.`, rawFirstItemKeys: null, allQuantitiesZero: false };
   }
 
   let rawJson: unknown;
   try { rawJson = await response.json(); }
   catch {
-    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Resposta inválida do endpoint de produtos vendidos." };
+    return { ok: false, products: null, providerEndpoint: endpoint, reason: "error", message: "Resposta inválida do endpoint de produtos vendidos.", rawFirstItemKeys: null, allQuantitiesZero: false };
   }
 
   const items: unknown[] = Array.isArray(rawJson) ? rawJson
@@ -623,22 +681,59 @@ async function fetchProductsSold(
       ? ((rawJson as Record<string, unknown>)["data"] as unknown[] | undefined ?? [])
       : [];
 
-  const products: TopProduct[] = (items as Record<string, unknown>[])
-    .map((i) => ({
+  const rawFirstItemKeys = items.length > 0 && typeof items[0] === "object" && items[0] !== null
+    ? Object.keys(items[0] as object)
+    : null;
+
+  // Resolver quantity tentando múltiplos nomes de campo — retorna [valor, nomeDoCampo]
+  function resolveQuantity(i: Record<string, unknown>): [number, string | null] {
+    const candidates: [string, unknown][] = [
+      ["quantity",       i["quantity"]],
+      ["qty",            i["qty"]],
+      ["sold",           i["sold"]],
+      ["sold_quantity",  i["sold_quantity"]],
+      ["total_sold",     i["total_sold"]],
+      ["total_quantity", i["total_quantity"]],
+      ["orders_count",   i["orders_count"]],
+      ["items_count",    i["items_count"]],
+      ["count",          i["count"]],
+      ["amount",         i["amount"]],
+    ];
+    for (const [field, val] of candidates) {
+      if (typeof val === "number" && val > 0) return [val, field];
+      if (typeof val === "string") {
+        const n = parseFloat(val);
+        if (!isNaN(n) && n > 0) return [n, field];
+      }
+    }
+    return [0, null];
+  }
+
+  const allProducts: TopProduct[] = (items as Record<string, unknown>[]).map((i) => {
+    const [quantity, quantityField] = resolveQuantity(i);
+    return {
       productId: i["product_id"] != null ? String(i["product_id"]) : i["id"] != null ? String(i["id"]) : null,
       name:      String(i["name"] ?? i["product_name"] ?? i["title"] ?? i["description"] ?? "Produto desconhecido"),
-      quantity:  typeof i["quantity"] === "number" ? i["quantity"] : typeof i["qty"] === "number" ? i["qty"] : 0,
+      quantity,
+      quantityField,
       revenue:   typeof i["revenue"]       === "number" ? i["revenue"]
                : typeof i["total_revenue"] === "number" ? i["total_revenue"]
                : typeof i["amount"]        === "number" ? i["amount"] : null,
       modifiers: Array.isArray(i["modifiers"]) ? i["modifiers"] : null,
       category:  typeof i["category"]      === "string" ? i["category"]
                : typeof i["category_name"] === "string" ? i["category_name"] : null,
-    }))
+    };
+  });
+
+  const allQuantitiesZero = allProducts.length > 0 && allProducts.every((p) => p.quantity === 0);
+
+  // Apenas produtos com quantity > 0 entram no ranking
+  const products = allProducts
+    .filter((p) => p.quantity > 0)
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 10);
 
-  return { ok: true, products, providerEndpoint: endpoint, reason: null, message: null };
+  return { ok: true, products, providerEndpoint: endpoint, reason: null, message: null, rawFirstItemKeys, allQuantitiesZero };
 }
 
 // ── Busca detalhes concorrente ─────────────────────────────────────────────────
@@ -796,7 +891,7 @@ export async function GET(request: NextRequest) {
       topProductsResult = await fetchProductsSold(baseUrl, safeTokenProd, start, end);
 
       if (topProductsResult.ok && (topProductsResult.products?.length ?? 0) > 0) {
-        // Usar dados do endpoint dedicado
+        // Produto só entra no ranking quando quantity > 0 (já filtrado em fetchProductsSold)
         metrics.produtos_mais_vendidos = (topProductsResult.products ?? []).map((p) => ({
           name: p.name,
           qty:  p.quantity,
@@ -804,6 +899,11 @@ export async function GET(request: NextRequest) {
         metrics.topItemsUnavailable     = false;
         metrics.topItemsReason          = null;
         metrics.topProductsCompleteness = "complete";
+      } else if (topProductsResult.ok && topProductsResult.allQuantitiesZero) {
+        // Endpoint retornou itens mas todas as quantidades são zero — campo não mapeado
+        metrics.topItemsUnavailable     = true;
+        metrics.topItemsReason          = `Endpoint /v1/orders/products-sold retornou itens mas quantidade=0 em todos. Campos disponíveis: ${topProductsResult.rawFirstItemKeys?.join(", ") ?? "desconhecido"}. Nenhum campo de quantidade reconhecido.`;
+        metrics.topProductsCompleteness = "unavailable";
       }
     }
 
@@ -849,9 +949,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Snapshot — falha explícita e categorizada, sem bloquear o relatório
+    // Snapshot — só salvar quando coleta for completa E scope do total estiver confirmado.
+    // Snapshot de coleta incompleta não pode alimentar comparações executivas futuras.
     let snapshotPersistence: SnapshotPersistence = "skipped";
-    if (metrics.total_pedidos > 0) {
+    const canSaveSnapshot = completeness === "complete" && metrics.total_pedidos > 0;
+
+    if (!canSaveSnapshot && metrics.total_pedidos > 0) {
+      // Dados existem mas coleta incompleta — registrar para auditoria mas não usar em tendências
+      snapshotPersistence = "skipped_incomplete";
+    } else if (canSaveSnapshot) {
       try {
         const { error: snapErr } = await supabase.from("client_business_snapshots").insert({
           client_id:          clientId,
@@ -864,7 +970,7 @@ export async function GET(request: NextRequest) {
           best_selling_items: metrics.produtos_mais_vendidos ?? [],
           best_days:          metrics.melhores_dias ?? [],
           opportunities:      [],
-          confidence_score:   metrics.total_pedidos > 0 ? 0.8 : 0.1,
+          confidence_score:   0.9,
         });
         if (!snapErr) {
           snapshotPersistence = "saved";
