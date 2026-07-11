@@ -964,7 +964,7 @@ export default function FaturamentoPage() {
             <Loader2 size={13} style={{ color: "var(--lk-accent)", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: "var(--lk-accent)", fontWeight: 500 }}>{syncPhase ?? "Sincronizando…"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
         </div>
@@ -1014,7 +1014,7 @@ export default function FaturamentoPage() {
           </div>
 
           {/* ── Tabs ─────────────────────────────────────────────────────── */}
-          <div style={{ display: "flex", borderBottom: "1px solid var(--lk-border)", marginBottom: 24, gap: 2 }}>
+          <div style={{ display: "flex", borderBottom: "1px solid var(--lk-border)", marginBottom: 24, gap: 2, overflowX: "auto" }}>
             {TABS.map(tab => (
               <button
                 key={tab.key}
@@ -1024,7 +1024,7 @@ export default function FaturamentoPage() {
                   color: activeTab === tab.key ? "var(--lk-accent)" : "var(--lk-muted)",
                   background: "transparent", border: "none", cursor: "pointer",
                   padding: "10px 14px", borderBottom: activeTab === tab.key ? `2px solid var(--lk-accent)` : "2px solid transparent",
-                  marginBottom: -1, transition: "color 0.15s",
+                  marginBottom: -1, transition: "color 0.15s", flexShrink: 0, whiteSpace: "nowrap",
                 }}
               >
                 {tab.label}
