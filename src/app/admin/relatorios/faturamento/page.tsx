@@ -1100,14 +1100,31 @@ export default function FaturamentoPage() {
         </div>
       )}
 
+      {/* ── Diagnóstico sem relatório ─────────────────────────────────────── */}
+      {activeTab === "diagnostics" && !report && (
+        <motion.div {...fadeUp} style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, padding: "18px 20px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <Info size={14} style={{ color: "var(--lk-muted)" }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)" }}>Contexto da sessão</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11, fontFamily: "'Space Mono', monospace", color: "var(--lk-muted)", lineHeight: 1.7 }}>
+            <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Cliente:</span> {selectedClient?.company_name ?? clientId.slice(0, 8) + "…"}</p>
+            <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Período:</span> {PERIODS.find(p => p.value === period)?.label ?? period}</p>
+            <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Conexão:</span> {loadingStatus ? "Verificando…" : isConnected ? (status?.connection?.provider ?? "Cardápio Digital") + " — " + (status?.connection?.connection_name ?? "—") : "Sem conexão ativa"}</p>
+            <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Context key:</span> {lastLoadedContextRef.current ? lastLoadedContextRef.current.slice(0, 24) + "…" : "—"}</p>
+            <p><span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Estado:</span> {loading ? (syncPhase ?? "Carregando…") : "Aguardando dados"}</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Empty state ────────────────────────────────────────────────────── */}
-      {!loading && !error && !report && isConnected && (
+      {!loading && !error && !report && isConnected && activeTab !== "diagnostics" && (
         <motion.div {...fadeUp} style={{ padding: "56px 24px", textAlign: "center", background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 18 }}>
           <ShoppingCart size={36} style={{ color: "var(--lk-border)", margin: "0 auto 12px" }} />
           <p style={{ fontSize: 14, fontWeight: 700, color: "var(--lk-text)", marginBottom: 6 }}>Nenhum dado carregado</p>
-          <p style={{ fontSize: 12, color: "var(--lk-muted)", marginBottom: 20 }}>Clique em &quot;Sincronizar&quot; para buscar os dados do período.</p>
+          <p style={{ fontSize: 12, color: "var(--lk-muted)", marginBottom: 20 }}>Clique em &quot;Atualizar dados&quot; para buscar os dados do período.</p>
           <button onClick={() => void loadReport()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--lk-accent)", background: "rgba(123,110,246,0.1)", border: "1px solid rgba(123,110,246,0.2)", borderRadius: 10, padding: "9px 18px", cursor: "pointer" }}>
-            <RefreshCw size={13} /> Sincronizar agora
+            <RefreshCw size={13} /> Atualizar agora
           </button>
         </motion.div>
       )}
@@ -1556,7 +1573,9 @@ export default function FaturamentoPage() {
 
                   {!report.heatmap && (!report.pedidosPorHora) && (
                     <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--lk-muted)", fontSize: 12 }}>
-                      Dados de horário não disponíveis para este período.
+                      <Clock size={28} style={{ color: "var(--lk-border)", margin: "0 auto 12px" }} />
+                      <p style={{ fontWeight: 600, marginBottom: 4 }}>Distribuição horária indisponível</p>
+                      <p style={{ fontSize: 11 }}>Pode ocorrer em períodos com poucos pedidos ou quando o provider não retornou informações de tempo detalhadas.</p>
                     </div>
                   )}
                 </div>
