@@ -8,6 +8,11 @@ export default function AdminProjetosPage() {
   return (
     <div>
       <PageHeader title="Projetos" description={`${mockProjects.length} projetos`} />
+      {/* Página legada com dados mockados. Não utilizar como fonte operacional da V1. */}
+      <div className="mb-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+        <p><strong>Dados demonstrativos.</strong> Esta página usa dados fictícios e não representa projetos reais. Os projetos audiovisuais operacionais estão em <strong>Audiovisual → /admin/recos</strong>.</p>
+      </div>
       <div className="space-y-3">
         {mockProjects.map((p) => (
           <div key={p.id} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer">
