@@ -468,25 +468,61 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Caminho 3: session insert direto via RLS policy (SQL 48/54)
+    // Funciona quando a policy "clients: admin/super_admin/equipe insere" está no banco.
+    // Não depende de service role nem de função RPC.
+    const sessionInsertBase: Record<string, unknown> = {
+      company_name:     body.company_name.trim(),
+      responsible_name: body.responsible_name?.trim() ?? null,
+      email:            body.email?.trim() ?? null,
+      phone:            body.phone?.trim() ?? null,
+      segment:          body.segment?.trim() ?? null,
+      status:           requestedStatus,
+    };
+
+    let sessionResult = await sessionDb
+      .from("clients")
+      .insert(sessionInsertBase)
+      .select("id, company_name, responsible_name, email, phone, segment, status")
+      .single();
+
+    if (sessionResult.error && isMissingColumnError(sessionResult.error)) {
+      sessionResult = await sessionDb
+        .from("clients")
+        .insert(sessionInsertBase)
+        .select("id, company_name, responsible_name, email, phone, segment, status")
+        .single();
+    }
+
+    if (!sessionResult.error && sessionResult.data) {
+      console.info("[api/admin/clients POST] criado via session insert (SQL 48/54 RLS)", { role });
+      return NextResponse.json(
+        { ...sessionResult.data, has_meta: false, has_instagram: false, has_diagnostico: false, has_brief: false, usedRpc: false, usedServiceRole: false },
+        { status: 201 }
+      );
+    }
+
     const rpcErr = rpcResult.error as SafeSupabaseError | null;
-    console.error("[api/admin/clients POST] criacao bloqueada — service role ausente e rpc falhou", {
+    const sessionErr = toSafeSupabaseError(sessionResult.error as SafeSupabaseError | null);
+    console.error("[api/admin/clients POST] todos os caminhos falharam", {
       role,
       account_type: accountType,
       rpcError: toSafeSupabaseError(rpcErr),
+      sessionError: sessionErr,
       serviceRoleConfigured,
     });
     return buildClientCreateError({
-      error: isRpcUnavailable(rpcErr)
-        ? `${RPC_MISSING_MESSAGE} Configure também SUPABASE_SERVICE_ROLE_KEY na Vercel para habilitar fallback.`
-        : clientWriteErrorMessage(rpcErr?.message, serviceRoleConfigured),
-      code: isRpcUnavailable(rpcErr) ? "ADMIN_CREATE_CLIENT_RPC_UNAVAILABLE" : "CLIENT_INSERT_FAILED",
-      step: "rpc_admin_create_client",
+      error: isRpcUnavailable(rpcErr) && isRlsError(sessionResult.error)
+        ? "Criação bloqueada por RLS e RPC indisponível. Rode o SQL 54 no Supabase SQL Editor."
+        : clientWriteErrorMessage(sessionErr?.message ?? rpcErr?.message, serviceRoleConfigured),
+      code: isRlsError(sessionResult.error) ? "CLIENT_RLS_BLOCKED" : "CLIENT_INSERT_FAILED",
+      step: "session_insert",
       role,
       accountType,
       serviceRoleConfigured,
       usedRpc: true,
       usedServiceRole: false,
-      supabaseError: toSafeSupabaseError(rpcErr),
+      supabaseError: sessionErr ?? toSafeSupabaseError(rpcErr),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : undefined;
