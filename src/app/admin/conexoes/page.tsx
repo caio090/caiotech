@@ -11,6 +11,7 @@ import {
   UtensilsCrossed, X, Eye, EyeOff, ShieldAlert, Lock, ChevronDown,
 } from "lucide-react";
 import { DigitalMenuConnectionModal } from "@/components/integrations/digital-menu-connection-modal";
+import { MetaClientAssetsModal } from "@/components/integrations/meta-client-assets-modal";
 
 // ── Tipos ──────────────────────────────────────────────────────
 type MetaStatusResponse = {
@@ -158,7 +159,14 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 // ── Tipos Cardápio Digital ──────────────────────────────────────
-type ClientOption = { id: string; company_name: string; email?: string | null };
+type ClientOption = {
+  id: string;
+  company_name: string;
+  email?: string | null;
+  meta_status?: "complete" | "partial" | "not_connected" | "unknown";
+  has_meta_page?: boolean;
+  has_instagram?: boolean;
+};
 
 // Representa uma conexão de provedor de Cardápio Digital.
 // Tabela: olaclick_connections (provider_slug = 'olaclick' por padrão).
@@ -702,6 +710,7 @@ function ConexoesContent() {
   const [linkError,     setLinkError]     = useState("");
   const [assetsSearch,  setAssetsSearch]  = useState("");
   const [assetsFilter,  setAssetsFilter]  = useState<"todos" | "complete" | "partial" | "not_connected" | "unknown">("todos");
+  const [metaHubClient, setMetaHubClient] = useState<{ id: string; company_name: string } | null>(null);
 
   // Carrega conexões OlaClick do banco no mount
   const loadOlaConnections = useCallback(async () => {
@@ -719,13 +728,15 @@ function ConexoesContent() {
 
   useEffect(() => { void loadOlaConnections(); }, [loadOlaConnections]);
 
-  // Carrega lista de clientes sempre no mount (usado no seletor de cliente e modais)
-  useEffect(() => {
+  // Carrega lista de clientes — usada no hub Meta e nos seletores
+  const refreshOlaClients = useCallback(() => {
     void fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((d: { clients?: ClientOption[] }) => setOlaClients(d.clients ?? []))
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => { refreshOlaClients(); }, [refreshOlaClients]);
 
   // ── Fetches ────────────────────────────────────────────────
   const checkAi = useCallback(async () => {
@@ -1125,20 +1136,20 @@ function ConexoesContent() {
                 </div>
               )}
 
-              {/* ── Ativos vinculados por cliente ── */}
-              {accountsTested && assets?.ok && (assets?.assets ?? []).some(a => a.link || a.instagram?.link) && (
+              {/* ── Hub: Status Meta por cliente ── */}
+              {accountsTested && (
                 <div className="mb-4">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ativos vinculados aos clientes</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status Meta por cliente</p>
                     <div className="flex-1" />
                     {/* Search */}
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="Buscar cliente no Meta…"
+                        placeholder="Buscar cliente, Página ou Instagram…"
                         value={assetsSearch}
                         onChange={(e) => setAssetsSearch(e.target.value)}
-                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 pr-6 focus:outline-none focus:border-indigo-400 w-44"
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 pr-6 focus:outline-none focus:border-indigo-400 w-56"
                       />
                       {assetsSearch && (
                         <button onClick={() => setAssetsSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
@@ -1146,85 +1157,135 @@ function ConexoesContent() {
                         </button>
                       )}
                     </div>
-                    {/* Filter chips */}
-                    {(["todos", "complete", "partial", "not_connected", "unknown"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setAssetsFilter(f)}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${assetsFilter === f ? "bg-indigo-600 text-white border-indigo-600" : "text-gray-500 border-gray-200 hover:border-indigo-300"}`}
-                      >
-                        {f === "todos" ? "Todos" : f === "complete" ? "Completos" : f === "partial" ? "Parciais" : f === "not_connected" ? "Não conectados" : "Indisponível"}
-                      </button>
-                    ))}
+                    {/* Filter chips with counts */}
+                    {(() => {
+                      const fbMap = new Map<string, string>();
+                      const igMap = new Map<string, { name: string | null; username: string | null }>();
+                      for (const asset of (assets?.assets ?? [])) {
+                        if (asset.link?.client_id) fbMap.set(asset.link.client_id, asset.name);
+                        if (asset.instagram?.link?.client_id) igMap.set(asset.instagram.link.client_id, { name: asset.instagram.name, username: asset.instagram.username });
+                      }
+                      const counts = { todos: olaClients.length, complete: 0, partial: 0, not_connected: 0, unknown: 0 };
+                      for (const c of olaClients) {
+                        const ms = c.meta_status ?? ((fbMap.has(c.id) && igMap.has(c.id)) ? "complete" : (fbMap.has(c.id) || igMap.has(c.id)) ? "partial" : "not_connected");
+                        if (ms === "complete") counts.complete++;
+                        else if (ms === "partial") counts.partial++;
+                        else if (ms === "unknown") counts.unknown++;
+                        else counts.not_connected++;
+                      }
+                      return (["todos", "complete", "partial", "not_connected", "unknown"] as const).map((f) => (
+                        <button key={f} onClick={() => setAssetsFilter(f)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${assetsFilter === f ? "bg-indigo-600 text-white border-indigo-600" : "text-gray-500 border-gray-200 hover:border-indigo-300"}`}
+                        >
+                          {f === "todos" ? "Todos" : f === "complete" ? "Completos" : f === "partial" ? "Parciais" : f === "not_connected" ? "Não conectados" : "Indisponível"}
+                          {" "}<span className={assetsFilter === f ? "opacity-80" : "opacity-60"}>{counts[f]}</span>
+                        </button>
+                      ));
+                    })()}
                   </div>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <table className="w-full text-xs">
+                  <div className="rounded-xl border border-gray-100 overflow-x-auto">
+                    <table className="w-full text-xs" style={{ minWidth: 640 }}>
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                           <th className="text-left px-3 py-2 text-gray-500 font-semibold">Cliente</th>
                           <th className="text-left px-3 py-2 text-gray-500 font-semibold">Página Facebook</th>
                           <th className="text-left px-3 py-2 text-gray-500 font-semibold">Instagram Business</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Conta de anúncio</th>
                           <th className="text-left px-3 py-2 text-gray-500 font-semibold">Status</th>
+                          <th className="text-left px-3 py-2 text-gray-500 font-semibold">Ação</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(() => {
-                          const rows: { clientId: string; clientName: string; fbPage: string | null; igAccount: string | null; igUsername: string | null }[] = [];
+                        {olaClients.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-4 text-center text-gray-400 text-xs">
+                              Nenhum cliente disponível.
+                            </td>
+                          </tr>
+                        ) : (() => {
+                          // Build enrichment maps from assets (enrich only, not source of truth)
+                          const fbMap = new Map<string, string>();
+                          const igMap = new Map<string, { name: string | null; username: string | null }>();
                           for (const asset of (assets?.assets ?? [])) {
-                            if (asset.link) {
-                              const existing = rows.find(r => r.clientId === asset.link!.client_id);
-                              const igAcc = asset.instagram?.link ? (asset.instagram.name ?? asset.instagram.username ?? "IG") : null;
-                              const igUser = asset.instagram?.link ? (asset.instagram.username ?? null) : null;
-                              if (existing) { existing.fbPage = asset.name; existing.igAccount = igAcc; existing.igUsername = igUser; }
-                              else rows.push({ clientId: asset.link.client_id, clientName: asset.link.client_name ?? asset.link.client_id.slice(0,8), fbPage: asset.name, igAccount: igAcc, igUsername: igUser });
-                            }
-                            if (asset.instagram?.link && !rows.some(r => r.clientId === asset.instagram!.link!.client_id)) {
-                              rows.push({ clientId: asset.instagram.link.client_id, clientName: asset.instagram.link.client_name ?? asset.instagram.link.client_id.slice(0,8), fbPage: null, igAccount: asset.instagram.name ?? asset.instagram.username ?? "IG", igUsername: asset.instagram.username ?? null });
-                            }
+                            if (asset.link?.client_id) fbMap.set(asset.link.client_id, asset.name);
+                            if (asset.instagram?.link?.client_id) igMap.set(asset.instagram.link.client_id, { name: asset.instagram.name, username: asset.instagram.username });
                           }
+                          // Full list from olaClients (source of truth)
+                          const allRows = olaClients.map(c => {
+                            const fb = fbMap.get(c.id) ?? null;
+                            const ig = igMap.get(c.id) ?? null;
+                            const ms: "complete" | "partial" | "not_connected" | "unknown" =
+                              c.meta_status ?? ((fb && ig) ? "complete" : (fb || ig) ? "partial" : "not_connected");
+                            return {
+                              clientId:   c.id,
+                              clientName: c.company_name,
+                              fbPage:     fb,
+                              igAccount:  ig ? (ig.name ?? ig.username ?? "IG") : null,
+                              igUsername: ig?.username ?? null,
+                              ms,
+                            };
+                          });
+                          // Filter
                           const q = assetsSearch.trim().toLowerCase();
-                          const filtered = rows.filter(row => {
+                          const filtered = allRows.filter(row => {
                             if (q) {
-                              const matchName = row.clientName.toLowerCase().includes(q);
-                              const matchFb   = (row.fbPage ?? "").toLowerCase().includes(q);
-                              const matchIg   = (row.igAccount ?? "").toLowerCase().includes(q);
-                              const matchUser = (row.igUsername ?? "").toLowerCase().includes(q.replace(/^@/, ""));
-                              if (!matchName && !matchFb && !matchIg && !matchUser) return false;
+                              const noQ = q.replace(/^@/, "");
+                              if (
+                                !row.clientName.toLowerCase().includes(q) &&
+                                !(row.fbPage ?? "").toLowerCase().includes(q) &&
+                                !(row.igAccount ?? "").toLowerCase().includes(q) &&
+                                !(row.igUsername ?? "").toLowerCase().includes(noQ)
+                              ) return false;
                             }
-                            const complete = !!row.fbPage && !!row.igAccount;
-                            const partial  = !!row.fbPage || !!row.igAccount;
-                            if (assetsFilter === "complete"      && !complete) return false;
-                            if (assetsFilter === "partial"       && !(partial && !complete)) return false;
-                            if (assetsFilter === "not_connected" && (partial || complete)) return false;
-                            if (assetsFilter === "unknown") return false; // rows always have at least one asset
+                            if (assetsFilter !== "todos" && row.ms !== assetsFilter) return false;
                             return true;
                           });
                           if (filtered.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 text-xs">
-                                  Nenhum cliente encontrado{q ? ` para "${q}"` : ""}.
+                                <td colSpan={6} className="px-3 py-4 text-center text-gray-400 text-xs">
+                                  Nenhum cliente encontrado{q ? ` para "${assetsSearch}"` : ""}.
                                 </td>
                               </tr>
                             );
                           }
-                          return filtered.map(row => {
-                            const complete = !!row.fbPage && !!row.igAccount;
-                            const partial  = !!row.fbPage || !!row.igAccount;
-                            return (
-                              <tr key={row.clientId} className="border-b border-gray-50 last:border-0">
-                                <td className="px-3 py-2 font-medium text-gray-800">{row.clientName}</td>
-                                <td className="px-3 py-2 text-gray-600">{row.fbPage ?? <span className="text-gray-300">—</span>}</td>
-                                <td className="px-3 py-2 text-gray-600">{row.igAccount ?? <span className="text-gray-300">—</span>}</td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${complete ? "text-emerald-700 bg-emerald-50 border-emerald-100" : partial ? "text-amber-700 bg-amber-50 border-amber-100" : "text-gray-400 bg-gray-50 border-gray-100"}`}>
-                                    {complete ? <CheckCircle2 className="w-3 h-3" /> : partial ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                    {complete ? "Completo" : partial ? "Parcial" : "Não configurado"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          });
+                          return filtered.map(row => (
+                            <tr key={row.clientId} className="border-b border-gray-50 last:border-0">
+                              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.clientName}</td>
+                              <td className="px-3 py-2 text-gray-600">{row.fbPage ?? <span className="text-gray-300">—</span>}</td>
+                              <td className="px-3 py-2 text-gray-600">
+                                {row.igAccount
+                                  ? <span>{row.igUsername ? `@${row.igUsername}` : row.igAccount}</span>
+                                  : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-3 py-2 text-gray-400 text-[10px] whitespace-nowrap">Indisponível nesta versão</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                  row.ms === "complete"      ? "text-emerald-700 bg-emerald-50 border-emerald-100"
+                                  : row.ms === "partial"     ? "text-amber-700 bg-amber-50 border-amber-100"
+                                  : row.ms === "unknown"     ? "text-gray-400 bg-gray-50 border-gray-100"
+                                  : "text-gray-400 bg-gray-50 border-gray-100"
+                                }`}>
+                                  {row.ms === "complete" ? <CheckCircle2 className="w-3 h-3" />
+                                    : row.ms === "partial" ? <AlertCircle className="w-3 h-3" />
+                                    : <Clock className="w-3 h-3" />}
+                                  {row.ms === "complete" ? "Completo" : row.ms === "partial" ? "Parcial" : row.ms === "unknown" ? "Indisponível" : "Não conectado"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  onClick={() => setMetaHubClient({ id: row.clientId, company_name: row.clientName })}
+                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition-colors ${
+                                    row.ms === "complete" ? "text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600"
+                                    : row.ms === "partial" ? "text-amber-700 border-amber-200 hover:bg-amber-50"
+                                    : "text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                  }`}
+                                >
+                                  {row.ms === "complete" ? "Gerenciar" : row.ms === "partial" ? "Completar" : "Vincular"}
+                                </button>
+                              </td>
+                            </tr>
+                          ));
                         })()}
                       </tbody>
                     </table>
@@ -1972,6 +2033,20 @@ function ConexoesContent() {
           conn={editingConn}
           onClose={() => setEditingConn(null)}
           onSaved={() => { setEditingConn(null); void loadOlaConnections(); }}
+        />
+      )}
+
+      {/* Modal vincular ativos Meta ao cliente */}
+      {metaHubClient && (
+        <MetaClientAssetsModal
+          clientId={metaHubClient.id}
+          clientName={metaHubClient.company_name}
+          onClose={() => setMetaHubClient(null)}
+          onSaved={() => {
+            setMetaHubClient(null);
+            refreshOlaClients();
+            void checkMeta();
+          }}
         />
       )}
     </div>
