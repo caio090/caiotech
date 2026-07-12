@@ -123,14 +123,10 @@ function NewClientModal({ onSave, onCancel, loading, error }: {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Status inicial</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
-            >
-              <option value="onboarding">Onboarding</option>
-              <option value="active">Ativo</option>
-            </select>
+            <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 text-gray-500 select-none">
+              Onboarding
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">Clientes novos entram em onboarding até concluírem as configurações iniciais.</p>
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-700">
             Depois de criar o cliente, use o botao de convite no card para gerar o link de acesso.
@@ -209,8 +205,8 @@ function Badge({ label, color }: { label: string; color: string }) {
 function ClientBadges({ c }: { c: Client }) {
   return (
     <div className="flex flex-wrap gap-1 mt-1.5">
-      {c.status === "active"     && <Badge label="Ativo"          color="text-emerald-700 bg-emerald-50" />}
-      {c.status === "onboarding" && <Badge label="Onboarding"     color="text-blue-700 bg-blue-50" />}
+      {(c.status === "active" || c.status === "ativo") && <Badge label="Ativo"      color="text-emerald-700 bg-emerald-50" />}
+      {c.status === "onboarding" && <Badge label="Onboarding" color="text-blue-700 bg-blue-50" />}
       {!c.has_brief              && <Badge label="Brief pendente" color="text-amber-700 bg-amber-50" />}
     </div>
   );

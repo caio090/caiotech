@@ -1,4 +1,7 @@
-export const CLIENT_VISIBLE_STATUSES = ["active", "onboarding"];
+// "ativo" is the Portuguese form stored by older DB rows (pre-SQL-54 migration path).
+// "active" is the normalised English form used by the app layer.
+// Both are visible; the API normalises "ativo" → "active" on read.
+export const CLIENT_VISIBLE_STATUSES = ["active", "onboarding", "ativo"];
 
 export const CLIENT_INVISIBLE_STATUSES = [
   "inactive",

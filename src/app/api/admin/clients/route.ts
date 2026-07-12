@@ -283,8 +283,11 @@ export async function GET() {
         : (hasFbPage && hasIg) ? "complete"
         : (hasFbPage || hasIg) ? "partial"
         : "not_connected";
+      // Normalise DB-stored "ativo" (Portuguese, constraint-allowed) to "active" for the app layer.
+      const normalisedStatus = c.status === "ativo" ? "active" : c.status;
       return {
         ...c,
+        status:          normalisedStatus,
         has_meta:        hasFbPage,
         has_meta_page:   hasFbPage,
         has_instagram:   hasIg,
@@ -363,7 +366,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
     }
 
-    const requestedStatus = ["active", "onboarding"].includes(body.status ?? "") ? body.status : "onboarding";
+    // V1 rule: new clients always start in onboarding.
+    // "active"/"ativo" are not valid creation statuses — they require onboarding first.
+    const requestedStatus = "onboarding";
     const serviceRoleConfigured = hasSupabaseServiceRoleKey();
 
     console.info("[api/admin/clients POST] tentativa de criar cliente", {

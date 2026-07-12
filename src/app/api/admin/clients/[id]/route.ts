@@ -78,6 +78,8 @@ export async function PATCH(
     const update = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k))
     );
+    // Normalise app-layer "active" → DB-layer "ativo" (constraint: clients_status_check).
+    if (update.status === "active") update.status = "ativo";
 
     const { data: profile } = await supabase
       .from("profiles")
