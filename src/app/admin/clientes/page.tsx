@@ -157,6 +157,8 @@ interface Client {
   has_diagnostico?: boolean;
   has_brief?: boolean;
   has_olaclick?: boolean;
+  meta_status?: "complete" | "partial" | "not_connected" | "unknown";
+  olaclick_status?: "connected" | "not_connected" | "unknown";
 }
 
 type DeleteMode = "archive" | "hard";
@@ -680,33 +682,45 @@ function EditModal({
 // ── Integrações por cliente ────────────────────────────────────
 // Meta e Instagram: derivados de client_meta_assets (per-client quando SQL 37 rodado).
 // Quando falso, pode ser "não configurado" (SQL 37 não rodado) ou de fato não conectado.
-// Brief e Diagnóstico: per-client real via client_context e onboarding_profiles.
 function ClientIntegrationsRow({ c }: { c: Client }) {
   const s = INTEGRATION_STATUS;
-  const metaInstagramItems = [
-    { label: "Meta",      ok: !!c.has_meta,      tipOn: "Meta: Página vinculada a este cliente", tipOff: "Meta: Nenhuma Página vinculada — configure em Conexões" },
-    { label: "Instagram", ok: !!c.has_instagram, tipOn: "Instagram: conta Business vinculada",   tipOff: "Instagram: Nenhuma conta vinculada — configure em Conexões" },
-    { label: "Cardápio Digital", ok: !!c.has_olaclick, tipOn: "Cardápio Digital: conexão OlaClick ativa", tipOff: "Cardápio Digital: sem conexão OlaClick" },
-  ];
+
+  // Meta — unified status
+  const ms = c.meta_status ?? (
+    !!c.has_meta && !!c.has_instagram ? "complete"
+    : (!!c.has_meta || !!c.has_instagram) ? "partial"
+    : "not_connected"
+  );
+  const metaBadge   = ms === "complete" ? "Completo" : ms === "partial" ? "Parcial" : ms === "unknown" ? "Status indisponível" : "Não conectado";
+  const metaTip     = ms === "complete" ? "Meta: Página Facebook + Instagram Business vinculados"
+                    : ms === "partial"  ? "Meta: vínculo parcial — configure em Conexões"
+                    : ms === "unknown"  ? "Meta: não foi possível verificar o status"
+                    : "Meta: sem vínculo — configure em Conexões";
+  const metaColor   = ms === "complete" ? s.connected.color
+                    : ms === "partial"  ? "text-amber-700 bg-amber-50 border-amber-100"
+                    : s.needs_setup.color;
+
+  // Cardápio Digital
+  const olaOk = !!c.has_olaclick;
+  const olaBadge = olaOk ? "Conectado" : c.olaclick_status === "unknown" ? "Status indisponível" : "Não configurado";
+  const olaColor = olaOk ? s.connected.color : c.olaclick_status === "unknown" ? "text-gray-400 bg-gray-50 border-gray-100" : s.needs_setup.color;
+  const olaTip   = olaOk ? "Cardápio Digital: conexão OlaClick ativa" : "Cardápio Digital: sem conexão OlaClick";
+
   const perClientItems: { label: string; ok: boolean }[] = [
     { label: "Brief",       ok: !!c.has_brief       },
     { label: "Diagnóstico", ok: !!c.has_diagnostico },
   ];
+
   return (
     <div className="pt-2 border-t border-gray-50 mt-2">
       <p className="text-[9px] text-gray-300 mb-1.5">Conexões identificadas para este cliente</p>
       <div className="flex flex-wrap gap-1.5">
-        {metaInstagramItems.map(({ label, ok, tipOn, tipOff }) => (
-          <span
-            key={label}
-            title={ok ? tipOn : tipOff}
-            className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
-              ok ? s.connected.color : s.needs_setup.color
-            }`}
-          >
-            {label}&nbsp;·&nbsp;{ok ? "Conectado" : "Não configurado"}
-          </span>
-        ))}
+        <span title={metaTip} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${metaColor}`}>
+          Meta&nbsp;·&nbsp;{metaBadge}
+        </span>
+        <span title={olaTip} className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${olaColor}`}>
+          Cardápio Digital&nbsp;·&nbsp;{olaBadge}
+        </span>
         {perClientItems.map(({ label, ok }) => {
           const cfg = ok ? s.connected : s.not_connected;
           const tip = ok ? `${label}: ok` : `${label}: pendente`;
@@ -795,20 +809,20 @@ function ClientCard({
           <button
             onClick={() => onConnectMeta(c)}
             className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors ${
-              (c.has_meta && c.has_instagram)
+              c.meta_status === "complete"
                 ? "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
-                : c.has_meta || c.has_instagram
+                : c.meta_status === "partial"
                   ? "text-amber-600 hover:text-amber-800 hover:bg-amber-50"
                   : "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
             }`}
             title={
-              (c.has_meta && c.has_instagram) ? "Gerenciar vínculo Meta"
-              : (c.has_meta || c.has_instagram) ? "Completar vínculo Meta"
+              c.meta_status === "complete" ? "Gerenciar vínculo Meta"
+              : c.meta_status === "partial" ? "Completar vínculo Meta"
               : "Vincular Meta"
             }
           >
             <AtSign className="w-3.5 h-3.5" />
-            {(c.has_meta && c.has_instagram) ? "Meta" : (c.has_meta || c.has_instagram) ? "Completar" : "Meta"}
+            {c.meta_status === "complete" ? "Meta" : c.meta_status === "partial" ? "Completar" : "Meta"}
           </button>
           {isAdmin && (
             <>
@@ -950,8 +964,8 @@ export default function AdminClientesPage() {
       if (statusFilter === "operacionais" && !isClientVisible(c.status)) return false;
       if (statusFilter === "onboarding" && c.status !== "onboarding") return false;
       if (segFilter && c.segment !== segFilter) return false;
-      if (metaFilter === "connected"     && !c.has_meta) return false;
-      if (metaFilter === "not_connected" && c.has_meta)  return false;
+      if (metaFilter === "connected"     && c.meta_status !== "complete" && c.meta_status !== "partial" && !(c.has_meta || c.has_instagram)) return false;
+      if (metaFilter === "not_connected" && (c.meta_status === "complete" || c.meta_status === "partial" || c.has_meta || c.has_instagram)) return false;
       if (diagFilter === "ok"      && !c.has_diagnostico) return false;
       if (diagFilter === "pending" && c.has_diagnostico)  return false;
       const q = search.trim().toLowerCase();
