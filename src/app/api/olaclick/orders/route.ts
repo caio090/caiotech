@@ -18,7 +18,9 @@ const MIN_RATE_LIMIT_REMAINING = 5;
 const MAX_WINDOW_DEPTH         = 12;
 const MIN_WINDOW_MINUTES       = 15;
 const CACHE_TTL_MS             = 5 * 60 * 1000;
-const MAX_EXECUTION_MS         = 55_000;
+const STALE_TTL_MS             = 24 * 60 * 60 * 1000;
+const ROUTE_DEADLINE_MS        = 48_000;
+const PAGE_TIMEOUT_MS          = 8_000;
 const RETRY_TRANSIENT          = new Set([408, 429, 500, 502, 503, 504]);
 export const DEFAULT_PAGE_SIZE = 50;
 
@@ -144,6 +146,7 @@ export interface WindowFetchDiagnostics {
   dailyDiagnostics:         DailyCollectionResult[];
   completeDays:             number;
   partialDays:              number;
+  circuitBreakerTriggered:  boolean;
 }
 
 interface PageFetchResult {
@@ -183,7 +186,9 @@ function classifyProviderError(httpStatus: number): { code: string; reason: stri
   if (httpStatus === 404) return { code: "provider_endpoint_not_found", reason: "endpoint_not_found", message: "Endpoint de pedidos não encontrado. Verifique o adapter OlaClick." };
   if (httpStatus === 422 || httpStatus === 400) return { code: "provider_bad_request", reason: "bad_params", message: "A API recusou os filtros do período." };
   if (httpStatus === 429) return { code: "provider_rate_limited",       reason: "rate_limited",       message: "Limite de requisições atingido. Tente novamente em alguns minutos." };
-  if (httpStatus >= 500)  return { code: "provider_server_error",       reason: "provider_error",     message: `Erro interno do provedor (HTTP ${httpStatus}). Tente novamente em instantes.` };
+  if (httpStatus === 503) return { code: "provider_unavailable",        reason: "provider_503",       message: "A OlaClick está temporariamente indisponível. Tente novamente em alguns instantes." };
+  if (httpStatus === 502 || httpStatus === 504) return { code: "provider_unavailable", reason: `provider_${httpStatus}` as string, message: "A OlaClick está temporariamente indisponível. Tente novamente em alguns instantes." };
+  if (httpStatus >= 500)  return { code: "provider_server_error",       reason: "provider_error",     message: "A OlaClick apresentou um erro interno. Tente novamente em instantes." };
   return { code: "provider_api_error", reason: "unknown", message: `Erro ao consultar API do provedor (HTTP ${httpStatus}).` };
 }
 
@@ -691,7 +696,7 @@ async function fetchOnePage(
     response = await fetch(url.toString(), {
       headers: buildOlaClickHeaders(token, authMode),
       cache: "no-store",
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
     });
   } catch {
     return empty;
@@ -750,8 +755,8 @@ async function fetchOnePageWithRetry(
   if (r1.httpStatus !== null && !RETRY_TRANSIENT.has(r1.httpStatus)) {
     return { ...r1, attemptCount: 1 };
   }
-  // No retry if not enough time remains (need at least 3s for the retry round-trip)
-  if (Date.now() + 3000 >= execDeadline) return { ...r1, attemptCount: 1 };
+  // No retry if not enough time remains (need at least 12s: backoff + page timeout + buffer)
+  if (Date.now() + 12_000 >= execDeadline) return { ...r1, attemptCount: 1 };
 
   let delayMs = 300 + Math.random() * 200;
   if (r1.httpStatus === 429) {
@@ -779,8 +784,18 @@ function getCache(key: string): CacheEntry | null {
   if (!store) return null;
   const entry = store.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL_MS) { store.delete(key); return null; }
+  // Don't delete — keep for stale fallback. Only return null if outside fresh window.
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null;
   return entry;
+}
+
+function getStaleCache(key: string): CacheEntry | null {
+  const store = (globalThis as Record<string, unknown>)["__olaclick_cache"] as Map<string, CacheEntry> | undefined;
+  if (!store) return null;
+  const entry = store.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > STALE_TTL_MS) { store.delete(key); return null; }
+  return entry; // may be older than CACHE_TTL_MS — caller treats as stale
 }
 
 function setCache(key: string, data: unknown): void {
@@ -790,9 +805,9 @@ function setCache(key: string, data: unknown): void {
     (globalThis as Record<string, unknown>)["__olaclick_cache"] = store;
   }
   store.set(key, { data, timestamp: Date.now() });
-  // Evict entries older than TTL to avoid unbounded growth
+  // Evict entries older than STALE_TTL_MS (24h) to avoid unbounded growth
   for (const [k, v] of store.entries()) {
-    if (Date.now() - v.timestamp > CACHE_TTL_MS) store.delete(k);
+    if (Date.now() - v.timestamp > STALE_TTL_MS) store.delete(k);
   }
 }
 
@@ -886,6 +901,7 @@ interface WindowingResult {
   providerReportedTotal:    number | null;
   dailyDiagnostics:         DailyCollectionResult[];
   debugShape:               DebugShape | null;
+  circuitBreakerTriggered:  boolean;
 }
 
 function addOrdersToMap(
@@ -931,6 +947,8 @@ async function fetchOrdersByWindowing(
   let providerTotalScope: ProviderTotalScope = "unknown";
   let providerReportedTotal: number | null   = initialTotal;
   let debugShape: DebugShape | null          = null;
+  let consecutiveProviderFails = 0;
+  let circuitBreakerTriggered  = false;
   const dailyDiagnostics: DailyCollectionResult[] = [];
 
   // ── Step 1: Probe datetime precision ──────────────────────────────────────
@@ -1070,8 +1088,11 @@ async function fetchOrdersByWindowing(
         failedWindows++;
         dayDiag.failedPages++;
         dailyDiagnostics.push(dayDiag);
+        consecutiveProviderFails++;
+        if (consecutiveProviderFails >= 2) { circuitBreakerTriggered = true; break; }
         continue;
       }
+      consecutiveProviderFails = 0;
 
       if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining < MIN_RATE_LIMIT_REMAINING) {
         addOrdersToMap(r1.orders, orderMap, counters);
@@ -1208,6 +1229,7 @@ async function fetchOrdersByWindowing(
     providerReportedTotal,
     debugShape,
     dailyDiagnostics,
+    circuitBreakerTriggered,
   };
 }
 
@@ -1217,11 +1239,12 @@ const MAX_PAGES  = 150;
 const MAX_ORDERS = 10_000;
 
 async function fetchWithPagination(
-  baseUrl:  string,
-  token:    string,
-  authMode: AuthMode,
-  start:    string,
-  end:      string,
+  baseUrl:      string,
+  token:        string,
+  authMode:     AuthMode,
+  start:        string,
+  end:          string,
+  execDeadline: number,
 ): Promise<
   | { ok: true;  orders: Record<string, unknown>[]; pagination: PaginationInfo; debugShape: DebugShape; rateLimitInfo: RateLimitInfo }
   | { ok: false; code: string; reason: string; message: string; httpStatus: number | null; providerErrorMessage: string | null }
@@ -1246,6 +1269,7 @@ async function fetchWithPagination(
   let lastProviderCurrentPage: number | null = null;
 
   while (currentPage <= MAX_PAGES && orderMap.size < MAX_ORDERS) {
+    if (Date.now() >= execDeadline) { hasMore = true; break; }
     const url = new URL(`${baseUrl}/v1/orders`);
     url.searchParams.set("filter[start_date]", start);
     url.searchParams.set("filter[end_date]",   end);
@@ -1258,7 +1282,7 @@ async function fetchWithPagination(
       response = await fetch(url.toString(), {
         headers: buildOlaClickHeaders(token, authMode),
         cache: "no-store",
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown";
@@ -1439,7 +1463,7 @@ async function fetchAllOrders(
   const authMode = await probeAuthMode(baseUrl, token, start, end);
 
   // ── Phase 1: Try standard pagination ──────────────────────────────────────
-  const pagResult = await fetchWithPagination(baseUrl, token, authMode, start, end);
+  const pagResult = await fetchWithPagination(baseUrl, token, authMode, start, end, execDeadline);
 
   if (!pagResult.ok) {
     return pagResult;
@@ -1535,12 +1559,13 @@ async function fetchAllOrders(
     duplicateCount:           wResult.duplicateCount,
     missingIdCount:           wResult.missingIdCount,
     rateLimitStopped:         wResult.rateLimitStopped,
-    executionMs:              Date.now() - (execDeadline - MAX_EXECUTION_MS),
+    executionMs:              Date.now() - (execDeadline - ROUTE_DEADLINE_MS),
     paginationFallbackReason,
     authMode,
     dailyDiagnostics:         wResult.dailyDiagnostics,
     completeDays,
     partialDays,
+    circuitBreakerTriggered:  wResult.circuitBreakerTriggered,
   };
 
   return {
@@ -1809,48 +1834,90 @@ export async function GET(request: NextRequest) {
       inflight.set(cacheKey, p);
     }
 
+    // helper: resolve or reject the in-flight promise and remove from map
+    const cleanInflight = (body: Record<string, unknown>) => {
+      if (inflightResolve) { inflightResolve(body); inflight.delete(cacheKey); }
+      else if (inflightReject) { inflightReject(new Error("early_return")); inflight.delete(cacheKey); }
+    };
+
     const lookup = await getActiveDigitalMenuConnection(supabase, clientId);
-    if (lookup.error?.code === "42P01") return NextResponse.json({ ok: false, reason: "sql_pending" });
+    if (lookup.error?.code === "42P01") {
+      const b = { ok: false as const, reason: "sql_pending" };
+      cleanInflight(b as Record<string, unknown>);
+      return NextResponse.json(b);
+    }
     if (!lookup.found) {
-      return NextResponse.json({
-        ok: false, reason: "not_connected", code: "no_digital_menu_connection",
+      const b = {
+        ok: false as const, reason: "not_connected", code: "no_digital_menu_connection",
         connectionFound: false, message: "Cliente sem conexão Cardápio Digital ativa.",
         stage: "lookup",
         supabaseErrorCode:    lookup.error?.code    ?? null,
         supabaseErrorMessage: lookup.error?.message ?? null,
-      });
+      };
+      cleanInflight(b as Record<string, unknown>);
+      return NextResponse.json(b);
     }
 
     const conn    = lookup.connection;
     const baseUrl = resolveOlaClickBaseUrl({ api_base_url: conn.api_base_url });
 
     if (!baseUrl) {
-      return NextResponse.json({
-        ok: false, reason: "base_url_missing", code: "missing_provider_base_url",
+      const b = {
+        ok: false as const, reason: "base_url_missing", code: "missing_provider_base_url",
         connectionFound: true, provider: conn.provider, baseUrlResolved: false, endpoint: ENDPOINT,
         message: "Conexão Cardápio Digital encontrada. Falta configurar a URL da API do provedor.",
         stage: "resolve_base_url",
-      });
+      };
+      cleanInflight(b as Record<string, unknown>);
+      return NextResponse.json(b);
     }
 
     const safeToken = sanitizeHeaderValue(conn.access_token);
     if (!isValidHeaderValue(safeToken)) {
-      return NextResponse.json({
-        ok: false, reason: "token_has_invalid_characters", code: "invalid_header_value",
-        connectionFound: true, provider: conn.provider, baseUrlResolved: true, endpoint: ENDPOINT, httpStatus: null,
+      const b = {
+        ok: false as const, reason: "token_has_invalid_characters", code: "invalid_header_value",
+        connectionFound: true, provider: conn.provider, baseUrlResolved: true, endpoint: ENDPOINT, httpStatus: null as null,
         message: "A chave do provider contém caracteres inválidos para envio no header. Atualize o token/API Key da conexão em Gerenciar.",
         stage: "sanitize_token",
-      });
+      };
+      cleanInflight(b as Record<string, unknown>);
+      return NextResponse.json(b);
     }
 
     const requestStart       = Date.now();
-    const execDeadline       = requestStart + MAX_EXECUTION_MS;
+    const execDeadline       = requestStart + ROUTE_DEADLINE_MS;
     const providerFetchStart = requestStart;
     const fetchResult        = await fetchAllOrders(baseUrl, safeToken, start, end, execDeadline);
     const providerFetchMs    = Date.now() - providerFetchStart;
 
     if (!fetchResult.ok) {
-      return NextResponse.json({
+      // Try stale cache before returning an error — prevents blank screen on provider instability
+      const staleEntry = getStaleCache(cacheKey);
+      if (staleEntry) {
+        const staleAgeMs = Date.now() - staleEntry.timestamp;
+        const staleBody: Record<string, unknown> = {
+          ...(staleEntry.data as Record<string, unknown>),
+          ok:               true,
+          stale:            true,
+          staleFallbackUsed: true,
+          staleAgeMs,
+          cacheHit:         true,
+          providerWarning: {
+            code:    fetchResult.code ?? "provider_temporarily_unavailable",
+            message: "A OlaClick apresentou instabilidade. Exibindo a última atualização disponível.",
+          },
+          routeDiag: {
+            routeDeadlineMs: ROUTE_DEADLINE_MS,
+            routeElapsedMs:  Date.now() - requestStart,
+            staleFallbackUsed: true,
+            staleAgeMs,
+          },
+        };
+        cleanInflight(staleBody);
+        return NextResponse.json(staleBody, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "Server-Timing": "cache;dur=0" } });
+      }
+
+      const errBody: Record<string, unknown> = {
         ok: false,
         code:     fetchResult.code,
         reason:   fetchResult.reason,
@@ -1862,7 +1929,9 @@ export async function GET(request: NextRequest) {
         httpStatus:           fetchResult.httpStatus,
         providerErrorMessage: fetchResult.providerErrorMessage,
         stage: "provider_api_call",
-      });
+      };
+      cleanInflight(errBody);
+      return NextResponse.json(errBody);
     }
 
     const { orders, pagination, debugShape, rateLimitInfo, windowDiag } = fetchResult;
@@ -1971,6 +2040,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const routeElapsedMs = Date.now() - requestStart;
+    const routeDeadlineReached = routeElapsedMs >= ROUTE_DEADLINE_MS;
+
     const responseBody = {
       ok:           true,
       period:       periodLabel,
@@ -1994,6 +2066,8 @@ export async function GET(request: NextRequest) {
       detailStats,
       windowDiag,
       cacheHit: false,
+      stale: false,
+      staleFallbackUsed: false,
       timings: {
         providerFetchMs,
         aggregationMs,
@@ -2002,6 +2076,14 @@ export async function GET(request: NextRequest) {
         daysFetched:     windowDiag?.dailyFallbackUsed ? windowDiag.totalWindows : null,
         cacheSource:     "none" as const,
         fallbackUsed:    windowDiag?.dailyFallbackUsed ?? false,
+      },
+      routeDiag: {
+        routeDeadlineMs:         ROUTE_DEADLINE_MS,
+        routeElapsedMs:          routeElapsedMs,
+        deadlineReached:         routeDeadlineReached,
+        circuitBreakerTriggered: windowDiag?.circuitBreakerTriggered ?? false,
+        staleFallbackUsed:       false,
+        staleAgeMs:              null as number | null,
       },
       topProductsEndpoint: topProductsResult
         ? { used: topProductsResult.ok, providerEndpoint: topProductsResult.providerEndpoint, reason: topProductsResult.reason, message: topProductsResult.message }
@@ -2044,6 +2126,7 @@ export async function GET(request: NextRequest) {
     inflight.delete(cacheKey);
 
     const serverTiming = [
+      `cache;dur=0`,
       `olaclick;dur=${providerFetchMs}`,
       `aggregation;dur=${aggregationMs}`,
       `total;dur=${Date.now() - requestStart}`,
