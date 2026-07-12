@@ -43,10 +43,11 @@ const NEW_CLIENT_SEGMENTS = [
   "Outro",
 ];
 
-function NewClientModal({ onSave, onCancel, loading }: {
+function NewClientModal({ onSave, onCancel, loading, error }: {
   onSave: (data: NewClientForm) => void;
   onCancel: () => void;
   loading: boolean;
+  error?: string | null;
 }) {
   const [form, setForm] = useState<NewClientForm>({
     company_name: "", responsible_name: "", email: "",
@@ -63,6 +64,12 @@ function NewClientModal({ onSave, onCancel, loading }: {
           </div>
           <p className="text-sm font-bold text-gray-900">Novo cliente</p>
         </div>
+        {error && (
+          <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-500" />
+            <span>{error}</span>
+          </div>
+        )}
         <div className="space-y-3 mb-5">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Nome da empresa <span className="text-red-500">*</span></label>
@@ -135,7 +142,7 @@ function NewClientModal({ onSave, onCancel, loading }: {
           </button>
           <button onClick={() => onSave(form)} disabled={!valid || loading} className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Criar cliente
+            {loading ? "Criando..." : "Criar cliente"}
           </button>
         </div>
       </div>
@@ -897,6 +904,7 @@ export default function AdminClientesPage() {
   const [userRole,      setUserRole]      = useState("");
   const [userPlan,      setUserPlan]      = useState<string | null>(null);
   const [actionMsg,     setActionMsg]     = useState<string | null>(null);
+  const [createError,   setCreateError]   = useState<string | null>(null);
   const [search,        setSearch]        = useState("");
   const [statusFilter,  setStatusFilter]  = useState<StatusFilter>("todos");
   const [segFilter,     setSegFilter]     = useState("");
@@ -995,6 +1003,7 @@ export default function AdminClientesPage() {
 
   const handleCreateClient = async (data: NewClientForm) => {
     setActionLoading(true);
+    setCreateError(null);
     try {
       const res = await fetch("/api/admin/clients", {
         method: "POST",
@@ -1004,30 +1013,26 @@ export default function AdminClientesPage() {
       if (res.ok) {
         const created = await res.json() as Client;
         setClients((prev) => [created, ...prev]);
-        flash(`Cliente "${created.company_name}" criado com sucesso.`);
         setCreatingClient(false);
+        setCreateError(null);
+        flash(`Cliente "${created.company_name}" criado com sucesso.`);
       } else {
         const err = await res.json().catch(() => ({})) as CreateClientApiError;
         let message = err.error ?? "Erro ao criar cliente.";
         if (err.code === "MISSING_SERVICE_ROLE" || err.code === "missing_service_role") {
-          message = "Configuracao do servidor ausente. Verifique SUPABASE_SERVICE_ROLE_KEY na Vercel.";
+          message = "Configuração do servidor ausente. Contate o suporte técnico (SUPABASE_SERVICE_ROLE_KEY).";
         } else if (err.code === "ADMIN_CREATE_CLIENT_RPC_UNAVAILABLE") {
-          message = err.error ?? "Rode docs/supabase/51-admin-create-client-bypass.sql no Supabase.";
+          message = "Função de criação indisponível no banco. Contate o suporte técnico (SQL 51).";
         } else if (err.code === "CLIENT_RLS_BLOCKED") {
-          message = "Nao foi possivel criar o cliente por RLS no passo server-side. Confira SQL 51 e service role.";
+          message = "Acesso bloqueado pela segurança do banco. Contate o suporte técnico (RLS/SQL 51).";
         } else if (err.code === "CLIENT_INSERT_FAILED") {
-          message = err.error ?? "Nao foi possivel criar o cliente. Verifique os campos obrigatorios ou o schema da tabela clients.";
+          message = err.error ?? "Não foi possível criar o cliente. Verifique os campos obrigatórios.";
         }
         const technical = err.supabaseMessage ?? err.supabaseError?.message;
-        if (technical) {
-          message += ` Detalhe tecnico: ${technical}`;
-        }
-        if (err.step) {
-          message += ` Step: ${err.step}.`;
-        }
-        flash(message);
+        if (technical) message += ` (${technical})`;
+        setCreateError(message);
       }
-    } catch { flash("Erro de conexão."); }
+    } catch { setCreateError("Erro de conexão. Verifique sua internet e tente novamente."); }
     finally { setActionLoading(false); }
   };
 
@@ -1406,7 +1411,7 @@ export default function AdminClientesPage() {
         </div>
       )}
 
-      {creatingClient && <NewClientModal onSave={handleCreateClient} onCancel={() => setCreatingClient(false)} loading={actionLoading} />}
+      {creatingClient && <NewClientModal onSave={handleCreateClient} onCancel={() => { setCreatingClient(false); setCreateError(null); }} loading={actionLoading} error={createError} />}
       {invitingClient && <InviteModal client={invitingClient} onClose={() => setInvitingClient(null)} />}
       {editingClient  && <EditModal  client={editingClient}  onSave={handleSaveEdit} onCancel={() => setEditingClient(null)}  loading={actionLoading} />}
       {cleanupOpen && (
