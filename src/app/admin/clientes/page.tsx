@@ -122,11 +122,28 @@ function NewClientModal({ onSave, onCancel, loading, error }: {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Status inicial</label>
-            <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 text-gray-500 select-none">
-              Onboarding
+            <label className="block text-xs font-semibold text-gray-700 mb-2">Status inicial</label>
+            <div className="space-y-2">
+              {([
+                { value: "aguardando_validacao", label: "Prospect", desc: "Empresa em negociação ou aguardando validação comercial." },
+                { value: "onboarding",           label: "Onboarding", desc: "Cliente contratado em fase de implantação." },
+              ] as const).map((opt) => (
+                <label key={opt.value} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${form.status === opt.value ? "border-indigo-300 bg-indigo-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <input
+                    type="radio"
+                    name="initial_status"
+                    value={opt.value}
+                    checked={form.status === opt.value}
+                    onChange={() => setForm((f) => ({ ...f, status: opt.value }))}
+                    className="mt-0.5 accent-indigo-600 flex-shrink-0"
+                  />
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{opt.label}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
             </div>
-            <p className="mt-1 text-[11px] text-gray-400">Clientes novos entram em onboarding até concluírem as configurações iniciais.</p>
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-700">
             Depois de criar o cliente, use o botao de convite no card para gerar o link de acesso.
@@ -191,7 +208,7 @@ interface CreateClientApiError {
   } | null;
 }
 
-type StatusFilter = "todos" | "operacionais" | "onboarding";
+type StatusFilter = "todos" | "prospect" | "onboarding" | "operacionais" | "pausado" | "inadimplente" | "encerrado";
 
 // ── Badges ─────────────────────────────────────────────────────
 function Badge({ label, color }: { label: string; color: string }) {
@@ -980,8 +997,12 @@ export default function AdminClientesPage() {
   const filtered = useMemo(() => {
     return clients.filter((c) => {
       if (!isClientVisible(c.status)) return false;
-      if (statusFilter === "operacionais" && c.status !== "active" && c.status !== "ativo") return false;
-      if (statusFilter === "onboarding" && c.status !== "onboarding") return false;
+      if (statusFilter === "prospect"      && c.status !== "aguardando_validacao") return false;
+      if (statusFilter === "onboarding"    && c.status !== "onboarding") return false;
+      if (statusFilter === "operacionais"  && c.status !== "active" && c.status !== "ativo") return false;
+      if (statusFilter === "pausado"       && c.status !== "pausado") return false;
+      if (statusFilter === "inadimplente"  && c.status !== "inadimplente") return false;
+      if (statusFilter === "encerrado"     && c.status !== "encerrado") return false;
       if (segFilter && c.segment !== segFilter) return false;
       if (metaFilter === "connected"     && c.meta_status !== "complete" && c.meta_status !== "partial" && !(c.has_meta || c.has_instagram)) return false;
       if (metaFilter === "not_connected" && (c.meta_status === "complete" || c.meta_status === "partial" || c.has_meta || c.has_instagram)) return false;
@@ -1204,9 +1225,13 @@ export default function AdminClientesPage() {
   };
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
-    { value: "todos",         label: "Todos" },
-    { value: "operacionais",  label: "Ativos" },
-    { value: "onboarding",    label: "Onboarding" },
+    { value: "todos",          label: "Todos" },
+    { value: "prospect",       label: "Prospects" },
+    { value: "onboarding",     label: "Onboarding" },
+    { value: "operacionais",   label: "Ativos" },
+    { value: "pausado",        label: "Pausados" },
+    { value: "inadimplente",   label: "Inadimplentes" },
+    { value: "encerrado",      label: "Encerrados" },
   ];
 
   return (
@@ -1321,6 +1346,8 @@ export default function AdminClientesPage() {
                 <span className="ml-1 opacity-70">
                   ({opt.value === "operacionais"
                     ? clients.filter((c) => ["active", "ativo"].includes(c.status ?? "")).length
+                    : opt.value === "prospect"
+                    ? clients.filter((c) => c.status === "aguardando_validacao").length
                     : clients.filter((c) => c.status === opt.value).length})
                 </span>
               )}

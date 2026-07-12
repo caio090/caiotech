@@ -366,9 +366,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
     }
 
-    // V1 rule: new clients always start in onboarding.
+    // Allowed creation statuses: onboarding (contracted) or aguardando_validacao (prospect).
     // "active"/"ativo" are not valid creation statuses — they require onboarding first.
-    const requestedStatus = "onboarding";
+    const ALLOWED_CREATION = new Set(["onboarding", "aguardando_validacao"]);
+    const requestedStatus = ALLOWED_CREATION.has(body.status ?? "") ? (body.status as string) : "onboarding";
     const serviceRoleConfigured = hasSupabaseServiceRoleKey();
 
     console.info("[api/admin/clients POST] tentativa de criar cliente", {

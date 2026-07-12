@@ -26,7 +26,7 @@ const FAQ = [
   { q: "Preciso pagar para entrar na lista?", a: "Não. Entrar na lista beta é gratuito. Só há cobrança se você optar por assinar após o período de testes, com seu consentimento explícito." },
   { q: "O que é o REC OS dentro da Lokat OS?", a: "REC OS é a área de produção audiovisual: briefing, roteiro, calendário, aprovação por link e relatório de performance — tudo em um único fluxo. É diferente do Lokat.rec, que é uma plataforma separada." },
   { q: "A Lokat OS serve para pequenos negócios?", a: "Sim. Foi construída pensando em negócios locais, agências pequenas e autônomos que precisam de organização sem complexidade. Sem planilhas avulsas, sem WhatsApp bagunçado." },
-  { q: "Como funciona a integração com o Cardápio Digital?", a: "A Lokat OS conecta diretamente com o OlaClick (Cardápio Digital) via API. Pedidos, faturamento e métricas chegam automaticamente ao painel — sem exportar planilha à mão." },
+  { q: "Como funciona a integração com o Cardápio Digital?", a: "A Lokat OS conecta com provedores de Cardápio Digital via API (atualmente OlaClick como fonte). Pedidos, faturamento e métricas chegam automaticamente ao painel — sem exportar planilha à mão." },
 ];
 
 export default function HomePage() {
