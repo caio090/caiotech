@@ -106,6 +106,7 @@ const PALETA_OPTIONS = [
 ];
 
 const ATTACHMENT_CATEGORIES = [
+  { value: "roteiro",      label: "Roteiro" },
   { value: "bruto",        label: "Material bruto" },
   { value: "referencia",   label: "Referência visual" },
   { value: "cliente",      label: "Arquivo do cliente" },
@@ -139,7 +140,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Visão Geral",        icon: Clapperboard },
   { id: "roteiro",    label: "Roteiro",             icon: FileText },
   { id: "storyboard", label: "Storyboard",          icon: Layers },
-  { id: "shotlist",   label: "Shot List",           icon: List },
+  { id: "shotlist",   label: "Decupagem",           icon: List },
   { id: "plano",      label: "Plano de Gravação",   icon: ClipboardList },
   { id: "referencias",label: "Referências",         icon: ImageIcon },
   { id: "arquivos",   label: "Arquivos",            icon: FolderOpen },
@@ -215,7 +216,7 @@ export function RecosProjectContent({ project: initialProject, script: initialSc
       {/* Tab content */}
       <div>
         {tab === "overview"    && <OverviewTab    project={project} frames={frames} shotList={shotList} references={references} />}
-        {tab === "roteiro"     && <RoteiroTab     projectId={project.id} script={script} onSave={setScript} />}
+        {tab === "roteiro"     && <RoteiroTab     projectId={project.id} script={script} onSave={setScript} attachments={attachments} onUpdateAttachments={setAttachments} />}
         {tab === "storyboard"  && <StoryboardTab  projectId={project.id} frames={frames} onUpdate={setFrames} />}
         {tab === "shotlist"    && <ShotListTab    projectId={project.id} shotList={shotList} onUpdate={setShotList} />}
         {tab === "plano"       && <PlanoTab       project={project} />}
@@ -349,16 +350,65 @@ function OverviewTab({ project, frames, shotList, references }: {
 
 // ── Roteiro tab ─────────────────────────────────────────────────
 
-function RoteiroTab({ projectId, script, onSave }: {
-  projectId: string;
-  script:    DbRecScript | null;
-  onSave:    (s: DbRecScript) => void;
+function RoteiroTab({ projectId, script, onSave, attachments, onUpdateAttachments }: {
+  projectId:             string;
+  script:                DbRecScript | null;
+  onSave:                (s: DbRecScript) => void;
+  attachments:           DbProjectAttachment[];
+  onUpdateAttachments:   (a: DbProjectAttachment[]) => void;
 }) {
   const [mode, setMode]       = useState<"anexar" | "criar">(script?.script_type === "criado" ? "criar" : "anexar");
   const [text, setText]       = useState(script?.script_text ?? "");
   const [url, setUrl]         = useState(script?.script_url ?? "");
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
+
+  // Attachments state for "roteiro" category
+  const scriptAttachments = attachments.filter((a) => a.category === "roteiro");
+  const [attachInput,  setAttachInput]  = useState<AttachmentValue | null>(null);
+  const [attachNotes,  setAttachNotes]  = useState("");
+  const [attachSaving, setAttachSaving] = useState(false);
+  const [deletingAtt,  setDeletingAtt]  = useState<string | null>(null);
+
+  async function handleAddAttachment() {
+    if (!isSupabaseConfigured || !attachInput) return;
+    setAttachSaving(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("operational_attachments")
+        .insert({
+          rec_project_id:  projectId,
+          attachment_url:  attachInput.url,
+          attachment_name: attachInput.name,
+          attachment_type: attachInput.type,
+          attachment_size: attachInput.size ?? null,
+          storage_path:    attachInput.storagePath ?? null,
+          upload_source:   attachInput.source,
+          category:        "roteiro",
+          attachment_notes: attachNotes.trim() || null,
+        })
+        .select()
+        .single();
+      if (data) {
+        onUpdateAttachments([data as DbProjectAttachment, ...attachments]);
+        setAttachInput(null);
+        setAttachNotes("");
+      }
+    } catch {}
+    setAttachSaving(false);
+  }
+
+  async function handleDeleteAttachment(id: string) {
+    if (!isSupabaseConfigured) return;
+    setDeletingAtt(id);
+    try {
+      const supabase = createClient();
+      await supabase.from("operational_attachments").delete().eq("id", id);
+      onUpdateAttachments(attachments.filter((a) => a.id !== id));
+    } catch {}
+    setDeletingAtt(null);
+  }
 
   async function handleSave() {
     if (!isSupabaseConfigured) return;
@@ -495,6 +545,76 @@ function RoteiroTab({ projectId, script, onSave }: {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
         {saved ? "Salvo!" : saving ? "Salvando..." : "Salvar roteiro"}
       </button>
+
+      {/* Script attachments */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-bold text-gray-800">Anexos do roteiro</h3>
+          <p className="text-xs text-gray-400 mt-0.5">PDF, DOC, links de referência e arquivos enviados pelo cliente.</p>
+        </div>
+        <AttachmentUploader
+          label="Arquivo ou link"
+          value={attachInput}
+          onChange={setAttachInput}
+          storagePathPrefix={`recos/${projectId}/roteiro`}
+          placeholder="PDF, DOC, Google Docs, Drive, link de referência..."
+        />
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1">Observação (opcional)</label>
+          <input value={attachNotes} onChange={(e) => setAttachNotes(e.target.value)}
+            placeholder="Ex: Versão revisada pelo cliente, roteiro final..."
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-rose-400" />
+        </div>
+        <button onClick={handleAddAttachment} disabled={attachSaving || !attachInput}
+          className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl hover:bg-rose-700 disabled:opacity-60 transition-colors">
+          {attachSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          {attachSaving ? "Salvando..." : "Adicionar anexo"}
+        </button>
+
+        {scriptAttachments.length > 0 && (
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+            {scriptAttachments.map((att) => (
+              <div key={att.id} className="flex items-center gap-3 px-4 py-3 group">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-800 truncate">
+                    {att.attachment_name ?? att.attachment_url.replace(/^https?:\/\//, "").slice(0, 50)}
+                  </p>
+                  {att.attachment_notes && (
+                    <p className="text-[11px] text-gray-400 truncate mt-0.5">{att.attachment_notes}</p>
+                  )}
+                  {att.attachment_type && (
+                    <p className="text-[10px] text-gray-300 mt-0.5">{att.attachment_type}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a href={att.attachment_url} target="_blank" rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg hover:bg-rose-50 text-gray-400 hover:text-rose-600 transition-colors"
+                    title="Abrir">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <a href={att.attachment_url} download
+                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Baixar">
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
+                  <button onClick={() => handleDeleteAttachment(att.id)}
+                    disabled={deletingAtt === att.id}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-50"
+                    title="Remover">
+                    {deletingAtt === att.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {scriptAttachments.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-4">Nenhum anexo de roteiro ainda.</p>
+        )}
+      </div>
     </div>
   );
 }

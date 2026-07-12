@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Video, Plus, Film, Clock, MapPin, Calendar, ChevronRight, Clapperboard, Trash2, Loader2, X } from "lucide-react";
+import { Video, Plus, Film, Clock, MapPin, Calendar, ChevronRight, Clapperboard, Trash2, Loader2, X, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DbRecProject } from "@/lib/supabase/types";
 
@@ -119,9 +119,9 @@ export function RecosDashboardContent({ projects: initialProjects }: Props) {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center">
               <Clapperboard className="w-4 h-4 text-white" />
             </div>
-            <h1 className="text-xl font-black text-gray-900">RecOS</h1>
+            <h1 className="text-xl font-black text-gray-900">Audiovisual</h1>
           </div>
-          <p className="text-sm text-gray-500">Central audiovisual da Lokat Rec</p>
+          <p className="text-sm text-gray-500">Projetos, roteiros, decupagem, gravações e entregas de vídeo.</p>
         </div>
         <Link
           href="/admin/recos/criar"
@@ -129,6 +129,17 @@ export function RecosDashboardContent({ projects: initialProjects }: Props) {
         >
           <Plus className="w-4 h-4" />
           Criar projeto
+        </Link>
+      </div>
+
+      {/* Module nav */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 w-fit">
+        <span className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white text-gray-900 shadow-sm">
+          <Clapperboard className="w-3.5 h-3.5" /> Projetos
+        </span>
+        <Link href="/admin/rec/videos"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors">
+          <Library className="w-3.5 h-3.5" /> Biblioteca de vídeos
         </Link>
       </div>
 

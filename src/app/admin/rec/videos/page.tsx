@@ -1,9 +1,11 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Upload, Copy, Archive, Play, RefreshCw, AlertTriangle, CheckCircle,
   Video, Tag, User, SortAsc, Eye, EyeOff, Star, MessageSquare,
+  Clapperboard, Library,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
@@ -329,9 +331,27 @@ export default function AdminRecVideosPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-10">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Vídeos LOKAT.REC</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Gerencie os vídeos usados na página pública da produtora.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center">
+              <Library className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">Biblioteca Audiovisual</h1>
+          </div>
+          <p className="text-sm text-gray-500">Vídeos, portfólio, cases, depoimentos e entregas publicadas.</p>
+        </div>
+      </div>
+
+      {/* Module nav */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 w-fit">
+        <Link href="/admin/recos"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors">
+          <Clapperboard className="w-3.5 h-3.5" /> Projetos
+        </Link>
+        <span className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white text-gray-900 shadow-sm">
+          <Library className="w-3.5 h-3.5" /> Biblioteca de vídeos
+        </span>
       </div>
 
       {/* Avisos */}

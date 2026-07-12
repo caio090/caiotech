@@ -36,7 +36,7 @@ export function OperacionalRecosContent({ projects }: Props) {
           <Clapperboard className="w-4 h-4 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-black text-gray-900">RecOS</h1>
+          <h1 className="text-lg font-black text-gray-900">Audiovisual</h1>
           <p className="text-xs text-gray-400">Produção audiovisual — {projects.length} projeto{projects.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
@@ -48,7 +48,7 @@ export function OperacionalRecosContent({ projects }: Props) {
           </div>
           <h3 className="text-base font-bold text-gray-800 mb-1">Nenhum projeto audiovisual</h3>
           <p className="text-sm text-gray-400">
-            Os projetos RecOS criados pelo admin aparecerão aqui.
+            Os projetos audiovisuais criados pela administração aparecerão aqui.
           </p>
         </div>
       ) : (
