@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isClientVisible } from "@/lib/client-visibility";
 import { INTEGRATION_STATUS } from "@/lib/integrations";
 import { DigitalMenuConnectionModal, type DigitalMenuClientOption } from "@/components/integrations/digital-menu-connection-modal";
+import { MetaClientAssetsModal } from "@/components/integrations/meta-client-assets-modal";
 import { UtensilsCrossed } from "lucide-react";
 
 // ── Modal Novo Cliente ─────────────────────────────────────────
@@ -728,6 +729,7 @@ function ClientCard({
   onHardDelete,
   onInvite,
   onConnectOlaClick,
+  onConnectMeta,
   isAdmin,
   canHardDelete,
   selectionMode,
@@ -741,6 +743,7 @@ function ClientCard({
   onHardDelete: (c: Client) => void;
   onInvite: (c: Client) => void;
   onConnectOlaClick: (c: Client) => void;
+  onConnectMeta: (c: Client) => void;
   isAdmin: boolean;
   canHardDelete: boolean;
   selectionMode: boolean;
@@ -788,6 +791,24 @@ function ClientCard({
           </button>
           <button onClick={() => onConnectOlaClick(c)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors" title={c.has_olaclick ? "Gerenciar Cardápio Digital" : "Conectar Cardápio Digital"}>
             <UtensilsCrossed className="w-3.5 h-3.5" /> {c.has_olaclick ? "Cardápio" : "Conectar"}
+          </button>
+          <button
+            onClick={() => onConnectMeta(c)}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors ${
+              (c.has_meta && c.has_instagram)
+                ? "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+                : c.has_meta || c.has_instagram
+                  ? "text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                  : "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+            }`}
+            title={
+              (c.has_meta && c.has_instagram) ? "Gerenciar vínculo Meta"
+              : (c.has_meta || c.has_instagram) ? "Completar vínculo Meta"
+              : "Vincular Meta"
+            }
+          >
+            <AtSign className="w-3.5 h-3.5" />
+            {(c.has_meta && c.has_instagram) ? "Meta" : (c.has_meta || c.has_instagram) ? "Completar" : "Meta"}
           </button>
           {isAdmin && (
             <>
@@ -882,7 +903,8 @@ export default function AdminClientesPage() {
   const [trashOpen,    setTrashOpen]    = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [trashItems,   setTrashItems]   = useState<TrashItem[]>([]);
-  const [olaModalClient, setOlaModalClient] = useState<Client | null>(null);
+  const [olaModalClient,  setOlaModalClient]  = useState<Client | null>(null);
+  const [metaModalClient, setMetaModalClient] = useState<Client | null>(null);
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
@@ -1353,6 +1375,7 @@ export default function AdminClientesPage() {
               onHardDelete={(client) => setDeleteModal({ mode: "hard", clients: [client] })}
               onInvite={setInvitingClient}
               onConnectOlaClick={setOlaModalClient}
+              onConnectMeta={setMetaModalClient}
             />
           ))}
         </div>
@@ -1392,6 +1415,14 @@ export default function AdminClientesPage() {
           preselectedClientId={olaModalClient.id}
           onClose={() => setOlaModalClient(null)}
           onSaved={() => { setOlaModalClient(null); void fetchClients(); }}
+        />
+      )}
+      {metaModalClient && (
+        <MetaClientAssetsModal
+          clientId={metaModalClient.id}
+          clientName={metaModalClient.company_name ?? "Cliente"}
+          onClose={() => setMetaModalClient(null)}
+          onSaved={() => { setMetaModalClient(null); void fetchClients(); }}
         />
       )}
       {trashOpen && (

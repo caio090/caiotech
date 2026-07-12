@@ -700,6 +700,8 @@ function ConexoesContent() {
   const [linkClientId,  setLinkClientId]  = useState("");
   const [linkSaving,    setLinkSaving]    = useState(false);
   const [linkError,     setLinkError]     = useState("");
+  const [assetsSearch,  setAssetsSearch]  = useState("");
+  const [assetsFilter,  setAssetsFilter]  = useState<"todos" | "complete" | "partial" | "not_connected">("todos");
 
   // Carrega conexões OlaClick do banco no mount
   const loadOlaConnections = useCallback(async () => {
@@ -1126,7 +1128,28 @@ function ConexoesContent() {
               {/* ── Ativos vinculados por cliente ── */}
               {accountsTested && assets?.ok && (assets?.assets ?? []).some(a => a.link || a.instagram?.link) && (
                 <div className="mb-4">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Ativos vinculados aos clientes</p>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ativos vinculados aos clientes</p>
+                    <div className="flex-1" />
+                    {/* Search */}
+                    <input
+                      type="text"
+                      placeholder="Buscar cliente…"
+                      value={assetsSearch}
+                      onChange={(e) => setAssetsSearch(e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-400 w-32"
+                    />
+                    {/* Filter chips */}
+                    {(["todos", "complete", "partial", "not_connected"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setAssetsFilter(f)}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${assetsFilter === f ? "bg-indigo-600 text-white border-indigo-600" : "text-gray-500 border-gray-200 hover:border-indigo-300"}`}
+                      >
+                        {f === "todos" ? "Todos" : f === "complete" ? "Completos" : f === "partial" ? "Parciais" : "Não conectados"}
+                      </button>
+                    ))}
+                  </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden">
                     <table className="w-full text-xs">
                       <thead>
@@ -1150,7 +1173,26 @@ function ConexoesContent() {
                               rows.push({ clientId: asset.instagram.link.client_id, clientName: asset.instagram.link.client_name ?? asset.instagram.link.client_id.slice(0,8), fbPage: null, igAccount: asset.instagram.name ?? asset.instagram.username ?? "IG" });
                             }
                           }
-                          return rows.map(row => {
+                          const q = assetsSearch.trim().toLowerCase();
+                          const filtered = rows.filter(row => {
+                            if (q && !row.clientName.toLowerCase().includes(q)) return false;
+                            const complete = !!row.fbPage && !!row.igAccount;
+                            const partial  = !!row.fbPage || !!row.igAccount;
+                            if (assetsFilter === "complete"      && !complete) return false;
+                            if (assetsFilter === "partial"       && !(partial && !complete)) return false;
+                            if (assetsFilter === "not_connected" && (partial || complete)) return false;
+                            return true;
+                          });
+                          if (filtered.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 text-xs">
+                                  Nenhum cliente encontrado{q ? ` para "${q}"` : ""}.
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return filtered.map(row => {
                             const complete = !!row.fbPage && !!row.igAccount;
                             const partial  = !!row.fbPage || !!row.igAccount;
                             return (
