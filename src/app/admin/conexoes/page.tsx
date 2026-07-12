@@ -701,7 +701,7 @@ function ConexoesContent() {
   const [linkSaving,    setLinkSaving]    = useState(false);
   const [linkError,     setLinkError]     = useState("");
   const [assetsSearch,  setAssetsSearch]  = useState("");
-  const [assetsFilter,  setAssetsFilter]  = useState<"todos" | "complete" | "partial" | "not_connected">("todos");
+  const [assetsFilter,  setAssetsFilter]  = useState<"todos" | "complete" | "partial" | "not_connected" | "unknown">("todos");
 
   // Carrega conexões OlaClick do banco no mount
   const loadOlaConnections = useCallback(async () => {
@@ -1132,21 +1132,28 @@ function ConexoesContent() {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ativos vinculados aos clientes</p>
                     <div className="flex-1" />
                     {/* Search */}
-                    <input
-                      type="text"
-                      placeholder="Buscar cliente…"
-                      value={assetsSearch}
-                      onChange={(e) => setAssetsSearch(e.target.value)}
-                      className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-400 w-32"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar cliente no Meta…"
+                        value={assetsSearch}
+                        onChange={(e) => setAssetsSearch(e.target.value)}
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1 pr-6 focus:outline-none focus:border-indigo-400 w-44"
+                      />
+                      {assetsSearch && (
+                        <button onClick={() => setAssetsSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                     {/* Filter chips */}
-                    {(["todos", "complete", "partial", "not_connected"] as const).map((f) => (
+                    {(["todos", "complete", "partial", "not_connected", "unknown"] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setAssetsFilter(f)}
                         className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${assetsFilter === f ? "bg-indigo-600 text-white border-indigo-600" : "text-gray-500 border-gray-200 hover:border-indigo-300"}`}
                       >
-                        {f === "todos" ? "Todos" : f === "complete" ? "Completos" : f === "partial" ? "Parciais" : "Não conectados"}
+                        {f === "todos" ? "Todos" : f === "complete" ? "Completos" : f === "partial" ? "Parciais" : f === "not_connected" ? "Não conectados" : "Indisponível"}
                       </button>
                     ))}
                   </div>
@@ -1162,25 +1169,34 @@ function ConexoesContent() {
                       </thead>
                       <tbody>
                         {(() => {
-                          const rows: { clientId: string; clientName: string; fbPage: string | null; igAccount: string | null }[] = [];
+                          const rows: { clientId: string; clientName: string; fbPage: string | null; igAccount: string | null; igUsername: string | null }[] = [];
                           for (const asset of (assets?.assets ?? [])) {
                             if (asset.link) {
                               const existing = rows.find(r => r.clientId === asset.link!.client_id);
-                              if (existing) { existing.fbPage = asset.name; }
-                              else rows.push({ clientId: asset.link.client_id, clientName: asset.link.client_name ?? asset.link.client_id.slice(0,8), fbPage: asset.name, igAccount: asset.instagram?.link ? (asset.instagram.name ?? asset.instagram.username ?? "IG") : null });
+                              const igAcc = asset.instagram?.link ? (asset.instagram.name ?? asset.instagram.username ?? "IG") : null;
+                              const igUser = asset.instagram?.link ? (asset.instagram.username ?? null) : null;
+                              if (existing) { existing.fbPage = asset.name; existing.igAccount = igAcc; existing.igUsername = igUser; }
+                              else rows.push({ clientId: asset.link.client_id, clientName: asset.link.client_name ?? asset.link.client_id.slice(0,8), fbPage: asset.name, igAccount: igAcc, igUsername: igUser });
                             }
                             if (asset.instagram?.link && !rows.some(r => r.clientId === asset.instagram!.link!.client_id)) {
-                              rows.push({ clientId: asset.instagram.link.client_id, clientName: asset.instagram.link.client_name ?? asset.instagram.link.client_id.slice(0,8), fbPage: null, igAccount: asset.instagram.name ?? asset.instagram.username ?? "IG" });
+                              rows.push({ clientId: asset.instagram.link.client_id, clientName: asset.instagram.link.client_name ?? asset.instagram.link.client_id.slice(0,8), fbPage: null, igAccount: asset.instagram.name ?? asset.instagram.username ?? "IG", igUsername: asset.instagram.username ?? null });
                             }
                           }
                           const q = assetsSearch.trim().toLowerCase();
                           const filtered = rows.filter(row => {
-                            if (q && !row.clientName.toLowerCase().includes(q)) return false;
+                            if (q) {
+                              const matchName = row.clientName.toLowerCase().includes(q);
+                              const matchFb   = (row.fbPage ?? "").toLowerCase().includes(q);
+                              const matchIg   = (row.igAccount ?? "").toLowerCase().includes(q);
+                              const matchUser = (row.igUsername ?? "").toLowerCase().includes(q.replace(/^@/, ""));
+                              if (!matchName && !matchFb && !matchIg && !matchUser) return false;
+                            }
                             const complete = !!row.fbPage && !!row.igAccount;
                             const partial  = !!row.fbPage || !!row.igAccount;
                             if (assetsFilter === "complete"      && !complete) return false;
                             if (assetsFilter === "partial"       && !(partial && !complete)) return false;
                             if (assetsFilter === "not_connected" && (partial || complete)) return false;
+                            if (assetsFilter === "unknown") return false; // rows always have at least one asset
                             return true;
                           });
                           if (filtered.length === 0) {
