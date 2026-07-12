@@ -15,7 +15,7 @@ import {
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
   ScrollText, Palette, Video, MousePointerClick, Link2, SlidersHorizontal,
-  Shield,
+  Shield, Clapperboard, UsersRound,
 } from "lucide-react";
 import { RecDropIcon } from "@/components/icons/RecDropIcon";
 
@@ -35,8 +35,11 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/inicio",            label: "Início",           icon: Home },
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
+      { href: "/admin/recos",             label: "Audiovisual",      icon: Clapperboard },
       { href: "/admin/operacional",       label: "Operacional",      icon: KanbanSquare },
       { href: "/admin/clientes",          label: "Clientes",         icon: Users },
+      { href: "/admin/equipe",            label: "Equipe",           icon: UsersRound },
+      { href: "/admin/diagnosticos",      label: "Diagnósticos",     icon: Activity },
       { href: "/admin/relatorios",        label: "Dados & Insights", icon: BarChart3 },
       { href: "/admin/financeiro",        label: "Financeiro",       icon: DollarSign },
       { href: "/admin/super/billing",     label: "Billing & Planos", icon: CreditCard },
@@ -86,7 +89,7 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/operacional/dashboard",      label: "Dashboard",            icon: LayoutDashboard },
       { href: "/operacional/briefings",      label: "Briefings & Demandas", icon: ScrollText },
-      { href: "/operacional/recos",          label: "RecOS",                icon: Video },
+      { href: "/operacional/recos",          label: "Audiovisual",          icon: Clapperboard },
       { href: "/operacional/minhas-tarefas", label: "Minhas Tarefas",       icon: ClipboardList },
       { href: "/operacional/calendario",     label: "Calendário",           icon: CalendarDays },
       { href: "/operacional/perfil",         label: "Meu Perfil",           icon: UserCheck },
