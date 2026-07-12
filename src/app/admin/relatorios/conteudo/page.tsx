@@ -894,8 +894,8 @@ export default function RelatorioConteudoPage() {
                               <div key={i} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--lk-border)", borderRadius: 12 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                                   <span style={{ fontSize: 12, fontWeight: 700, color: "var(--lk-text)" }}>{s.title}</span>
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: s.confidence === "Alta" ? "#34d399" : s.confidence === "Média" ? "#fbbf24" : "var(--lk-muted)", background: "rgba(255,255,255,0.05)", border: "1px solid var(--lk-border)", padding: "1px 6px", borderRadius: 4 }}>
-                                    {s.confidence}
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: s.confidence === "high" ? "#34d399" : s.confidence === "medium" ? "#fbbf24" : "var(--lk-muted)", background: "rgba(255,255,255,0.05)", border: "1px solid var(--lk-border)", padding: "1px 6px", borderRadius: 4 }}>
+                                    {s.confidence === "high" ? "Confiança alta" : s.confidence === "medium" ? "Confiança média" : "Confiança baixa"}
                                   </span>
                                   <span style={{ fontSize: 9, color: "var(--lk-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--lk-border)", padding: "1px 6px", borderRadius: 4 }}>
                                     {s.category}

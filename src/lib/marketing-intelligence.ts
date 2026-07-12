@@ -28,7 +28,8 @@ export interface MarketingSuggestion {
   reason:         string;
   action:         string;
   expectedImpact: string;
-  confidence:     "Alta" | "Média" | "Baixa";
+  /** Deterministic confidence: "high" = both periods + relevant delta; "medium" = current only or partial; "low" = single metric or short period */
+  confidence:     "high" | "medium" | "low";
 }
 
 export interface MarketingReportInsights {
@@ -200,46 +201,50 @@ export function generateMarketingReportInsights(context: MarketingContext): Mark
   // ── Suggestions ───────────────────────────────────────────────────────────
 
   if (reach !== null && reach > 0 && clicks === 0) {
+    // High: current metric confirmed, recommendation directly tied to observed gap
     suggestions.push({
       title: "Adicionar CTA rastreável",
       category: "engagement",
       reason: `Alcance de ${reach.toLocaleString("pt-BR")} pessoas sem nenhum clique no site registrado.`,
       action: "Inclua um link com UTM na bio e adicione CTAs diretos nos posts para direcionar tráfego.",
       expectedImpact: "Início de rastreamento de conversões orgânicas.",
-      confidence: "Alta",
+      confidence: "high",
     });
   }
 
   if (reachCmp.direction !== "unavailable") {
+    // Medium: general best-practice, not tied to a specific observed delta
     suggestions.push({
       title: "Priorizar Reels no próximo ciclo",
       category: "format",
       reason: "Reels tendem a ter maior distribuição orgânica no algoritmo atual do Instagram.",
       action: "Produza 2 Reels curtos (15-30s) com foco em alcance orgânico no próximo período.",
       expectedImpact: "Aumento estimado de 20-40% no alcance sem custo adicional.",
-      confidence: "Média",
+      confidence: "medium",
     });
   }
 
   if (profileViews !== null && profileViews > 100) {
+    // High: metric confirmed + conversion bottleneck identified
     suggestions.push({
       title: "Otimizar bio para conversão",
       category: "engagement",
       reason: `${profileViews.toLocaleString("pt-BR")} visitas ao perfil no período — a bio é o ponto crítico de conversão.`,
       action: "Atualize a bio com uma oferta clara, link de WhatsApp ou página de destino e CTA direto.",
       expectedImpact: "Aumento na taxa de conversão perfil→ação.",
-      confidence: "Alta",
+      confidence: "high",
     });
   }
 
   if (viewsCmp.direction === "up" || reachCmp.direction === "up") {
+    // High: two-period comparison confirmed upward trend
     suggestions.push({
       title: "Manter cadência de publicação",
       category: "frequency",
       reason: "Métricas de distribuição em crescimento — consistência é o principal fator de manutenção.",
       action: "Mantenha pelo menos 3-5 publicações semanais para preservar o momento atual.",
       expectedImpact: "Manutenção ou aceleração da curva de crescimento.",
-      confidence: "Alta",
+      confidence: "high",
     });
   }
 
