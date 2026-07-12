@@ -88,6 +88,11 @@ interface WindowFetchDiagnostics {
   completeDays?: number; partialDays?: number;
 }
 
+interface RouteDiag {
+  routeDeadlineMs: number; routeElapsedMs: number; deadlineReached: boolean;
+  circuitBreakerTriggered: boolean; staleFallbackUsed: boolean; staleAgeMs: number | null;
+}
+
 interface OrdersResult {
   ok: boolean; reason?: string; code?: string; message?: string;
   connectionFound?: boolean; provider?: string; baseUrlResolved?: boolean; endpoint?: string;
@@ -95,6 +100,9 @@ interface OrdersResult {
   snapshotPersistence?: SnapshotPersistence; completeness?: OrderFetchCompleteness;
   pagination?: PaginationInfo; debugShape?: DebugShape;
   windowDiag?: WindowFetchDiagnostics | null; cacheHit?: boolean;
+  stale?: boolean; staleFallbackUsed?: boolean; staleAgeMs?: number;
+  providerWarning?: { code: string; message: string };
+  routeDiag?: RouteDiag;
   data?: {
     faturamento_total: number | null; total_pedidos: number | null; ticket_medio: number | null;
     pedidos_por_status: Record<string, number> | null;
@@ -122,6 +130,9 @@ interface ReportData {
   pagination?: PaginationInfo; debugShape?: DebugShape;
   snapshotPersistence?: SnapshotPersistence; completeness?: OrderFetchCompleteness;
   windowDiag?: WindowFetchDiagnostics | null; cacheHit?: boolean;
+  stale?: boolean; staleFallbackUsed?: boolean; staleAgeMs?: number;
+  providerWarning?: { code: string; message: string };
+  routeDiag?: RouteDiag;
   heatmap?: { weekday: number; hour: number; orders: number; revenue: number }[];
   pedidosPorServiceType?: Record<string, number>; pedidosPorSource?: Record<string, number>;
   totalDescontos?: number; totalTaxasEntrega?: number; totalGorjetas?: number;
@@ -571,6 +582,8 @@ function buildReportFromData(d: OrdersResult): ReportData {
     melhores_dias: p?.melhores_dias ?? null, pedidos_recentes: p?.pedidos_recentes ?? [],
     pagination: d.pagination, debugShape: d.debugShape, snapshotPersistence: d.snapshotPersistence,
     completeness: d.completeness, windowDiag: d.windowDiag ?? null, cacheHit: d.cacheHit ?? false,
+    stale: d.stale, staleFallbackUsed: d.staleFallbackUsed, staleAgeMs: d.staleAgeMs,
+    providerWarning: d.providerWarning, routeDiag: d.routeDiag,
     heatmap: p?.heatmap, pedidosPorServiceType: p?.pedidosPorServiceType,
     pedidosPorSource: p?.pedidosPorSource, totalDescontos: p?.totalDescontos,
     totalTaxasEntrega: p?.totalTaxasEntrega, totalGorjetas: p?.totalGorjetas,
@@ -630,10 +643,12 @@ export default function FaturamentoPage() {
   const [productsKey,      setProductsKey]      = useState<string | null>(null);
   const [productsLastFetch, setProductsLastFetch] = useState<string | null>(null);
   const [revChartTooltip,  setRevChartTooltip]   = useState<number | null>(null);
+  const [staleWarning,         setStaleWarning]         = useState<string | null>(null);
   const activeControllerRef    = useRef<AbortController | null>(null);
   const requestIdRef           = useRef(0);
   const prevClientIdRef        = useRef("");
   const lastLoadedContextRef   = useRef<string | null>(null);
+  const activeLoadKeyRef       = useRef<string | null>(null);
   const router                 = useRouter();
 
   // ── Load clients (with proper error handling) ──────────────────────────────
@@ -706,7 +721,7 @@ export default function FaturamentoPage() {
 
     setReport(null); setPrevReport(null);
     setProductsData(null); setProductsKey(null); setProductsError(null); setProductsLastFetch(null);
-    setError(null); setApiDiag(null); setCacheLabel(null);
+    setError(null); setApiDiag(null); setCacheLabel(null); setStaleWarning(null);
     setMissingBaseUrl(false); setSyncPhase(null); setLastSync(null);
     setActiveTab("overview");
     lastLoadedContextRef.current = null;
@@ -722,6 +737,15 @@ export default function FaturamentoPage() {
       if (customStart > customEnd) { setCustomError("Data inicial deve ser menor ou igual à data final."); return; }
     }
     setCustomError(null);
+
+    // Dedup: prevent concurrent loads of the same context
+    const dates = periodDates(period, customStart, customEnd);
+    if (dates) {
+      const connId = status?.connection?.id ?? "";
+      const loadKey = `${clientId}:${connId}:${dates.start}:${dates.end}:${forceRefresh ? "1" : "0"}`;
+      if (activeLoadKeyRef.current === loadKey) return; // already in-flight for this exact context
+      activeLoadKeyRef.current = loadKey;
+    }
 
     if (activeControllerRef.current) activeControllerRef.current.abort();
     const controller = new AbortController();
@@ -769,6 +793,10 @@ export default function FaturamentoPage() {
         else if (d.reason === "bad_params" || d.code === "provider_bad_request") { setError(d.message ?? "API recusou os filtros do período."); setApiDiag(diag); }
         else if (d.reason === "network_error" || d.code === "provider_network_error") { setError("Não foi possível conectar à API OlaClick."); setApiDiag(diag); }
         else if (d.reason === "unexpected_response" || d.code === "provider_unexpected_response") { setError("API respondeu em formato inesperado."); setApiDiag(diag); }
+        else if (d.code === "provider_unavailable" || d.reason === "provider_503") {
+          setError("A OlaClick está temporariamente indisponível. Tente novamente em alguns instantes.");
+          setApiDiag(diag);
+        }
         else { setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital."); if (d.provider || d.endpoint || d.httpStatus != null) setApiDiag(diag); }
         return;
       }
@@ -776,18 +804,29 @@ export default function FaturamentoPage() {
       setMissingBaseUrl(false);
       const built = buildReportFromData(d);
       setReport(built); setLastSync(new Date().toISOString());
-      if (built.total_pedidos > 0) {
-        const dates = periodDates(period, customStart, customEnd);
-        if (dates) ssWrite(clientId, dates.start, dates.end, built);
+
+      // Handle stale fallback response
+      if (d.stale && d.providerWarning) {
+        setStaleWarning(d.providerWarning.message);
+      } else {
+        setStaleWarning(null);
+      }
+
+      if (built.total_pedidos > 0 && !d.stale) {
+        const datesForCache = periodDates(period, customStart, customEnd);
+        if (datesForCache) ssWrite(clientId, datesForCache.start, datesForCache.end, built);
       }
     } catch (e) {
       if ((e as Error)?.name === "AbortError") return;
       if (requestIdRef.current !== thisRequestId) return;
       setError("Erro de rede ao buscar faturamento. Verifique conexão e tente novamente.");
     } finally {
-      if (requestIdRef.current === thisRequestId) { setLoading(false); setSyncPhase(null); }
+      if (requestIdRef.current === thisRequestId) {
+        setLoading(false); setSyncPhase(null);
+        activeLoadKeyRef.current = null; // allow future loads of same context
+      }
     }
-  }, [clientId, period, customStart, customEnd]);
+  }, [clientId, period, customStart, customEnd, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load previous period (manual only) ────────────────────────────────────
   const loadPrevReport = useCallback(async () => {
@@ -1148,7 +1187,18 @@ export default function FaturamentoPage() {
           {loading && (
             <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(123,110,246,0.07)", border: "1px solid rgba(123,110,246,0.18)", borderRadius: 10 }}>
               <Loader2 size={12} style={{ color: "var(--lk-accent)", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "var(--lk-accent)", fontWeight: 500 }}>{syncPhase ?? "Atualizando dados…"}</span>
+              <span style={{ fontSize: 11, color: "var(--lk-accent)", fontWeight: 500 }}>{syncPhase ?? "Atualizando dados em segundo plano…"}</span>
+            </div>
+          )}
+
+          {/* Stale fallback warning */}
+          {staleWarning && !loading && (
+            <div style={{ marginBottom: 14, display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 10 }}>
+              <AlertCircle size={13} style={{ color: "#fbbf24", flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 12, color: "#fbbf24" }}>{staleWarning}</span>
+                {lastSync && <span style={{ display: "block", fontSize: 10, color: "rgba(251,191,36,0.6)", marginTop: 2 }}>Última atualização: {fmtDate(lastSync)}</span>}
+              </div>
             </div>
           )}
 
@@ -1863,6 +1913,33 @@ export default function FaturamentoPage() {
                       </>
                     )}
 
+                    {report.routeDiag && (
+                      <>
+                        <hr style={{ border: "none", borderTop: "1px solid var(--lk-border)", margin: "4px 0" }} />
+                        <p style={{ color: "var(--lk-muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Proteções de rota</p>
+                        <p>
+                          <span style={{ color: "var(--lk-text)", fontWeight: 600 }}>Deadline:</span>{" "}
+                          {report.routeDiag.routeDeadlineMs}ms limite ·{" "}
+                          <span style={{ color: report.routeDiag.deadlineReached ? "#f87171" : "#34d399" }}>
+                            {report.routeDiag.routeElapsedMs}ms usados
+                          </span>
+                          {report.routeDiag.deadlineReached && <span style={{ color: "#f87171", fontWeight: 700 }}> · LIMITE ATINGIDO</span>}
+                        </p>
+                        {report.routeDiag.circuitBreakerTriggered && (
+                          <p style={{ color: "#f87171", fontWeight: 700 }}>⚡ Circuit breaker ativado (2 falhas consecutivas do provider)</p>
+                        )}
+                        {report.routeDiag.staleFallbackUsed && (
+                          <p style={{ color: "#fbbf24" }}>
+                            <span style={{ fontWeight: 600 }}>Fallback stale usado:</span>{" "}
+                            cache com {Math.round((report.routeDiag.staleAgeMs ?? 0) / 60000)}min de idade exibido enquanto provider estava indisponível
+                          </p>
+                        )}
+                        {!report.routeDiag.staleFallbackUsed && !report.routeDiag.circuitBreakerTriggered && !report.routeDiag.deadlineReached && (
+                          <p style={{ color: "#34d399" }}>✓ Rota concluída dentro do prazo sem fallback</p>
+                        )}
+                      </>
+                    )}
+
                     <div style={{ marginTop: 8, paddingTop: 10, borderTop: "1px solid var(--lk-border)" }}>
                       <button
                         onClick={() => {
@@ -1879,6 +1956,11 @@ export default function FaturamentoPage() {
                             lines.push(`Requisições: ${report.windowDiag.requestsMade}`);
                             lines.push(`Dedup: ${report.windowDiag.rawCount} brutos → ${report.windowDiag.uniqueCount} únicos (${report.windowDiag.duplicateCount} removidos)`);
                             lines.push(`Tempo: ${report.windowDiag.executionMs}ms`);
+                          }
+                          if (report.routeDiag) {
+                            lines.push(`Deadline: ${report.routeDiag.routeDeadlineMs}ms / Elapsed: ${report.routeDiag.routeElapsedMs}ms${report.routeDiag.deadlineReached ? " ⚠ LIMITE ATINGIDO" : ""}`);
+                            if (report.routeDiag.circuitBreakerTriggered) lines.push("Circuit breaker: ATIVADO");
+                            if (report.routeDiag.staleFallbackUsed) lines.push(`Stale fallback: usado (${Math.round((report.routeDiag.staleAgeMs ?? 0) / 60000)}min de idade)`);
                           }
                           void navigator.clipboard.writeText(lines.join("\n")).then(() => alert("Diagnóstico copiado."));
                         }}
