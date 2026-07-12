@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { DigitalMenuConnectionModal } from "@/components/integrations/digital-menu-connection-modal";
 import { MetaClientAssetsModal } from "@/components/integrations/meta-client-assets-modal";
+import { ClientIntegrationSelector } from "@/components/integrations/client-integration-selector";
+import { IntegrationProviderCard } from "@/components/integrations/integration-provider-card";
 
 // ── Tipos ──────────────────────────────────────────────────────
 type MetaStatusResponse = {
@@ -191,250 +193,6 @@ const DIGITAL_MENU_PROVIDERS = [
   { slug: "olaclick", name: "OlaClick" },
   // futuros: { slug: "anotaai", name: "Anota AI" }, { slug: "deliverydireto", name: "Delivery Direto" }
 ] as const;
-
-function DigitalMenuModal({ onClose, onSaved, clients, preselectedClientId }: {
-  onClose: () => void;
-  onSaved: () => void;
-  clients: ClientOption[];
-  preselectedClientId?: string;
-}) {
-  const [providerSlug, setProviderSlug] = useState<string>(DIGITAL_MENU_PROVIDERS[0].slug);
-  const [clientId,    setClientId]    = useState(preselectedClientId ?? "");
-  const [connName,    setConnName]    = useState("");
-  const [token,       setToken]       = useState("");
-  const [apiBaseUrl,  setApiBaseUrl]  = useState("");
-  const [notes,       setNotes]       = useState("");
-  const [showToken,   setShowToken]   = useState(false);
-  const [showSteps,   setShowSteps]   = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [error,       setError]       = useState("");
-
-  const selectedProvider = DIGITAL_MENU_PROVIDERS.find((p) => p.slug === providerSlug) ?? DIGITAL_MENU_PROVIDERS[0];
-
-  async function handleSave() {
-    if (!clientId || !connName || !token) { setError("Preencha todos os campos obrigatórios."); return; }
-    setSaving(true);
-    setError("");
-    try {
-      const r = await fetch("/api/olaclick/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id:       clientId,
-          connection_name: connName,
-          access_token:    token,
-          api_base_url:    apiBaseUrl.trim() || undefined,
-          notes,
-        }),
-      });
-      const d = await r.json() as { ok: boolean; reason?: string; message?: string };
-      if (d.ok) { onSaved(); }
-      else if (d.reason === "sql_pending") { setError("SQL 39 pendente. Rode docs/supabase/39-olaclick-connections.sql no Supabase."); }
-      else { setError(d.message ?? "Erro ao salvar conexão."); }
-    } catch { setError("Erro de rede. Tente novamente."); }
-    finally { setSaving(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center">
-              <UtensilsCrossed className="w-4 h-4 text-orange-500" strokeWidth={1.5} />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-gray-900">Conectar Cardápio Digital</p>
-              <p className="text-[10px] text-gray-400">via {selectedProvider.name}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Aviso de segurança */}
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
-            <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[10px] text-amber-700">
-              Se o token apareceu em print ou conversa, revogue e gere outro no OlaClick antes de conectar.
-            </p>
-          </div>
-
-          {/* Provedor */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Provedor <span className="text-red-500">*</span></label>
-            <select
-              value={providerSlug}
-              onChange={(e) => setProviderSlug(e.target.value)}
-              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 bg-white"
-            >
-              {DIGITAL_MENU_PROVIDERS.map((p) => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Cliente */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Cliente <span className="text-red-500">*</span></label>
-            {clients.length > 0 ? (
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 bg-white"
-              >
-                <option value="">Selecione o cliente…</option>
-                {clients.map((c) => {
-                  // Detecta duplicatas pelo nome para exibir e-mail + id curto
-                  const hasDup = clients.filter(x => x.company_name === c.company_name).length > 1;
-                  const label = hasDup
-                    ? `${c.company_name} · ${c.email ?? "sem email"} · ${c.id.slice(0, 8)}`
-                    : c.company_name;
-                  return <option key={c.id} value={c.id}>{label}</option>;
-                })}
-              </select>
-            ) : (
-              <p className="text-xs text-gray-400 italic">Nenhum cliente cadastrado.</p>
-            )}
-          </div>
-
-          {/* Nome da conexão */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Nome da conexão <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={connName}
-              onChange={(e) => setConnName(e.target.value)}
-              placeholder="Ex: Duh Lanches — OlaClick"
-              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
-            />
-          </div>
-
-          {/* Token */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Token / API Key — {selectedProvider.name} <span className="text-red-500">*</span></label>
-            <div className="relative">
-              <input
-                type={showToken ? "text" : "password"}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder={`Cole o token gerado no ${selectedProvider.name}`}
-                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 pr-10 outline-none focus:border-orange-400 font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
-              <Lock className="w-2.5 h-2.5" />Token salvo criptografado. Não aparece em tela após salvar.
-            </p>
-          </div>
-
-          {/* URL da API — campo avançado opcional */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-            >
-              <span className="text-xs font-semibold text-gray-700">Configurações avançadas</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-            </button>
-            {showAdvanced && (
-              <div className="p-4 space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">URL da API do provedor</label>
-                  <input
-                    type="url"
-                    value={apiBaseUrl}
-                    onChange={(e) => setApiBaseUrl(e.target.value)}
-                    placeholder="Use apenas se o provedor exigir uma URL específica"
-                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 font-mono"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Para OlaClick deixe em branco. Necessário apenas se o provedor tiver uma URL personalizada.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Observações */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Observações internas</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notas sobre essa conexão..."
-              rows={2}
-              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none resize-none focus:border-orange-400"
-            />
-          </div>
-
-          {/* Como gerar token — accordion */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setShowSteps((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-            >
-              <span className="text-xs font-semibold text-gray-700">Como gerar token no {selectedProvider.name}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showSteps ? "rotate-180" : ""}`} />
-            </button>
-            {showSteps && (
-              <div className="p-4 space-y-2 text-xs text-gray-600">
-                {[
-                  "Acesse o painel OlaClick.",
-                  "Vá em Integrações.",
-                  "Clique em API Keys.",
-                  "Clique em Gerar novo token.",
-                  "Marque permissões de leitura: menu:read, orders:read, clients:read e companies:read.",
-                  "Copie o token gerado.",
-                  "Cole aqui na LOKAT OS.",
-                  "Clique em Salvar e testar conexão.",
-                ].map((step, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="w-4 h-4 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                    <span>{step}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
-              <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
-
-          {/* Botões */}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-xs font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
-              Cancelar
-            </button>
-            <button
-              onClick={() => void handleSave()}
-              disabled={saving || !clientId || !connName || !token}
-              className="flex-1 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
-              {saving ? "Salvando..." : "Salvar conexão"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Modal de edição de conexão existente ───────────────────────
 const OLACLICK_DEFAULT_BASE_URL = "https://public-api.olaclick.app";
@@ -671,10 +429,13 @@ function DigitalMenuEditModal({ conn, onClose, onSaved }: {
 function ConexoesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const flashOk    = searchParams.get("meta_ok");
-  const flashWarn  = searchParams.get("meta_warn");
-  const flashErr   = searchParams.get("meta_error");
-  const clientParam = searchParams.get("client");
+  const flashOk      = searchParams.get("meta_ok");
+  const flashWarn    = searchParams.get("meta_warn");
+  const flashErr     = searchParams.get("meta_error");
+  // clientParam and providerParam: used ONLY for deep-links, not for global filtering
+  const clientParam  = searchParams.get("client");
+  const providerParam = searchParams.get("provider");
+  const deepLinkFired = useRef(false);
 
   const [aiData,    setAiData]    = useState<AiResponse>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -711,6 +472,9 @@ function ConexoesContent() {
   const [assetsSearch,  setAssetsSearch]  = useState("");
   const [assetsFilter,  setAssetsFilter]  = useState<"todos" | "complete" | "partial" | "not_connected" | "unknown">("todos");
   const [metaHubClient, setMetaHubClient] = useState<{ id: string; company_name: string } | null>(null);
+
+  // Client selector: which provider is currently requesting a client selection
+  const [clientSelectorFor, setClientSelectorFor] = useState<"meta" | "olaclick" | null>(null);
 
   // Carrega conexões OlaClick do banco no mount
   const loadOlaConnections = useCallback(async () => {
@@ -794,6 +558,30 @@ function ConexoesContent() {
     }
   }, [insightsTested, insights?.ok, checkAccounts]);
 
+  // Deep-link: ?provider=meta&client=uuid → abre modal do cliente automaticamente (uma vez)
+  useEffect(() => {
+    if (deepLinkFired.current) return;
+    if (!providerParam || !clientParam || olaClients.length === 0) return;
+    deepLinkFired.current = true;
+    const client = olaClients.find((c) => c.id === clientParam);
+    if (providerParam === "meta" && client) {
+      setMetaHubClient({ id: client.id, company_name: client.company_name });
+    } else if (providerParam === "olaclick" && client) {
+      setOlaModalClientId(client.id);
+      setShowOlaModal(true);
+    }
+  }, [providerParam, clientParam, olaClients]);
+
+  // Enrich clients with OlaClick connection status for ClientIntegrationSelector
+  const clientsWithOlaStatus = useMemo(
+    () =>
+      olaClients.map((c) => ({
+        ...c,
+        has_olaclick: olaConnections.some((conn) => conn.client_id === c.id),
+      })),
+    [olaClients, olaConnections],
+  );
+
   // ── Estado derivado Meta ───────────────────────────────────
   // Considera conectado se: status route diz connected=true OU insights ok
   const isConnected = Boolean(
@@ -805,15 +593,6 @@ function ConexoesContent() {
   const sqlOk  = metaTested && !metaStatus?.sqlPending;
   const conn   = insights?.connection;
 
-  // Ativos vinculados ao cliente selecionado (separação global vs por cliente)
-  const clientLinkedAssets = clientParam && assets?.assets
-    ? assets.assets.filter(
-        (a) => a.link?.client_id === clientParam || a.instagram?.link?.client_id === clientParam
-      )
-    : null;
-  const clientHasAssets = clientLinkedAssets !== null && clientLinkedAssets.length > 0;
-  const selectedClientName = clientParam ? (olaClients.find((c) => c.id === clientParam)?.company_name ?? "cliente selecionado") : null;
-
   const isDomainError = Boolean(
     flashErr &&
     (flashErr.toLowerCase().includes("domain") ||
@@ -823,15 +602,11 @@ function ConexoesContent() {
      flashErr.toLowerCase().includes("não está incluído"))
   );
 
-  // Cor do badge Meta — quando cliente selecionado, reflete ativos por cliente
+  // Cor do badge Meta
   const metaColor = (): "gray" | "red" | "emerald" | "amber" | "blue" => {
     if (!metaTested) return "gray";
     if (!metaStatus?.ok) return "red";
-    if (isConnected && insightReason !== "token_expired") {
-      // Com cliente selecionado: verde apenas se tiver ativo vinculado
-      if (clientParam) return accountsTested ? (clientHasAssets ? "emerald" : "blue") : "blue";
-      return "emerald";
-    }
+    if (isConnected && insightReason !== "token_expired") return "emerald";
     if (insightReason === "token_expired") return "red";
     if (metaStatus?.sqlPending) return "amber";
     return "blue";
@@ -891,37 +666,7 @@ function ConexoesContent() {
 
   return (
     <div>
-      <PageHeader title="Conexões" description="Integrações externas — configure por cliente" />
-
-      {/* ── Seletor de cliente ──────────────────────────────── */}
-      {olaClients.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Cliente:</span>
-          <button
-            onClick={() => router.replace("/admin/conexoes")}
-            className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-              !clientParam
-                ? "bg-gray-900 text-white border-transparent"
-                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            Todos
-          </button>
-          {olaClients.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => router.replace(`/admin/conexoes?client=${c.id}`)}
-              className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                clientParam === c.id
-                  ? "bg-indigo-600 text-white border-transparent"
-                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {c.company_name}
-            </button>
-          ))}
-        </div>
-      )}
+      <PageHeader title="Central de Conexões" description="Conecte e gerencie os serviços utilizados por cada cliente." />
 
       {/* Flash messages */}
       {flashOk && (
@@ -971,29 +716,57 @@ function ConexoesContent() {
         </div>
       )}
 
-      <div className="max-w-2xl mb-4 p-3.5 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-700 flex items-start gap-2">
-        <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-        <span>
-          {clientParam && olaClients.length > 0 ? (
-            <>
-              Consultando conexões de{" "}
-              <strong>{olaClients.find((c) => c.id === clientParam)?.company_name ?? "cliente selecionado"}</strong>.
-              {" "}Selecione <strong>Todos</strong> no seletor acima para ver todas as conexões da plataforma.
-            </>
-          ) : olaClients.length > 0 ? (
-            <>
-              Selecione um cliente para visualizar e gerenciar suas conexões.
-              {" "}Para Meta/Instagram, cada ativo deve ser{" "}
-              <strong>vinculado individualmente ao cliente</strong> na seção "Ativos encontrados na Meta".
-            </>
-          ) : (
-            <>
-              As integrações abaixo são da plataforma LOKAT OS. Para Meta/Instagram, cada ativo deve ser{" "}
-              <strong>vinculado individualmente ao cliente</strong> correspondente na seção "Ativos encontrados na Meta".
-            </>
-          )}
-        </span>
-      </div>
+      {/* ── Resumo de provedores ─────────────────────────────── */}
+      {(metaTested || olaConnections.length > 0) && (
+        <div className="flex flex-wrap gap-5 mb-6 max-w-2xl">
+          {(() => {
+            const activeProviders = [isConnected, olaConnections.length > 0].filter(Boolean).length;
+            const olaIds = new Set(olaConnections.map((c) => c.client_id));
+            const metaIds = new Set(
+              (assets?.assets ?? [])
+                .flatMap((a) => [a.link?.client_id, a.instagram?.link?.client_id])
+                .filter(Boolean) as string[],
+            );
+            const totalIntegrated = new Set([...olaIds, ...metaIds]).size;
+            const needsAttention = insightReason === "token_expired" ? 1 : 0;
+            return (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{activeProviders}</p>
+                    <p className="text-xs text-gray-400">provedor{activeProviders !== 1 ? "es" : ""} ativo{activeProviders !== 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+                {totalIntegrated > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{totalIntegrated}</p>
+                      <p className="text-xs text-gray-400">cliente{totalIntegrated !== 1 ? "s" : ""} integrado{totalIntegrated !== 1 ? "s" : ""}</p>
+                    </div>
+                  </div>
+                )}
+                {needsAttention > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-amber-50 rounded-xl flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{needsAttention}</p>
+                      <p className="text-xs text-gray-400">com atenção</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="max-w-2xl space-y-4">
 
@@ -1040,32 +813,20 @@ function ConexoesContent() {
                 <AtSign className={`w-5 h-5 ${colorIcon[metaColor()]}`} strokeWidth={1.5} />
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-800">
-                  {clientParam ? "Conexão Meta da plataforma" : "Meta / Instagram"}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {clientParam
-                    ? "OAuth da LOKAT OS — não representa a conexão de um cliente específico"
-                    : "Instagram Business, Paginas e Anuncios"}
-                </p>
+                <p className="text-sm font-bold text-gray-800">Meta / Instagram</p>
+                <p className="text-xs text-gray-400">Instagram Business, Páginas e Anúncios</p>
               </div>
             </div>
             <span className={`inline-flex items-center gap-1 text-xs font-medium border px-2 py-0.5 rounded-full flex-shrink-0 ${colorBadge[metaColor()]}`}>
               {isLoading && !insightsTested
                 ? <><Loader2 className="w-3 h-3 animate-spin" /> Verificando</>
                 : isConnected
-                  ? clientParam
-                    ? accountsTested
-                      ? clientHasAssets
-                        ? <><CheckCircle2 className="w-3 h-3" /> Ativo</>
-                        : <><Clock className="w-3 h-3" /> Sem ativos</>
-                      : <><Loader2 className="w-3 h-3 animate-spin" /> Verificando ativos</>
-                    : <><CheckCircle2 className="w-3 h-3" /> OAuth global</>
+                  ? <><CheckCircle2 className="w-3 h-3" /> OAuth conectado</>
                   : !metaStatus?.ok
                     ? <><XCircle className="w-3 h-3" /> Vars faltando</>
                     : metaStatus?.sqlPending
                       ? <><AlertCircle className="w-3 h-3" /> SQL pendente</>
-                      : <><Clock className="w-3 h-3" /> Aguardando conexao</>
+                      : <><Clock className="w-3 h-3" /> Aguardando conexão</>
               }
             </span>
           </div>
@@ -1081,11 +842,9 @@ function ConexoesContent() {
                     {clientParam ? "OAuth da plataforma LOKAT OS conectado" : "Conta conectada com sucesso"}
                   </p>
                 </div>
-                {clientParam && (
-                  <p className="text-[11px] text-emerald-700 leading-snug">
-                    Esta conexão é da plataforma LOKAT OS. Os ativos de cada cliente aparecem abaixo, separados por vínculo.
+                <p className="text-[11px] text-emerald-700 leading-snug">
+                    OAuth da plataforma LOKAT OS. Os ativos de cada cliente aparecem no hub abaixo.
                   </p>
-                )}
 
                 {conn?.instagram_username && (
                   <div className="flex items-center gap-2 text-xs text-emerald-800">
@@ -1119,22 +878,15 @@ function ConexoesContent() {
                 )}
               </div>
 
-              {/* ── Status de ativos por cliente ── */}
-              {clientParam && accountsTested && (
-                <div className={`mb-4 p-3 rounded-xl text-xs flex items-start gap-2 ${clientHasAssets ? "bg-emerald-50 border border-emerald-100 text-emerald-800" : "bg-amber-50 border border-amber-100 text-amber-800"}`}>
-                  {clientHasAssets
-                    ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-500" />
-                    : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
-                  }
-                  <span>
-                    <strong>Ativos de {selectedClientName}:</strong>{" "}
-                    {clientHasAssets
-                      ? `${clientLinkedAssets!.length} ativo${clientLinkedAssets!.length !== 1 ? "s" : ""} vinculado${clientLinkedAssets!.length !== 1 ? "s" : ""}.`
-                      : "Nenhuma Página ou conta do Instagram vinculada a este cliente. O OAuth acima é da plataforma LOKAT OS, não deste cliente."
-                    }
-                  </span>
-                </div>
-              )}
+              {/* ── Botão Conectar cliente (Meta) ── */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  onClick={() => setClientSelectorFor("meta")}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <AtSign className="w-3.5 h-3.5" /> Vincular cliente
+                </button>
+              </div>
 
               {/* ── Hub: Status Meta por cliente ── */}
               {accountsTested && (
@@ -1693,96 +1445,115 @@ function ConexoesContent() {
           </div>
         </div>
 
-        {/* ══ Canva ═══════════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-75">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Palette className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Canva</p>
-                <p className="text-xs text-gray-400">Design e templates visuais</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
-
-        {/* ══ Google Analytics ════════════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-75">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Google Analytics</p>
-                <p className="text-xs text-gray-400">Metricas de trafego e conversao</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
-
         {/* ══ Google Drive ════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-75">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <HardDrive className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Google Drive</p>
-                <p className="text-xs text-gray-400">Arquivos e ativos de campanha</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
+        <IntegrationProviderCard
+          providerId="google-drive"
+          title="Google Drive"
+          description="Arquivos, ativos de campanha e mídia por cliente"
+          icon={<HardDrive className="w-5 h-5 text-blue-400" strokeWidth={1.5} />}
+          platformStatus="in_preparation"
+          accentColor="blue"
+          inPreparation
+          features={[
+            "Pasta raiz por cliente",
+            "Sincronização de briefs e arquivos",
+            "Entrega de conteúdo via Drive",
+          ]}
+        />
 
-        {/* ══ Google Ads ══════════════════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-75">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Google Ads</p>
-                <p className="text-xs text-gray-400">Campanhas de trafego pago</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
+        {/* ══ Google Agenda ═══════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="google-agenda"
+          title="Google Agenda"
+          description="Calendário e agendamentos por cliente"
+          icon={<CalendarDays className="w-5 h-5 text-green-400" strokeWidth={1.5} />}
+          platformStatus="in_preparation"
+          accentColor="green"
+          inPreparation
+          features={[
+            "Calendário editorial vinculado ao cliente",
+            "Lembretes de entrega de conteúdo",
+            "Agendamentos e reuniões",
+          ]}
+        />
+
+        {/* ══ WhatsApp ════════════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="whatsapp"
+          title="WhatsApp Business"
+          description="Atendimento e notificações por cliente"
+          icon={<Bot className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={[
+            "Número de WhatsApp Business por cliente",
+            "Notificações automáticas de relatório",
+            "Integração com Typebot",
+          ]}
+        />
 
         {/* ══ Google Meu Negocio ══════════════════════════════ */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-75">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Google Meu Negocio</p>
-                <p className="text-xs text-gray-400">Presenca local e avaliacoes</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
+        <IntegrationProviderCard
+          providerId="google-business"
+          title="Google Meu Negócio"
+          description="Presença local, avaliações e posts"
+          icon={<MapPin className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={[
+            "Perfil local vinculado ao cliente",
+            "Avaliações e respostas",
+            "Posts e atualizações",
+          ]}
+        />
 
-        {/* ── Separador: Por nicho ───────────────────────────── */}
-        <div className="pt-2">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Restaurante / Delivery</p>
-        </div>
+        {/* ══ Google Analytics ════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="google-analytics"
+          title="Google Analytics"
+          description="Métricas de tráfego e conversão"
+          icon={<BarChart3 className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={[
+            "Tráfego orgânico e pago",
+            "Taxas de conversão por cliente",
+          ]}
+        />
+
+        {/* ══ Google Ads ══════════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="google-ads"
+          title="Google Ads"
+          description="Campanhas de tráfego pago"
+          icon={<TrendingUp className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={[
+            "Performance de campanhas por cliente",
+            "ROAS e CPL",
+          ]}
+        />
+
+        {/* ══ Canva ═══════════════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="canva"
+          title="Canva"
+          description="Design e templates visuais"
+          icon={<Palette className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={["Templates por cliente", "Aprovação de artes"]}
+        />
 
         {/* ══ Cardápio Digital / OlaClick ═════════════════════ */}
         {(() => {
-          const visibleConns = clientParam
-            ? olaConnections.filter((c) => c.client_id === clientParam)
-            : olaConnections;
+          const visibleConns = olaConnections;
           const hasConns = visibleConns.length > 0;
           const connectedClientCount = new Set(olaConnections.map((c) => c.client_id)).size;
           return (
@@ -1800,9 +1571,7 @@ function ConexoesContent() {
                 {olaLoading
                   ? <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Verificando…</span>
                   : hasConns
-                    ? clientParam
-                      ? <StatusBadge ok={true} label={`${visibleConns.length} conexão${visibleConns.length > 1 ? "ões" : ""}`} />
-                      : <StatusBadge ok={true} label={`${connectedClientCount} de ${olaClients.length} clientes`} />
+                    ? <StatusBadge ok={true} label={`${connectedClientCount} de ${olaClients.length} clientes`} />
                     : <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> Não conectado</span>
                 }
               </div>
@@ -1830,13 +1599,6 @@ function ConexoesContent() {
                 ))}
               </div>
 
-              {/* Aviso quando filtrado por cliente sem conexão */}
-              {!hasConns && clientParam && olaConnections.length > 0 && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex items-center gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                  Este cliente não tem conexão de Cardápio Digital. Clique em <strong>Conectar Cardápio Digital</strong> abaixo para adicionar.
-                </div>
-              )}
 
               {/* Multi-client hub — grid quando todos, lista quando filtrado */}
               {!clientParam ? (
@@ -1953,14 +1715,14 @@ function ConexoesContent() {
 
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => { setOlaModalClientId(clientParam ?? undefined); setShowOlaModal(true); }}
+                  onClick={() => setClientSelectorFor("olaclick")}
                   className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors ${
                     hasConns
                       ? "text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-100"
                       : "text-white bg-orange-500 hover:bg-orange-600"
                   }`}
                 >
-                  <Link2 className="w-3.5 h-3.5" /> {hasConns ? "Adicionar conexão" : "Conectar Cardápio Digital"}
+                  <Link2 className="w-3.5 h-3.5" /> {hasConns ? "Conectar cliente" : "Conectar Cardápio Digital"}
                 </button>
                 <button
                   onClick={() => void loadOlaConnections()}
@@ -1975,47 +1737,49 @@ function ConexoesContent() {
           );
         })()}
 
-        {/* ── Separador: Clínica ──────────────────────────────── */}
-        <div className="pt-2">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Clínica / Atendimento</p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-60">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CalendarDays className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Agenda / Clínica</p>
-                <p className="text-xs text-gray-400">Agendamentos, prontuários e atendimento</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
-
-        {/* ── Separador: Comercial ───────────────────────────── */}
-        <div className="pt-2">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Conexões por nicho — Serviços / Comercial</p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 opacity-60">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Globe className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">CRM Externo</p>
-                <p className="text-xs text-gray-400">HubSpot, RD Station, Pipedrive e similares</p>
-              </div>
-            </div>
-            <ComingSoonBadge />
-          </div>
-        </div>
+        {/* ══ CRM Externo ═════════════════════════════════════ */}
+        <IntegrationProviderCard
+          providerId="crm"
+          title="CRM Externo"
+          description="HubSpot, RD Station, Pipedrive e similares"
+          icon={<Globe className="w-5 h-5 text-gray-400" strokeWidth={1.5} />}
+          platformStatus="coming_soon"
+          accentColor="gray"
+          comingSoon
+          features={["Contatos e pipeline por cliente", "Histórico de leads"]}
+        />
 
       </div>
+
+      {/* Seletor de cliente por provedor */}
+      {clientSelectorFor === "meta" && (
+        <ClientIntegrationSelector
+          clients={clientsWithOlaStatus}
+          loading={olaClients.length === 0}
+          title="Vincular cliente ao Meta"
+          description="Selecione o cliente para configurar Página Facebook e Instagram Business."
+          onSelect={(client) => {
+            setMetaHubClient({ id: client.id, company_name: client.company_name });
+            setClientSelectorFor(null);
+          }}
+          onClose={() => setClientSelectorFor(null)}
+        />
+      )}
+      {clientSelectorFor === "olaclick" && (
+        <ClientIntegrationSelector
+          clients={clientsWithOlaStatus}
+          loading={olaClients.length === 0}
+          title="Conectar cliente ao Cardápio Digital"
+          description="Selecione o cliente para configurar a conexão OlaClick."
+          filterStatus="unconnected_olaclick"
+          onSelect={(client) => {
+            setOlaModalClientId(client.id);
+            setShowOlaModal(true);
+            setClientSelectorFor(null);
+          }}
+          onClose={() => setClientSelectorFor(null)}
+        />
+      )}
 
       {/* Modal nova conexão */}
       {showOlaModal && (
