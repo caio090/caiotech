@@ -212,7 +212,7 @@ export default async function PlataformaPage() {
                   <p className="text-xs font-bold text-amber-800">Conexões pendentes</p>
                 </div>
                 <p className="text-sm font-bold text-amber-900">{withPendingConnection.length} clientes</p>
-                <p className="text-xs text-amber-700">sem Meta ou OlaClick conectado</p>
+                <p className="text-xs text-amber-700">sem Meta ou Cardápio Digital conectado</p>
               </div>
             )}
             {withOpenRequests.length > 0 && (

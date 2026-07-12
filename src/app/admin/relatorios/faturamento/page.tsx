@@ -1944,7 +1944,7 @@ export default function FaturamentoPage() {
                       <button
                         onClick={() => {
                           const lines = [
-                            `Diagnóstico OlaClick — ${new Date().toISOString()}`,
+                            `Diagnóstico Cardápio Digital — ${new Date().toISOString()}`,
                             `Endpoint: /v1/orders`, `Período: ${PERIODS.find(p => p.value === period)?.label ?? period}`,
                             `Pedidos únicos: ${report.total_pedidos}`, `Completude: ${report.completeness ?? "—"}`,
                           ];

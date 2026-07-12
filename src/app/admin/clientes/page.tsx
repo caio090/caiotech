@@ -980,7 +980,7 @@ export default function AdminClientesPage() {
   const filtered = useMemo(() => {
     return clients.filter((c) => {
       if (!isClientVisible(c.status)) return false;
-      if (statusFilter === "operacionais" && !isClientVisible(c.status)) return false;
+      if (statusFilter === "operacionais" && c.status !== "active" && c.status !== "ativo") return false;
       if (statusFilter === "onboarding" && c.status !== "onboarding") return false;
       if (segFilter && c.segment !== segFilter) return false;
       if (metaFilter === "connected"     && c.meta_status !== "complete" && c.meta_status !== "partial" && !(c.has_meta || c.has_instagram)) return false;
@@ -1320,7 +1320,7 @@ export default function AdminClientesPage() {
               {opt.value !== "todos" && (
                 <span className="ml-1 opacity-70">
                   ({opt.value === "operacionais"
-                    ? clients.filter((c) => ["active", "onboarding"].includes(c.status ?? "")).length
+                    ? clients.filter((c) => ["active", "ativo"].includes(c.status ?? "")).length
                     : clients.filter((c) => c.status === opt.value).length})
                 </span>
               )}
