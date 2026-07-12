@@ -231,17 +231,27 @@ export async function GET() {
     enrichment.briefs = contextsRes.error ? "unavailable" : "success";
     if (contextsRes.error) warnings.push({ code: "client_context_unavailable", feature: "brief" });
 
-    // olaclick connections (optional — table may not exist yet)
-    const olaRes = await supabase.from("olaclick_connections").select("client_id, status").eq("status", "active");
+    // olaclick connections — canonical statuses: "connected" | "active"
+    // Admin client bypasses RLS; enrichment is already gated behind role check above.
+    const enrichDb = hasSupabaseServiceRoleKey() ? createRequiredSupabaseAdminClient() : supabase;
+    const olaRes = await enrichDb
+      .from("olaclick_connections")
+      .select("client_id, status")
+      .in("status", ["connected", "active"])
+      .order("created_at", { ascending: false });
     const olaClientIds = new Set<string>();
+    let olaQueryStatus: "success" | "unavailable" = "unavailable";
     if (!olaRes.error) {
+      olaQueryStatus = "success";
       (olaRes.data ?? []).forEach((r: { client_id: string; status: string }) => {
         if (r.client_id) olaClientIds.add(r.client_id);
       });
+    } else {
+      warnings.push({ code: "olaclick_unavailable", feature: "digital_menu" });
     }
 
     // meta assets (SQL 37 optional)
-    const assetsRes = await supabase.from("client_meta_assets").select("client_id, asset_type");
+    const assetsRes = await enrichDb.from("client_meta_assets").select("client_id, asset_type");
     let metaClientIds     = new Set<string>();
     let instagramClientIds = new Set<string>();
     let useAssets = false;
@@ -264,14 +274,27 @@ export async function GET() {
       }
     }
 
-    const enriched = visibleClients.map((c) => ({
-      ...c,
-      has_meta:        useAssets ? metaClientIds.has(c.id)      : false,
-      has_instagram:   useAssets ? instagramClientIds.has(c.id) : false,
-      has_diagnostico: diagIds.has(c.id),
-      has_brief:       briefIds.has(c.id),
-      has_olaclick:    olaClientIds.has(c.id),
-    }));
+    const enriched = visibleClients.map((c) => {
+      const hasFbPage = useAssets ? metaClientIds.has(c.id)      : false;
+      const hasIg     = useAssets ? instagramClientIds.has(c.id) : false;
+      const hasOla    = olaClientIds.has(c.id);
+      const metaStatus: "complete" | "partial" | "not_connected" | "unknown" =
+        !useAssets           ? "unknown"
+        : (hasFbPage && hasIg) ? "complete"
+        : (hasFbPage || hasIg) ? "partial"
+        : "not_connected";
+      return {
+        ...c,
+        has_meta:        hasFbPage,
+        has_meta_page:   hasFbPage,
+        has_instagram:   hasIg,
+        has_olaclick:    hasOla,
+        meta_status:     metaStatus,
+        olaclick_status: hasOla ? "connected" as const : olaQueryStatus === "unavailable" ? "unknown" as const : "not_connected" as const,
+        has_diagnostico: diagIds.has(c.id),
+        has_brief:       briefIds.has(c.id),
+      };
+    });
 
     // ── 6. Diagnostics (admin-only, safe — no values, only booleans) ─────────
     const diagnostics = {
@@ -281,6 +304,12 @@ export async function GET() {
       clientsQuery:  "success",
       clientsCount,
       enrichment,
+      integrationConsistency: {
+        olaclickQuery:         olaQueryStatus,
+        connectedClientsCount: olaClientIds.size,
+        acceptedStatuses:      ["active", "connected"],
+        usedAdminClient:       hasSupabaseServiceRoleKey(),
+      },
       environment: {
         supabaseUrlConfigured:  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
         supabaseAnonConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
