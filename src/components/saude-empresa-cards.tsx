@@ -170,7 +170,7 @@ export function SaudeEmpresaCards({
           <div className="flex flex-col gap-1.5 pt-3 border-t border-gray-50">
             {!hasOlaClick && (
               <Link href={connectHref} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 transition-colors flex items-center gap-1">
-                → Conectar Cardápio Digital
+                → Configurar fonte de dados
               </Link>
             )}
             <button

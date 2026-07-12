@@ -180,12 +180,12 @@ function DiagCard({ d, onRemoveDemo }: { d: ClientDiag; onRemoveDemo?: () => voi
             <BarChart3 className="w-3 h-3 text-emerald-500" strokeWidth={1.5} />
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Saúde Comercial</p>
           </div>
-          <StatusBadge status={d.hasOlaClick ? "aguardando_leitura" : "aguardando_conexao"} />
+          <StatusBadge status={d.hasOlaClick ? "aguardando_leitura" : "pendente"} />
         </div>
         <p className="text-[10px] text-gray-400 mb-1.5">
           {d.hasOlaClick
             ? "Cardápio Digital conectado — aguardando leitura de dados."
-            : "Dados de faturamento não disponíveis. Conecte o Cardápio Digital ou envie relatório."}
+            : "Sem fonte de faturamento configurada. Envie um relatório manual ou conecte uma fonte."}
         </p>
         <div className="flex flex-wrap gap-1">
           <SourceBadge label="Cardápio Digital"  active={d.hasOlaClick} />

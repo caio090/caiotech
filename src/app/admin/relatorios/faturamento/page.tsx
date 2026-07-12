@@ -31,7 +31,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "schedule",    label: "Horários"    },
   { key: "orders",      label: "Pedidos"     },
   { key: "products",    label: "Produtos"    },
-  { key: "diagnostics", label: "Diagnóstico" },
+  { key: "diagnostics", label: "Diagnóstico API" },
 ];
 
 interface ClientOption { id: string; company_name: string }
@@ -1092,8 +1092,8 @@ export default function FaturamentoPage() {
         ) : (
           <><AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
-              <span style={{ fontWeight: 600 }}>{selectedClient ? `${selectedClient.company_name} sem conexão Cardápio Digital.` : "Selecione um cliente."}</span>{" "}
-              <Link href="/admin/conexoes" style={{ textDecoration: "underline", fontWeight: 700, color: "#fbbf24" }}>Conectar →</Link>
+              <span style={{ fontWeight: 600 }}>{selectedClient ? `${selectedClient.company_name} sem fonte de faturamento configurada.` : "Selecione um cliente."}</span>{" "}
+              <Link href="/admin/conexoes" style={{ textDecoration: "underline", fontWeight: 700, color: "#fbbf24" }}>Configurar →</Link>
             </div>
           </>
         )}
