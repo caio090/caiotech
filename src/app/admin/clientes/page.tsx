@@ -205,8 +205,12 @@ function Badge({ label, color }: { label: string; color: string }) {
 function ClientBadges({ c }: { c: Client }) {
   return (
     <div className="flex flex-wrap gap-1 mt-1.5">
-      {(c.status === "active" || c.status === "ativo") && <Badge label="Ativo"      color="text-emerald-700 bg-emerald-50" />}
-      {c.status === "onboarding" && <Badge label="Onboarding" color="text-blue-700 bg-blue-50" />}
+      {(c.status === "active" || c.status === "ativo") && <Badge label="Ativo"         color="text-emerald-700 bg-emerald-50" />}
+      {c.status === "onboarding"                       && <Badge label="Onboarding"    color="text-blue-700 bg-blue-50" />}
+      {c.status === "pausado"                          && <Badge label="Pausado"       color="text-amber-700 bg-amber-50" />}
+      {c.status === "inadimplente"                     && <Badge label="Inadimplente"  color="text-red-700 bg-red-50" />}
+      {c.status === "encerrado"                        && <Badge label="Encerrado"     color="text-gray-600 bg-gray-100" />}
+      {c.status === "aguardando_validacao"             && <Badge label="Prospect"      color="text-violet-700 bg-violet-50" />}
       {!c.has_brief              && <Badge label="Brief pendente" color="text-amber-700 bg-amber-50" />}
     </div>
   );
@@ -323,13 +327,11 @@ function DeleteModal({
 }: {
   state: DeleteModalState; onConfirm: () => void; onCancel: () => void; loading: boolean;
 }) {
-  const [checked, setChecked] = useState(false);
-  const [typed, setTyped] = useState("");
+  const [step, setStep] = useState<1 | 2>(1);
   const firstName = state.clients[0]?.company_name ?? "";
   const isHard = state.mode === "hard";
   const isBulk = state.clients.length > 1;
-  const validHard = typed.trim() === "APAGAR" || (!isBulk && typed.trim() === firstName);
-  const canConfirm = isHard ? validHard : checked;
+  const clientLabel = isBulk ? `${state.clients.length} clientes` : `"${firstName}"`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
@@ -339,50 +341,60 @@ function DeleteModal({
             {isHard ? <Trash2 className="w-5 h-5 text-red-500" /> : <Archive className="w-5 h-5 text-amber-500" />}
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">{isHard ? "Apagar definitivamente?" : "Arquivar cliente?"}</p>
-            <p className="text-xs text-gray-400 truncate max-w-[220px]">
-              {isBulk ? `${state.clients.length} clientes selecionados` : firstName}
+            <p className="text-sm font-bold text-gray-900">
+              {step === 1
+                ? (isHard ? "Apagar definitivamente?" : "Arquivar cliente?")
+                : "Confirmar exclusão"}
             </p>
+            <p className="text-xs text-gray-400 truncate max-w-[220px]">{clientLabel}</p>
           </div>
         </div>
-        <div className={`p-3 rounded-xl mb-4 text-xs leading-relaxed ${isHard ? "bg-red-50 border border-red-100 text-red-700" : "bg-amber-50 border border-amber-100 text-amber-700"}`}>
-          {isHard
-            ? "Isso remove o cliente e vínculos relacionados do banco. Essa ação não deve ser usada em cliente real sem backup."
-            : "Ele sairá das listas e seletores, mas os dados ficam preservados."}
-        </div>
-        {isHard ? (
-          <div className="mb-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Digite {isBulk ? "APAGAR" : `o nome "${firstName}" ou APAGAR`} para confirmar
-            </label>
-            <input
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-            />
-          </div>
+
+        {step === 1 ? (
+          <>
+            <div className={`p-3 rounded-xl mb-5 text-xs leading-relaxed ${isHard ? "bg-red-50 border border-red-100 text-red-700" : "bg-amber-50 border border-amber-100 text-amber-700"}`}>
+              {isHard
+                ? `Tem certeza que deseja apagar ${clientLabel}? Esta ação remove o cliente e todos os vínculos relacionados do banco.`
+                : `Tem certeza que deseja arquivar ${clientLabel}? O cliente sairá das listas e seletores, mas os dados ficam preservados.`}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onCancel} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={() => isHard ? setStep(2) : onConfirm()}
+                className={`flex-1 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors ${isHard ? "bg-red-500 hover:bg-red-600" : "bg-amber-600 hover:bg-amber-700"}`}
+              >
+                Continuar
+              </button>
+            </div>
+          </>
         ) : (
-          <label className="flex items-start gap-3 mb-5 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={(e) => setChecked(e.target.checked)}
-              className="mt-0.5 w-4 h-4 accent-amber-600 cursor-pointer flex-shrink-0"
-            />
-            <span className="text-xs text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
-              Entendo que estes clientes sairão das listas e seletores.
-            </span>
-          </label>
+          <>
+            <div className="mb-4 space-y-2">
+              <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700 leading-relaxed">
+                Esta ação removerá o cliente e vínculos relacionados permanentemente.
+              </div>
+              <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-600 space-y-1">
+                <p className="font-semibold text-gray-700 mb-1">O que será removido:</p>
+                <p className="flex items-center gap-1.5"><span className="text-red-400">×</span> Registro do cliente</p>
+                <p className="flex items-center gap-1.5"><span className="text-red-400">×</span> Integrações vinculadas (Meta, Cardápio Digital)</p>
+                <p className="flex items-center gap-1.5"><span className="text-red-400">×</span> Diagnóstico e onboarding</p>
+                <p className="flex items-center gap-1.5"><span className="text-red-400">×</span> Arquivos e relatórios associados</p>
+                <p className="flex items-center gap-1.5"><span className="text-amber-500">!</span> Usuários com acesso vinculado perderão o portal</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={onConfirm} disabled={loading} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Apagar definitivamente
+              </button>
+            </div>
+          </>
         )}
-        <div className="flex gap-2">
-          <button onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
-            Cancelar
-          </button>
-          <button onClick={onConfirm} disabled={!canConfirm || loading} className={`flex-1 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isHard ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}>
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isHard ? "Apagar definitivamente" : "Arquivar"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -663,8 +675,11 @@ function EditModal({
               onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
             >
-              <option value="active">Ativo</option>
-              <option value="onboarding">Onboarding</option>
+              <option value="onboarding">Onboarding — em implantação</option>
+              <option value="active">Ativo — operacional</option>
+              <option value="pausado">Pausado</option>
+              <option value="inadimplente">Inadimplente</option>
+              <option value="encerrado">Encerrado</option>
             </select>
           </div>
         </div>
@@ -707,7 +722,7 @@ function ClientIntegrationsRow({ c }: { c: Client }) {
   const olaOk = !!c.has_olaclick;
   const olaBadge = olaOk ? "Conectado" : c.olaclick_status === "unknown" ? "Status indisponível" : "Não configurado";
   const olaColor = olaOk ? s.connected.color : c.olaclick_status === "unknown" ? "text-gray-400 bg-gray-50 border-gray-100" : s.needs_setup.color;
-  const olaTip   = olaOk ? "Cardápio Digital: conexão OlaClick ativa" : "Cardápio Digital: sem conexão OlaClick";
+  const olaTip   = olaOk ? "Cardápio Digital: conexão ativa" : "Cardápio Digital: sem conexão configurada";
 
   const perClientItems: { label: string; ok: boolean }[] = [
     { label: "Brief",       ok: !!c.has_brief       },

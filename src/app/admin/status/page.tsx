@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<ModuleStatus, { label: string; icon: typeof CheckCir
 
 const INTEGRATIONS = [
   {
-    name: "Cardápio Digital / OlaClick",
+    name: "Cardápio Digital",
     desc: "Faturamento real, pedidos, ticket médio — auto-refresh a cada 5 min",
     statusKey: "olaclick",
     status: "ativo",

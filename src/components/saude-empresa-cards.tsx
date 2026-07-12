@@ -78,8 +78,8 @@ export function SaudeEmpresaCards({
   const comercialStatus: StatusKey = hasOlaClick ? "aguardando_leitura" : "aguardando_conexao";
 
   const comercialDesc = hasOlaClick
-    ? "OlaClick conectado. Aguardando leitura dos dados de pedidos, produtos e faturamento."
-    : "Nenhuma fonte de dados comerciais conectada. Conecte o OlaClick ou anexe um relatório mensal.";
+    ? "Cardápio Digital conectado. Aguardando leitura dos dados de pedidos, produtos e faturamento."
+    : "Nenhuma fonte de dados comerciais conectada. Conecte o Cardápio Digital ou anexe um relatório mensal.";
 
   const connectHref = isAdmin
     ? `/admin/conexoes${clientId ? `?client=${clientId}` : ""}`
@@ -160,7 +160,7 @@ export function SaudeEmpresaCards({
 
           {/* Source badges */}
           <div className="flex flex-wrap gap-1.5 mb-3">
-            <SourceBadge label="OlaClick" active={hasOlaClick} />
+            <SourceBadge label="Cardápio Digital" active={hasOlaClick} />
             <SourceBadge label="Relatório mensal" active={false} />
             <SourceBadge label="Dados manuais" active={false} />
             {!hasOlaClick && <SourceBadge label="Sem dados de faturamento" active={false} />}
@@ -170,7 +170,7 @@ export function SaudeEmpresaCards({
           <div className="flex flex-col gap-1.5 pt-3 border-t border-gray-50">
             {!hasOlaClick && (
               <Link href={connectHref} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 transition-colors flex items-center gap-1">
-                → Conectar OlaClick
+                → Conectar Cardápio Digital
               </Link>
             )}
             <button

@@ -536,7 +536,7 @@ function InsightsPanel({ report, prevReport }: { report: ReportData; prevReport:
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--lk-border)", display: "flex", alignItems: "flex-start", gap: 7 }}>
         <Info size={11} style={{ color: "var(--lk-muted)", marginTop: 1, flexShrink: 0 }} />
         <span style={{ fontSize: 11, color: "var(--lk-muted)", lineHeight: 1.5 }}>
-          Estes destaques refletem exclusivamente pedidos registrados no OlaClick. Não é possível atribuir pedidos a campanhas sem cupom, UTM ou link rastreável na origem do pedido.
+          Estes destaques refletem exclusivamente pedidos registrados no Cardápio Digital. Não é possível atribuir pedidos a campanhas sem cupom, UTM ou link rastreável na origem do pedido.
         </span>
       </div>
     </div>
@@ -791,10 +791,10 @@ export default function FaturamentoPage() {
         else if (d.reason === "endpoint_not_found" || d.code === "provider_endpoint_not_found") { setError("Endpoint de pedidos não encontrado."); setApiDiag(diag); }
         else if (d.reason === "token_has_invalid_characters" || d.code === "invalid_header_value") { setError("Chave do provider com caracteres inválidos. Atualize o token."); setApiDiag(diag); }
         else if (d.reason === "bad_params" || d.code === "provider_bad_request") { setError(d.message ?? "API recusou os filtros do período."); setApiDiag(diag); }
-        else if (d.reason === "network_error" || d.code === "provider_network_error") { setError("Não foi possível conectar à API OlaClick."); setApiDiag(diag); }
+        else if (d.reason === "network_error" || d.code === "provider_network_error") { setError("Não foi possível conectar à API do Cardápio Digital."); setApiDiag(diag); }
         else if (d.reason === "unexpected_response" || d.code === "provider_unexpected_response") { setError("API respondeu em formato inesperado."); setApiDiag(diag); }
         else if (d.code === "provider_unavailable" || d.reason === "provider_503") {
-          setError("A OlaClick está temporariamente indisponível. Tente novamente em alguns instantes.");
+          setError("O serviço de Cardápio Digital está temporariamente indisponível. Tente novamente em alguns instantes.");
           setApiDiag(diag);
         }
         else { setError(d.message ?? "Não foi possível buscar dados do Cardápio Digital."); if (d.provider || d.endpoint || d.httpStatus != null) setApiDiag(diag); }
@@ -978,7 +978,7 @@ export default function FaturamentoPage() {
             <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--lk-text)", letterSpacing: "-0.02em", marginBottom: 2 }}>
               Relatório de vendas
             </h1>
-            <p style={{ fontSize: 12, color: "var(--lk-muted)" }}>Cardápio Digital · OlaClick</p>
+            <p style={{ fontSize: 12, color: "var(--lk-muted)" }}>Cardápio Digital</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             {cacheLabel && (

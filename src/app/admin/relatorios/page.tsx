@@ -181,7 +181,7 @@ export default function AdminRelatoriosPage() {
           title="Relatório Comercial"
           description="Faturamento, ticket médio, produtos mais vendidos, recorrência e pedidos por período."
           color="bg-emerald-50 text-emerald-600"
-          fonte="OlaClick · API de vendas · Relatório manual"
+          fonte="Cardápio Digital · API de vendas · Relatório manual"
           status="em_preparacao"
           cta={{ label: "Ver relatório de faturamento", href: "/admin/relatorios/faturamento" }}
           items={[

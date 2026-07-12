@@ -82,7 +82,7 @@ export function DigitalMenuConnectionModal({
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
             <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-[10px] text-amber-700">
-              Se o token apareceu em print ou conversa, revogue e gere outro no OlaClick antes de conectar.
+              Se o token apareceu em print ou conversa, revogue e gere outro no painel do provedor antes de conectar.
             </p>
           </div>
 
@@ -127,7 +127,7 @@ export function DigitalMenuConnectionModal({
               type="text"
               value={connName}
               onChange={(e) => setConnName(e.target.value)}
-              placeholder="Ex: Duh Lanches — OlaClick"
+              placeholder="Ex: Duh Lanches — Cardápio Digital"
               className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400"
             />
           </div>
@@ -176,7 +176,7 @@ export function DigitalMenuConnectionModal({
                     className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-orange-400 font-mono"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Para OlaClick deixe em branco. Necessário apenas se o provedor tiver uma URL personalizada.
+                    Para a maioria dos provedores, deixe em branco. Necessário apenas se o provedor exigir uma URL específica.
                   </p>
                 </div>
               </div>
@@ -205,7 +205,7 @@ export function DigitalMenuConnectionModal({
             {showSteps && (
               <div className="p-4 space-y-2 text-xs text-gray-600">
                 {[
-                  "Acesse o painel OlaClick.",
+                  `Acesse o painel do provedor (${selectedProvider.name}).`,
                   "Vá em Integrações.",
                   "Clique em API Keys.",
                   "Clique em Gerar novo token.",

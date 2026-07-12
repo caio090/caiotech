@@ -10,7 +10,7 @@ const TOURS: Record<AccountType, { icon: string; title: string; steps: { icon: s
     title: "Bem-vindo à Lokat!",
     steps: [
       { icon: "👥", title: "Cadastre seus clientes",    desc: "Adicione empresas em Admin → Clientes e comece a organizar." },
-      { icon: "🔗", title: "Conecte os canais",          desc: "Vincule Meta, Instagram e OlaClick de cada cliente." },
+      { icon: "🔗", title: "Conecte os canais",          desc: "Vincule Meta, Instagram e Cardápio Digital de cada cliente." },
       { icon: "📅", title: "Planeje na REC OS",              desc: "Crie conteúdos, agende publicações e envie para aprovação." },
       { icon: "📊", title: "Acompanhe relatórios",       desc: "Veja métricas reais por cliente em Resultados." },
     ],

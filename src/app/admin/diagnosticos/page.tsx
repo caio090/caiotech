@@ -55,7 +55,7 @@ const DEMO_DIAG: ClientDiag = {
   recommendations: [
     "Este é um cliente demonstrativo — explore o painel para entender o funcionamento",
     "Diagnóstico Digital analisa presença, conteúdo e engajamento da marca",
-    "Diagnóstico Comercial mostra dados de vendas quando OlaClick estiver conectado",
+    "Diagnóstico Comercial mostra dados de vendas quando Cardápio Digital estiver conectado",
   ],
   hasMetaConn:  false,
   hasOlaClick:  false,
@@ -184,11 +184,11 @@ function DiagCard({ d, onRemoveDemo }: { d: ClientDiag; onRemoveDemo?: () => voi
         </div>
         <p className="text-[10px] text-gray-400 mb-1.5">
           {d.hasOlaClick
-            ? "OlaClick conectado — aguardando leitura de dados."
-            : "Dados de faturamento não disponíveis. Conecte OlaClick ou envie relatório."}
+            ? "Cardápio Digital conectado — aguardando leitura de dados."
+            : "Dados de faturamento não disponíveis. Conecte o Cardápio Digital ou envie relatório."}
         </p>
         <div className="flex flex-wrap gap-1">
-          <SourceBadge label="OlaClick"         active={d.hasOlaClick} />
+          <SourceBadge label="Cardápio Digital"  active={d.hasOlaClick} />
           <SourceBadge label="Relatório mensal" active={false} />
         </div>
       </div>
@@ -586,10 +586,10 @@ export default function AdminDiagnosticosPage() {
             <p className="text-xs font-black text-emerald-800">Diagnóstico Comercial</p>
           </div>
           <p className="text-[11px] text-emerald-700 leading-relaxed">
-            Mede faturamento, ticket médio, produtos mais vendidos e gargalos de venda via OlaClick ou relatório manual.
+            Mede faturamento, ticket médio, produtos mais vendidos e gargalos de venda via Cardápio Digital ou relatório manual.
           </p>
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {["OlaClick", "API de vendas", "Relatório anexado", "Dados manuais"].map((l) => (
+            {["Cardápio Digital", "API de vendas", "Relatório anexado", "Dados manuais"].map((l) => (
               <span key={l} className="text-[9px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{l}</span>
             ))}
           </div>
@@ -653,10 +653,10 @@ export default function AdminDiagnosticosPage() {
           <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
           <div className="text-[11px] text-gray-400 space-y-1">
             <p>
-              <strong className="text-gray-600">Fluxo correto:</strong> Cadastre o cliente em <Link href="/admin/clientes" className="text-indigo-500 hover:underline">Clientes</Link> → conecte o Meta em <Link href="/admin/conexoes" className="text-indigo-500 hover:underline">Conexões</Link> → inicie o diagnóstico digital → o comercial aparece automaticamente quando OlaClick estiver conectado.
+              <strong className="text-gray-600">Fluxo correto:</strong> Cadastre o cliente em <Link href="/admin/clientes" className="text-indigo-500 hover:underline">Clientes</Link> → conecte o Meta em <Link href="/admin/conexoes" className="text-indigo-500 hover:underline">Conexões</Link> → inicie o diagnóstico digital → o comercial aparece automaticamente quando Cardápio Digital estiver conectado.
             </p>
             <p>
-              <strong className="text-gray-600">Dados comerciais:</strong> Quando OlaClick ou outro sistema estiver conectado, o Diagnóstico Comercial exibirá faturamento, ticket médio e produtos mais vendidos automaticamente.
+              <strong className="text-gray-600">Dados comerciais:</strong> Quando Cardápio Digital ou outro sistema estiver conectado, o Diagnóstico Comercial exibirá faturamento, ticket médio e produtos mais vendidos automaticamente.
             </p>
           </div>
         </div>

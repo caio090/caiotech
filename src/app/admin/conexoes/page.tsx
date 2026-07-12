@@ -1565,7 +1565,7 @@ function ConexoesContent() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-800">Cardápio Digital</p>
-                    <p className="text-xs text-gray-400">OlaClick e outros · Pedidos, produtos e faturamento</p>
+                    <p className="text-xs text-gray-400">Pedidos, produtos e faturamento</p>
                   </div>
                 </div>
                 {olaLoading
@@ -1664,7 +1664,7 @@ function ConexoesContent() {
                   <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700">
                     <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-500" />
                     <p>
-                      URL da API configurada automaticamente via preset do provider OlaClick.
+                      URL da API configurada automaticamente via preset do provedor.
                       Clique em <strong>Gerenciar</strong> para usar uma URL personalizada ou atualizar o token.
                     </p>
                   </div>
@@ -1770,7 +1770,7 @@ function ConexoesContent() {
           clients={clientsWithOlaStatus}
           loading={olaClients.length === 0}
           title="Conectar cliente ao Cardápio Digital"
-          description="Selecione o cliente para configurar a conexão OlaClick."
+          description="Selecione o cliente e configure a conexão com o Cardápio Digital."
           filterStatus="unconnected_olaclick"
           onSelect={(client) => {
             setOlaModalClientId(client.id);

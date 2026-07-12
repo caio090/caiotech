@@ -157,7 +157,7 @@ export default async function AdminContentosVisualPage({
     { id: "cliente",   label: "Cliente",           subtitle: displayName || "Nenhum",       icon: User,       color: "text-purple-600",  bg: "bg-purple-50",  border: "border-purple-100", isGlobal: true,  status: ctx.hasOnboarding ? "active" : "pending" },
     { id: "ativos",    label: "Ativos Globais",     subtitle: "Logo, pessoa, produto",        icon: FolderOpen, color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-100",   isGlobal: true,  status: "pending", badge: "Em breve" },
     { id: "contexto",  label: "Contexto",           subtitle: "Estratégia + tom de voz",      icon: BookOpen,   color: "text-indigo-600",  bg: "bg-indigo-50",  border: "border-indigo-100", isGlobal: true,  status: ctx.hasOnboarding ? "connected" : "pending" },
-    { id: "comercial", label: "Dados Comerciais",   subtitle: "OlaClick / relatório",         icon: BarChart3,  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100",isGlobal: true,  status: ctx.hasOlaClick ? "connected" : "pending" },
+    { id: "comercial", label: "Dados Comerciais",   subtitle: "Cardápio Digital / relatório",         icon: BarChart3,  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100",isGlobal: true,  status: ctx.hasOlaClick ? "connected" : "pending" },
     { id: "temporada", label: "Temporada",          subtitle: "Sazonalidade / trends",        icon: Calendar,   color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-100",  isGlobal: true,  status: "pending", badge: "Manual V1" },
   ];
 
@@ -399,7 +399,7 @@ export default async function AdminContentosVisualPage({
           </div>
           {ctx.hasOlaClick ? (
             <div className="space-y-1.5">
-              <p className="text-xs text-emerald-700 font-bold">OlaClick conectado</p>
+              <p className="text-xs text-emerald-700 font-bold">Cardápio Digital conectado</p>
               <p className="text-[10px] text-gray-400 leading-relaxed">Sugestões visuais baseadas em dados de vendas em breve.</p>
               <div className="mt-2 space-y-1">
                 {[
@@ -416,7 +416,7 @@ export default async function AdminContentosVisualPage({
           ) : (
             <div>
               <p className="text-xs text-gray-400 mb-2">Nenhuma fonte comercial conectada.</p>
-              <Link href="/admin/conexoes" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">→ Conectar OlaClick</Link>
+              <Link href="/admin/conexoes" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">→ Conectar Cardápio Digital</Link>
               <p className="text-[9px] text-gray-400 mt-2">Ou anexar relatório mensal (em breve)</p>
             </div>
           )}
