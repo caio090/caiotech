@@ -91,6 +91,16 @@ type AssetsResponse = {
   }>;
 } | null;
 
+type HubAssetsResponse = {
+  ok: boolean;
+  items?: Array<{
+    client_id:          string;
+    facebook_page_name: string | null;
+    instagram_username: string | null;
+    meta_status:        "complete" | "partial" | "not_connected";
+  }>;
+} | null;
+
 // ── Helpers visuais ────────────────────────────────────────────
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return ok ? (
@@ -465,6 +475,7 @@ function ConexoesContent() {
   const [olaModalClientId, setOlaModalClientId] = useState<string | undefined>(undefined);
 
   const [assets,        setAssets]        = useState<AssetsResponse>(null);
+  const [hubAssets,     setHubAssets]     = useState<HubAssetsResponse>(null);
   const [linkingKey,    setLinkingKey]    = useState<string | null>(null); // "fb:{pageId}" ou "ig:{igId}"
   const [linkClientId,  setLinkClientId]  = useState("");
   const [linkSaving,    setLinkSaving]    = useState(false);
@@ -533,12 +544,14 @@ function ConexoesContent() {
   const checkAccounts = useCallback(async () => {
     setAccountsLoading(true);
     try {
-      const [acct, assetData] = await Promise.all([
+      const [acct, assetData, hubData] = await Promise.all([
         fetch("/api/meta/accounts").then((r) => r.json()) as Promise<AccountsResponse>,
         fetch("/api/meta/assets").then((r) => r.json()) as Promise<AssetsResponse>,
+        fetch("/api/meta/hub-assets").then((r) => r.json()) as Promise<HubAssetsResponse>,
       ]);
       setAccounts(acct);
       setAssets(assetData);
+      setHubAssets(hubData);
       setAccountsTested(true);
     } catch { setAccountsTested(true); }
     finally { setAccountsLoading(false); }
@@ -723,9 +736,7 @@ function ConexoesContent() {
             const activeProviders = [isConnected, olaConnections.length > 0].filter(Boolean).length;
             const olaIds = new Set(olaConnections.map((c) => c.client_id));
             const metaIds = new Set(
-              (assets?.assets ?? [])
-                .flatMap((a) => [a.link?.client_id, a.instagram?.link?.client_id])
-                .filter(Boolean) as string[],
+              (hubAssets?.items ?? []).map((item) => item.client_id)
             );
             const totalIntegrated = new Set([...olaIds, ...metaIds]).size;
             const needsAttention = insightReason === "token_expired" ? 1 : 0;
@@ -911,15 +922,11 @@ function ConexoesContent() {
                     </div>
                     {/* Filter chips with counts */}
                     {(() => {
-                      const fbMap = new Map<string, string>();
-                      const igMap = new Map<string, { name: string | null; username: string | null }>();
-                      for (const asset of (assets?.assets ?? [])) {
-                        if (asset.link?.client_id) fbMap.set(asset.link.client_id, asset.name);
-                        if (asset.instagram?.link?.client_id) igMap.set(asset.instagram.link.client_id, { name: asset.instagram.name, username: asset.instagram.username });
-                      }
+                      // Fonte: client_meta_assets via /api/meta/hub-assets (persistido, não Graph API)
+                      const hubMap = new Map((hubAssets?.items ?? []).map((item) => [item.client_id, item]));
                       const counts = { todos: olaClients.length, complete: 0, partial: 0, not_connected: 0, unknown: 0 };
                       for (const c of olaClients) {
-                        const ms = c.meta_status ?? ((fbMap.has(c.id) && igMap.has(c.id)) ? "complete" : (fbMap.has(c.id) || igMap.has(c.id)) ? "partial" : "not_connected");
+                        const ms = c.meta_status ?? hubMap.get(c.id)?.meta_status ?? "not_connected";
                         if (ms === "complete") counts.complete++;
                         else if (ms === "partial") counts.partial++;
                         else if (ms === "unknown") counts.unknown++;
@@ -955,25 +962,21 @@ function ConexoesContent() {
                             </td>
                           </tr>
                         ) : (() => {
-                          // Build enrichment maps from assets (enrich only, not source of truth)
-                          const fbMap = new Map<string, string>();
-                          const igMap = new Map<string, { name: string | null; username: string | null }>();
-                          for (const asset of (assets?.assets ?? [])) {
-                            if (asset.link?.client_id) fbMap.set(asset.link.client_id, asset.name);
-                            if (asset.instagram?.link?.client_id) igMap.set(asset.instagram.link.client_id, { name: asset.instagram.name, username: asset.instagram.username });
-                          }
+                          // Fonte: client_meta_assets via /api/meta/hub-assets (persistido, não Graph API)
+                          const hubMap = new Map((hubAssets?.items ?? []).map((item) => [item.client_id, item]));
                           // Full list from olaClients (source of truth)
                           const allRows = olaClients.map(c => {
-                            const fb = fbMap.get(c.id) ?? null;
-                            const ig = igMap.get(c.id) ?? null;
+                            const hubItem = hubMap.get(c.id);
+                            const fb = hubItem?.facebook_page_name ?? null;
+                            const igUsername = hubItem?.instagram_username ?? null;
                             const ms: "complete" | "partial" | "not_connected" | "unknown" =
-                              c.meta_status ?? ((fb && ig) ? "complete" : (fb || ig) ? "partial" : "not_connected");
+                              c.meta_status ?? hubItem?.meta_status ?? "not_connected";
                             return {
                               clientId:   c.id,
                               clientName: c.company_name,
                               fbPage:     fb,
-                              igAccount:  ig ? (ig.name ?? ig.username ?? "IG") : null,
-                              igUsername: ig?.username ?? null,
+                              igAccount:  igUsername ?? null,
+                              igUsername: igUsername,
                               ms,
                             };
                           });
