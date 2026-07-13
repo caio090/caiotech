@@ -123,20 +123,42 @@ export async function POST(request: NextRequest) {
 
   // ── Etapa 2: Fallback direto ────────────────────────────────────────────────
   //
-  // Resolve meta_connection_id:
-  //   - Se veio do body (enviado por /admin/conexoes após listar ativos via
-  //     /api/meta/assets), usa diretamente. Não re-verificamos: o listing já
-  //     provou a conexão ao chamar a Graph API com sucesso.
+  // Resolve e valida meta_connection_id:
+  //   - Se veio do body, valida server-side que o usuário tem acesso (Fase 8).
   //   - Se não veio, busca a conexão Meta ativa mais recente no banco.
-  let resolvedConnectionId: string | null = meta_connection_id ?? null;
+  let resolvedConnectionId: string | null = null;
+  const isBroadAccess = userRole === "super_admin" || userRole === "admin";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let connDb: any = supabase;
+  if (hasSupabaseServiceRoleKey()) {
+    try { connDb = createSupabaseAdminClient(); } catch { /* usa session */ }
+  }
+
+  if (meta_connection_id) {
+    // Valida que o usuário tem acesso à conexão enviada pelo front (Fase 8)
+    const connQ = isBroadAccess
+      ? connDb.from("meta_connections").select("id").eq("id", meta_connection_id).eq("status", "active").maybeSingle()
+      : connDb.from("meta_connections").select("id").eq("id", meta_connection_id).eq("connected_by", userId).eq("status", "active").maybeSingle();
+
+    const { data: connRow, error: connErr } = await connQ as {
+      data: { id: string } | null;
+      error: { code?: string; message?: string } | null;
+    };
+
+    if (connErr?.code === "42P01") {
+      return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 35 no Supabase." });
+    }
+    if (!connRow) {
+      return NextResponse.json({
+        ok: false, reason: "connection_not_found",
+        message: "Conexão Meta não encontrada ou sem permissão de acesso.",
+      }, { status: 404 });
+    }
+    resolvedConnectionId = connRow.id;
+  }
 
   if (!resolvedConnectionId) {
-    // Busca conexão ativa — tenta adminDb primeiro (bypassa RLS)
-    let connDb: typeof supabase = supabase;
-    if (hasSupabaseServiceRoleKey()) {
-      try { connDb = createSupabaseAdminClient() as unknown as typeof supabase; } catch { /* usa session */ }
-    }
-
     const { data: connRow, error: connLookupErr } = await connDb
       .from("meta_connections")
       .select("id")
@@ -155,7 +177,6 @@ export async function POST(request: NextRequest) {
     resolvedConnectionId = connRow?.id ?? null;
 
     if (!resolvedConnectionId) {
-      // Nenhuma conexão Meta ativa no banco
       return NextResponse.json({
         ok: false, reason: "no_active_meta_connection",
         message: "Nenhuma conexão Meta ativa encontrada. Conecte a Meta em /admin/conexoes.",

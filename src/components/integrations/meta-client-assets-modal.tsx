@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X, Loader2, CheckCircle2, AlertCircle, Link2,
-  AtSign, Globe, ChevronRight, Trash2, Info,
+  AtSign, Globe, ChevronRight, Trash2, Info, Plus, RefreshCw,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,7 +26,15 @@ interface CurrentAssets {
   adAccount:         null;
 }
 
-type Step = "select" | "confirm" | "saving" | "success";
+interface Connection {
+  id:                   string;
+  display_name:         string;
+  status:               string;
+  created_at:           string;
+  linked_clients_count: number;
+}
+
+type Step = "choose_mode" | "pick_connection" | "loading_pages" | "select" | "confirm" | "saving" | "success";
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
@@ -35,64 +43,120 @@ export function MetaClientAssetsModal({
   clientName,
   onSaved,
   onClose,
+  preferredConnectionId,
 }: {
-  clientId:   string;
-  clientName: string;
-  onSaved:    () => void;
-  onClose:    () => void;
+  clientId:               string;
+  clientName:             string;
+  onSaved:                () => void;
+  onClose:                () => void;
+  preferredConnectionId?: string; // pre-seleciona após retorno de OAuth
 }) {
-  const [step,           setStep]           = useState<Step>("select");
+  const [step,           setStep]           = useState<Step>("choose_mode");
+  const [connections,    setConnections]    = useState<Connection[]>([]);
+  const [selectedConnId, setSelectedConnId] = useState<string | null>(preferredConnectionId ?? null);
   const [pages,          setPages]          = useState<AvailablePage[]>([]);
   const [currentAssets,  setCurrentAssets]  = useState<CurrentAssets | null>(null);
   const [connectionId,   setConnectionId]   = useState<string | null>(null);
-  const [loading,        setLoading]        = useState(true);
+  const [loadingInit,    setLoadingInit]    = useState(true);
+  const [loadingPages,   setLoadingPages]   = useState(false);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [error,          setError]          = useState("");
   const [unlinking,      setUnlinking]      = useState(false);
 
   const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null;
 
+  // ── Carga inicial: conexões disponíveis + ativos atuais do cliente ────
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    setLoadingInit(true);
     setError("");
+
     Promise.all([
-      fetch("/api/meta/accounts").then((r) => r.json()),
+      fetch("/api/meta/connections").then((r) => r.json()),
       fetch(`/api/meta/client-assets?client_id=${clientId}`).then((r) => r.json()),
     ])
-      .then(([accts, assets]) => {
+      .then(([connsData, assetsData]) => {
         if (!active) return;
-        const a = accts as {
-          ok: boolean; connection_id?: string;
-          pages?: AvailablePage[];
-          reason?: string; message?: string;
-        };
-        const ca = assets as { ok: boolean; assets?: CurrentAssets; reason?: string; message?: string };
 
-        if (!a.ok) {
-          setError(a.message ?? "Não foi possível carregar os ativos Meta. Verifique a conexão em /admin/conexoes.");
+        const cd = connsData as {
+          ok: boolean;
+          connections?: Connection[];
+          reason?: string;
+          message?: string;
+        };
+        const ca = assetsData as { ok: boolean; assets?: CurrentAssets };
+
+        if (!cd.ok) {
+          setError(cd.message ?? "Não foi possível carregar conexões Meta.");
         } else {
-          setPages(a.pages ?? []);
-          setConnectionId(a.connection_id ?? null);
+          const list = cd.connections ?? [];
+          setConnections(list);
+
+          // Se voltou de OAuth com uma conexão preferida, vai direto para páginas
+          if (preferredConnectionId && list.find((c) => c.id === preferredConnectionId)) {
+            setSelectedConnId(preferredConnectionId);
+            setStep("loading_pages");
+          } else if (list.length === 1 && !cd.connections?.length) {
+            // Uma única conexão — vai para seleção direta
+            setSelectedConnId(list[0].id);
+            setStep("loading_pages");
+          }
+          // else: mostra tela de escolha de modo
         }
+
         if (ca.ok && ca.assets) {
           setCurrentAssets(ca.assets);
-          // Pre-select current page if linked
           if (ca.assets.facebookPage?.id) setSelectedPageId(ca.assets.facebookPage.id);
         }
       })
-      .catch(() => { if (active) setError("Erro de rede ao carregar ativos."); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [clientId]);
+      .catch(() => { if (active) setError("Erro de rede ao carregar dados."); })
+      .finally(() => { if (active) setLoadingInit(false); });
 
+    return () => { active = false; };
+  }, [clientId, preferredConnectionId]);
+
+  // ── Carrega páginas de uma conexão específica ─────────────────────────
+  const loadPagesForConnection = useCallback(async (connId: string) => {
+    setLoadingPages(true);
+    setError("");
+    setPages([]);
+    try {
+      const r = await fetch(`/api/meta/accounts?connection_id=${connId}`);
+      const d = await r.json() as {
+        ok: boolean; connection_id?: string;
+        pages?: AvailablePage[];
+        reason?: string; message?: string;
+      };
+      if (!d.ok) {
+        setError(d.message ?? "Falha ao carregar páginas desta conexão.");
+        setStep("pick_connection");
+        return;
+      }
+      setPages(d.pages ?? []);
+      setConnectionId(d.connection_id ?? null);
+      setStep("select");
+    } catch {
+      setError("Erro de rede ao carregar páginas.");
+      setStep("pick_connection");
+    } finally {
+      setLoadingPages(false);
+    }
+  }, []);
+
+  // Dispara quando step muda para loading_pages
+  useEffect(() => {
+    if (step === "loading_pages" && selectedConnId) {
+      void loadPagesForConnection(selectedConnId);
+    }
+  }, [step, selectedConnId, loadPagesForConnection]);
+
+  // ── Salvar vínculo ────────────────────────────────────────────────────
   async function handleSave() {
     if (!selectedPage) { setError("Selecione uma Página Facebook."); return; }
     setStep("saving");
     setError("");
 
     try {
-      // Link Facebook Page
       const fbRes = await fetch("/api/meta/assets/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,7 +177,6 @@ export function MetaClientAssetsModal({
         return;
       }
 
-      // Link Instagram Business if available
       if (selectedPage.instagram) {
         const igRes = await fetch("/api/meta/assets/link", {
           method: "POST",
@@ -144,6 +207,7 @@ export function MetaClientAssetsModal({
     }
   }
 
+  // ── Desvincular ativo ─────────────────────────────────────────────────
   async function handleUnlink(assetRecordId: string) {
     setUnlinking(true);
     setError("");
@@ -151,21 +215,29 @@ export function MetaClientAssetsModal({
       const r = await fetch(`/api/meta/assets/link?id=${assetRecordId}`, { method: "DELETE" });
       const d = await r.json() as { ok: boolean; message?: string };
       if (!d.ok) { setError(d.message ?? "Erro ao desvincular."); return; }
-      // Refresh current assets
       const ca = await fetch(`/api/meta/client-assets?client_id=${clientId}`).then((r2) => r2.json()) as { ok: boolean; assets?: CurrentAssets };
       if (ca.ok && ca.assets) setCurrentAssets(ca.assets);
     } catch { setError("Erro de rede ao desvincular."); }
     finally { setUnlinking(false); }
   }
 
+  // ── Iniciar nova conexão OAuth ────────────────────────────────────────
+  function startNewOAuth() {
+    const params = new URLSearchParams({
+      return_to: "/admin/clientes",
+      client_id: clientId,
+    });
+    window.location.href = `/api/meta/connect?${params.toString()}`;
+  }
+
   const isCurrentlyLinked = (pageId: string) =>
-    currentAssets?.facebookPage?.id === pageId || currentAssets?.instagramBusiness !== null;
+    currentAssets?.facebookPage?.id === pageId;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && step !== "saving") onClose(); }}
     >
       <div
         className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
@@ -176,7 +248,7 @@ export function MetaClientAssetsModal({
           <div>
             <p className="text-sm font-bold text-gray-900">Vincular Meta</p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {step === "success" ? "Vínculo salvo" : clientName}
+              {step === "success" ? "Vínculo salvo" : `Cliente: ${clientName}`}
             </p>
           </div>
           {step !== "saving" && (
@@ -192,36 +264,35 @@ export function MetaClientAssetsModal({
         {/* Body */}
         <div className="px-5 py-4 overflow-y-auto" style={{ maxHeight: "calc(90vh - 120px)" }}>
 
-          {/* Loading */}
-          {loading && (
+          {/* Carregando inicial */}
+          {loadingInit && (
             <div className="flex items-center gap-3 py-8 justify-center">
               <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-              <span className="text-sm text-gray-400">Carregando ativos da Meta…</span>
+              <span className="text-sm text-gray-400">Carregando…</span>
             </div>
           )}
 
-          {/* Error */}
-          {error && (
+          {/* Erro */}
+          {error && !loadingInit && (
             <div className="mb-4 flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Success */}
+          {/* Sucesso */}
           {step === "success" && (
             <div className="py-4 text-center space-y-3">
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-6 h-6 text-emerald-600" />
               </div>
-              <p className="text-sm font-bold text-gray-900">Vínculo salvo com sucesso!</p>
+              <p className="text-sm font-bold text-gray-900">Meta vinculada com sucesso!</p>
               {selectedPage && (
                 <div className="text-xs text-gray-500 space-y-0.5">
                   <p><span className="font-semibold text-gray-700">Página:</span> {selectedPage.name}</p>
                   {selectedPage.instagram && (
                     <p><span className="font-semibold text-gray-700">Instagram:</span> @{selectedPage.instagram.username}</p>
                   )}
-                  <p><span className="font-semibold text-gray-700">Conta de anúncio:</span> Não vinculada</p>
                 </div>
               )}
               <button
@@ -233,7 +304,7 @@ export function MetaClientAssetsModal({
             </div>
           )}
 
-          {/* Saving */}
+          {/* Salvando */}
           {step === "saving" && (
             <div className="flex items-center gap-3 py-8 justify-center">
               <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
@@ -241,10 +312,18 @@ export function MetaClientAssetsModal({
             </div>
           )}
 
-          {/* Select step */}
-          {!loading && step === "select" && (
+          {/* Carregando páginas */}
+          {(step === "loading_pages" || loadingPages) && !loadingInit && (
+            <div className="flex items-center gap-3 py-8 justify-center">
+              <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+              <span className="text-sm text-gray-400">Carregando páginas da conta Meta…</span>
+            </div>
+          )}
+
+          {/* ETAPA: escolha de modo */}
+          {!loadingInit && step === "choose_mode" && (
             <>
-              {/* Current assets */}
+              {/* Ativos atuais */}
               {(currentAssets?.facebookPage || currentAssets?.instagramBusiness) && (
                 <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                   <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-2">Ativos atuais de {clientName}</p>
@@ -285,28 +364,199 @@ export function MetaClientAssetsModal({
                 </div>
               )}
 
-              {/* No Meta connection */}
-              {pages.length === 0 && !loading && !error && (
+              <p className="text-sm font-semibold text-gray-800 mb-3">Como deseja conectar?</p>
+
+              <div className="space-y-2">
+                {/* Usar conexão existente */}
+                {connections.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setStep("pick_connection")}
+                    className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition-all group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <Link2 className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 group-hover:text-indigo-700">Usar uma conexão Meta existente</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {connections.length === 1
+                            ? `1 conta Meta disponível`
+                            : `${connections.length} contas Meta disponíveis`}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 ml-auto flex-shrink-0 mt-1" />
+                    </div>
+                  </button>
+                )}
+
+                {/* Conectar nova conta */}
+                <button
+                  type="button"
+                  onClick={startNewOAuth}
+                  className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 transition-all group"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Plus className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">Conectar outra conta Meta</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Autorizar uma conta Facebook com acesso às Páginas do cliente</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 ml-auto flex-shrink-0 mt-1" />
+                  </div>
+                </button>
+
+                {connections.length === 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                    <p className="text-xs text-amber-700">
+                      Nenhuma conta Meta conectada ainda. Entre com o Facebook que tem acesso à Página do cliente.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Disclaimer */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-xl">
+                <p className="text-[10px] text-gray-400">
+                  Entre com um perfil Facebook que tenha acesso à Página ou ao portfólio empresarial do cliente.
+                  A LOKAT OS não recebe nem armazena sua senha da Meta.
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* ETAPA: selecionar conexão */}
+          {!loadingInit && step === "pick_connection" && (
+            <>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Contas Meta disponíveis</p>
+              <div className="space-y-2 mb-4">
+                {connections.map((conn) => {
+                  const selected = selectedConnId === conn.id;
+                  return (
+                    <button
+                      key={conn.id}
+                      type="button"
+                      onClick={() => setSelectedConnId(conn.id)}
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all ${
+                        selected
+                          ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300"
+                          : "border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{conn.display_name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {conn.linked_clients_count > 0
+                              ? `${conn.linked_clients_count} cliente${conn.linked_clients_count > 1 ? "s" : ""} vinculado${conn.linked_clients_count > 1 ? "s" : ""}`
+                              : "Sem vínculos"}
+                            {" · "}
+                            Conectada em {new Date(conn.created_at).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        {selected && <CheckCircle2 className="w-4 h-4 text-indigo-500 flex-shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={startNewOAuth}
+                className="w-full flex items-center justify-center gap-2 p-3 text-xs text-gray-500 border border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:text-blue-600 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Conectar outra conta Meta
+              </button>
+            </>
+          )}
+
+          {/* ETAPA: selecionar página */}
+          {!loadingInit && !loadingPages && step === "select" && (
+            <>
+              {/* Ativos atuais */}
+              {(currentAssets?.facebookPage || currentAssets?.instagramBusiness) && (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-2">Ativos atuais de {clientName}</p>
+                  <div className="space-y-1.5">
+                    {currentAssets.facebookPage && (
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="text-gray-700 font-medium">{currentAssets.facebookPage.name ?? currentAssets.facebookPage.id}</span>
+                        </div>
+                        <button
+                          onClick={() => void handleUnlink(currentAssets.facebookPage!.asset_record_id)}
+                          disabled={unlinking}
+                          className="text-[10px] text-red-400 hover:text-red-600 flex items-center gap-1"
+                        >
+                          {unlinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          Desvincular
+                        </button>
+                      </div>
+                    )}
+                    {currentAssets.instagramBusiness && (
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <AtSign className="w-3.5 h-3.5 text-pink-500" />
+                          <span className="text-gray-700 font-medium">@{currentAssets.instagramBusiness.username ?? currentAssets.instagramBusiness.id}</span>
+                        </div>
+                        <button
+                          onClick={() => void handleUnlink(currentAssets.instagramBusiness!.asset_record_id)}
+                          disabled={unlinking}
+                          className="text-[10px] text-red-400 hover:text-red-600 flex items-center gap-1"
+                        >
+                          {unlinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          Desvincular
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sem páginas */}
+              {pages.length === 0 && (
                 <div className="py-6 text-center space-y-2">
                   <Info className="w-8 h-8 text-gray-300 mx-auto" />
                   <p className="text-sm font-medium text-gray-600">Nenhuma Página encontrada</p>
                   <p className="text-xs text-gray-400">
-                    Reconecte a conta Meta em{" "}
-                    <a href="/admin/conexoes" className="text-indigo-600 hover:underline">Conexões</a>
-                    {" "}e autorize o acesso a Páginas no fluxo OAuth.
+                    A conta Meta selecionada não tem Páginas acessíveis. Tente outra conta.
                   </p>
+                  <button
+                    onClick={() => setStep("pick_connection")}
+                    className="mt-2 flex items-center gap-1.5 mx-auto text-xs text-indigo-600 hover:underline"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Escolher outra conexão
+                  </button>
                 </div>
               )}
 
-              {/* Page list */}
+              {/* Lista de páginas */}
               {pages.length > 0 && (
                 <>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
-                    Selecione a Página Facebook do cliente
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                      Selecione a Página Facebook do cliente
+                    </p>
+                    {connections.length > 1 && (
+                      <button
+                        onClick={() => setStep("pick_connection")}
+                        className="text-[10px] text-indigo-500 hover:underline flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        Trocar conta
+                      </button>
+                    )}
+                  </div>
                   <div className="space-y-2 mb-5">
                     {pages.map((page) => {
-                      const linked = isCurrentlyLinked(page.id);
+                      const linked   = isCurrentlyLinked(page.id);
                       const selected = selectedPageId === page.id;
                       return (
                         <button
@@ -331,21 +581,18 @@ export function MetaClientAssetsModal({
                               <p className="text-sm font-semibold text-gray-800 truncate">{page.name}</p>
                               <p className="text-[10px] text-gray-400">
                                 Página Facebook
-                                {linked && <span className="ml-1.5 text-emerald-600 font-medium">· Já vinculado</span>}
+                                {linked && <span className="ml-1.5 text-emerald-600 font-medium">· Já vinculada</span>}
                               </p>
                             </div>
                             {selected && <CheckCircle2 className="w-4 h-4 text-indigo-500 flex-shrink-0" />}
                           </div>
 
-                          {/* Instagram Business */}
                           {page.instagram ? (
                             <div className={`mt-2 ml-10 flex items-center gap-2 text-xs ${selected ? "text-pink-700" : "text-gray-500"}`}>
                               <AtSign className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" />
-                              <span>
-                                @{page.instagram.username ?? page.instagram.name ?? page.instagram.id}
-                              </span>
+                              <span>@{page.instagram.username ?? page.instagram.name ?? page.instagram.id}</span>
                               <ChevronRight className="w-3 h-3 text-gray-300" />
-                              <span className="text-[10px] text-gray-400">Instagram Business — será vinculado automaticamente</span>
+                              <span className="text-[10px] text-gray-400">Instagram Business — será vinculado</span>
                             </div>
                           ) : (
                             <p className="mt-1.5 ml-10 text-[10px] text-gray-400">
@@ -357,11 +604,10 @@ export function MetaClientAssetsModal({
                     })}
                   </div>
 
-                  {/* Ad account notice */}
                   <div className="mb-4 p-3 bg-gray-50 border border-gray-100 rounded-xl">
                     <p className="text-[10px] text-gray-400">
                       <span className="font-semibold text-gray-500">Conta de anúncio:</span>{" "}
-                      Contas de anúncio ainda não estão disponíveis nesta conexão.
+                      Ainda não disponível nesta conexão.
                     </p>
                   </div>
                 </>
@@ -369,7 +615,7 @@ export function MetaClientAssetsModal({
             </>
           )}
 
-          {/* Confirm step */}
+          {/* ETAPA: confirmar */}
           {step === "confirm" && selectedPage && (
             <div className="space-y-4">
               <p className="text-sm font-bold text-gray-900 mb-3">Confirmar vínculo</p>
@@ -400,16 +646,44 @@ export function MetaClientAssetsModal({
           )}
         </div>
 
-        {/* Footer actions */}
-        {!loading && step !== "saving" && step !== "success" && (
+        {/* Footer */}
+        {!loadingInit && !loadingPages && step !== "saving" && step !== "success" && step !== "loading_pages" && (
           <div className="px-5 pb-5 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
-            {step === "select" ? (
+            {step === "choose_mode" && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                Fechar
+              </button>
+            )}
+
+            {step === "pick_connection" && (
               <>
                 <button
-                  onClick={onClose}
+                  onClick={() => setStep("choose_mode")}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors"
                 >
-                  Cancelar
+                  Voltar
+                </button>
+                <button
+                  disabled={!selectedConnId}
+                  onClick={() => { if (selectedConnId) setStep("loading_pages"); }}
+                  className="px-5 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  Usar esta conexão
+                </button>
+              </>
+            )}
+
+            {step === "select" && (
+              <>
+                <button
+                  onClick={() => connections.length > 1 ? setStep("pick_connection") : setStep("choose_mode")}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Voltar
                 </button>
                 <button
                   onClick={() => { if (selectedPage) setStep("confirm"); else setError("Selecione uma Página Facebook."); }}
@@ -420,7 +694,9 @@ export function MetaClientAssetsModal({
                   Continuar
                 </button>
               </>
-            ) : (
+            )}
+
+            {step === "confirm" && (
               <>
                 <button
                   onClick={() => setStep("select")}

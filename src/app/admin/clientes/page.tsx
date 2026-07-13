@@ -973,6 +973,8 @@ export default function AdminClientesPage() {
   const [trashItems,   setTrashItems]   = useState<TrashItem[]>([]);
   const [olaModalClient,  setOlaModalClient]  = useState<Client | null>(null);
   const [metaModalClient, setMetaModalClient] = useState<Client | null>(null);
+  const [metaPreferredConnectionId, setMetaPreferredConnectionId] = useState<string | undefined>(undefined);
+  const deepLinkFiredRef = useRef(false);
 
   const fetchClients = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return; }
@@ -990,6 +992,34 @@ export default function AdminClientesPage() {
   }, []);
 
   useEffect(() => { void fetchClients(); }, [fetchClients]);
+
+  // Deep-link OAuth callback: ?provider=meta&client=X&connection=Y&meta_ok=<msg>
+  useEffect(() => {
+    const provider   = searchParams.get("provider");
+    const clientId   = searchParams.get("client");
+    const connection = searchParams.get("connection");
+    const metaOkMsg  = searchParams.get("meta_ok");
+
+    if (!provider || !clientId || deepLinkFiredRef.current) return;
+    if (provider !== "meta") return;
+    if (clients.length === 0) return; // aguarda carga dos clientes
+
+    deepLinkFiredRef.current = true;
+    const found = clients.find((c) => c.id === clientId);
+    if (found) {
+      setMetaModalClient(found);
+      setMetaPreferredConnectionId(connection ?? undefined);
+      if (metaOkMsg) flash(decodeURIComponent(metaOkMsg));
+    }
+
+    // Limpa params da URL
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("provider");
+    params.delete("client");
+    params.delete("connection");
+    params.delete("meta_ok");
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, clients]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const segments = useMemo(() => {
     const set = new Set(clients.map((c) => c.segment).filter(Boolean));
@@ -1496,8 +1526,9 @@ export default function AdminClientesPage() {
         <MetaClientAssetsModal
           clientId={metaModalClient.id}
           clientName={metaModalClient.company_name ?? "Cliente"}
-          onClose={() => setMetaModalClient(null)}
-          onSaved={() => { setMetaModalClient(null); void fetchClients(); }}
+          preferredConnectionId={metaPreferredConnectionId}
+          onClose={() => { setMetaModalClient(null); setMetaPreferredConnectionId(undefined); }}
+          onSaved={() => { setMetaModalClient(null); setMetaPreferredConnectionId(undefined); void fetchClients(); }}
         />
       )}
       {trashOpen && (
