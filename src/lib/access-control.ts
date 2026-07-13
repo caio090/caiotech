@@ -69,7 +69,7 @@ export type InvitableRole = typeof INVITABLE_ROLES[number];
 // ── Home page per role (used by login + proxy) ────────────────
 
 export const ROLE_HOME: Record<string, string> = {
-  super_admin:    "/admin/plataforma",
+  super_admin:    "/admin/dashboard",
   admin:          "/admin/dashboard",
   cliente:        "/client/home",
   aluno:          "/academy/home",

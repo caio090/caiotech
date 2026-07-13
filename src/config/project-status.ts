@@ -63,6 +63,9 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
   { id: "blog",           name: "Blog público",           description: "Fundação: listagem, artigo, categorias, admin, SEO.",   phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   { id: "contato",        name: "Página de contato",      description: "Formulário, API, registro de lead.",                    phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   { id: "seo",            name: "SEO técnico",            description: "robots.ts, sitemap.ts, canonical, JSON-LD, metadataBase.", phase: "v1", readiness: "deployed",  last_updated: "2026-07-12" },
+  // ── Navegação administrativa ──────────────────────────────
+  { id: "admin_navigation",      name: "Navegação admin",          description: "super_admin → /admin/dashboard. ROLE_HOME corrigido em access-control.ts.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
+  { id: "legacy_platform_page",  name: "Rota legada /plataforma",  description: "Aposentada. Redireciona para /admin/super/accounts por compatibilidade.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
   // ── V2 ─────────────────────────────────────────────────────
   { id: "v2_adsense",     name: "Google AdSense (blog)",  description: "Monetização do blog.",                                   phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
   { id: "v2_affiliate",   name: "Afiliados",              description: "Programa de afiliados.",                                 phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
