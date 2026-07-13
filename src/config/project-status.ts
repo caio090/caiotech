@@ -43,7 +43,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
   { id: "rec_os",         name: "REC OS",                 description: "Briefing, roteiro, decupagem, produção audiovisual.",    phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
   { id: "storyboard",     name: "Storyboard",             description: "Visualização visual de cenas.",                          phase: "v1", readiness: "qa_pending",   last_updated: "2026-07-12" },
   // ── Integrações ────────────────────────────────────────────
-  { id: "meta",           name: "Meta / Instagram",       description: "OAuth, insights básicos, conexão por cliente.",          phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
+  { id: "meta",           name: "Meta / Instagram",       description: "OAuth multiconexão, signed state, wizard por cliente, Hub via client_meta_assets.", phase: "v1", readiness: "qa_pending", next_actions: ["QA wizard + deep-link após OAuth", "Validar Duh preservada"], last_updated: "2026-07-13" },
   { id: "cardapio",       name: "Cardápio Digital",       description: "Integração OlaClick — faturamento e pedidos.",           phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   { id: "whatsapp",       name: "WhatsApp",               description: "Canal em preparação — não homologado.",                  phase: "v1", readiness: "blocked",      blockers: ["Homologação Meta Business API pendente"], last_updated: "2026-07-12" },
   // ── Relatórios e diagnósticos ──────────────────────────────
