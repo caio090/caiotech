@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/plataforma",  label: "Plataforma" },
   { href: "/diagnostico", label: "Diagnóstico" },
   { href: "/#rec-os",     label: "REC OS" },
+  { href: "/blog",        label: "Blog" },
   { href: "/planos",      label: "Planos" },
 ];
 

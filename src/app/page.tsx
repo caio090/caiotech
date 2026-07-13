@@ -22,12 +22,58 @@ const S = {
 
 // ── FAQ data ───────────────────────────────────────────────────
 const FAQ = [
-  { q: "O que é o acesso beta?", a: "É o período de uso antecipado da plataforma, por convite. Você entra antes do lançamento oficial, sem cobrança automática, e ajuda a moldar o produto com feedback real." },
-  { q: "Preciso pagar para entrar na lista?", a: "Não. Entrar na lista beta é gratuito. Só há cobrança se você optar por assinar após o período de testes, com seu consentimento explícito." },
-  { q: "O que é o REC OS dentro da Lokat OS?", a: "REC OS é a área de produção audiovisual: briefing, roteiro, calendário, aprovação por link e relatório de performance — tudo em um único fluxo. É diferente do Lokat.rec, que é uma plataforma separada." },
-  { q: "A Lokat OS serve para pequenos negócios?", a: "Sim. Foi construída pensando em negócios locais, agências pequenas e autônomos que precisam de organização sem complexidade. Sem planilhas avulsas, sem WhatsApp bagunçado." },
-  { q: "Como funciona a integração com o Cardápio Digital?", a: "A Lokat OS conecta com provedores de Cardápio Digital via API (atualmente OlaClick como fonte). Pedidos, faturamento e métricas chegam automaticamente ao painel — sem exportar planilha à mão." },
+  { q: "O que é a LOKAT OS?", a: "LOKAT OS é um sistema operacional para conectar marketing, clientes, produção, operação, CRM e dados em uma única plataforma. Funciona para empresas, agências, clínicas, lojas, equipes e qualquer negócio que precisa organizar sem planilhas espalhadas." },
+  { q: "Para quem serve a LOKAT OS?", a: "Para empresas locais (restaurante, clínica, loja, academia), agências de marketing, equipes de marketing, autônomos e prestadores de serviços. A plataforma é horizontal — o mesmo ecossistema serve diferentes tipos de operação." },
+  { q: "O acesso beta é gratuito?", a: "Entrar na lista beta é gratuito. O período de teste é de 14 dias sem cobrança automática. Você só paga se decidir continuar, com seu consentimento explícito." },
+  { q: "O que é o REC OS?", a: "REC OS é a área de produção audiovisual dentro da LOKAT OS: briefing, roteiro, calendário, aprovação por link e performance — em um único fluxo. É diferente do Lokat.rec, que é uma plataforma separada de vídeo." },
+  { q: "Preciso conectar o Cardápio Digital para usar a plataforma?", a: "Não. Cardápio Digital é uma integração opcional para negócios que utilizam pedidos online. A plataforma funciona com qualquer negócio — dados manuais, Meta, planilhas ou outras fontes." },
+  { q: "WhatsApp está disponível?", a: "A integração de WhatsApp está em preparação. Quando disponível, funcionará como canal de atendimento, CRM e automação — não como produto principal." },
+  { q: "Como funciona o diagnóstico gratuito?", a: "O diagnóstico analisa a presença digital do negócio e entrega um relatório de pontos de melhoria em marketing, dados e operação. É público, sem login e sem custo." },
 ];
+
+// ── Ecosystem Cycle ───────────────────────────────────────────
+const CYCLE_STEPS = [
+  { label: "Diagnóstico",  icon: "◈", color: "#7b6ef6", desc: "Entenda o estado atual" },
+  { label: "Estratégia",   icon: "◉", color: "#6366f1", desc: "Defina objetivos e plano" },
+  { label: "Conteúdo",     icon: "◐", color: "#a855f7", desc: "Crie e aprove materiais" },
+  { label: "Produção",     icon: "◑", color: "#8b5cf6", desc: "Audiovisual e execução" },
+  { label: "Operação",     icon: "◒", color: "#3b82f6", desc: "Tarefas, equipe e prazos" },
+  { label: "Dados",        icon: "◓", color: "#0ea5e9", desc: "Métricas e relatórios" },
+  { label: "Insights",     icon: "◔", color: "#10b981", desc: "Interprete os resultados" },
+  { label: "Próxima ação", icon: "◕", color: "#059669", desc: "Decida com clareza" },
+];
+
+function EcosystemCycle() {
+  return (
+    <div>
+      {/* Desktop: horizontal flow */}
+      <div className="hidden md:flex items-stretch gap-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {CYCLE_STEPS.map((step, i) => (
+          <div key={step.label} className="flex items-stretch" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, background: `${step.color}09`, border: `1px solid ${step.color}20`, padding: "1.25rem .75rem", textAlign: "center", position: "relative" }}>
+              <div style={{ fontSize: "1.1rem", color: step.color, marginBottom: ".5rem", lineHeight: 1 }} aria-hidden="true">{step.icon}</div>
+              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase", color: step.color, marginBottom: ".3rem", fontWeight: 700 }}>{step.label}</p>
+              <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: ".68rem", color: "#555566", lineHeight: 1.4 }}>{step.desc}</p>
+            </div>
+            {i < CYCLE_STEPS.length - 1 && (
+              <div style={{ display: "flex", alignItems: "center", padding: "0 2px", color: "#333340", fontSize: ".7rem", flexShrink: 0 }} aria-hidden="true">→</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile: 2-column grid */}
+      <div className="grid grid-cols-2 gap-3 md:hidden">
+        {CYCLE_STEPS.map((step) => (
+          <div key={step.label} style={{ background: `${step.color}09`, border: `1px solid ${step.color}20`, padding: "1rem", textAlign: "center" }}>
+            <div style={{ fontSize: ".95rem", color: step.color, marginBottom: ".4rem" }} aria-hidden="true">{step.icon}</div>
+            <p style={{ fontFamily: "'Space Mono', monospace", fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase", color: step.color, fontWeight: 700 }}>{step.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,8 +86,46 @@ export default function HomePage() {
   const betaHref = LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta";
   const betaLabel = LAUNCH_MODE.publicSignupMode === "waitlist" ? "Entrar na lista beta" : "Criar conta grátis";
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.lokat.com.br/#org",
+        "name": "LOKAT OS",
+        "url": "https://www.lokat.com.br",
+        "logo": "https://www.lokat.com.br/icon.svg",
+        "description": "LOKAT OS conecta marketing, clientes, produção, operação e dados para empresas, agências e equipes.",
+        "contactPoint": { "@type": "ContactPoint", "contactType": "customer service", "url": "https://www.lokat.com.br/contato" },
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://www.lokat.com.br/#app",
+        "name": "LOKAT OS",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://www.lokat.com.br",
+        "description": "Sistema operacional para organizar marketing, clientes, produção e resultados.",
+        "publisher": { "@id": "https://www.lokat.com.br/#org" },
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.lokat.com.br/#website",
+        "url": "https://www.lokat.com.br",
+        "name": "LOKAT OS",
+        "publisher": { "@id": "https://www.lokat.com.br/#org" },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": { "@type": "EntryPoint", "urlTemplate": "https://www.lokat.com.br/blog/busca?q={search_term_string}" },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
+
   return (
     <div style={{ background: S.bg, color: S.text, minHeight: "100vh" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PublicHeader />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
@@ -59,7 +143,7 @@ export default function HomePage() {
         ))}
 
         <div className="hero-fade-up" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, border: `1px solid ${S.accent}30`, background: `${S.accent}10`, padding: ".25rem .8rem", marginBottom: "2rem", display: "inline-block" }}>
-          Para agências, empresas e negócios locais
+          Sistema operacional para empresas, agências e equipes
         </div>
 
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 w-full">
@@ -69,13 +153,13 @@ export default function HomePage() {
               className="hero-fade-up-d1"
               style={{ ...S.grotesk, fontSize: "clamp(2rem, 8vw, 6.2rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-.03em", color: S.text, marginBottom: "1.2rem", textWrap: "balance" } as React.CSSProperties}
             >
-              Marketing que<br />
-              <em style={{ fontStyle: "italic", color: S.accent }}>funciona</em><br />
-              e gera resultado.
+              Organize marketing,<br />
+              <em style={{ fontStyle: "italic", color: S.accent }}>clientes</em><br />
+              e resultados.
             </h1>
 
             <p className="hero-fade-up-d2 mx-auto lg:mx-0" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "clamp(.85rem, 2.5vw, 1rem)", lineHeight: 1.7, color: S.muted, marginBottom: "2rem" }}>
-              Planeje conteúdo, aprovações, leads e finanças em um único lugar — sem planilha perdida, sem WhatsApp bagunçado, com IA do início ao fim.
+              A LOKAT OS conecta estratégia, conteúdo, operação, CRM, dados e integrações para empresas, agências e equipes trabalharem com mais clareza.
             </p>
 
             {/* 2 CTAs principais */}
@@ -167,6 +251,32 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Seletor de perfil ─────────────────────────────────── */}
+      <section className="max-w-4xl mx-auto px-4 md:px-8 pb-12 pt-4 text-center">
+        <p style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, marginBottom: "1.25rem" }}>
+          Para quem você usa a LOKAT OS?
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {[
+            { label: "Minha empresa",    desc: "Gerencie marketing, CRM, dados e operação de um negócio.",       q: "empresa"  },
+            { label: "Minha agência",    desc: "Multi-clientes, equipe, aprovações e relatórios centralizados.", q: "agencia"  },
+            { label: "Minha equipe",     desc: "Tarefas, briefings, conteúdo e resultados num fluxo único.",     q: "equipe"   },
+            { label: "Contratar LOKAT",  desc: "Agência especializada para tocar sua operação de marketing.",    q: "servicos" },
+          ].map((p) => (
+            <a
+              key={p.q}
+              href={`/?perfil=${p.q}`}
+              style={{ background: `${S.accent}08`, border: `1px solid ${S.accent}25`, padding: ".85rem 1.25rem", textDecoration: "none", minWidth: 160, textAlign: "center", transition: "border-color .2s, background .2s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${S.accent}55`; e.currentTarget.style.background = `${S.accent}14`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${S.accent}25`; e.currentTarget.style.background = `${S.accent}08`; }}
+            >
+              <span style={{ ...S.mono, display: "block", fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.text, marginBottom: ".3rem", fontWeight: 700 }}>{p.label}</span>
+              <span style={{ ...S.grotesk, display: "block", fontSize: ".72rem", color: S.muted, lineHeight: 1.4 }}>{p.desc}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
       {/* ── Transição hero → branco ────────────────────────────── */}
       <div style={{ background: `linear-gradient(to bottom, ${S.bg} 0%, #ffffff 100%)`, height: "64px" }} />
 
@@ -235,6 +345,48 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── Ciclo do ecossistema ── */}
+        <section className="py-14 md:py-20" style={{ background: "#111" }}>
+          <div className="max-w-5xl mx-auto px-4 md:px-8">
+            <div className="text-center mb-10">
+              <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 800, color: "#f0f0f0", marginBottom: ".75rem" }}>
+                Do diagnóstico à próxima decisão
+              </h2>
+              <p style={{ ...S.grotesk, fontSize: ".9rem", color: "#888899", maxWidth: "440px", margin: "0 auto", lineHeight: 1.6 }}>
+                Cada etapa conectada à próxima — sem planilha avulsa, sem retrabalho.
+              </p>
+            </div>
+            <EcosystemCycle />
+          </div>
+        </section>
+
+        {/* ── Como começa em 3 passos ── */}
+        <section className="max-w-5xl mx-auto px-4 md:px-8 py-16 md:py-24">
+          <div className="text-center mb-10">
+            <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 800, color: "#111", marginBottom: ".75rem" }}>
+              Como a LOKAT OS começa a trabalhar com você
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { step: "01", title: "Entendemos sua operação", desc: "Diagnóstico, objetivos, clientes, equipe e fontes existentes. Mapeamos o que você já tem e o que está faltando." },
+              { step: "02", title: "Conectamos e organizamos", desc: "Integrações, documentos, processos, campanhas e dados. Tudo em um fluxo — sem copiar, sem exportar." },
+              { step: "03", title: "Executamos e interpretamos", desc: "Conteúdo, operação, relatórios, diagnósticos e próximas ações. Decisões baseadas em dados reais." },
+            ].map((s) => (
+              <div key={s.step} style={{ border: "1px solid #ebebf7", padding: "1.75rem", background: "#fff", position: "relative" }}>
+                <div style={{ ...S.mono, fontSize: "2rem", fontWeight: 700, color: "#ebebf7", position: "absolute", top: "1rem", right: "1.25rem", lineHeight: 1 }}>{s.step}</div>
+                <h3 style={{ ...S.grotesk, fontSize: ".95rem", fontWeight: 700, color: "#111", marginBottom: ".6rem", lineHeight: 1.3 }}>{s.title}</h3>
+                <p style={{ ...S.grotesk, fontSize: ".82rem", color: "#666", lineHeight: 1.65 }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <Link href="/diagnostico" style={{ display: "inline-block", background: "#7b6ef6", color: "#fff", padding: ".85rem 2rem", ...S.mono, fontSize: ".68rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", fontWeight: 700 }}>
+              Fazer diagnóstico →
+            </Link>
           </div>
         </section>
 
@@ -460,8 +612,37 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── Multinicho ── */}
+        <section className="py-14 md:py-20" style={{ background: "#f4f3ff" }}>
+          <div className="max-w-5xl mx-auto px-4 md:px-8">
+            <div className="text-center mb-10">
+              <h2 style={{ ...S.grotesk, fontSize: "clamp(1.4rem, 3.5vw, 2.4rem)", fontWeight: 800, color: "#111", marginBottom: ".75rem" }}>
+                Uma plataforma, diferentes operações
+              </h2>
+              <p style={{ ...S.grotesk, fontSize: ".9rem", color: "#666", maxWidth: "440px", margin: "0 auto", lineHeight: 1.6 }}>
+                O mesmo ecossistema serve negócios diferentes. A diferença está no contexto, não na plataforma.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[
+                { niche: "Clínicas e saúde",     color: "#10b981", useCase: "CRM de pacientes, agenda, conteúdo educativo, presença no Google e Instagram." },
+                { niche: "Varejo e lojas",        color: "#f59e0b", useCase: "Campanhas sazonais, gestão de fornecedores, conteúdo de produto, relatórios de venda." },
+                { niche: "Construção e serviços", color: "#6366f1", useCase: "OS de projetos, documentos, equipe, orçamentos, relatórios e presença digital." },
+                { niche: "Restaurantes e food",   color: "#f97316", useCase: "Cardápio digital (opcional), conteúdo gastronômico, aprovações de campanha e dados de pedido." },
+                { niche: "Agências",              color: "#7b6ef6", useCase: "Multi-clientes, briefings, calendário editorial, aprovação por link, relatórios por conta." },
+                { niche: "Profissionais liberais", color: "#a855f7", useCase: "Calendário de conteúdo, CRM de prospects, relatório de presença digital, aprovações." },
+              ].map((n) => (
+                <div key={n.niche} style={{ border: `1px solid ${n.color}20`, background: `${n.color}05`, padding: "1.25rem 1.5rem", borderLeft: `3px solid ${n.color}` }}>
+                  <span style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: n.color, fontWeight: 700 }}>{n.niche}</span>
+                  <p style={{ ...S.grotesk, fontSize: ".85rem", color: "#555", lineHeight: 1.6, marginTop: ".5rem" }}>{n.useCase}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Beta ── */}
-        <section className="py-12 md:py-16" style={{ background: "#f4f3ff" }}>
+        <section className="py-12 md:py-16" style={{ background: "#fff" }}>
           <div className="max-w-2xl mx-auto px-4 md:px-8 text-center">
             <div className="inline-flex items-center gap-2 border px-4 py-1.5 rounded-full mb-5" style={{ background: "#eeeeff", borderColor: "#d0d0ff" }}>
               <Zap className="w-3.5 h-3.5" style={{ color: "#7b6ef6" }} />
@@ -577,8 +758,8 @@ export default function HomePage() {
               </div>
               <div>
                 <p style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted, marginBottom: ".6rem" }}>Legal</p>
-                {["Privacidade", "Termos", "Contato"].map((l) => (
-                  <a key={l} href="#" style={{ display: "block", ...S.grotesk, fontSize: ".73rem", color: S.muted, textDecoration: "none", marginBottom: ".35rem" }}
+                {[["Privacidade", "/privacidade"], ["Termos", "/termos"], ["Contato", "/contato"], ["Blog", "/blog"]].map(([l, h]) => (
+                  <a key={l} href={h} style={{ display: "block", ...S.grotesk, fontSize: ".73rem", color: S.muted, textDecoration: "none", marginBottom: ".35rem" }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = S.text)}
                     onMouseLeave={(e) => (e.currentTarget.style.color = S.muted)}
                   >{l}</a>
