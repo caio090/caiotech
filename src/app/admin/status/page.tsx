@@ -47,6 +47,13 @@ const MODULES: Module[] = [
   { name: "Meta Insights",      desc: "Conexão Meta configurada — insights ativos, dados avançados de público dependem das permissões da conta", status: "parcial", notes: "Dados avançados dependem das permissões conectadas." },
   { name: "Cardápio Digital",   desc: "Faturamento real funcionando — paginação e produtos detalhados em breve", status: "parcial", notes: "Paginação além 50 pedidos: próxima fase" },
 
+  // Sprint Pública — adicionado 2026-07-12
+  { name: "Blog público",        desc: "Listagem, artigo, categoria, autor, busca, admin editor, SEO, fundação SQL 78.", status: "funcional", notes: "Tabelas SQL 78 pendentes — funciona com graceful degradation." },
+  { name: "Contato /contato",    desc: "Formulário com honeypot, rate limit, consentimento, registro de lead.", status: "funcional" },
+  { name: "SEO técnico",         desc: "robots.ts, sitemap.ts, metadataBase, canonical, JSON-LD Organization/SoftwareApplication.", status: "funcional" },
+  { name: "Landing multinicho",  desc: "Hero, seletor de perfil, ciclo visual, 3 passos, módulos, multinicho, FAQ atualizado.", status: "funcional" },
+  { name: "prefers-reduced-motion", desc: "Animações da landing respeitam preferência do SO.", status: "funcional" },
+
   // Em breve
   { name: "Storage & Drive",    desc: "Upload de arquivos, artes aprovadas, briefings e vínculos Google Drive. Planejado para Fase 1 via Supabase Storage.", status: "em_breve", notes: "Ver docs/STORAGE_AND_DRIVE_STRATEGY.md. Sem implementação ainda." },
   { name: "Tráfego OS",         desc: "Meta Ads, Google Ads, SEO, campanhas pagas, orçamento e públicos", status: "em_breve" },
