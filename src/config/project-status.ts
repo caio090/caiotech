@@ -50,14 +50,16 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
   { id: "reports",        name: "Relatórios",             description: "Faturamento, Meta insights, diagnóstico.",               phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
   { id: "diagnostics",    name: "Diagnósticos",           description: "Diagnóstico de marketing e saúde da empresa.",          phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   // ── Comercial ─────────────────────────────────────────────
-  { id: "crm",            name: "CRM Comercial",          description: "Leads, funil, oportunidades.",                          phase: "v1", readiness: "qa_pending",   last_updated: "2026-07-12" },
+  { id: "crm",            name: "CRM Comercial",          description: "Leads, funil, oportunidades, coluna Instagram, perfis 4-way.",  phase: "v1", readiness: "qa_pending",  last_updated: "2026-07-13" },
   { id: "team",           name: "Equipe",                 description: "Papéis, convites, acessos.",                            phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
   // ── Billing e assinatura ──────────────────────────────────
   { id: "billing_arch",   name: "Arquitetura de billing", description: "Planos, cupons, assinaturas, providers.",               phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
   { id: "asaas",          name: "Gateway Asaas",          description: "Integração de pagamento — sandbox não homologado.",     phase: "v1", readiness: "blocked",      blockers: ["Credenciais Asaas sandbox pendentes", "SQL 77 não executado"], last_updated: "2026-07-12" },
   { id: "checkout",       name: "Checkout público",       description: "Fluxo de assinatura pública.",                          phase: "v1", readiness: "planned",      blockers: ["Depende de Asaas homologado"], last_updated: "2026-07-12" },
   // ── Público ───────────────────────────────────────────────
-  { id: "landing",        name: "Landing page",           description: "Home multinicho, hero, ciclo visual, FAQ, módulos.",    phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
+  { id: "landing",        name: "Landing page",           description: "Home multinicho, hero, ciclo visual, FAQ, módulos. Perfis 4-way, /pre-acesso?perfil= routing.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
+  { id: "pre_acesso",     name: "Pré-acesso (waitlist)",  description: "Formulário beta com perfil 4-way, ?perfil= param, campo Instagram, Suspense.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
+  { id: "diagnostico",    name: "Diagnóstico rápido",     description: "Diagnóstico de presença digital. Modal de identificação antes dos resultados.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
   { id: "blog",           name: "Blog público",           description: "Fundação: listagem, artigo, categorias, admin, SEO.",   phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   { id: "contato",        name: "Página de contato",      description: "Formulário, API, registro de lead.",                    phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
   { id: "seo",            name: "SEO técnico",            description: "robots.ts, sitemap.ts, canonical, JSON-LD, metadataBase.", phase: "v1", readiness: "deployed",  last_updated: "2026-07-12" },

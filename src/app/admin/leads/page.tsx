@@ -22,6 +22,8 @@ type WaitlistEntry = {
   source: string | null;
   status: string;
   created_at: string;
+  social_or_site: string | null;
+  instagram_username: string | null;
 };
 
 type ApiResponse = {
@@ -91,9 +93,11 @@ function getProfileLabel(s: string | null): string {
     agency:         "Agência",
     agencia:        "Agência",
     business:       "Empresa",
+    company:        "Empresa",
     local_business: "Negócio local",
     professional:   "Profissional",
-    interested:     "Interessado",
+    interested:     "Cliente Lokat",
+    lokat_client:   "Cliente Lokat",
     autonomo:       "Autônomo",
   };
   return map[s.toLowerCase()] ?? s;
@@ -127,10 +131,12 @@ const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   operacional:      { label: "Operacional",        color: "bg-sky-50 text-sky-700 border-sky-100" },
   agency:           { label: "Agência parceira",   color: "bg-purple-50 text-purple-700 border-purple-100" },
   agencia:          { label: "Agência parceira",   color: "bg-purple-50 text-purple-700 border-purple-100" },
-  business:         { label: "Cliente Lokat",      color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
-  local_business:   { label: "Cliente Lokat",      color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
-  professional:     { label: "Autônomo",           color: "bg-amber-50 text-amber-700 border-amber-100" },
-  interested:       { label: "Lead",               color: "bg-gray-50 text-gray-600 border-gray-200" },
+  business:         { label: "Empresa",            color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  company:          { label: "Empresa",            color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  local_business:   { label: "Empresa",            color: "bg-indigo-50 text-indigo-700 border-indigo-100" },
+  professional:     { label: "Profissional",       color: "bg-amber-50 text-amber-700 border-amber-100" },
+  interested:       { label: "Cliente Lokat",      color: "bg-sky-50 text-sky-700 border-sky-100" },
+  lokat_client:     { label: "Cliente Lokat",      color: "bg-sky-50 text-sky-700 border-sky-100" },
   novo_cadastro:    { label: "Lead",               color: "bg-gray-50 text-gray-600 border-gray-200" },
 };
 
@@ -455,6 +461,7 @@ export default function AdminLeadsPage() {
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-semibold">Nome / Contato</th>
+                <th className="text-left px-4 py-3 font-semibold">Instagram / Site</th>
                 <th className="text-left px-4 py-3 font-semibold">Origem</th>
                 <th className="text-left px-4 py-3 font-semibold">Intenção</th>
                 <th className="text-left px-4 py-3 font-semibold" title="Perfil comercial do contato — não cria conta ou acesso">Perfil do lead</th>
@@ -477,6 +484,22 @@ export default function AdminLeadsPage() {
                       <p className="font-semibold text-gray-900 text-xs">{e.name}</p>
                       <p className="text-[10px] text-gray-500 mt-0.5">{e.email}</p>
                       {e.phone && <p className="text-[10px] text-gray-400">{e.phone}</p>}
+                    </td>
+                    <td className="px-4 py-3 max-w-[140px]">
+                      {(e.instagram_username || e.social_or_site) ? (
+                        <a
+                          href={e.instagram_username
+                            ? `https://instagram.com/${e.instagram_username}`
+                            : (e.social_or_site?.startsWith("http") ? e.social_or_site : `https://${e.social_or_site}`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-indigo-600 hover:underline truncate block"
+                        >
+                          {e.instagram_username ? `@${e.instagram_username}` : e.social_or_site}
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${srcCls}`}>

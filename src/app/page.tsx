@@ -153,13 +153,13 @@ export default function HomePage() {
               className="hero-fade-up-d1"
               style={{ ...S.grotesk, fontSize: "clamp(2rem, 8vw, 6.2rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-.03em", color: S.text, marginBottom: "1.2rem", textWrap: "balance" } as React.CSSProperties}
             >
-              Organize marketing,<br />
-              <em style={{ fontStyle: "italic", color: S.accent }}>clientes</em><br />
-              e resultados.
+              Do planejamento<br />
+              ao <em style={{ fontStyle: "italic", color: S.accent }}>resultado</em>,<br />
+              tudo trabalha junto.
             </h1>
 
             <p className="hero-fade-up-d2 mx-auto lg:mx-0" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "clamp(.85rem, 2.5vw, 1rem)", lineHeight: 1.7, color: S.muted, marginBottom: "2rem" }}>
-              A LOKAT OS conecta estratégia, conteúdo, operação, CRM, dados e integrações para empresas, agências e equipes trabalharem com mais clareza.
+              A LOKAT OS conecta marketing, clientes, conteúdo, produção, CRM e dados em um fluxo único para empresas, agências e profissionais.
             </p>
 
             {/* 2 CTAs principais */}
@@ -254,25 +254,25 @@ export default function HomePage() {
       {/* ── Seletor de perfil ─────────────────────────────────── */}
       <section className="max-w-4xl mx-auto px-4 md:px-8 pb-12 pt-4 text-center">
         <p style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, marginBottom: "1.25rem" }}>
-          Para quem você usa a LOKAT OS?
+          Qual é o seu perfil?
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           {[
-            { label: "Minha empresa",    desc: "Gerencie marketing, CRM, dados e operação de um negócio.",       q: "empresa"  },
-            { label: "Minha agência",    desc: "Multi-clientes, equipe, aprovações e relatórios centralizados.", q: "agencia"  },
-            { label: "Minha equipe",     desc: "Tarefas, briefings, conteúdo e resultados num fluxo único.",     q: "equipe"   },
-            { label: "Contratar LOKAT",  desc: "Agência especializada para tocar sua operação de marketing.",    q: "servicos" },
+            { label: "Tenho uma agência",          desc: "Multi-clientes, equipe, aprovações e relatórios centralizados.", q: "agency"       },
+            { label: "Tenho uma empresa",           desc: "Gerencie marketing, CRM, dados e operação de um negócio.",       q: "company"      },
+            { label: "Sou profissional da área",    desc: "Tarefas, briefings, conteúdo e resultados num fluxo único.",     q: "professional" },
+            { label: "Quero ser cliente da LOKAT",  desc: "Agência especializada para tocar sua operação de marketing.",    q: "lokat_client" },
           ].map((p) => (
-            <a
+            <Link
               key={p.q}
-              href={`/?perfil=${p.q}`}
+              href={`/pre-acesso?perfil=${p.q}`}
               style={{ background: `${S.accent}08`, border: `1px solid ${S.accent}25`, padding: ".85rem 1.25rem", textDecoration: "none", minWidth: 160, textAlign: "center", transition: "border-color .2s, background .2s" }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${S.accent}55`; e.currentTarget.style.background = `${S.accent}14`; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${S.accent}25`; e.currentTarget.style.background = `${S.accent}08`; }}
             >
               <span style={{ ...S.mono, display: "block", fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.text, marginBottom: ".3rem", fontWeight: 700 }}>{p.label}</span>
               <span style={{ ...S.grotesk, display: "block", fontSize: ".72rem", color: S.muted, lineHeight: 1.4 }}>{p.desc}</span>
-            </a>
+            </Link>
           ))}
         </div>
       </section>

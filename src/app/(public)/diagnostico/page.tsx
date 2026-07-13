@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardList, FileSearch, Users, TrendingUp, Eye, Megaphone, MessageSquare, BarChart3 } from "lucide-react";
+import { ClipboardList, FileSearch, Users, TrendingUp, Eye, Megaphone, MessageSquare, BarChart3, X, Loader2 } from "lucide-react";
 
 const QUESTIONS = [
   {
@@ -120,10 +120,20 @@ const QUESTIONS = [
   },
 ];
 
+const inputCls =
+  "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all";
+
 export default function DiagnosticoPage() {
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
+
+  // Identification modal state
+  const [showModal, setShowModal]     = useState(false);
+  const [idName,    setIdName]        = useState("");
+  const [idEmail,   setIdEmail]       = useState("");
+  const [idPhone,   setIdPhone]       = useState("");
+  const [idLoading, setIdLoading]     = useState(false);
 
   const answered = Object.keys(answers).filter((k) => answers[k]).length;
   const allAnswered = answered === QUESTIONS.length;
@@ -132,17 +142,124 @@ export default function DiagnosticoPage() {
     setAnswers((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = () => {
-    if (!allAnswered) { setError(true); return; }
-    setError(false);
+  function saveAndNavigate() {
     try {
       sessionStorage.setItem("lokat_diagnostico_answers", JSON.stringify(answers));
     } catch {}
     router.push("/diagnostico/resultado");
+  }
+
+  const handleSubmit = () => {
+    if (!allAnswered) { setError(true); return; }
+    setError(false);
+    setShowModal(true);
   };
+
+  async function handleIdentifiedSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!idName.trim() || !idEmail.trim()) return;
+    setIdLoading(true);
+    try {
+      await fetch("/api/launch/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:         idName.trim(),
+          email:        idEmail.trim(),
+          phone:        idPhone.trim() || null,
+          account_type: "interested",
+          source:       "quick_diagnostic",
+          interest:     "diagnóstico gratuito",
+        }),
+      });
+    } catch { /* silently ignore — result page still loads */ }
+    setIdLoading(false);
+    setShowModal(false);
+    saveAndNavigate();
+  }
+
+  function handleSkipIdentification() {
+    setShowModal(false);
+    saveAndNavigate();
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
+      {/* Identification modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Quase lá!</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Informe seus dados para receber o resultado completo.</p>
+              </div>
+              <button
+                onClick={handleSkipIdentification}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => void handleIdentifiedSubmit(e)} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Nome *</label>
+                <input
+                  type="text"
+                  placeholder="Seu nome"
+                  value={idName}
+                  onChange={(e) => setIdName(e.target.value)}
+                  required
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">E-mail *</label>
+                <input
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={idEmail}
+                  onChange={(e) => setIdEmail(e.target.value)}
+                  required
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">WhatsApp (opcional)</label>
+                <input
+                  type="tel"
+                  placeholder="(00) 9 0000-0000"
+                  value={idPhone}
+                  onChange={(e) => setIdPhone(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <button
+                  type="submit"
+                  disabled={idLoading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-3 text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                >
+                  {idLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><FileSearch className="w-4 h-4" />Ver resultado completo</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkipIdentification}
+                  className="w-full text-xs text-gray-400 hover:text-gray-600 py-2 transition-colors"
+                >
+                  Ver sem me identificar →
+                </button>
+              </div>
+              <p className="text-center text-[11px] text-gray-400">
+                Sem spam. Usamos para enviar o relatório e acompanhar sua evolução.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
       <div className="text-center mb-10">
         <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <ClipboardList className="w-6 h-6 text-indigo-600" />

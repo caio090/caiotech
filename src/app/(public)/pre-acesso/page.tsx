@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 
+// UI labels use the new profile names; DB still receives the old constraint-valid values
+// (business for company, interested for lokat_client) until SQL 82 runs in Supabase.
 const ACCOUNT_TYPE_OPTIONS = [
-  { value: "agency",       label: "Agência de Marketing" },
-  { value: "business",     label: "Negócio Local / Empresa" },
-  { value: "professional", label: "Profissional Autônomo" },
-  { value: "interested",   label: "Só quero acompanhar" },
+  { value: "agency",       label: "Tenho uma agência",         dbValue: "agency"       },
+  { value: "business",     label: "Tenho uma empresa",         dbValue: "business"     },
+  { value: "professional", label: "Sou profissional da área",  dbValue: "professional" },
+  { value: "interested",   label: "Quero ser cliente da LOKAT", dbValue: "interested"  },
 ];
+
+// Maps ?perfil= URL param (new slugs) to ACCOUNT_TYPE_OPTIONS values
+const PARAM_TO_OPTION: Record<string, string> = {
+  agency:       "agency",
+  company:      "business",
+  professional: "professional",
+  lokat_client: "interested",
+};
 
 const SEGMENT_OPTIONS = [
   "Gastronomia / Delivery",
@@ -27,7 +38,15 @@ const SEGMENT_OPTIONS = [
 const inputCls =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all";
 
-export default function PreAcessoPage() {
+function normalizeInstagram(raw: string): string {
+  return raw.trim().replace(/^@+/, "").replace(/\s+/g, "");
+}
+
+function PreAcessoForm() {
+  const searchParams = useSearchParams();
+  const perfilParam = searchParams.get("perfil") ?? "";
+  const initialAccountType = PARAM_TO_OPTION[perfilParam] ?? "";
+
   const [sent,       setSent]       = useState(false);
   const [duplicate,  setDuplicate]  = useState(false);
   const [loading,    setLoading]    = useState(false);
@@ -37,12 +56,13 @@ export default function PreAcessoPage() {
     name:          "",
     email:         "",
     phone:         "",
-    account_type:  "",
+    account_type:  initialAccountType,
     city:          "",
     segment:       "",
     interest:      "",
+    instagram:     "",
     social_or_site:"",
-    _hp:           "", // honeypot
+    _hp:           "",
   });
 
   function set(key: keyof typeof form) {
@@ -58,11 +78,27 @@ export default function PreAcessoPage() {
       return;
     }
     setLoading(true);
+
+    const igNormalized = normalizeInstagram(form.instagram);
+    const socialOrSite = form.instagram.trim() || form.social_or_site.trim();
+
     try {
       const res = await fetch("/api/launch/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ ...form, source: "pre-acesso" }),
+        body: JSON.stringify({
+          name:              form.name,
+          email:             form.email,
+          phone:             form.phone,
+          account_type:      form.account_type,
+          city:              form.city,
+          segment:           form.segment,
+          interest:          form.interest,
+          social_or_site:    socialOrSite || null,
+          instagram_username: igNormalized || null,
+          _hp:               form._hp,
+          source:            "pre-acesso",
+        }),
       });
       type WaitlistRes = {
         ok: boolean; duplicate?: boolean; message?: string; code?: string;
@@ -122,7 +158,6 @@ export default function PreAcessoPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header — PublicHeader já vem do layout (public) */}
       <header className="max-w-2xl mx-auto px-4 pt-10 pb-6 text-center">
         <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight mb-3">
           A Lokat OS está abrindo acesso beta
@@ -137,7 +172,6 @@ export default function PreAcessoPage() {
         </div>
       </header>
 
-      {/* Form */}
       <main className="max-w-lg mx-auto px-4 pb-16">
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-7 space-y-4">
           {/* Honeypot */}
@@ -202,17 +236,29 @@ export default function PreAcessoPage() {
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">Você é... *</label>
-            <select
-              value={form.account_type}
-              onChange={set("account_type")}
-              required
-              className={inputCls}
-            >
-              <option value="" disabled>Selecione seu perfil</option>
-              {ACCOUNT_TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <div className="grid grid-cols-1 gap-2">
+              {ACCOUNT_TYPE_OPTIONS.map((o) => {
+                const selected = form.account_type === o.value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, account_type: o.value }))}
+                    className={`w-full text-left rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                      selected
+                        ? "border-indigo-400 bg-indigo-50 text-indigo-800 ring-2 ring-indigo-100"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className={`inline-block w-3.5 h-3.5 rounded-full border-2 mr-2.5 flex-shrink-0 align-middle transition-colors ${selected ? "border-indigo-500 bg-indigo-500" : "border-gray-300 bg-white"}`} />
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!form.account_type && (
+              <p className="text-[11px] text-gray-400 mt-1.5">Selecione o perfil que melhor descreve você.</p>
+            )}
           </div>
 
           <div>
@@ -244,15 +290,25 @@ export default function PreAcessoPage() {
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Instagram ou site (opcional)
+              Instagram (opcional)
             </label>
             <input
               type="text"
-              placeholder="@perfil ou www.seusite.com.br"
-              value={form.social_or_site}
-              onChange={set("social_or_site")}
+              placeholder="@seuinstagram"
+              value={form.instagram}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  instagram: val,
+                  social_or_site: val.trim() ? val.trim() : prev.social_or_site,
+                }));
+              }}
               className={inputCls}
             />
+            {form.instagram && !form.instagram.startsWith("@") && (
+              <p className="text-[11px] text-gray-400 mt-1">Use @seuinstagram ou apenas o nome de usuário.</p>
+            )}
           </div>
 
           {error && (
@@ -287,5 +343,13 @@ export default function PreAcessoPage() {
         </p>
       </main>
     </div>
+  );
+}
+
+export default function PreAcessoPage() {
+  return (
+    <Suspense>
+      <PreAcessoForm />
+    </Suspense>
   );
 }
