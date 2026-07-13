@@ -1,3 +1,29 @@
+# NAVIGATION V1 AUDIT — atualizado 2026-07-13
+
+## Decisão: home do super_admin
+
+| Antes | Depois | Motivo |
+|-------|--------|--------|
+| `/admin/plataforma` | `/admin/dashboard` | Plataforma duplicava Dashboard + Clientes + Contas sem valor próprio |
+
+### Rota legada `/admin/plataforma`
+- Mantida para compatibilidade de link (bookmarks, emails, documentação antiga).
+- Executa `redirect("/admin/super/accounts")` — sem busca de dados, sem renderização.
+- **Não aparece na sidebar.** Nunca apareceu.
+
+### Home por perfil (ROLE_HOME em src/lib/access-control.ts)
+
+| Role | Destino |
+|------|---------|
+| super_admin | /admin/dashboard |
+| admin | /admin/dashboard |
+| cliente | /client/home |
+| operacional | /operacional/dashboard |
+| comercial / sdr / closer | /operacional/comercial |
+| social_media / designer / editor / videomaker / gestor_trafego | /operacional/minhas-tarefas |
+| financeiro | /operacional/dashboard |
+| aluno | /academy/home |
+
 # NAVIGATION V1 AUDIT — 2026-07-12
 
 Auditoria completa dos itens da sidebar administrativa após sprint de restauração.

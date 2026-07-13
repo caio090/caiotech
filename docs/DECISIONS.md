@@ -2,6 +2,12 @@
 
 Registro de decisoes do projeto Lokat OS.
 
+## 2026-07-13
+
+- `/admin/plataforma` foi aposentada como página funcional por duplicar Dashboard, Clientes e Central de Contas sem adicionar valor próprio. A rota agora redireciona permanentemente para `/admin/super/accounts`. O arquivo `page.tsx` é mantido por compatibilidade de link, mas executa apenas `redirect()`.
+- `ROLE_HOME.super_admin` alterado de `/admin/plataforma` para `/admin/dashboard`. Fonte única: `src/lib/access-control.ts`. Login continua usando `getRoleHome()` — nenhum hardcode no formulário.
+- Responsabilidades definidas: Dashboard = visão operacional; Clientes = empresas atendidas; Contas (/admin/super/accounts) = usuários da plataforma; Integrações = conexões externas; Billing = planos e pagamentos.
+
 ## Decisoes registradas
 
 - A memoria oficial do projeto deve ficar no repositorio.
