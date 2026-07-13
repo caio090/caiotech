@@ -250,7 +250,29 @@ body {
   will-change: transform;
 }
 
-/* prefers-reduced-motion: not applied for marquees/orbits — animations run regardless of OS setting */
+/* ── Prefers-reduced-motion: respeitar preferência do SO ────── */
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-up,
+  .hero-fade-up-d1,
+  .hero-fade-up-d2,
+  .hero-fade-up-d3,
+  .hero-robot-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .glow-pulse,
+  .orbit-slow,
+  .orbit-rev,
+  .lk-drop-float,
+  .eye-blink {
+    animation: none;
+  }
+  .lk-ticker-track,
+  .lk-scroll-track {
+    animation: none;
+  }
+}
 
 /* ── Motion utility classes ─────────────────────────────────── */
 @keyframes lk-reveal-up {
