@@ -1,136 +1,180 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/app-url";
+import { verifyOAuthState } from "@/lib/meta/state";
 
 // GET /api/meta/callback
-// Recebe o callback OAuth do Meta após o usuário autorizar o app.
-// Fluxo: Meta redireciona aqui com ?code=...&state=...
-// O code é trocado por access_token via Graph API e salvo em meta_connections.
+// Recebe o retorno OAuth do Meta, valida state assinado, troca code por token
+// e persiste em meta_connections via admin client (não depende de sessão ativa).
 export async function GET(request: NextRequest) {
   const appUrl = getAppUrl();
   const { searchParams } = new URL(request.url);
-  const code  = searchParams.get("code");
-  const state = searchParams.get("state");
-  const error = searchParams.get("error");
+  const code        = searchParams.get("code");
+  const rawState    = searchParams.get("state");
+  const errorParam  = searchParams.get("error");
   const errorReason = searchParams.get("error_reason");
 
-  // Usuário negou o acesso
-  if (error) {
+  // ── 1. Usuário cancelou o OAuth ───────────────────────────────────────
+  if (errorParam) {
     const msg = errorReason === "user_denied"
       ? "Autorização cancelada pelo usuário."
-      : "Não foi possível conectar. Tente novamente.";
-    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
+      : "Não foi possível conectar a conta Meta. Tente novamente.";
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`
+    );
   }
 
-  // Code não veio
   if (!code) {
-    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Parâmetro code ausente no callback.")}`);
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Parâmetro code ausente no callback OAuth.")}`
+    );
   }
 
-  // Valida sessão do usuário via state (base64url do userId)
-  let userId: string | null = null;
-  if (state) {
-    try {
-      userId = Buffer.from(state, "base64url").toString("utf8");
-    } catch {
-      userId = null;
-    }
+  // ── 2. Valida state HMAC assinado ─────────────────────────────────────
+  if (!rawState) {
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("State OAuth ausente. Tente reconectar.")}`
+    );
   }
 
-  // Se não conseguiu extrair userId do state, valida pela sessão ativa
-  if (!userId) {
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id ?? null;
-    } catch {
-      userId = null;
-    }
+  const stateResult = verifyOAuthState(rawState);
+  if (!stateResult.ok) {
+    const msgs: Record<string, string> = {
+      invalid_format:    "State OAuth inválido. Tente reconectar.",
+      invalid_signature: "State OAuth adulterado. Por segurança, a conexão foi bloqueada.",
+      expired:           "A sessão OAuth expirou (limite: 10 minutos). Tente reconectar.",
+      replay:            "State OAuth já utilizado. Por segurança, a conexão foi bloqueada.",
+    };
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msgs[stateResult.reason] ?? "Erro de validação OAuth.")}`
+    );
   }
 
-  if (!userId) {
-    return NextResponse.redirect(`${appUrl}/login?redirect=/admin/conexoes`);
-  }
+  const { uid: userId, cid: clientId, rt: returnTo } = stateResult.payload;
 
-  // Variáveis necessárias para troca do code por token
+  // ── 3. Troca code por access_token ────────────────────────────────────
   const appId      = process.env.META_APP_ID?.trim();
   const appSecret  = process.env.META_APP_SECRET?.trim();
   const redirectUri = process.env.META_REDIRECT_URI?.trim();
 
   if (!appId || !appSecret || !redirectUri) {
     return NextResponse.redirect(
-      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Variáveis Meta não configuradas. Adicione no painel da Vercel.")}`
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Variáveis Meta não configuradas no servidor.")}`
     );
   }
 
-  // Troca o code por access_token
   let accessToken: string | null = null;
   try {
     const tokenUrl = new URL("https://graph.facebook.com/oauth/access_token");
-    tokenUrl.searchParams.set("client_id", appId);
-    tokenUrl.searchParams.set("client_secret", appSecret); // server-side only — nunca exposto
-    tokenUrl.searchParams.set("redirect_uri", redirectUri);
-    tokenUrl.searchParams.set("code", code);
+    tokenUrl.searchParams.set("client_id",     appId);
+    tokenUrl.searchParams.set("client_secret", appSecret); // server-side only
+    tokenUrl.searchParams.set("redirect_uri",  redirectUri);
+    tokenUrl.searchParams.set("code",          code);
 
-    const tokenRes = await fetch(tokenUrl.toString());
+    const tokenRes  = await fetch(tokenUrl.toString());
     const tokenData = await tokenRes.json() as { access_token?: string; error?: { message: string } };
 
     if (tokenData.error || !tokenData.access_token) {
-      const msg = tokenData.error?.message ?? "Falha ao obter token da Meta.";
-      return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`);
+      const msg = tokenData.error?.message
+        ? "Falha ao obter token da Meta. Verifique as credenciais do app."
+        : "Resposta inesperada da Meta ao trocar o code.";
+      return NextResponse.redirect(
+        `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(msg)}`
+      );
     }
 
     accessToken = tokenData.access_token;
   } catch {
     return NextResponse.redirect(
-      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Erro ao comunicar com a API da Meta.")}`
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Erro de rede ao comunicar com a API da Meta.")}`
     );
   }
 
-  // Busca dados básicos da conta Meta autorizada
-  let metaUserId: string | null = null;
+  // ── 4. Busca metadados da conta Meta (não-crítico) ────────────────────
+  let metaUserId:   string | null = null;
   let metaUserName: string | null = null;
   try {
-    const meRes = await fetch(`https://graph.facebook.com/me?fields=id,name&access_token=${accessToken}`);
+    const meRes  = await fetch(`https://graph.facebook.com/me?fields=id,name&access_token=${accessToken}`);
     const meData = await meRes.json() as { id?: string; name?: string };
-    metaUserId = meData.id ?? null;
+    metaUserId   = meData.id   ?? null;
     metaUserName = meData.name ?? null;
-  } catch {
-    // não crítico — prossegue sem nome
-  }
+  } catch { /* não crítico */ }
 
-  // Tenta salvar em meta_connections (só funciona após rodar SQL 35 no Supabase)
-  try {
-    const supabase = await createServerSupabaseClient();
-
-    const { error: insertError } = await supabase.from("meta_connections").insert({
-      connected_by:  userId,
-      provider:      "meta",
-      meta_app_id:   appId,
-      meta_user_id:  metaUserId,
-      access_token:  accessToken,
-      status:        "active",
-      is_active:     true,
-    });
-
-    if (insertError) {
-      // Tabela ainda não existe ou outro erro de DB
-      if (insertError.code === "42P01") {
-        // relation does not exist — SQL 35 não foi rodado
-        return NextResponse.redirect(
-          `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido com sucesso, mas a tabela meta_connections ainda não existe. Rode o SQL 35 no Supabase para salvar a conexão.")}`
-        );
-      }
-      throw insertError;
-    }
-
-    const successMsg = metaUserName
-      ? `Conta Meta conectada: ${metaUserName}`
-      : "Conta Meta conectada com sucesso.";
-    return NextResponse.redirect(`${appUrl}/admin/conexoes?meta_ok=${encodeURIComponent(successMsg)}`);
-  } catch {
+  // ── 5. Persiste em meta_connections via admin client (bypassa RLS) ────
+  //    connected_by vem exclusivamente do state validado, não de query param.
+  if (!hasSupabaseServiceRoleKey()) {
+    // Sem service role, não consegue persistir sem depender de sessão.
+    // Avisa sem registrar o token no log.
     return NextResponse.redirect(
-      `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent("OAuth recebido. Rode o SQL 35 no Supabase para ativar o salvamento da conexão.")}`
+      `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent(
+        "OAuth autorizado, mas SUPABASE_SERVICE_ROLE_KEY não está configurada. Configure-a na Vercel para salvar a conexão."
+      )}`
     );
   }
+
+  const adminDb = createSupabaseAdminClient();
+  let newConnectionId: string | null = null;
+
+  try {
+    const { data: inserted, error: insertError } = await adminDb
+      .from("meta_connections")
+      .insert({
+        connected_by: userId,
+        provider:     "meta",
+        meta_app_id:  appId,
+        meta_user_id: metaUserId,
+        access_token: accessToken, // armazenado server-side, nunca enviado ao front
+        status:       "active",
+        is_active:    true,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      if (insertError.code === "42P01") {
+        return NextResponse.redirect(
+          `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent(
+            "OAuth autorizado com sucesso, mas a tabela meta_connections ainda não existe. Rode o SQL 35 no Supabase."
+          )}`
+        );
+      }
+      // Erro real de DB — não redireciona como sucesso
+      console.error("[meta/callback] falha ao inserir conexão", {
+        code:    insertError.code,
+        message: insertError.message,
+        // Nunca loga token
+      });
+      return NextResponse.redirect(
+        `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(
+          "Falha ao salvar a conexão Meta. Tente reconectar ou contate o suporte."
+        )}`
+      );
+    }
+
+    newConnectionId = inserted?.id ?? null;
+  } catch {
+    return NextResponse.redirect(
+      `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Erro inesperado ao salvar a conexão Meta.")}`
+    );
+  }
+
+  // ── 6. Retorno contextual ─────────────────────────────────────────────
+  const successMsg = metaUserName
+    ? `Conta Meta conectada: ${metaUserName}`
+    : "Conta Meta conectada com sucesso.";
+
+  // Se o OAuth foi iniciado a partir de um cliente, retorna ao contexto do cliente
+  if (returnTo === "/admin/clientes" && clientId) {
+    const params = new URLSearchParams({
+      provider:    "meta",
+      client:      clientId,
+      meta_ok:     encodeURIComponent(successMsg),
+    });
+    if (newConnectionId) params.set("connection", newConnectionId);
+    return NextResponse.redirect(`${appUrl}/admin/clientes?${params.toString()}`);
+  }
+
+  return NextResponse.redirect(
+    `${appUrl}/admin/conexoes?meta_ok=${encodeURIComponent(successMsg)}`
+  );
 }

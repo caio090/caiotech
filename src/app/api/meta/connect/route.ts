@@ -1,53 +1,52 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAppUrl, isProductionEnv, hasLocalhostMetaRedirect } from "@/lib/app-url";
+import { createOAuthState } from "@/lib/meta/state";
 
-// GET /api/meta/connect
+const VALID_RETURN_PATHS = new Set([
+  "/admin/clientes",
+  "/admin/conexoes",
+  "/client/integracoes",
+  "/client/configuracoes",
+]);
+
+// GET /api/meta/connect?client_id=<uuid>&return_to=<path>
 // Monta a URL de autorização OAuth do Meta/Facebook e redireciona o usuário.
-// Requer sessão autenticada — redireciona para /login se não houver.
-//
-// Escopos solicitados:
-//   - pages_show_list              → listar páginas do Facebook
-//   - pages_read_engagement        → ler engajamento das páginas
-//   - instagram_basic              → acesso básico ao Instagram Business
-//   - instagram_manage_insights    → acessar métricas/insights do Instagram
-//   - business_management          → acesso ao Meta Business Manager
-//   - instagram_content_publish    → publicação (reservado, sem ativar agora)
-//
-// NOTA: instagram_manage_insights e business_management exigem
-// revisão e aprovação pelo Meta App Review antes de funcionar
-// em produção para usuários fora do time de desenvolvimento.
-export async function GET() {
-  const appId      = process.env.META_APP_ID?.trim();
+// Requer sessão autenticada.
+// State é assinado com HMAC-SHA256 para proteger contra CSRF e replay.
+export async function GET(request: NextRequest) {
+  const appUrl      = getAppUrl();
+  const appId       = process.env.META_APP_ID?.trim();
   const redirectUri = process.env.META_REDIRECT_URI?.trim();
-  const apiVersion = process.env.META_API_VERSION?.trim() ?? "v21.0";
+  const apiVersion  = process.env.META_API_VERSION?.trim() ?? "v21.0";
 
   if (!appId || !redirectUri) {
     return NextResponse.json(
-      { ok: false, error: "META_APP_ID ou META_REDIRECT_URI não configurados. Adicione as variáveis no painel da Vercel e faça redeploy." },
+      { ok: false, error: "META_APP_ID ou META_REDIRECT_URI não configurados." },
       { status: 500 }
     );
   }
 
-  // Em produção, rejeita se META_REDIRECT_URI apontar para localhost
   if (isProductionEnv() && hasLocalhostMetaRedirect()) {
-    const appUrl = getAppUrl();
     return NextResponse.redirect(
       `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent(
-        "META_REDIRECT_URI está apontando para localhost. Atualize na Vercel para https://www.lokat.com.br/api/meta/callback e faça redeploy."
+        "META_REDIRECT_URI aponta para localhost. Atualize na Vercel e faça redeploy."
       )}`
     );
   }
 
-  // Valida sessão antes de montar URL OAuth
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", getAppUrl()));
+    return NextResponse.redirect(new URL("/login", appUrl));
   }
 
-  // state = userId codificado em base64 para validar no callback (proteção CSRF básica)
-  const state = Buffer.from(user.id).toString("base64url");
+  const { searchParams } = new URL(request.url);
+  const clientId  = searchParams.get("client_id")  ?? undefined;
+  const rawReturn = searchParams.get("return_to")   ?? undefined;
+  const returnTo  = rawReturn && VALID_RETURN_PATHS.has(rawReturn) ? rawReturn : undefined;
+
+  const state = createOAuthState({ uid: user.id, cid: clientId, rt: returnTo });
 
   const scopes = [
     "pages_show_list",
@@ -58,11 +57,11 @@ export async function GET() {
   ].join(",");
 
   const authUrl = new URL(`https://www.facebook.com/${apiVersion}/dialog/oauth`);
-  authUrl.searchParams.set("client_id", appId);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("scope", scopes);
+  authUrl.searchParams.set("client_id",     appId);
+  authUrl.searchParams.set("redirect_uri",  redirectUri);
+  authUrl.searchParams.set("scope",         scopes);
   authUrl.searchParams.set("response_type", "code");
-  authUrl.searchParams.set("state", state);
+  authUrl.searchParams.set("state",         state);
 
   return NextResponse.redirect(authUrl.toString());
 }
