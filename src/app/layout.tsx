@@ -4,25 +4,30 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.lokat.com.br"),
   title: {
-    default:  "LOKAT OS | Marketing, CRM e conteúdo com IA",
+    default:  "LOKAT OS — Organize marketing, clientes, produção e resultados",
     template: "%s | LOKAT OS",
   },
   description:
-    "Planeje campanhas, gerencie leads, aprove conteúdos, acompanhe clientes e organize sua operação de marketing em um só lugar, com IA e automação.",
+    "LOKAT OS conecta estratégia, conteúdo, operação, CRM, dados e integrações para empresas, agências e equipes trabalharem com mais clareza e resultado.",
   keywords: [
-    "marketing com IA", "CRM para agências", "sistema de marketing",
-    "gestão de conteúdo", "automação de marketing", "aprovação de conteúdo",
-    "social media", "negócios locais", "agência de marketing", "Floriano PI",
+    "sistema operacional de marketing", "plataforma de marketing", "CRM para agências",
+    "gestão de marketing", "automação de marketing", "negócios locais",
+    "agência de marketing", "gestão de conteúdo", "relatórios de marketing",
+    "diagnóstico de marketing", "Cardápio Digital", "integração Meta",
   ],
+  alternates: {
+    canonical: "https://www.lokat.com.br",
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
     ],
   },
   openGraph: {
-    title:       "LOKAT OS | Marketing, CRM e conteúdo com IA",
-    description: "Planeje campanhas, leads, aprovações, relatórios e atendimento em uma única plataforma com IA para agências e negócios locais.",
+    title:       "LOKAT OS — Organize marketing, clientes, produção e resultados",
+    description: "LOKAT OS conecta estratégia, conteúdo, operação, CRM, dados e integrações para empresas, agências e equipes.",
     url:         "https://www.lokat.com.br",
     siteName:    "LOKAT OS",
     locale:      "pt_BR",
@@ -30,8 +35,13 @@ export const metadata: Metadata = {
   },
   twitter: {
     card:        "summary_large_image",
-    title:       "LOKAT OS | Marketing, CRM e conteúdo com IA",
-    description: "Organize marketing, CRM, conteúdo, aprovações e clientes em uma plataforma com IA.",
+    title:       "LOKAT OS — Organize marketing, clientes, produção e resultados",
+    description: "Conecte estratégia, conteúdo, operação, CRM, dados e integrações em uma plataforma.",
+  },
+  robots: {
+    index:  true,
+    follow: true,
+    googleBot: { index: true, follow: true },
   },
 };
 
