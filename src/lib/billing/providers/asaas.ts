@@ -8,6 +8,8 @@
 //   ASAAS_API_KEY          — chave da API (sandbox ou produção)
 //   ASAAS_WEBHOOK_TOKEN    — token de verificação do webhook
 //   ASAAS_ENVIRONMENT      — "sandbox" | "production"
+//   ASAAS_BASE_URL         — sobrescreve URL base (opcional, para proxy/testes)
+//   ASAAS_USER_AGENT       — identificação da plataforma (padrão: "LOKAT-OS")
 
 import type {
   PaymentProvider, CreateCustomerInput, CustomerResult,
@@ -16,12 +18,19 @@ import type {
 } from "./types";
 import { ProviderNotConfiguredError } from "./types";
 
-const SANDBOX_BASE = "https://sandbox.asaas.com/api/v3";
-const PRODUCTION_BASE = "https://api.asaas.com/api/v3";
+const SANDBOX_BASE    = "https://api-sandbox.asaas.com/v3";
+const PRODUCTION_BASE = "https://api.asaas.com/v3";
+
+const DEFAULT_USER_AGENT = "LOKAT-OS";
 
 function getBaseUrl(): string {
+  if (process.env.ASAAS_BASE_URL) return process.env.ASAAS_BASE_URL;
   const env = process.env.ASAAS_ENVIRONMENT ?? "sandbox";
   return env === "production" ? PRODUCTION_BASE : SANDBOX_BASE;
+}
+
+function getUserAgent(): string {
+  return process.env.ASAAS_USER_AGENT ?? DEFAULT_USER_AGENT;
 }
 
 function getApiKey(): string | undefined {
@@ -83,6 +92,7 @@ export class AsaasProvider implements PaymentProvider {
       headers: {
         "access_token": key,
         "Content-Type": "application/json",
+        "User-Agent": getUserAgent(),
         ...(options.headers as Record<string, string> ?? {}),
       },
     });
