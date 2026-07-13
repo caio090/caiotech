@@ -66,6 +66,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
   // ── Navegação administrativa ──────────────────────────────
   { id: "admin_navigation",      name: "Navegação admin",          description: "super_admin → /admin/dashboard. ROLE_HOME corrigido em access-control.ts.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
   { id: "legacy_platform_page",  name: "Rota legada /plataforma",  description: "Aposentada. Redireciona para /admin/super/accounts por compatibilidade.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
+  { id: "task_comments",         name: "Comentários em tarefas",   description: "Coluna is_internal faltante na tabela pré-existente operational_task_comments. SQL 85 corrige.", phase: "v1", readiness: "blocked", blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN is_internal"], last_updated: "2026-07-13" },
+  { id: "project_time_tracking", name: "Time tracking de projetos", description: "Coluna profile_id faltante na tabela pré-existente work_sessions. SQL 85 corrige.", phase: "v1", readiness: "blocked", blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN profile_id"], last_updated: "2026-07-13" },
   // ── V2 ─────────────────────────────────────────────────────
   { id: "v2_adsense",     name: "Google AdSense (blog)",  description: "Monetização do blog.",                                   phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
   { id: "v2_affiliate",   name: "Afiliados",              description: "Programa de afiliados.",                                 phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
