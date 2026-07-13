@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import {
   Plus, Search, X, AtSign, CheckCircle2, AlertCircle, Clock,
@@ -926,6 +927,9 @@ function PlanUsageBar({ plan, clientCount, isAdmin }: { plan: string | null; cli
 
 // ── Página principal ───────────────────────────────────────────
 export default function AdminClientesPage() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
   const [clients,       setClients]       = useState<Client[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [isAdmin,       setIsAdmin]       = useState(false);
@@ -934,11 +938,25 @@ export default function AdminClientesPage() {
   const [actionMsg,     setActionMsg]     = useState<string | null>(null);
   const [createError,   setCreateError]   = useState<string | null>(null);
   const [search,        setSearch]        = useState("");
-  const [statusFilter,  setStatusFilter]  = useState<StatusFilter>("todos");
-  const [segFilter,     setSegFilter]     = useState("");
+  const [statusFilter,  setStatusFilter]  = useState<StatusFilter>(
+    (searchParams.get("status") as StatusFilter) ?? "todos"
+  );
+  const [segFilter,     setSegFilter]     = useState(searchParams.get("segmento") ?? "");
   const [metaFilter,    setMetaFilter]    = useState<"todos" | "connected" | "not_connected">("todos");
   const [diagFilter,    setDiagFilter]    = useState<"todos" | "ok" | "pending">("todos");
-  const [showFilters,   setShowFilters]   = useState(false);
+  const [showFilters,   setShowFilters]   = useState(
+    !!(searchParams.get("segmento") || searchParams.get("status"))
+  );
+
+  // Persiste status e segmento na URL
+  const urlSyncRef = useRef(false);
+  useEffect(() => {
+    if (!urlSyncRef.current) { urlSyncRef.current = true; return; }
+    const p = new URLSearchParams(searchParams.toString());
+    if (statusFilter === "todos") p.delete("status"); else p.set("status", statusFilter);
+    if (!segFilter) p.delete("segmento"); else p.set("segmento", segFilter);
+    router.replace(`?${p.toString()}`, { scroll: false });
+  }, [statusFilter, segFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editingClient,  setEditingClient]  = useState<Client | null>(null);
   const [deleteModal,    setDeleteModal]    = useState<DeleteModalState | null>(null);
   const [creatingClient, setCreatingClient] = useState(false);

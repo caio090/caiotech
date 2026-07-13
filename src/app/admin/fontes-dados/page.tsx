@@ -9,6 +9,7 @@ import {
   UtensilsCrossed, AtSign, Globe, Layers, WifiOff, Wifi,
 } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { AttachmentUploader, type AttachmentValue } from "@/components/attachment-uploader";
 
 // ── Tipos ──────────────────────────────────────────────────────
 interface ClientOption { id: string; company_name: string }
@@ -101,17 +102,23 @@ function UploadModal({ clients, onClose, onSaved }: {
   const [reportSource, setReportSource] = useState<ReportSourceValue>("other");
   const [periodStart,  setPeriodStart]  = useState("");
   const [periodEnd,    setPeriodEnd]    = useState("");
-  const [fileName,     setFileName]     = useState("");
-  const [fileType,     setFileType]     = useState("pdf");
+  const [attachment,   setAttachment]   = useState<AttachmentValue | null>(null);
   const [notes,        setNotes]        = useState("");
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState("");
 
   async function handleSave() {
-    if (!clientId || !fileName) { setError("Cliente e nome do arquivo são obrigatórios."); return; }
+    if (!clientId) { setError("Selecione um cliente."); return; }
+    if (!attachment && !reportSource) { setError("Faça upload de um arquivo ou informe a fonte."); return; }
     setSaving(true);
     setError("");
     try {
+      const fileName = attachment?.name ?? null;
+      const fileUrl  = attachment?.url ?? null;
+      const fileType = attachment
+        ? (attachment.name.split(".").pop()?.toLowerCase() ?? "other")
+        : null;
+
       const r = await fetch("/api/admin/reports/uploads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,9 +129,9 @@ function UploadModal({ clients, onClose, onSaved }: {
           period_start:  periodStart || null,
           period_end:    periodEnd   || null,
           file_name:     fileName,
+          file_url:      fileUrl,
           file_type:     fileType,
           notes:         notes || null,
-          // file_url: vazio por enquanto — upload real para Storage será implementado
         }),
       });
       const d = await r.json() as { ok: boolean; reason?: string; message?: string };
@@ -206,30 +213,16 @@ function UploadModal({ clients, onClose, onSaved }: {
             </div>
           </div>
 
-          {/* Arquivo */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">Nome do arquivo <span className="text-red-500">*</span></label>
-              <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)}
-                placeholder="relatorio-junho.pdf"
-                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-indigo-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">Tipo</label>
-              <select value={fileType} onChange={(e) => setFileType(e.target.value)}
-                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-indigo-400 bg-white">
-                <option value="pdf">PDF</option>
-                <option value="xlsx">Excel</option>
-                <option value="csv">CSV</option>
-                <option value="png">PNG</option>
-                <option value="jpg">JPG</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-            <p className="font-semibold mb-1">Upload de arquivo</p>
-            <p>O upload direto para Supabase Storage será habilitado em breve. Por enquanto, registre os metadados do relatório e anexe o arquivo manualmente no Supabase ou informe a URL.</p>
+          {/* Upload de arquivo */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Arquivo</label>
+            <AttachmentUploader
+              value={attachment}
+              onChange={setAttachment}
+              label="Relatório"
+              placeholder="Cole o link do arquivo (Drive, Dropbox…)"
+              storagePathPrefix={clientId ? `client-reports/${clientId}` : "client-reports/misc"}
+            />
           </div>
 
           {/* Observações */}
@@ -253,7 +246,7 @@ function UploadModal({ clients, onClose, onSaved }: {
               className="flex-1 py-2.5 border border-gray-200 text-xs font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
               Cancelar
             </button>
-            <button onClick={() => void handleSave()} disabled={saving || !clientId || !fileName}
+            <button onClick={() => void handleSave()} disabled={saving || !clientId}
               className="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
               {saving ? "Registrando..." : "Registrar relatório"}

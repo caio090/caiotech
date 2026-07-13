@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   TrendingUp, Users, Zap, AlertCircle, Tag, CreditCard,
-  Plus, CheckCircle2, Clock, XCircle, RefreshCw, ChevronDown,
+  Plus, CheckCircle2, Clock, RefreshCw, ChevronDown,
+  Globe, Activity, Bell, Settings,
 } from "lucide-react";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
-import { PLANS, formatPrice } from "@/lib/billing/plans";
+import { formatPrice } from "@/lib/billing/plans";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ interface Coupon {
   status: string;
 }
 
-type Tab = "mrr" | "subscriptions" | "coupons" | "plans";
+type Tab = "mrr" | "subscriptions" | "coupons" | "plans" | "payments" | "gateway" | "events";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   trialing:   { label: "Teste",    color: "text-blue-600 bg-blue-50 border-blue-100" },
@@ -89,21 +90,24 @@ function NewCouponModal({ onClose, onCreated }: NewCouponModalProps) {
     setLoading(true);
     setError("");
     try {
-      const supabase = createClient();
       const payload: Record<string, unknown> = {
         code:          form.code.trim().toUpperCase(),
         description:   form.description || null,
         discount_type: form.discount_type,
         duration_type: form.duration_type,
-        status:        "active",
       };
       if (form.discount_value) payload.discount_value = parseFloat(form.discount_value);
       if (form.duration_months) payload.duration_months = parseInt(form.duration_months);
       if (form.max_redemptions) payload.max_redemptions = parseInt(form.max_redemptions);
-      if (form.expires_at) payload.expires_at = new Date(form.expires_at).toISOString();
+      if (form.expires_at) payload.expires_at = form.expires_at;
 
-      const { error: err } = await supabase.from("billing_coupons").insert(payload);
-      if (err) { setError(err.message); return; }
+      const r = await fetch("/api/admin/billing/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json() as { ok: boolean; message?: string; reason?: string };
+      if (!d.ok) { setError(d.message ?? d.reason ?? "Erro ao criar cupom."); return; }
       onCreated();
       onClose();
     } catch (ex) {
@@ -185,6 +189,125 @@ function NewCouponModal({ onClose, onCreated }: NewCouponModalProps) {
   );
 }
 
+// ── Plans Tab — lê da API (DB ou fallback) ───────────────────────────────────
+
+function PlansTab({ formatPriceFn }: { formatPriceFn: (n: number) => string }) {
+  const [plans, setPlans] = useState<Array<{
+    slug: string; name: string; description: string;
+    price_monthly: number; trial_days: number; status: string;
+    entitlements: string[]; limits: Record<string,unknown>;
+  }>>([]);
+  const [source, setSource] = useState<"database"|"fallback"|null>(null);
+
+  useEffect(() => {
+    void fetch("/api/billing/plans?internal=true")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; source?: "database"|"fallback"; plans?: typeof plans }) => {
+        if (d.ok && d.plans) { setPlans(d.plans); setSource(d.source ?? null); }
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div>
+      {source === "fallback" && (
+        <div className="mb-4 flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          SQL 68 pendente — exibindo planos locais como fallback. Execute o SQL para usar o banco como fonte canônica.
+        </div>
+      )}
+      {source === "database" && (
+        <div className="mb-4 flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700">
+          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+          Planos lidos do banco (billing_plans) — fonte canônica ativa.
+        </div>
+      )}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {plans.map((plan) => (
+          <div key={plan.slug} className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-black text-gray-900">{plan.name}</p>
+              <span className={`text-[9px] font-bold border px-1.5 py-0.5 rounded-full ${plan.status === "active" ? "text-emerald-600 bg-emerald-50 border-emerald-100" : plan.status === "beta" ? "text-purple-600 bg-purple-50 border-purple-100" : "text-gray-400 bg-gray-50 border-gray-100"}`}>
+                {plan.status}
+              </span>
+            </div>
+            <p className="text-2xl font-black text-gray-900 mb-0.5">
+              {formatPriceFn(plan.price_monthly)}<span className="text-xs font-normal text-gray-400">/mês</span>
+            </p>
+            <p className="text-[10px] text-gray-400 mb-3">{plan.trial_days} dias de trial</p>
+            <p className="text-xs text-gray-500 mb-3">{plan.description}</p>
+            <div className="space-y-1">
+              {plan.entitlements.slice(0, 5).map((e) => (
+                <div key={e} className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" strokeWidth={2} />
+                  {e.replace(/_/g, " ")}
+                </div>
+              ))}
+              {plan.entitlements.length > 5 && (
+                <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <ChevronDown className="w-3 h-3" /> +{plan.entitlements.length - 5} módulos
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Gateway Tab ──────────────────────────────────────────────────────────────
+
+function GatewayTab() {
+  const asaasConfigured = false; // será dinâmico quando ASAAS_API_KEY for definida
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-black text-gray-900">Asaas</p>
+            <p className="text-xs text-gray-400 mt-0.5">Gateway de pagamento candidato para V1 brasileira</p>
+          </div>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${asaasConfigured ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-amber-600 bg-amber-50 border-amber-100"}`}>
+            {asaasConfigured ? "Configurado" : "Não configurado"}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          {[
+            { label: "Ambiente",          value: process.env.NEXT_PUBLIC_ASAAS_ENV ?? "sandbox" },
+            { label: "Status",            value: asaasConfigured ? "Ativo" : "Aguardando chave" },
+            { label: "Webhook",           value: "Não registrado" },
+            { label: "Último evento",     value: "—" },
+            { label: "Cartão",            value: "Suportado" },
+            { label: "Pix",               value: "Suportado" },
+            { label: "Pix Automático",    value: "Suportado" },
+            { label: "Boleto",            value: "Suportado" },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex flex-col gap-0.5">
+              <span className="text-gray-400">{label}</span>
+              <span className="font-semibold text-gray-700">{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-xs text-gray-500 space-y-2">
+        <p className="font-bold text-gray-700">Para ativar o gateway:</p>
+        <ol className="list-decimal list-inside space-y-1 pl-1">
+          <li>Crie ou valide conta empresarial no Asaas.</li>
+          <li>Ative o ambiente sandbox no painel.</li>
+          <li>Copie a chave API e defina <code className="bg-gray-100 px-1 rounded">ASAAS_API_KEY</code> no servidor.</li>
+          <li>Registre o webhook em: <code className="bg-gray-100 px-1 rounded">/api/webhooks/billing/asaas</code></li>
+          <li>Defina <code className="bg-gray-100 px-1 rounded">ASAAS_WEBHOOK_TOKEN</code> no servidor.</li>
+          <li>Teste com cartão sandbox antes de ativar produção.</li>
+        </ol>
+        <p className="text-gray-400 italic">Segredos permanecem somente no servidor — nunca no banco ou no frontend.</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function SuperBillingPage() {
@@ -231,8 +354,11 @@ export default function SuperBillingPage() {
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "mrr",           label: "Visão geral",  icon: TrendingUp   },
     { key: "subscriptions", label: "Assinaturas",  icon: Users        },
-    { key: "coupons",       label: "Cupons",        icon: Tag          },
-    { key: "plans",         label: "Planos",        icon: Zap          },
+    { key: "payments",      label: "Pagamentos",   icon: CreditCard   },
+    { key: "coupons",       label: "Cupons",       icon: Tag          },
+    { key: "plans",         label: "Planos",       icon: Zap          },
+    { key: "gateway",       label: "Gateway",      icon: Globe        },
+    { key: "events",        label: "Eventos",      icon: Activity     },
   ];
 
   if (sqlPending) {
@@ -397,35 +523,40 @@ export default function SuperBillingPage() {
 
       {/* ── Planos ── */}
       {tab === "plans" && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PLANS.map((plan) => (
-            <div key={plan.slug} className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-black text-gray-900">{plan.name}</p>
-                <span className={`text-[9px] font-bold border px-1.5 py-0.5 rounded-full ${plan.status === "active" ? "text-emerald-600 bg-emerald-50 border-emerald-100" : plan.status === "beta" ? "text-purple-600 bg-purple-50 border-purple-100" : "text-gray-400 bg-gray-50 border-gray-100"}`}>
-                  {plan.status}
-                </span>
-              </div>
-              <p className="text-2xl font-black text-gray-900 mb-0.5">
-                {formatPrice(plan.price_monthly)}<span className="text-xs font-normal text-gray-400">/mês</span>
-              </p>
-              <p className="text-[10px] text-gray-400 mb-3">{plan.trial_days} dias de trial</p>
-              <p className="text-xs text-gray-500 mb-3">{plan.description}</p>
-              <div className="space-y-1">
-                {plan.entitlements.slice(0, 5).map((e) => (
-                  <div key={e} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" strokeWidth={2} />
-                    {e.replace(/_/g, " ")}
-                  </div>
-                ))}
-                {plan.entitlements.length > 5 && (
-                  <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                    <ChevronDown className="w-3 h-3" /> +{plan.entitlements.length - 5} módulos
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+        <PlansTab formatPriceFn={formatPrice} />
+      )}
+
+      {/* ── Pagamentos ── */}
+      {tab === "payments" && (
+        <div>
+          <div className="flex items-center gap-2 mb-5 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              <span className="font-bold">Pagamentos automáticos em preparação.</span>{" "}
+              Nesta fase beta, pagamentos são registrados manualmente. Configure um gateway em <strong>Gateway</strong> para ativar cobranças automáticas.
+            </p>
+          </div>
+          <div className="text-center py-12 text-gray-400">
+            <CreditCard className="w-8 h-8 mx-auto mb-2" strokeWidth={1} />
+            <p className="text-sm">Nenhum pagamento registrado ainda.</p>
+            <p className="text-xs mt-1 text-gray-400">Pagamentos serão registrados automaticamente via webhook do gateway.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Gateway ── */}
+      {tab === "gateway" && (
+        <GatewayTab />
+      )}
+
+      {/* ── Eventos ── */}
+      {tab === "events" && (
+        <div>
+          <div className="text-center py-12 text-gray-400">
+            <Activity className="w-8 h-8 mx-auto mb-2" strokeWidth={1} />
+            <p className="text-sm">Nenhum evento de webhook recebido ainda.</p>
+            <p className="text-xs mt-1">Eventos aparecerão aqui após configurar o gateway e registrar o webhook.</p>
+          </div>
         </div>
       )}
 
