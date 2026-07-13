@@ -1,6 +1,6 @@
 // Status do projeto LOKAT OS — V1 e V2.
 // V1_PROGRESS e V2_PROGRESS são imutáveis até QA formal em produção.
-// Altere apenas os status das áreas após validação.
+// V1_READINESS é calculado dinamicamente a partir dos pesos por readiness.
 
 export type AreaReadiness =
   | "validated"       // testado e aprovado em produção
@@ -14,73 +14,611 @@ export type AreaReadiness =
 
 export type AreaPhase = "v1" | "v2" | "future";
 
+export type QAStatus =
+  | "approved"           // sem ressalvas
+  | "approved_with_p2"   // aprovado com ressalvas P2 (não bloqueiam V1)
+  | "pending"            // pendente de execução
+  | "not_started"        // ainda não iniciado
+  | "not_required";      // não requer QA externo
+
+export type RiskLevel = "none" | "low" | "medium" | "high" | "critical";
+
+export type AreaCategory =
+  | "infraestrutura"
+  | "conteudo"
+  | "crm"
+  | "integracao"
+  | "billing"
+  | "publico"
+  | "admin"
+  | "banco"
+  | "operacional";
+
+export interface AreaQA {
+  status: QAStatus;
+  date?: string;
+  auditor?: string;
+  result?: string[];
+  p2?: string[];
+}
+
+export interface AreaEstimate {
+  hoursMin?: number;
+  hoursLikely?: number;
+  hoursMax?: number;
+}
+
 export interface ProjectAreaStatus {
   id: string;
   name: string;
   description: string;
   phase: AreaPhase;
   readiness: AreaReadiness;
+  category: AreaCategory;
   blockers?: string[];
   next_actions?: string[];
+  qa?: AreaQA;
+  commit?: string;
+  deployment?: string;
+  sql_dependency?: string;
+  estimate?: AreaEstimate;
+  risk?: RiskLevel;
+  notes?: string;
   last_updated: string;
 }
 
-export const V1_PROGRESS = 81; // IMUTÁVEL — alterar apenas após QA formal
-export const V2_PROGRESS = 12; // IMUTÁVEL — alterar apenas após QA formal
+export const V1_PROGRESS = 81;  // IMUTÁVEL — alterar apenas após QA formal
+export const V2_PROGRESS = 12;  // IMUTÁVEL — alterar apenas após QA formal
+
+// Pesos de prontidão por readiness (0.0 – 1.0).
+// Representa "quanto essa área está realmente pronta para lançamento".
+export const READINESS_WEIGHTS: Record<AreaReadiness, number> = {
+  validated:    1.00,
+  qa_pending:   0.75,
+  deployed:     0.65,
+  implemented:  0.50,
+  in_progress:  0.30,
+  blocked:      0.10,
+  planned:      0.10,
+  out_of_scope: 0.00,
+};
+
+export function calcV1Readiness(): { score: number; label: string } {
+  const v1 = PROJECT_AREAS.filter((a) => a.phase === "v1");
+  const total = v1.reduce((s, a) => s + (READINESS_WEIGHTS[a.readiness] ?? 0), 0);
+  const score = Math.round((total / v1.length) * 100);
+  const label =
+    score >= 85 ? "Alta" :
+    score >= 70 ? "Média-alta" :
+    score >= 55 ? "Média" :
+    "Em desenvolvimento";
+  return { score, label };
+}
 
 export const PROJECT_AREAS: ProjectAreaStatus[] = [
   // ── Infraestrutura ─────────────────────────────────────────
-  { id: "auth",           name: "Autenticação",          description: "Login, convites, sessão e RLS.",                         phase: "v1", readiness: "validated",    last_updated: "2026-07-12" },
-  { id: "db_schema",      name: "Schema do banco",        description: "70+ SQLs evolutivos, RLS, políticas.",                   phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  { id: "storage",        name: "Storage",                description: "Buckets de uploads, políticas de acesso.",               phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  // ── Clientes e onboarding ──────────────────────────────────
-  { id: "clients",        name: "Gestão de clientes",     description: "CRUD, filtros, ciclo de vida, soft delete.",             phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  { id: "onboarding",     name: "Onboarding",             description: "Checklist e fluxo de ativação de cliente.",             phase: "v1", readiness: "qa_pending",   last_updated: "2026-07-12" },
-  // ── Conteúdo (ContenOS) ────────────────────────────────────
-  { id: "contentos",      name: "ContenOS",               description: "Calendário editorial, aprovação por link, fluxo.",       phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  { id: "approvals",      name: "Aprovações",             description: "Aprovação pública por link, sem login.",                 phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  // ── Audiovisual (REC OS) ───────────────────────────────────
-  { id: "rec_os",         name: "REC OS",                 description: "Briefing, roteiro, decupagem, produção audiovisual.",    phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  { id: "storyboard",     name: "Storyboard",             description: "Visualização visual de cenas.",                          phase: "v1", readiness: "qa_pending",   last_updated: "2026-07-12" },
-  // ── Integrações ────────────────────────────────────────────
-  { id: "meta",           name: "Meta / Instagram",       description: "OAuth multiconexão, signed state, wizard por cliente, Hub via client_meta_assets.", phase: "v1", readiness: "qa_pending", next_actions: ["QA wizard + deep-link após OAuth", "Validar Duh preservada"], last_updated: "2026-07-13" },
-  { id: "cardapio",       name: "Cardápio Digital",       description: "Integração OlaClick — faturamento e pedidos.",           phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  { id: "whatsapp",       name: "WhatsApp",               description: "Canal em preparação — não homologado.",                  phase: "v1", readiness: "blocked",      blockers: ["Homologação Meta Business API pendente"], last_updated: "2026-07-12" },
-  // ── Relatórios e diagnósticos ──────────────────────────────
-  { id: "reports",        name: "Relatórios",             description: "Faturamento, Meta insights, diagnóstico.",               phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  { id: "diagnostics",    name: "Diagnósticos",           description: "Diagnóstico de marketing e saúde da empresa.",          phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  // ── Comercial ─────────────────────────────────────────────
-  { id: "crm",            name: "CRM Comercial",          description: "Leads, funil, oportunidades, coluna Instagram, perfis 4-way.",  phase: "v1", readiness: "qa_pending",  last_updated: "2026-07-13" },
-  { id: "team",           name: "Equipe",                 description: "Papéis, convites, acessos.",                            phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  // ── Billing e assinatura ──────────────────────────────────
-  { id: "billing_arch",   name: "Arquitetura de billing", description: "Planos, cupons, assinaturas, providers.",               phase: "v1", readiness: "implemented",  last_updated: "2026-07-12" },
-  { id: "asaas",          name: "Gateway Asaas",          description: "Integração de pagamento — sandbox não homologado.",     phase: "v1", readiness: "blocked",      blockers: ["Credenciais Asaas sandbox pendentes", "SQL 77 não executado"], last_updated: "2026-07-12" },
-  { id: "checkout",       name: "Checkout público",       description: "Fluxo de assinatura pública.",                          phase: "v1", readiness: "planned",      blockers: ["Depende de Asaas homologado"], last_updated: "2026-07-12" },
+  {
+    id: "auth", name: "Autenticação", category: "infraestrutura",
+    description: "Login, convites, sessão e RLS.",
+    phase: "v1", readiness: "validated",
+    qa: { status: "approved", date: "2026-07-01", auditor: "interno", result: ["Login funcional", "RLS ativo", "Convites testados"] },
+    risk: "none", last_updated: "2026-07-12",
+  },
+  {
+    id: "db_schema", name: "Schema do banco", category: "banco",
+    description: "85+ SQLs evolutivos, RLS, políticas de acesso.",
+    phase: "v1", readiness: "deployed",
+    qa: { status: "pending", p2: ["SQL 85 pendente de execução"] },
+    risk: "low", notes: "SQL 82 e SQL 84 falharam — SQL 85 corretivo criado, não executado.",
+    last_updated: "2026-07-13",
+  },
+  {
+    id: "storage", name: "Storage", category: "infraestrutura",
+    description: "Buckets de uploads, políticas de acesso.",
+    phase: "v1", readiness: "deployed",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
   // ── Público ───────────────────────────────────────────────
-  { id: "landing",        name: "Landing page",           description: "Home multinicho, hero, ciclo visual, FAQ, módulos. Perfis 4-way, /pre-acesso?perfil= routing.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
-  { id: "pre_acesso",     name: "Pré-acesso (waitlist)",  description: "Formulário beta com perfil 4-way, ?perfil= param, campo Instagram, Suspense.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
-  { id: "diagnostico",    name: "Diagnóstico rápido",     description: "Diagnóstico de presença digital. Modal de identificação antes dos resultados.", phase: "v1", readiness: "qa_pending", last_updated: "2026-07-13" },
-  { id: "blog",           name: "Blog público",           description: "Fundação: listagem, artigo, categorias, admin, SEO.",   phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  { id: "contato",        name: "Página de contato",      description: "Formulário, API, registro de lead.",                    phase: "v1", readiness: "deployed",     last_updated: "2026-07-12" },
-  { id: "seo",            name: "SEO técnico",            description: "robots.ts, sitemap.ts, canonical, JSON-LD, metadataBase.", phase: "v1", readiness: "deployed",  last_updated: "2026-07-12" },
+  {
+    id: "hero_visual", name: "Hero visual", category: "publico",
+    description: "Gota flutuante (vai-e-vem 8px↔−12px / 4.5s), glow orgânico sem borda reta, dois anéis orbitais com direções opostas, efeito de átomo.",
+    phase: "v1", readiness: "validated",
+    commit: "d06b5c1", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved_with_p2",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: [
+        "Gota sobe e desce — vai-e-vem real",
+        "Duração 4.5s — suave",
+        "Órbita 1 gira (22s)",
+        "Órbita 2 gira sentido oposto (35s)",
+        "Efeito de átomo visível",
+        "Glow sem borda reta",
+        "Sem overflow",
+        "Sem React #418",
+        "Mobile sem regressão",
+      ],
+      p2: ["prefers-reduced-motion não validado com mídia ativa"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "profile_entry_cards", name: "Cards de perfil", category: "publico",
+    description: "Grid 2 colunas, 4 cards interativos (Building2/Briefcase/Users/Sparkles), ArrowRight com hover, micro-CTA em mono accent.",
+    phase: "v1", readiness: "validated",
+    commit: "d06b5c1", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved_with_p2",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: [
+        "Quatro cards visíveis",
+        "Cards inteiros clicáveis",
+        "Contraste aprovado",
+        "Mobile — coluna única",
+        "Rotas corretas para /pre-acesso?perfil=*",
+      ],
+      p2: ["Hover state: aprovado visualmente, fine-tune opcional", "Focus-visible: P2"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "landing", name: "Landing page", category: "publico",
+    description: "Home multinicho, hero, ciclo visual, FAQ, módulos. Perfis 4-way, /pre-acesso?perfil= routing.",
+    phase: "v1", readiness: "validated",
+    commit: "4d8357a", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved_with_p2",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: ["Headline nova aprovada", "Seções públicas visíveis", "Sem 404 ou 500", "Sem overflow"],
+      p2: ["Reduced motion: validação completa pendente"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "pre_acesso", name: "Pré-acesso (waitlist)", category: "publico",
+    description: "Formulário beta com perfil 4-way, ?perfil= param, campo Instagram, Suspense.",
+    phase: "v1", readiness: "validated",
+    commit: "4d8357a", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved_with_p2",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: [
+        "agency selecionado via ?perfil=agency",
+        "company selecionado via ?perfil=company",
+        "professional selecionado via ?perfil=professional",
+        "lokat_client selecionado via ?perfil=lokat_client",
+        "Nenhum alias técnico visível ao usuário",
+        "Campo Instagram presente e funcional",
+      ],
+      p2: ["Pré-seleção depende de Suspense — aguardar resultado de QA de hidratação"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "diagnostico", name: "Diagnóstico rápido", category: "publico",
+    description: "Diagnóstico de presença digital. Modal de identificação antes dos resultados.",
+    phase: "v1", readiness: "validated",
+    commit: "4d8357a", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: [
+        "8 perguntas visíveis",
+        "Modal de identificação abre antes dos resultados",
+        "Campo nome (obrigatório)",
+        "Campo e-mail (obrigatório)",
+        "Campo WhatsApp (opcional)",
+        "Opção de ver sem identificação",
+        "Nenhum envio automático em falha de POST",
+      ],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "blog", name: "Blog público", category: "publico",
+    description: "Fundação: listagem, artigo, categorias, admin, SEO.",
+    phase: "v1", readiness: "validated",
+    qa: {
+      status: "approved",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: ["Público sem redirect", "Estado vazio honesto", "Sem 404"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "contato", name: "Página de contato", category: "publico",
+    description: "Formulário, API, registro de lead.",
+    phase: "v1", readiness: "validated",
+    qa: {
+      status: "approved",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: ["Público sem redirect", "Formulário visível", "Sem envio automático de QA"],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "seo", name: "SEO técnico", category: "publico",
+    description: "robots.ts, sitemap.ts, canonical, JSON-LD, metadataBase.",
+    phase: "v1", readiness: "deployed",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
   // ── Navegação administrativa ──────────────────────────────
-  { id: "admin_navigation",      name: "Navegação admin",          description: "super_admin → /admin/dashboard. ROLE_HOME corrigido em access-control.ts.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
-  { id: "legacy_platform_page",  name: "Rota legada /plataforma",  description: "Aposentada. Redireciona para /admin/super/accounts por compatibilidade.", phase: "v1", readiness: "implemented", last_updated: "2026-07-13" },
-  { id: "task_comments",         name: "Comentários em tarefas",   description: "Coluna is_internal faltante na tabela pré-existente operational_task_comments. SQL 85 corrige.", phase: "v1", readiness: "blocked", blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN is_internal"], last_updated: "2026-07-13" },
-  { id: "project_time_tracking", name: "Time tracking de projetos", description: "Coluna profile_id faltante na tabela pré-existente work_sessions. SQL 85 corrige.", phase: "v1", readiness: "blocked", blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN profile_id"], last_updated: "2026-07-13" },
+  {
+    id: "admin_navigation", name: "Navegação admin", category: "admin",
+    description: "super_admin → /admin/dashboard. ROLE_HOME corrigido em access-control.ts.",
+    phase: "v1", readiness: "validated",
+    commit: "831b3ea", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: {
+      status: "approved",
+      date: "2026-07-13", auditor: "Codex Web",
+      result: [
+        "super_admin abre /admin/dashboard",
+        "/admin/plataforma redireciona para /admin/super/accounts",
+        "Central de Contas abre normalmente",
+        "Nenhum loop de redirect",
+        "Sidebar preservada sem alteração",
+      ],
+    },
+    risk: "none", last_updated: "2026-07-13",
+  },
+  {
+    id: "legacy_platform_page", name: "Rota legada /plataforma", category: "admin",
+    description: "Aposentada. Redireciona para /admin/super/accounts por compatibilidade.",
+    phase: "v1", readiness: "validated",
+    commit: "9f64291", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+    qa: { status: "approved", date: "2026-07-13", auditor: "Codex Web",
+      result: ["Redirect server-side confirmado"] },
+    risk: "none", last_updated: "2026-07-13",
+  },
+
+  // ── Clientes e onboarding ──────────────────────────────────
+  {
+    id: "clients", name: "Gestão de clientes", category: "crm",
+    description: "CRUD, filtros, ciclo de vida, soft delete.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "onboarding", name: "Onboarding", category: "crm",
+    description: "Checklist e fluxo de ativação de cliente.",
+    phase: "v1", readiness: "qa_pending",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Conteúdo (ContenOS) ────────────────────────────────────
+  {
+    id: "contentos", name: "ContenOS", category: "conteudo",
+    description: "Calendário editorial, aprovação por link, fluxo.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "approvals", name: "Aprovações", category: "conteudo",
+    description: "Aprovação pública por link, sem login.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Audiovisual (REC OS) ───────────────────────────────────
+  {
+    id: "rec_os", name: "REC OS", category: "conteudo",
+    description: "Briefing, roteiro, decupagem, produção audiovisual.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "storyboard", name: "Storyboard", category: "conteudo",
+    description: "Visualização visual de cenas.",
+    phase: "v1", readiness: "qa_pending",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Integrações ────────────────────────────────────────────
+  {
+    id: "meta", name: "Meta / Instagram", category: "integracao",
+    description: "OAuth multiconexão, signed state HMAC-SHA256, wizard por cliente, Hub via client_meta_assets.",
+    phase: "v1", readiness: "qa_pending",
+    commit: "f141e05",
+    qa: {
+      status: "pending",
+      date: "2026-07-13",
+      result: [
+        "Duh preservada (evidência parcial)",
+        "Pedreirão preservado (evidência parcial)",
+        "Tela Conexões abre",
+        "Meta OAuth aparece conectado",
+        "Sem regressão crítica",
+      ],
+      p2: [
+        "QA do wizard completo pendente",
+        "Nova conta: não testada",
+        "Retorno contextual: não testado",
+        "Hub persistido: não testado",
+        "Isolamento de connection_id: não testado",
+      ],
+    },
+    next_actions: [
+      "QA wizard completo com conta real",
+      "Testar nova conexão + retorno contextual",
+      "Validar Hub persistido após OAuth",
+      "Confirmar isolamento por connection_id e asset_id",
+    ],
+    risk: "medium",
+    estimate: { hoursMin: 4, hoursLikely: 6, hoursMax: 10 },
+    last_updated: "2026-07-13",
+  },
+  {
+    id: "cardapio", name: "Cardápio Digital", category: "integracao",
+    description: "Integração OlaClick — faturamento e pedidos.",
+    phase: "v1", readiness: "deployed",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "whatsapp", name: "WhatsApp", category: "integracao",
+    description: "Canal em preparação — não homologado.",
+    phase: "v1", readiness: "blocked",
+    blockers: ["Homologação Meta Business API pendente"],
+    qa: { status: "not_required" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Relatórios e diagnósticos ──────────────────────────────
+  {
+    id: "reports", name: "Relatórios", category: "admin",
+    description: "Faturamento, Meta insights, diagnóstico.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "diagnostics", name: "Diagnósticos admin", category: "admin",
+    description: "Diagnóstico de marketing e saúde da empresa — área administrativa.",
+    phase: "v1", readiness: "deployed",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Comercial ─────────────────────────────────────────────
+  {
+    id: "crm", name: "CRM Comercial", category: "crm",
+    description: "Leads, funil, oportunidades, coluna Instagram, perfis 4-way.",
+    phase: "v1", readiness: "qa_pending",
+    commit: "4d8357a",
+    qa: { status: "pending" }, risk: "low",
+    next_actions: ["Modal de detalhes do lead", "UTM tracking melhorado", "QA da coluna Instagram"],
+    estimate: { hoursMin: 4, hoursLikely: 6, hoursMax: 10 },
+    last_updated: "2026-07-13",
+  },
+  {
+    id: "team", name: "Equipe", category: "admin",
+    description: "Papéis, convites, acessos.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Billing e assinatura ──────────────────────────────────
+  {
+    id: "billing_arch", name: "Arquitetura de billing", category: "billing",
+    description: "Planos, cupons, assinaturas, providers.",
+    phase: "v1", readiness: "implemented",
+    qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+  },
+  {
+    id: "asaas", name: "Gateway Asaas", category: "billing",
+    description: "Integração de pagamento — sandbox não homologado. Código preparado.",
+    phase: "v1", readiness: "blocked",
+    blockers: ["Credenciais Asaas sandbox pendentes"],
+    qa: { status: "not_started" }, risk: "high",
+    notes: "Código existe: provider, gateway status, checkout preparado, webhook preparado. Falta: chave sandbox, customer, cobrança simulada, webhook, assinatura, checkout visual.",
+    next_actions: [
+      "Obter chave sandbox Asaas",
+      "Testar conexão e customer",
+      "Simular cobrança",
+      "Validar webhook",
+      "QA checkout visual",
+    ],
+    estimate: { hoursMin: 8, hoursLikely: 12, hoursMax: 18 },
+    last_updated: "2026-07-12",
+  },
+  {
+    id: "checkout", name: "Checkout público", category: "billing",
+    description: "Fluxo de assinatura pública.",
+    phase: "v1", readiness: "planned",
+    blockers: ["Depende de Asaas homologado"],
+    qa: { status: "not_started" }, risk: "high",
+    last_updated: "2026-07-12",
+  },
+
+  // ── Operacional ───────────────────────────────────────────
+  {
+    id: "task_comments", name: "Comentários em tarefas", category: "operacional",
+    description: "Comentários internos e externos em tarefas operacionais. Arquitetura, políticas RLS e proposta de tabela existem.",
+    phase: "v1", readiness: "blocked",
+    sql_dependency: "SQL 85 — BLOCO 1",
+    blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN is_internal"],
+    qa: { status: "not_started" }, risk: "medium",
+    notes: "O que existe: proposta de tabela, políticas, arquitetura, status cadastrado. O que falta: executar SQL 85, validar RLS, implementar/liberar interface, testar comentários, menções, anexos e notificações.",
+    next_actions: ["Executar SQL 85 BLOCO 1", "Validar RLS is_internal", "Implementar UI de comentários"],
+    estimate: { hoursMin: 6, hoursLikely: 10, hoursMax: 14 },
+    last_updated: "2026-07-13",
+  },
+  {
+    id: "project_time_tracking", name: "Controle de horas", category: "operacional",
+    description: "Sessões de trabalho por tarefa/área, esforço acumulado e previsão de entrega.",
+    phase: "v1", readiness: "blocked",
+    sql_dependency: "SQL 85 — BLOCO 2",
+    blockers: ["SQL 85 pendente de execução — ALTER TABLE ADD COLUMN profile_id"],
+    qa: { status: "not_started" }, risk: "medium",
+    notes: "O que existe: proposta work_sessions, previsão conceitual, campos de esforço, definição de sessões. O que falta: corrigir banco, validar profile_id, criar interface, registrar sessões, gráficos, calcular velocidade.",
+    next_actions: ["Executar SQL 85 BLOCO 2", "Validar profile_id na tabela", "Criar interface de registro"],
+    estimate: { hoursMin: 8, hoursLikely: 14, hoursMax: 20 },
+    last_updated: "2026-07-13",
+  },
+
   // ── V2 ─────────────────────────────────────────────────────
-  { id: "v2_adsense",     name: "Google AdSense (blog)",  description: "Monetização do blog.",                                   phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
-  { id: "v2_affiliate",   name: "Afiliados",              description: "Programa de afiliados.",                                 phase: "v2", readiness: "planned",     last_updated: "2026-07-12" },
+  {
+    id: "v2_adsense", name: "Google AdSense (blog)", category: "billing",
+    description: "Monetização do blog.", phase: "v2", readiness: "planned",
+    qa: { status: "not_started" }, last_updated: "2026-07-12",
+  },
+  {
+    id: "v2_affiliate", name: "Afiliados", category: "crm",
+    description: "Programa de afiliados.", phase: "v2", readiness: "planned",
+    qa: { status: "not_started" }, last_updated: "2026-07-12",
+  },
 ];
 
+// ── Histórico de eventos versionado ─────────────────────────
+export interface HistoryEntry {
+  date: string;
+  event: string;
+  commit?: string;
+  deployment?: string;
+}
+
+export const V1_HISTORY: HistoryEntry[] = [
+  {
+    date: "2026-07-13",
+    event: "5 commits publicados em produção — deployment READY.",
+    commit: "3d4eb5b", deployment: "dpl_6TWxhJHpk3QGh896c7kJEvzwAB8E",
+  },
+  {
+    date: "2026-07-13",
+    event: "SQL 85 criado como proposta corretiva para falhas de SQL 82 (is_internal) e SQL 84 (profile_id). Não executado.",
+    commit: "3d4eb5b",
+  },
+  {
+    date: "2026-07-13",
+    event: "Blog público e Contato validados como rotas públicas pelo Codex Web.",
+  },
+  {
+    date: "2026-07-13",
+    event: "Navegação admin validada: Dashboard como home do super_admin; /admin/plataforma redireciona corretamente.",
+    commit: "831b3ea",
+  },
+  {
+    date: "2026-07-13",
+    event: "Diagnóstico rápido com modal de identificação aprovado pelo Codex Web.",
+    commit: "4d8357a",
+  },
+  {
+    date: "2026-07-13",
+    event: "Pré-acesso com perfis 4-way e campo Instagram aprovado pelo Codex Web.",
+    commit: "4d8357a",
+  },
+  {
+    date: "2026-07-13",
+    event: "Hero visual aprovado pelo Codex Web: gota (vai-e-vem), órbitas, efeito de átomo, glow orgânico.",
+    commit: "d06b5c1",
+  },
+  {
+    date: "2026-07-13",
+    event: "Cards de perfil interativos aprovados: grid 2 colunas, ícones, hover com ArrowRight.",
+    commit: "d06b5c1",
+  },
+  {
+    date: "2026-07-13",
+    event: "Headline do hero atualizada: 'Do planejamento ao resultado, tudo trabalha junto.'",
+    commit: "4d8357a",
+  },
+];
+
+// ── Bloqueadores de banco ─────────────────────────────────────
+export interface SQLBlocker {
+  number: number;
+  label: string;
+  file: string;
+  status: "executed" | "failed" | "pending" | "created";
+  errorCode?: string;
+  errorMessage?: string;
+  affectedAreas: string[];
+  fix?: string;
+  fixFile?: string;
+  fixStatus?: "created" | "pending_execution";
+  rootCause?: string;
+  bankAltered: boolean;
+}
+
+export const SQL_BLOCKERS: SQLBlocker[] = [
+  {
+    number: 82,
+    label: "Especialidades e comentários de tarefas",
+    file: "docs/supabase/82-team-specialties-and-task-comments.sql",
+    status: "failed",
+    errorCode: "42703",
+    errorMessage: "column \"is_internal\" does not exist",
+    affectedAreas: ["task_comments"],
+    fix: "SQL 85 — BLOCO 1",
+    fixFile: "docs/supabase/85-fix-team-comments-and-work-sessions.sql",
+    fixStatus: "created",
+    rootCause: "operational_task_comments pré-existia sem a coluna is_internal. CREATE TABLE IF NOT EXISTS pulou a recriação.",
+    bankAltered: false,
+  },
+  {
+    number: 84,
+    label: "Time tracking e previsão de entrega",
+    file: "docs/supabase/84-project-effort-and-sessions.sql",
+    status: "failed",
+    errorCode: "42703",
+    errorMessage: "column \"profile_id\" does not exist",
+    affectedAreas: ["project_time_tracking"],
+    fix: "SQL 85 — BLOCO 2",
+    fixFile: "docs/supabase/85-fix-team-comments-and-work-sessions.sql",
+    fixStatus: "created",
+    rootCause: "work_sessions pré-existia sem a coluna profile_id. Índice ws_profile_idx e políticas RLS falharam.",
+    bankAltered: false,
+  },
+  {
+    number: 85,
+    label: "Correção: is_internal + profile_id e recriação de políticas RLS",
+    file: "docs/supabase/85-fix-team-comments-and-work-sessions.sql",
+    status: "pending",
+    affectedAreas: ["task_comments", "project_time_tracking"],
+    fixStatus: "created",
+    rootCause: "Criado como patch idempotente: ADD COLUMN IF NOT EXISTS + DROP/CREATE de policies.",
+    bankAltered: false,
+  },
+];
+
+// ── Estimativa de esforço restante (cotação) ──────────────────
+export const EFFORT_ESTIMATE = {
+  scopeRemaining: [
+    "Meta QA completo e possíveis correções",
+    "Asaas Sandbox — setup, homologação e QA",
+    "SQL 85 — execução e validação de RLS",
+    "Task assignment UI",
+    "Comentários operacionais (task_comments após SQL 85)",
+    "REC OS — board de referências",
+    "CRM — modal de detalhes do lead",
+    "UTMs — tracking melhorado",
+    "QA final de todas as áreas V1",
+  ],
+  hoursMin: 32,
+  hoursLikely: 48,
+  hoursMax: 70,
+  qaHoursMin: 8,
+  qaHoursMax: 14,
+  confidence: "média" as const,
+  recalcTriggers: [
+    "Após execução do SQL 85",
+    "Quando Asaas Sandbox estiver disponível",
+    "Após QA completo da Meta multiconexão",
+    "Se novas funcionalidades entrarem no escopo V1",
+  ],
+} as const;
+
+// ── Helpers ───────────────────────────────────────────────────
 export function getAreasByPhase(phase: AreaPhase): ProjectAreaStatus[] {
   return PROJECT_AREAS.filter((a) => a.phase === phase);
 }
 
 export function getBlockedAreas(): ProjectAreaStatus[] {
-  return PROJECT_AREAS.filter((a) => a.readiness === "blocked");
+  return PROJECT_AREAS.filter((a) => a.readiness === "blocked" && a.phase === "v1");
 }
 
 export function getQaPendingAreas(): ProjectAreaStatus[] {
-  return PROJECT_AREAS.filter((a) => a.readiness === "qa_pending");
+  return PROJECT_AREAS.filter((a) => a.readiness === "qa_pending" && a.phase === "v1");
+}
+
+export function getValidatedAreas(): ProjectAreaStatus[] {
+  return PROJECT_AREAS.filter((a) => a.readiness === "validated" && a.phase === "v1");
 }
