@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public-header";
-import { Zap } from "lucide-react";
+import { Zap, Building2, Briefcase, Users, Sparkles, ArrowRight } from "lucide-react";
 import { MIN_PUBLIC_PRICE } from "@/lib/billing/plans";
 import { LAUNCH_MODE } from "@/lib/launch/config";
 import { LeadConversationModal } from "@/components/lead-conversation-modal";
@@ -72,6 +72,42 @@ function EcosystemCycle() {
         ))}
       </div>
     </div>
+  );
+}
+
+type LkIcon = React.ComponentType<{ size?: number; strokeWidth?: number }>;
+type ProfileCardProps = {
+  label: string; cta: string; desc: string; q: string; Icon: LkIcon;
+  accent: string; mono: React.CSSProperties; grotesk: React.CSSProperties; text: string; muted: string;
+};
+function ProfileCard({ label, cta, desc, q, Icon, accent, mono, grotesk, text, muted }: ProfileCardProps) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Link
+      href={`/pre-acesso?perfil=${q}`}
+      style={{
+        display: "flex", flexDirection: "column", gap: ".75rem", textDecoration: "none",
+        background: hovered ? `${accent}12` : `${accent}07`,
+        border: `1px solid ${hovered ? `${accent}50` : `${accent}20`}`,
+        padding: "1.25rem 1.25rem 1rem",
+        boxShadow: hovered ? `0 4px 24px rgba(123,110,246,.1)` : "none",
+        transition: "border-color .2s ease, background .2s ease, box-shadow .2s ease",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ color: accent, opacity: hovered ? 1 : 0.65, transition: "opacity .2s" }}>
+          <Icon size={20} strokeWidth={1.5} />
+        </div>
+        <ArrowRight size={14} strokeWidth={1.5} style={{ color: accent, opacity: hovered ? 0.85 : 0.3, transform: hovered ? "translateX(3px)" : "translateX(0)", transition: "opacity .2s, transform .2s" }} />
+      </div>
+      <div>
+        <span style={{ ...mono, display: "block", fontSize: ".65rem", letterSpacing: ".08em", textTransform: "uppercase", color: text, fontWeight: 700, marginBottom: ".35rem" }}>{label}</span>
+        <span style={{ ...grotesk, display: "block", fontSize: ".78rem", color: muted, lineHeight: 1.5 }}>{desc}</span>
+      </div>
+      <span style={{ ...mono, display: "block", fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase", color: accent, opacity: hovered ? 0.85 : 0.5, transition: "opacity .2s", paddingTop: ".25rem" }}>{cta} →</span>
+    </Link>
   );
 }
 
@@ -210,7 +246,7 @@ export default function HomePage() {
 
           {/* Drop visual */}
           <div className="relative hero-robot-in flex-shrink-0 w-full lg:w-[340px] h-[280px] lg:h-[480px] hidden lg:flex items-center justify-center">
-            <div className="absolute inset-0 glow-pulse pointer-events-none" style={{ background: "radial-gradient(circle at 50% 45%, rgba(123,110,246,0.2) 0%, rgba(139,92,246,0.07) 45%, transparent 70%)" }} />
+            <div className="glow-pulse pointer-events-none" style={{ position: "absolute", left: "50%", top: "45%", width: "180%", height: "160%", transform: "translate(-50%, -50%)", background: "radial-gradient(ellipse at center, rgba(123,110,246,0.24) 0%, rgba(103,80,220,0.1) 38%, rgba(66,47,160,0.04) 62%, transparent 80%)", borderRadius: "999px", filter: "blur(12px)" }} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <svg width="370" height="220" viewBox="0 0 370 220" fill="none" className="orbit-slow" style={{ opacity: 0.2 }}>
                 <ellipse cx="185" cy="110" rx="170" ry="62" stroke="#7b6ef6" strokeWidth="1" strokeDasharray="5 9" />
@@ -252,27 +288,18 @@ export default function HomePage() {
       </section>
 
       {/* ── Seletor de perfil ─────────────────────────────────── */}
-      <section className="max-w-4xl mx-auto px-4 md:px-8 pb-12 pt-4 text-center">
-        <p style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, marginBottom: "1.25rem" }}>
+      <section className="max-w-4xl mx-auto px-4 md:px-8 pb-14 pt-4">
+        <p style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".18em", textTransform: "uppercase", color: S.muted, marginBottom: "1.25rem", textAlign: "center" }}>
           Qual é o seu perfil?
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {[
-            { label: "Tenho uma agência",          desc: "Multi-clientes, equipe, aprovações e relatórios centralizados.", q: "agency"       },
-            { label: "Tenho uma empresa",           desc: "Gerencie marketing, CRM, dados e operação de um negócio.",       q: "company"      },
-            { label: "Sou profissional da área",    desc: "Tarefas, briefings, conteúdo e resultados num fluxo único.",     q: "professional" },
-            { label: "Quero ser cliente da LOKAT",  desc: "Agência especializada para tocar sua operação de marketing.",    q: "lokat_client" },
-          ].map((p) => (
-            <Link
-              key={p.q}
-              href={`/pre-acesso?perfil=${p.q}`}
-              style={{ background: `${S.accent}08`, border: `1px solid ${S.accent}25`, padding: ".85rem 1.25rem", textDecoration: "none", minWidth: 160, textAlign: "center", transition: "border-color .2s, background .2s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${S.accent}55`; e.currentTarget.style.background = `${S.accent}14`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${S.accent}25`; e.currentTarget.style.background = `${S.accent}08`; }}
-            >
-              <span style={{ ...S.mono, display: "block", fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.text, marginBottom: ".3rem", fontWeight: 700 }}>{p.label}</span>
-              <span style={{ ...S.grotesk, display: "block", fontSize: ".72rem", color: S.muted, lineHeight: 1.4 }}>{p.desc}</span>
-            </Link>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+          {([
+            { label: "Tenho uma agência",         cta: "Quero organizar minha agência",  desc: "Multi-clientes, equipe, aprovações e relatórios centralizados.",    q: "agency",       Icon: Building2 },
+            { label: "Tenho uma empresa",          cta: "Quero organizar meu negócio",    desc: "Gerencie marketing, CRM, dados e operação tudo num fluxo único.",   q: "company",      Icon: Briefcase  },
+            { label: "Sou profissional da área",   cta: "Quero minha central de trabalho",desc: "Tarefas, briefings, conteúdo e resultados num fluxo próprio.",      q: "professional", Icon: Users      },
+            { label: "Quero ser cliente da LOKAT", cta: "Quero falar com a agência",      desc: "Agência especializada para tocar sua operação de marketing digital.", q: "lokat_client", Icon: Sparkles   },
+          ] as const).map((p) => (
+            <ProfileCard key={p.q} {...p} accent={S.accent} mono={S.mono} grotesk={S.grotesk} text={S.text} muted={S.muted} />
           ))}
         </div>
       </section>

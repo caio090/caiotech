@@ -181,15 +181,18 @@ body {
 .hero-fade-up-d3 { animation: lokat-fade-up 0.75s 0.30s cubic-bezier(0.16,1,0.3,1) both; }
 .hero-robot-in   { animation: lokat-fade-up 1s 0.25s cubic-bezier(0.16,1,0.3,1) both; }
 .glow-pulse      { animation: lokat-glow 5s ease-in-out infinite; }
-.orbit-slow      { animation: lokat-orbit 22s linear infinite; transform-origin: center; transform-box: fill-box; }
-.orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; transform-box: fill-box; }
+.orbit-slow      { animation: lokat-orbit 22s linear infinite; transform-origin: center; transform-box: view-box; will-change: transform; }
+.orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; transform-box: view-box; will-change: transform; }
 .eye-blink       { animation: lokat-eye-blink 5s 2.5s ease-in-out infinite; }
 
 @keyframes lk-drop-float {
-  0%, 100% { transform: translateY(0px); }
+  0%, 100% { transform: translateY(8px); }
   50%       { transform: translateY(-12px); }
 }
-.lk-drop-float { animation: lk-drop-float 4s ease-in-out infinite; }
+.lk-drop-float {
+  animation: lk-drop-float 4.5s ease-in-out infinite;
+  will-change: transform;
+}
 
 @keyframes robot-blink {
   0%, 91%, 100% { transform: scaleY(0); opacity: 0; }
@@ -261,12 +264,10 @@ body {
     opacity: 1;
     transform: none;
   }
-  .glow-pulse,
-  .orbit-slow,
-  .orbit-rev,
-  .eye-blink {
-    animation: none;
-  }
+  .glow-pulse { animation: none; }
+  .eye-blink  { animation: none; }
+  .orbit-slow { animation-duration: 120s; }
+  .orbit-rev  { animation-duration: 180s; }
   .lk-ticker-track,
   .lk-scroll-track {
     animation: none;
