@@ -117,6 +117,8 @@ interface OrderMetrics {
   faturamentoPorHora:      Record<string, number>;
   concentracaoPorFaixa:    Record<string, { orders: number; revenue: number }>;
   faturamentoPorDia:       { date: string; revenue: number; orders: number }[];
+  pedidosPorFormaPagamento:     Record<string, number>;
+  faturamentoPorFormaPagamento: Record<string, number>;
 }
 
 interface RateLimitInfo {
@@ -490,6 +492,64 @@ function normalizeSource(raw: unknown): string {
   return s;
 }
 
+function normalizePaymentMethod(raw: unknown): string {
+  const s = String(raw ?? "").toLowerCase().replace(/[-_\s]/g, "");
+  if (!s || s === "undefined" || s === "null" || s === "") return "desconhecido";
+  if (s.includes("credit") || s.includes("credito") || s.includes("crédito")) return "cartao_credito";
+  if (s.includes("debit")  || s.includes("debito")  || s.includes("débito"))  return "cartao_debito";
+  if (s.includes("pix"))                                                        return "pix";
+  if (s.includes("cash") || s.includes("dinheiro") || s.includes("especie") || s.includes("espécie")) return "dinheiro";
+  if (s.includes("voucher") || s.includes("vale"))                              return "voucher";
+  if (s.includes("online") || s.includes("digital"))                            return "pagamento_online";
+  return s;
+}
+
+function extractPaymentEntries(order: Record<string, unknown>): string[] {
+  const methods: string[] = [];
+
+  // Single-value candidates
+  const singleKeys = [
+    "payment_method", "paymentMethod", "payment_type", "paymentType",
+    "forma_pagamento", "metodo_pagamento", "payment",
+  ];
+  for (const k of singleKeys) {
+    if (typeof order[k] === "string" && (order[k] as string).trim()) {
+      methods.push(normalizePaymentMethod(order[k]));
+      return methods;
+    }
+  }
+
+  // Array candidates
+  const arrayKeys = ["payments", "payment_methods", "paymentMethods"];
+  for (const k of arrayKeys) {
+    const arr = order[k];
+    if (Array.isArray(arr)) {
+      for (const entry of arr) {
+        if (!entry || typeof entry !== "object") continue;
+        const rec = entry as Record<string, unknown>;
+        const m = rec["method"] ?? rec["type"] ?? rec["payment_method"] ?? rec["name"];
+        if (typeof m === "string" && m.trim()) {
+          methods.push(normalizePaymentMethod(m));
+        }
+      }
+      if (methods.length > 0) return methods;
+    }
+  }
+
+  // Nested object
+  const nested = order["payment"];
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const rec = nested as Record<string, unknown>;
+    const m = rec["method"] ?? rec["type"] ?? rec["name"];
+    if (typeof m === "string" && m.trim()) {
+      methods.push(normalizePaymentMethod(m));
+      return methods;
+    }
+  }
+
+  return methods;
+}
+
 function getTimeFaixa(hour: number): "madrugada" | "manha" | "tarde" | "noite" {
   if (hour < 6)  return "madrugada";
   if (hour < 12) return "manha";
@@ -512,6 +572,8 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
   const weekdayOrdMap:  Record<string, number> = {};
   const hourOrdMap:     Record<string, number> = {};
   const hourRevMap:     Record<string, number> = {};
+  const paymentOrdMap:  Record<string, number> = {};
+  const paymentRevMap:  Record<string, number> = {};
   const faixaMap: Record<string, { orders: number; revenue: number }> = {
     madrugada: { orders: 0, revenue: 0 },
     manha:     { orders: 0, revenue: 0 },
@@ -573,6 +635,17 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
                  : typeof item["qty"]      === "number" ? item["qty"] : 1;
       itemCounts[name] = (itemCounts[name] ?? 0) + (qty as number);
     }
+
+    const payMethods = extractPaymentEntries(order);
+    if (payMethods.length > 0) {
+      for (const pm of payMethods) {
+        paymentOrdMap[pm] = (paymentOrdMap[pm] ?? 0) + 1;
+        paymentRevMap[pm] = (paymentRevMap[pm] ?? 0) + total / payMethods.length;
+      }
+    } else {
+      paymentOrdMap["desconhecido"] = (paymentOrdMap["desconhecido"] ?? 0) + 1;
+      paymentRevMap["desconhecido"] = (paymentRevMap["desconhecido"] ?? 0) + total;
+    }
   }
 
   const total_pedidos = orders.length;
@@ -628,6 +701,8 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     faturamentoPorHora:      hourRevMap,
     concentracaoPorFaixa:    faixaMap,
     faturamentoPorDia,
+    pedidosPorFormaPagamento:     paymentOrdMap,
+    faturamentoPorFormaPagamento: paymentRevMap,
   };
 }
 
