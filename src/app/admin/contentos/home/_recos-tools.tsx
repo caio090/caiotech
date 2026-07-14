@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Layers, CalendarClock, FlaskConical, AlertCircle } from "lucide-react";
+import { Plus, Flag, CalendarDays, BarChart2, AlertCircle, ListChecks } from "lucide-react";
 
 interface RecOSToolsProps {
   clientId: string;
@@ -7,68 +7,81 @@ interface RecOSToolsProps {
 }
 
 export function RecOSTools({ clientId, role }: RecOSToolsProps) {
-  const isAdmin      = role === "admin" || role === "super_admin";
-  const isSuperAdmin = role === "super_admin";
-
+  const isAdmin = role === "admin" || role === "super_admin";
   if (!isAdmin) return null;
+
+  const actions = [
+    {
+      icon: Plus,
+      label: "Criar conteúdo",
+      desc: "Novo briefing ou peça visual",
+      href: `/admin/contentos/criar?client=${clientId}`,
+      color: "text-purple-400",
+      bg: "bg-purple-950/40 border-purple-800/40",
+    },
+    {
+      icon: Flag,
+      label: "Abrir campanha",
+      desc: "Planejar ciclo estratégico",
+      href: `/admin/contentos/campanhas?client=${clientId}`,
+      color: "text-indigo-400",
+      bg: "bg-indigo-950/40 border-indigo-800/40",
+    },
+    {
+      icon: CalendarDays,
+      label: "Ver calendário",
+      desc: "Conteúdos agendados e planejados",
+      href: `/admin/contentos/calendario?client=${clientId}`,
+      color: "text-sky-400",
+      bg: "bg-sky-950/40 border-sky-800/40",
+    },
+    {
+      icon: BarChart2,
+      label: "Ver resultados",
+      desc: "Desempenho e insights",
+      href: `/admin/contentos/resultados?client=${clientId}`,
+      color: "text-emerald-400",
+      bg: "bg-emerald-950/40 border-emerald-800/40",
+    },
+    {
+      icon: AlertCircle,
+      label: "Pendências",
+      desc: "Conteúdos aguardando aprovação",
+      href: `/admin/contentos/aprovacoes?client=${clientId}`,
+      color: "text-amber-400",
+      bg: "bg-amber-950/40 border-amber-800/40",
+    },
+    {
+      icon: ListChecks,
+      label: "Tarefa no Operacional",
+      desc: "Criar ou abrir tarefa de produção",
+      href: `/operacional/tarefas`,
+      color: "text-zinc-400",
+      bg: "bg-zinc-800/60 border-zinc-700",
+    },
+  ];
 
   return (
     <section className="mb-6">
       <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">
-        Ferramentas do REC OS
+        Ações rápidas
       </h2>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {/* Agendamento — admin + super_admin */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-            <CalendarClock className="w-4 h-4 text-zinc-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <p className="text-sm font-semibold text-zinc-200">Agendamento</p>
-              <span className="flex items-center gap-1 text-[10px] bg-zinc-800 text-zinc-500 border border-zinc-700 rounded px-1.5 py-px">
-                <AlertCircle className="w-2.5 h-2.5" />
-                Não configurado
-              </span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {actions.map(({ icon: Icon, label, desc, href, color, bg }) => (
+          <Link
+            key={label}
+            href={href}
+            className={`rounded-xl border ${bg} p-3 flex items-center gap-2.5 hover:brightness-110 transition-all group`}
+          >
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
+              <Icon className={`w-3.5 h-3.5 ${color}`} />
             </div>
-            <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-              Prepare conteúdos aprovados para programação e publicação.
-            </p>
-            <Link
-              href={`/admin/contentos/agendamento?client=${clientId}`}
-              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-zinc-700 hover:border-zinc-500 rounded-lg px-3 py-1.5"
-            >
-              Ver fluxo de agendamento
-            </Link>
-          </div>
-        </div>
-
-        {/* EditorOS — super_admin only */}
-        {isSuperAdmin && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-950/60 border border-indigo-800/50 flex items-center justify-center shrink-0">
-              <Layers className="w-4 h-4 text-indigo-400" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-zinc-200 truncate">{label}</p>
+              <p className="text-[10px] text-zinc-500 truncate">{desc}</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-semibold text-zinc-200">EditorOS</p>
-                <span className="flex items-center gap-1 text-[10px] bg-amber-950/40 text-amber-400 border border-amber-800/40 rounded px-1.5 py-px">
-                  <FlaskConical className="w-2.5 h-2.5" />
-                  Em avaliação
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-                Crie peças e prepare projetos visuais usando o contexto da marca.
-              </p>
-              <Link
-                href={`/admin/contentos/editor-os?client=${clientId}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-800/50 hover:border-indigo-600 rounded-lg px-3 py-1.5"
-              >
-                Abrir EditorOS
-              </Link>
-            </div>
-          </div>
-        )}
+          </Link>
+        ))}
       </div>
     </section>
   );
