@@ -5,6 +5,7 @@ import EditorOSWorkspace from "./EditorOSWorkspace";
 
 interface PageProps {
   searchParams: Promise<{
+    client?: string;
     client_id?: string;
     campaign_id?: string;
     content_id?: string;
@@ -33,34 +34,41 @@ export default async function EditorOSPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
 
+  // Canonical param: `client`. Accept `client_id` as legacy fallback.
+  const activeClientId = params.client ?? params.client_id ?? null;
+
+  if (!activeClientId) {
+    redirect("/admin/contentos/selecionar-cliente");
+  }
+
   let client: { id: string; company_name: string; segment: string | null } | null = null;
   let brandName: string | null = null;
   let socialChannels: string[] | null = null;
 
-  if (params.client_id) {
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("id, company_name, segment")
-      .eq("id", params.client_id)
-      .is("deleted_at", null)
-      .single();
+  const { data: clientData } = await supabase
+    .from("clients")
+    .select("id, company_name, segment")
+    .eq("id", activeClientId)
+    .is("deleted_at", null)
+    .single();
 
-    if (clientData) {
-      client = clientData;
+  if (!clientData) {
+    redirect("/admin/contentos/selecionar-cliente");
+  }
 
-      const { data: onboarding } = await supabase
-        .from("onboarding_profiles")
-        .select("brand_name, social_channels")
-        .eq("client_id", params.client_id)
-        .maybeSingle();
+  client = clientData;
 
-      if (onboarding) {
-        brandName = onboarding.brand_name ?? null;
-        socialChannels = Array.isArray(onboarding.social_channels)
-          ? (onboarding.social_channels as string[])
-          : null;
-      }
-    }
+  const { data: onboarding } = await supabase
+    .from("onboarding_profiles")
+    .select("brand_name, social_channels")
+    .eq("client_id", activeClientId)
+    .maybeSingle();
+
+  if (onboarding) {
+    brandName = onboarding.brand_name ?? null;
+    socialChannels = Array.isArray(onboarding.social_channels)
+      ? (onboarding.social_channels as string[])
+      : null;
   }
 
   return (

@@ -30,7 +30,7 @@ export default function EditorOSWorkspace({
   const [mockProjectId] = useState(() => `mock_${Date.now().toString().slice(-8)}`);
 
   const backHref = client
-    ? `/admin/contentos/home?client_id=${client.id}`
+    ? `/admin/contentos/home?client=${client.id}`
     : "/admin/contentos/selecionar-cliente";
 
   function handleFormatSelect(format: DesignFormatSpec) {
