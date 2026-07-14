@@ -3,28 +3,29 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentOSHomeContent } from "@/app/contentos/home/_client-content";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import type { DbOnboardingProfile, DbContentItem, DbApprovalWithContent } from "@/lib/supabase/types";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 import { BriefGate } from "./_brief-gate";
+import { RecOSTools } from "./_recos-tools";
 
 export default async function AdminContentosHomePage({
   searchParams,
 }: {
   searchParams: Promise<{ client?: string }>;
 }) {
-  const params        = await searchParams;
+  const params         = await searchParams;
   const activeClientId = params.client ?? null;
 
   if (!activeClientId) {
     redirect("/admin/contentos/selecionar-cliente");
   }
 
-  let serverOnboarding: DbOnboardingProfile | null     = null;
-  let serverContents:   DbContentItem[] | null          = null;
-  let serverApprovals:  DbApprovalWithContent[] | null  = null;
-  const userRole = "admin";
+  let serverOnboarding: DbOnboardingProfile | null    = null;
+  let serverContents:   DbContentItem[] | null         = null;
+  let serverApprovals:  DbApprovalWithContent[] | null = null;
+  let userRole = "";
   let companyName: string | null = null;
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
   let hasClientContext = false;
@@ -32,7 +33,6 @@ export default async function AdminContentosHomePage({
   let hasOlaClick = false;
 
   if (isSupabaseConfigured) {
-    // Validate that the client is a real client (not operacional/admin/test/archived)
     const validClient = await validateContentOSClient(activeClientId);
     if (!validClient) {
       redirect("/admin/contentos/selecionar-cliente");
@@ -42,6 +42,17 @@ export default async function AdminContentosHomePage({
       const supabase = await createServerSupabaseClient();
       companyName = validClient.company_name;
 
+      // Fetch role alongside other data
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        userRole = profileData?.role ?? "admin";
+      }
+
       const [onbResult, contentsResult, approvalsResult, contextResult, assetsResult] = await Promise.all([
         supabase.from("onboarding_profiles").select("*").eq("client_id", activeClientId).maybeSingle(),
         supabase.from("content_items").select("*").eq("client_id", activeClientId).order("created_at", { ascending: false }).limit(20),
@@ -49,13 +60,12 @@ export default async function AdminContentosHomePage({
         supabase.from("client_context").select("id").eq("client_id", activeClientId).maybeSingle(),
         supabase.from("client_meta_assets").select("asset_type, asset_name, username").eq("client_id", activeClientId),
       ]);
-      serverOnboarding  = onbResult.data;
-      serverContents    = contentsResult.data ?? [];
-      serverApprovals   = (approvalsResult.data as DbApprovalWithContent[]) ?? [];
-      suggestions       = await getContentOSSuggestions(supabase, activeClientId!);
-      hasClientContext  = !contextResult.error && !!contextResult.data;
+      serverOnboarding = onbResult.data;
+      serverContents   = contentsResult.data ?? [];
+      serverApprovals  = (approvalsResult.data as DbApprovalWithContent[]) ?? [];
+      suggestions      = await getContentOSSuggestions(supabase, activeClientId!);
+      hasClientContext = !contextResult.error && !!contextResult.data;
 
-      // Enriquece com ativo Meta vinculado (SQL 37 — graceful se não rodado)
       if (!assetsResult.error && assetsResult.data && assetsResult.data.length > 0) {
         const rows = assetsResult.data as Array<{ asset_type: string; asset_name: string | null; username: string | null }>;
         const page = rows.find((r) => r.asset_type === "facebook_page");
@@ -66,7 +76,6 @@ export default async function AdminContentosHomePage({
         };
       }
 
-      // Verifica se cliente tem Cardápio Digital / OlaClick (SQL 39)
       const olaClickRes = await supabase
         .from("olaclick_connections")
         .select("id")
@@ -84,18 +93,19 @@ export default async function AdminContentosHomePage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       {isSupabaseConfigured && !hasClientContext && (
         <BriefGate clientId={activeClientId} companyName={companyName} />
       )}
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} className="mb-5" />
       )}
+      <RecOSTools clientId={activeClientId} role={userRole} />
       <ContentOSHomeContent
         serverOnboarding={serverOnboarding}
         serverContents={serverContents}
         serverApprovals={serverApprovals}
-        userRole={userRole}
+        userRole={userRole || "admin"}
         isSupabaseActive={isSupabaseConfigured}
         companyName={companyName}
         metaAsset={metaAsset}
