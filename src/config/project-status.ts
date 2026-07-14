@@ -465,6 +465,69 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Programa de afiliados.", phase: "v2", readiness: "planned",
     qa: { status: "not_started" }, last_updated: "2026-07-12",
   },
+
+  // ── V2 — Arquitetura Modular (Sprint V2.1) ─────────────────
+  {
+    id: "open_source_provider_architecture",
+    name: "Provider Architecture",
+    category: "admin",
+    description: "Contratos TypeScript para DesignEditorProvider, CustomerInboxProvider e SocialSchedulerProvider. Registry, feature flags e API de status.",
+    phase: "v2",
+    readiness: "implemented",
+    qa: { status: "not_started" },
+    commit: "sprint-v2.1",
+    last_updated: "2026-07-13",
+    notes: "Fundação modular implementada. Providers iniciais: disabled/mock (editor), chatwoot-disabled, postiz-disabled. Nenhum serviço externo ativado.",
+  },
+  {
+    id: "editor_os",
+    name: "EditorOS",
+    category: "conteudo",
+    description: "Editor visual integrado ao REC OS. Vertical slice com seletor de formato e contexto de marca.",
+    phase: "v2",
+    readiness: "in_progress",
+    qa: { status: "not_started" },
+    blockers: [
+      "LidoJS: licença ausente (license:null) — bloqueado para incorporação",
+      "CE.SDK: licença comercial obrigatória — trial disponível",
+    ],
+    sql_dependency: "SQL 87 — design_projects, design_versions",
+    last_updated: "2026-07-13",
+    notes: "UI do vertical slice entregue. Motor real bloqueado por decisão de licença. Acesso: super_admin + feature flag editor_os.",
+  },
+  {
+    id: "crm_inbox",
+    name: "CRM Inbox",
+    category: "crm",
+    description: "Módulo de atendimento integrado ao CRM OS. Motor candidato: Chatwoot (MIT).",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    blockers: [
+      "Chatwoot: requer VPS + Docker + Redis + Ruby/Rails",
+      "Infraestrutura de VPS não provisionada",
+    ],
+    sql_dependency: "SQL 88 — conversation_links",
+    last_updated: "2026-07-13",
+    notes: "CustomerInboxProvider interface e chatwoot-disabled provider implementados. Feature flag crm_inbox=disabled.",
+  },
+  {
+    id: "social_scheduler",
+    name: "Social Scheduler",
+    category: "conteudo",
+    description: "Agendamento e publicação social integrado ao REC OS. Motor candidato: Postiz (AGPL-3.0).",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    blockers: [
+      "Postiz: AGPL-3.0 — não incorporar código; requer VPS + Docker",
+      "Infraestrutura de VPS não provisionada",
+      "Canais sociais não conectados",
+    ],
+    sql_dependency: "SQL 89 — scheduled_publications, publication_attempts",
+    last_updated: "2026-07-13",
+    notes: "SocialSchedulerProvider interface e postiz-disabled provider implementados. Feature flag social_scheduler=disabled. Página /admin/contentos/agendamento criada com estado não configurado.",
+  },
 ];
 
 // ── Histórico de eventos versionado ─────────────────────────
@@ -519,6 +582,11 @@ export const V1_HISTORY: HistoryEntry[] = [
     date: "2026-07-13",
     event: "Headline do hero atualizada: 'Do planejamento ao resultado, tudo trabalha junto.'",
     commit: "4d8357a",
+  },
+  {
+    date: "2026-07-13",
+    event: "Sprint V2.1: auditoria de motores open source (LidoJS, CE.SDK, Chatwoot, Postiz), fundação de providers TypeScript, feature flags, vertical slice EditorOS, propostas SQL 86-89.",
+    commit: "sprint-v2.1",
   },
 ];
 
