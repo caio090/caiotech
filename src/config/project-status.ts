@@ -485,7 +485,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "conteudo",
     description: "Editor visual integrado ao REC OS. Vertical slice com seletor de formato e contexto de marca.",
     phase: "v2",
-    readiness: "in_progress",
+    readiness: "qa_pending",
     qa: { status: "not_started" },
     blockers: [
       "LidoJS: licença ausente (license:null) — bloqueado para incorporação",
@@ -493,7 +493,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
     sql_dependency: "SQL 87 — design_projects, design_versions",
     last_updated: "2026-07-13",
-    notes: "UI do vertical slice entregue. Motor real bloqueado por decisão de licença. Acesso: super_admin + feature flag editor_os.",
+    notes: "Navegação visível no subnav (super_admin), cards na Visão Geral, atalho no Início. Parâmetro client normalizado. Motor real bloqueado por licença.",
   },
   {
     id: "crm_inbox",
