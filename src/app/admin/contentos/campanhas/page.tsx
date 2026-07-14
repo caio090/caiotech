@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { PageHeader } from "@/components/page-header";
 import { Flag, Plus, Target, CalendarDays, Users, TrendingUp, Rocket, BookOpen, Sparkles } from "lucide-react";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
@@ -33,7 +33,7 @@ export default async function AdminContentosCampanhasPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <PageHeader
         title="Campanhas"
         description={`Ciclos estratégicos de ${companyName}`}

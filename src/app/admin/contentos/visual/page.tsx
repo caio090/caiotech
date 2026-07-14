@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { PageHeader } from "@/components/page-header";
 import {
   Sparkles, Zap, Layers, Image, CreditCard, AlertCircle, CheckCircle2,
@@ -178,7 +178,7 @@ export default async function AdminContentosVisualPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <PageHeader
         title="PNG Vidigal"
         description={`Motor visual com IA para ${displayName || ctx.companyName}`}

@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosCalendarioContent } from "@/app/contentos/calendario/_client-content";
 import type { CalendarEvent } from "@/app/contentos/calendario/_client-content";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { dbStatusToUi } from "@/lib/supabase/types";
 
 export default async function AdminContentosCalendarioPage({
@@ -57,7 +57,7 @@ export default async function AdminContentosCalendarioPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <ContentosCalendarioContent serverEvents={serverEvents} />
     </>
   );

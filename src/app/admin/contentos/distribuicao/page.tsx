@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { PageHeader } from "@/components/page-header";
 import { MousePointerClick, Target, DollarSign, Clock, CheckCircle2, AlertCircle, Megaphone, Sparkles, Smartphone, Link2 } from "lucide-react";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
@@ -41,7 +41,7 @@ export default async function AdminContentosDistribuicaoPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <PageHeader
         title="Distribuição"
         description={`Como e onde o conteúdo de ${companyName} será publicado`}

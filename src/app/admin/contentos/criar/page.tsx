@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import ContentosCriarOriginal from "@/app/contentos/criar/page";
 
 export default async function AdminContentosCriarPage({
@@ -25,7 +25,7 @@ export default async function AdminContentosCriarPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <ContentosCriarOriginal />
     </>
   );

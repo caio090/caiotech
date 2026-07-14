@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { PageHeader } from "@/components/page-header";
 import { Radar, TrendingUp, Zap, AlertCircle, Calendar, Image, Clock } from "lucide-react";
 
@@ -25,7 +25,7 @@ export default async function AdminContentosRadarPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       <PageHeader
         title="Radar de Tendências"
         description={`Tendências, eventos e oportunidades de conteúdo para ${companyName}`}

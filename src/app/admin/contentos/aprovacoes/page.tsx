@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import type { DbApprovalWithContent } from "@/lib/supabase/types";
 import { ContentosAprovacoesContent } from "@/app/contentos/aprovacoes/_client-content";
-import { ContentosSubNav } from "../_contentos-subnav";
+import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 
@@ -50,7 +50,7 @@ export default async function AdminContentosAprovacoesPage({
 
   return (
     <>
-      <ContentosSubNav />
+      <ContentosSubNavServer />
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} compact className="mb-5" />
       )}
