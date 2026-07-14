@@ -1,13 +1,14 @@
 import Link from "next/link";
 import {
   Flag, Sparkles, CheckSquare, CalendarDays, Users, KanbanSquare, Target, Activity,
+  Layers, CalendarClock,
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { VideoBackground } from "@/components/video-background";
 import { SmartStartInput } from "@/components/smart-start-input";
 
-const SHORTCUTS = [
+const BASE_SHORTCUTS = [
   { href: "/admin/leads",               label: "CRM",              icon: Target },
   { href: "/admin/contentos",           label: "Abrir REC OS",     icon: Sparkles },
   { href: "/admin/contentos/campanhas", label: "Nova campanha",    icon: Flag },
@@ -34,6 +35,7 @@ function getGreeting(): string {
 
 export default async function AdminInicioPage() {
   let firstName = "";
+  let role = "";
 
   if (isSupabaseConfigured) {
     try {
@@ -42,19 +44,38 @@ export default async function AdminInicioPage() {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("name")
+          .select("name, role")
           .eq("id", user.id)
           .maybeSingle();
         const fullName = profile?.name ?? user.email ?? "";
         firstName = fullName.split(/\s+/)[0] ?? "";
+        role = profile?.role ?? "";
       }
     } catch {}
   }
 
+  const isSuperAdmin = role === "super_admin";
+  const isAdmin      = role === "admin" || role === "super_admin";
+
+  // Build shortcuts — add tool shortcuts for eligible roles
+  const shortcuts = [...BASE_SHORTCUTS];
+  if (isAdmin) {
+    shortcuts.push({
+      href: `/admin/contentos/agendamento`,
+      label: "Agendamento",
+      icon: CalendarClock,
+    });
+  }
+  if (isSuperAdmin) {
+    shortcuts.push({
+      href: `/admin/contentos/editor-os`,
+      label: "EditorOS Beta",
+      icon: Layers,
+    });
+  }
+
   return (
     <div className="-m-4 md:-m-6 relative min-h-[calc(100vh-3.5rem)] overflow-hidden">
-      {/* Vídeo cobre a página inteira (fixed) — topo e base ficam preenchidos ao rolar, sem bloco preto */}
-      {/* z-index negativo: garante que o vídeo fica atrás da sidebar/header, que não são posicionados */}
       <div className="fixed inset-0 -z-10 bg-[#0a0a0c]">
         <VideoBackground
           src="/videos/gota-caindo.mp4"
@@ -64,7 +85,6 @@ export default async function AdminInicioPage() {
       </div>
       <div className="fixed inset-0 -z-10 bg-[#0a0a0c]/75 backdrop-blur-sm" />
 
-      {/* Conteúdo — sobre o vídeo, sem cortar o fundo em nenhuma seção */}
       <div className="relative flex flex-col min-h-[calc(100vh-3.5rem)]">
         <div className="flex-1 flex items-center justify-center px-4 py-16">
           <div className="w-full max-w-2xl mx-auto text-center">
@@ -78,21 +98,40 @@ export default async function AdminInicioPage() {
             <SmartStartInput />
 
             <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {SHORTCUTS.map(({ href, label, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 text-xs font-medium px-3 py-2 rounded-xl transition-colors backdrop-blur-sm"
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {label}
-                </Link>
-              ))}
+              {shortcuts.map(({ href, label, icon: Icon }) => {
+                const isEditorOS  = label === "EditorOS Beta";
+                const isAgendamento = label === "Agendamento";
+                return (
+                  <Link
+                    key={href + label}
+                    href={href}
+                    className={`flex items-center gap-1.5 border text-white/90 text-xs font-medium px-3 py-2 rounded-xl transition-colors backdrop-blur-sm ${
+                      isEditorOS
+                        ? "bg-indigo-600/20 hover:bg-indigo-600/35 border-indigo-500/30"
+                        : isAgendamento
+                        ? "bg-white/10 hover:bg-white/20 border-white/15"
+                        : "bg-white/10 hover:bg-white/20 border-white/15"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                    {isEditorOS && (
+                      <span className="text-[9px] bg-amber-500/30 text-amber-300 rounded px-1 py-px leading-none">
+                        Avaliação
+                      </span>
+                    )}
+                    {isAgendamento && (
+                      <span className="text-[9px] bg-zinc-700/60 text-zinc-400 rounded px-1 py-px leading-none">
+                        Não configurado
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Continuar de onde parou — cards translúcidos, vídeo continua visível por trás */}
         <div className="px-4 md:px-6 pb-10">
           <h2 className="text-sm font-bold text-white mb-1">Continuar de onde parou</h2>
           <p className="text-xs text-indigo-100/50 mb-4">Prévia ilustrativa — conteúdo real chega na próxima fase.</p>
