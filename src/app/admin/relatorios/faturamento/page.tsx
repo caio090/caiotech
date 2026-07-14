@@ -109,7 +109,7 @@ interface OrdersResult {
     produtos_mais_vendidos: { name: string; qty: number }[] | null;
     topItemsUnavailable: boolean; topItemsReason: string | null;
     melhores_dias: { date: string; revenue: number; orders: number }[] | null;
-    pedidos_recentes: { id: string; date: string | null; status: string; total: number }[];
+    pedidos_recentes: { id: string; date: string | null; status: string; total: number; payment?: string | null }[];
     heatmap?: { weekday: number; hour: number; orders: number; revenue: number }[];
     pedidosPorServiceType?: Record<string, number>; pedidosPorSource?: Record<string, number>;
     totalDescontos?: number; totalTaxasEntrega?: number; totalGorjetas?: number;
@@ -117,6 +117,16 @@ interface OrdersResult {
     pedidosPorHora?: Record<string, number>; faturamentoPorHora?: Record<string, number>;
     concentracaoPorFaixa?: Record<string, { orders: number; revenue: number }>;
     faturamentoPorDia?: { date: string; revenue: number; orders: number }[];
+    pedidosPorFormaPagamento?: Record<string, number>;
+    faturamentoPorFormaPagamento?: Record<string, number>;
+    ticketMedioPorFormaPagamento?: Record<string, number | null>;
+    percentualPorFormaPagamento?: Record<string, number>;
+    pagamentosNaoIdentificados?: number;
+    pedidosComPagamentoMisto?: number;
+    paymentDataCompleteness?: "complete" | "partial" | "unavailable" | "unknown";
+    paymentDataSource?: string;
+    paymentOrdersWithData?: number;
+    paymentOrdersWithoutData?: number;
   };
 }
 
@@ -126,7 +136,7 @@ interface ReportData {
   produtos_mais_vendidos: { name: string; qty: number }[] | null;
   topItemsUnavailable: boolean; topItemsReason: string | null;
   melhores_dias: { date: string; revenue: number; orders: number }[] | null;
-  pedidos_recentes: { id: string; date: string | null; status: string; total: number }[];
+  pedidos_recentes: { id: string; date: string | null; status: string; total: number; payment?: string | null }[];
   pagination?: PaginationInfo; debugShape?: DebugShape;
   snapshotPersistence?: SnapshotPersistence; completeness?: OrderFetchCompleteness;
   windowDiag?: WindowFetchDiagnostics | null; cacheHit?: boolean;
@@ -140,6 +150,16 @@ interface ReportData {
   pedidosPorHora?: Record<string, number>; faturamentoPorHora?: Record<string, number>;
   concentracaoPorFaixa?: Record<string, { orders: number; revenue: number }>;
   faturamentoPorDia?: { date: string; revenue: number; orders: number }[];
+  pedidosPorFormaPagamento?: Record<string, number>;
+  faturamentoPorFormaPagamento?: Record<string, number>;
+  ticketMedioPorFormaPagamento?: Record<string, number | null>;
+  percentualPorFormaPagamento?: Record<string, number>;
+  pagamentosNaoIdentificados?: number;
+  pedidosComPagamentoMisto?: number;
+  paymentDataCompleteness?: "complete" | "partial" | "unavailable" | "unknown";
+  paymentDataSource?: string;
+  paymentOrdersWithData?: number;
+  paymentOrdersWithoutData?: number;
   timings?: {
     providerFetchMs: number; aggregationMs: number; totalDurationMs: number;
     requestsMade: number; daysFetched: number | null; cacheSource: string; fallbackUsed: boolean;
@@ -591,6 +611,16 @@ function buildReportFromData(d: OrdersResult): ReportData {
     pedidosPorHora: p?.pedidosPorHora, faturamentoPorHora: p?.faturamentoPorHora,
     concentracaoPorFaixa: p?.concentracaoPorFaixa,
     faturamentoPorDia: p?.faturamentoPorDia,
+    pedidosPorFormaPagamento: p?.pedidosPorFormaPagamento,
+    faturamentoPorFormaPagamento: p?.faturamentoPorFormaPagamento,
+    ticketMedioPorFormaPagamento: p?.ticketMedioPorFormaPagamento,
+    percentualPorFormaPagamento: p?.percentualPorFormaPagamento,
+    pagamentosNaoIdentificados: p?.pagamentosNaoIdentificados,
+    pedidosComPagamentoMisto: p?.pedidosComPagamentoMisto,
+    paymentDataCompleteness: p?.paymentDataCompleteness,
+    paymentDataSource: p?.paymentDataSource,
+    paymentOrdersWithData: p?.paymentOrdersWithData,
+    paymentOrdersWithoutData: p?.paymentOrdersWithoutData,
   };
 }
 
@@ -643,6 +673,7 @@ export default function FaturamentoPage() {
   const [productsKey,      setProductsKey]      = useState<string | null>(null);
   const [productsLastFetch, setProductsLastFetch] = useState<string | null>(null);
   const [revChartTooltip,  setRevChartTooltip]   = useState<number | null>(null);
+  const [paymentFilter,    setPaymentFilter]     = useState<string>("todos");
   const [staleWarning,         setStaleWarning]         = useState<string | null>(null);
   const activeControllerRef    = useRef<AbortController | null>(null);
   const requestIdRef           = useRef(0);
@@ -1547,6 +1578,127 @@ export default function FaturamentoPage() {
                       })()}
                     </motion.div>
                   )}
+                {/* ── Formas de Pagamento ─────────────────────────────── */}
+                {(() => {
+                  const payMap   = report.pedidosPorFormaPagamento;
+                  const revMap   = report.faturamentoPorFormaPagamento;
+                  const tickMap  = report.ticketMedioPorFormaPagamento;
+                  const pctMap   = report.percentualPorFormaPagamento;
+                  const completeness = report.paymentDataCompleteness;
+                  if (!payMap || Object.keys(payMap).length === 0) return null;
+
+                  const LABEL: Record<string, string> = {
+                    pix:              "Pix",
+                    dinheiro:         "Dinheiro",
+                    cartao_credito:   "Cartão de crédito",
+                    cartao_debito:    "Cartão de débito",
+                    cartao:           "Cartão (tipo não identificado)",
+                    voucher:          "Vale / Voucher",
+                    pagamento_online: "Pagamento online",
+                    misto:            "Pagamento misto",
+                    outro:            "Outro",
+                    desconhecido:     "Não identificado",
+                  };
+
+                  const allKeys = Object.keys(payMap).sort((a, b) => (payMap[b] ?? 0) - (payMap[a] ?? 0));
+                  const activeKeys = paymentFilter === "todos" ? allKeys : allKeys.filter(k => k === paymentFilter);
+                  const maxPedidos = Math.max(...allKeys.map(k => payMap[k] ?? 0), 1);
+                  const totalFat = Object.values(revMap ?? {}).reduce((s, v) => s + v, 0);
+
+                  const completenessLabel = completeness === "complete" ? "Dados de pagamento completos"
+                    : completeness === "partial" ? "Dados de pagamento parciais"
+                    : completeness === "unavailable" ? "Forma de pagamento indisponível na API"
+                    : null;
+                  const completenessColor = completeness === "complete" ? "#34d399"
+                    : completeness === "partial" ? "#fbbf24"
+                    : "#ef4444";
+
+                  return (
+                    <motion.div variants={fadeUp} style={{ background: "var(--lk-card)", border: "1px solid var(--lk-border)", borderRadius: 14, padding: "18px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <DollarSign size={14} style={{ color: "var(--lk-muted)" }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--lk-text)" }}>Formas de pagamento</span>
+                          {completenessLabel && (
+                            <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 999, background: `${completenessColor}18`, color: completenessColor, border: `1px solid ${completenessColor}30` }}>
+                              {completenessLabel}
+                            </span>
+                          )}
+                        </div>
+                        {/* Filter pills */}
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {["todos", ...allKeys].map(k => (
+                            <button key={k} onClick={() => setPaymentFilter(k)}
+                              style={{ fontSize: 10, fontWeight: 600, padding: "3px 9px", borderRadius: 999,
+                                background: paymentFilter === k ? "rgba(123,110,246,0.18)" : "transparent",
+                                color: paymentFilter === k ? "var(--lk-accent)" : "var(--lk-muted)",
+                                border: paymentFilter === k ? "1px solid rgba(123,110,246,0.4)" : "1px solid var(--lk-border)",
+                                cursor: "pointer", whiteSpace: "nowrap" }}>
+                              {k === "todos" ? "Todos" : (LABEL[k] ?? k)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Summary cards */}
+                      {paymentFilter === "todos" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}>
+                          {allKeys.slice(0, 3).map(k => (
+                            <div key={k} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--lk-border)", borderRadius: 10, padding: "10px 12px" }}>
+                              <p style={{ fontSize: 10, color: "var(--lk-muted)", marginBottom: 4 }}>{LABEL[k] ?? k}</p>
+                              <p style={{ fontSize: 15, fontWeight: 700, color: "var(--lk-text)" }}>{fmtBRL(revMap?.[k] ?? 0)}</p>
+                              <p style={{ fontSize: 10, color: "var(--lk-muted)", marginTop: 2 }}>
+                                {payMap[k]} pedidos · {pctMap?.[k]?.toFixed(1) ?? 0}%
+                              </p>
+                            </div>
+                          ))}
+                          {(report.pagamentosNaoIdentificados ?? 0) > 0 && (
+                            <div style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 10, padding: "10px 12px" }}>
+                              <p style={{ fontSize: 10, color: "rgba(239,68,68,0.7)", marginBottom: 4 }}>Não identificados</p>
+                              <p style={{ fontSize: 15, fontWeight: 700, color: "var(--lk-text)" }}>{report.pagamentosNaoIdentificados}</p>
+                              <p style={{ fontSize: 10, color: "var(--lk-muted)", marginTop: 2 }}>A API não retornou a forma de pagamento destes pedidos.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Bar chart */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {activeKeys.map(k => {
+                          const orders = payMap[k] ?? 0;
+                          const rev = revMap?.[k] ?? 0;
+                          const pct = pctMap?.[k]?.toFixed(1) ?? "0";
+                          const ticket = tickMap?.[k];
+                          return (
+                            <div key={k}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, color: "var(--lk-muted)", fontWeight: 500 }}>{LABEL[k] ?? k}</span>
+                                <span style={{ fontSize: 10, color: "var(--lk-muted)" }}>{orders} ped · {pct}% · {ticket != null ? `ticket ${fmtBRL(ticket)}` : ""}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" }}>
+                                  <div style={{ width: `${(orders / maxPedidos) * 100}%`, height: "100%", background: k === "desconhecido" ? "#6b7280" : "var(--lk-accent)", borderRadius: 3, transition: "width 0.3s ease" }} />
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--lk-text)", minWidth: 80, textAlign: "right" }}>{fmtBRL(rev)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {completeness === "partial" && (
+                        <p style={{ fontSize: 10, color: "var(--lk-muted)", marginTop: 12 }}>
+                          Alguns pedidos não retornaram forma de pagamento na API. Os valores acima representam apenas os pedidos com dados disponíveis.
+                        </p>
+                      )}
+                      {completeness === "unavailable" && (
+                        <p style={{ fontSize: 10, color: "#ef4444", marginTop: 12 }}>
+                          A API OlaClick não retornou forma de pagamento para este período. O campo pode não estar disponível no endpoint /v1/orders.
+                        </p>
+                      )}
+                    </motion.div>
+                  );
+                })()}
                 </div>
               )}
 
@@ -1647,7 +1799,7 @@ export default function FaturamentoPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                           <thead>
                             <tr style={{ borderBottom: "1px solid var(--lk-border)" }}>
-                              {["ID", "Data", "Status", "Total"].map(h => (
+                              {["ID", "Data", "Status", "Pagamento", "Total"].map(h => (
                                 <th key={h} style={{ padding: "6px 8px", textAlign: h === "Total" ? "right" : "left", fontSize: 10, fontWeight: 600, color: "var(--lk-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "'Space Mono', monospace" }}>{h}</th>
                               ))}
                             </tr>
@@ -1655,6 +1807,8 @@ export default function FaturamentoPage() {
                           <tbody>
                             {(showOrdersAll ? report.pedidos_recentes : report.pedidos_recentes.slice(0, 5)).map((o, i) => {
                               const sc = STATUS_COLORS[o.status.toUpperCase()] ?? "#555566";
+                              const PAY_LABEL: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", cartao_credito: "Crédito", cartao_debito: "Débito", cartao: "Cartão", voucher: "Vale", pagamento_online: "Online", misto: "Misto", outro: "Outro", desconhecido: "—" };
+                              const payLabel = o.payment ? (PAY_LABEL[o.payment] ?? o.payment) : "—";
                               return (
                                 <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                                   <td style={{ padding: "9px 8px", fontFamily: "'Space Mono', monospace", fontSize: 11, color: "var(--lk-muted)" }}>{o.id ? `#${o.id.slice(-6)}` : "—"}</td>
@@ -1664,6 +1818,7 @@ export default function FaturamentoPage() {
                                       {translateStatus(o.status)}
                                     </span>
                                   </td>
+                                  <td style={{ padding: "9px 8px", fontSize: 11, color: o.payment && o.payment !== "desconhecido" ? "var(--lk-text)" : "var(--lk-muted)" }}>{payLabel}</td>
                                   <td style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, color: "var(--lk-text)" }}>{fmtBRL(o.total)}</td>
                                 </tr>
                               );
