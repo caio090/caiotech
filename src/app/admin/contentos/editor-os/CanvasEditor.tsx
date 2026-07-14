@@ -247,11 +247,14 @@ function drawSelection(ctx: CanvasRenderingContext2D, el: EditorElement) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const DRAFT_VERSION = "v1";
+
 interface Props {
+  clientId: string;
   clientName?: string;
 }
 
-export function CanvasEditor({ clientName }: Props) {
+export function CanvasEditor({ clientId, clientName }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -345,7 +348,7 @@ export function CanvasEditor({ clientName }: Props) {
   }
 
   // ── Coordinates ────────────────────────────────────────────────────────────
-  function toCanvas(e: React.MouseEvent<HTMLCanvasElement>): [number, number] {
+  function toCanvas(e: { clientX: number; clientY: number }): [number, number] {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     return [
@@ -354,9 +357,12 @@ export function CanvasEditor({ clientName }: Props) {
     ];
   }
 
-  // ── Mouse handlers ─────────────────────────────────────────────────────────
-  function onMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
+  // ── Pointer handlers (mouse + touch + pen) ─────────────────────────────────
+  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (editingId) return;
+    e.preventDefault(); // prevent scroll during drag
+    const canvas = canvasRef.current;
+    if (canvas) canvas.setPointerCapture(e.pointerId);
     const [px, py] = toCanvas(e);
 
     if (selectedId) {
@@ -395,7 +401,7 @@ export function CanvasEditor({ clientName }: Props) {
     setSelectedId(null);
   }
 
-  function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     const [px, py] = toCanvas(e);
 
     // Update cursor
@@ -450,11 +456,23 @@ export function CanvasEditor({ clientName }: Props) {
     }));
   }
 
-  function onMouseUp() {
+  function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (canvas && canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
     if (dragging.current) {
       pushHistory(elements);
       dragging.current = null;
     }
+  }
+
+  function onPointerCancel(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (canvas && canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+    dragging.current = null;
   }
 
   function onDblClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -643,31 +661,51 @@ export function CanvasEditor({ clientName }: Props) {
   }
 
   // ── Local draft ────────────────────────────────────────────────────────────
+  function draftKey(p: Preset) {
+    return `editor_os_draft_${DRAFT_VERSION}_${clientId}_${p}`;
+  }
+
   function saveDraft() {
     try {
-      localStorage.setItem(
-        `editor_os_draft_${clientName ?? "default"}_${preset}`,
-        JSON.stringify({ preset, elements, bgColor })
-      );
-      showSaved("Rascunho salvo neste navegador.");
+      localStorage.setItem(draftKey(preset), JSON.stringify({ preset, elements, bgColor, clientId }));
+      showSaved("Rascunho salvo neste navegador para este cliente.");
     } catch {}
   }
 
   function loadDraft() {
     try {
-      const raw = localStorage.getItem(`editor_os_draft_${clientName ?? "default"}_${preset}`);
+      const raw = localStorage.getItem(draftKey(preset));
       if (!raw) return;
-      const data = JSON.parse(raw);
+      const data = JSON.parse(raw) as { elements?: unknown; bgColor?: string; clientId?: string };
+      // Safety: reject draft from a different clientId
+      if (data.clientId && data.clientId !== clientId) return;
       if (Array.isArray(data.elements)) {
-        setElements(data.elements);
-        pushHistory(data.elements);
+        setElements(data.elements as EditorElement[]);
+        pushHistory(data.elements as EditorElement[]);
       }
       if (data.bgColor) setBgColor(data.bgColor);
     } catch {}
   }
 
-  // Load draft on mount / preset change
-  useEffect(() => { loadDraft(); }, [preset]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reset canvas when clientId changes (isolate per client)
+  useEffect(() => {
+    setElements([]);
+    setSelectedId(null);
+    setHistory([[]]);
+    setHistIdx(0);
+    setBgColor("#ffffff");
+    imgCache.current.clear();
+    loadDraft();
+  }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload draft when preset changes (within same client)
+  useEffect(() => {
+    setElements([]);
+    setSelectedId(null);
+    setHistory([[]]);
+    setHistIdx(0);
+    loadDraft();
+  }, [preset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showSaved(msg: string) {
     setSavedMsg(msg);
@@ -833,11 +871,11 @@ export function CanvasEditor({ clientName }: Props) {
           <div style={{ position: "relative", display: "inline-block" }}>
             <canvas
               ref={canvasRef}
-              style={{ cursor, display: "block", boxShadow: "0 0 0 1px #3f3f46" }}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
+              style={{ cursor, display: "block", boxShadow: "0 0 0 1px #3f3f46", touchAction: "none" }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
               onDoubleClick={onDblClick}
             />
             {/* Text editing overlay */}

@@ -72,7 +72,10 @@ export default function EditorOSWorkspace({
 
       {/* Editor fills remaining height */}
       <div className="flex-1 overflow-hidden">
-        <CanvasEditor clientName={client?.company_name ?? undefined} />
+        <CanvasEditor
+          clientId={client?.id ?? "default"}
+          clientName={displayName || undefined}
+        />
       </div>
     </div>
   );
