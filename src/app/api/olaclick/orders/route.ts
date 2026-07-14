@@ -104,7 +104,7 @@ interface OrderMetrics {
   topItemsReason:          string | null;
   topProductsCompleteness: "complete" | "partial" | "unavailable";
   melhores_dias:           { date: string; revenue: number; orders: number }[] | null;
-  pedidos_recentes:        { id: string; date: string | null; status: string; total: number }[];
+  pedidos_recentes:        { id: string; date: string | null; status: string; total: number; payment: string | null }[];
   heatmap:                 HeatmapCell[];
   pedidosPorServiceType:   Record<string, number>;
   pedidosPorSource:        Record<string, number>;
@@ -119,6 +119,15 @@ interface OrderMetrics {
   faturamentoPorDia:       { date: string; revenue: number; orders: number }[];
   pedidosPorFormaPagamento:     Record<string, number>;
   faturamentoPorFormaPagamento: Record<string, number>;
+  ticketMedioPorFormaPagamento: Record<string, number | null>;
+  percentualPorFormaPagamento:  Record<string, number>;
+  pagamentosNaoIdentificados:   number;
+  pedidosComPagamentoMisto:     number;
+  paymentDataCompleteness:      "complete" | "partial" | "unavailable" | "unknown";
+  paymentDataSource:            "single_field" | "array_field" | "nested_object" | "none";
+  paymentSampledOrders:         number;
+  paymentOrdersWithData:        number;
+  paymentOrdersWithoutData:     number;
 }
 
 interface RateLimitInfo {
@@ -492,30 +501,47 @@ function normalizeSource(raw: unknown): string {
   return s;
 }
 
+type PaymentSource = "single_field" | "array_field" | "nested_object" | "none";
+
+interface PaymentEntry {
+  method: string;
+  amount: number | null;
+}
+
 function normalizePaymentMethod(raw: unknown): string {
   const s = String(raw ?? "").toLowerCase().replace(/[-_\s]/g, "");
   if (!s || s === "undefined" || s === "null" || s === "") return "desconhecido";
-  if (s.includes("credit") || s.includes("credito") || s.includes("crédito")) return "cartao_credito";
-  if (s.includes("debit")  || s.includes("debito")  || s.includes("débito"))  return "cartao_debito";
-  if (s.includes("pix"))                                                        return "pix";
-  if (s.includes("cash") || s.includes("dinheiro") || s.includes("especie") || s.includes("espécie")) return "dinheiro";
-  if (s.includes("voucher") || s.includes("vale"))                              return "voucher";
-  if (s.includes("online") || s.includes("digital"))                            return "pagamento_online";
-  return s;
+  // Pix
+  if (s === "pix" || s === "pixonline" || s === "pix_online" || s.startsWith("pix")) return "pix";
+  // Credit card — must have explicit "credit" or "crédito"
+  if (s.includes("credit") || s === "credito" || s === "crédito") return "cartao_credito";
+  // Debit card — must have explicit "debit" or "débito"
+  if (s.includes("debit") || s === "debito" || s === "débito") return "cartao_debito";
+  // Cash
+  if (s === "cash" || s === "dinheiro" || s === "money" || s.includes("especie") || s.includes("espécie")) return "dinheiro";
+  // Voucher / meal voucher
+  if (s.includes("voucher") || s.includes("vale") || s.includes("meal") || s.includes("food")) return "voucher";
+  // Generic online payment / payment link
+  if (s === "online" || s === "gateway" || s.includes("paymentlink") || s.includes("payment_link")) return "pagamento_online";
+  // Generic card ��� known to be card but type not specified
+  if (s === "card" || s === "cartao" || s === "cartão" || s === "creditdebit") return "cartao";
+  // Mixed
+  if (s === "split" || s === "mixed" || s === "misto") return "misto";
+  return "outro";
 }
 
-function extractPaymentEntries(order: Record<string, unknown>): string[] {
-  const methods: string[] = [];
-
+function extractPaymentEntries(order: Record<string, unknown>): { entries: PaymentEntry[]; source: PaymentSource } {
   // Single-value candidates
   const singleKeys = [
     "payment_method", "paymentMethod", "payment_type", "paymentType",
-    "forma_pagamento", "metodo_pagamento", "payment",
+    "forma_pagamento", "metodo_pagamento",
   ];
   for (const k of singleKeys) {
     if (typeof order[k] === "string" && (order[k] as string).trim()) {
-      methods.push(normalizePaymentMethod(order[k]));
-      return methods;
+      return {
+        entries: [{ method: normalizePaymentMethod(order[k]), amount: null }],
+        source: "single_field",
+      };
     }
   }
 
@@ -523,16 +549,20 @@ function extractPaymentEntries(order: Record<string, unknown>): string[] {
   const arrayKeys = ["payments", "payment_methods", "paymentMethods"];
   for (const k of arrayKeys) {
     const arr = order[k];
-    if (Array.isArray(arr)) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      const entries: PaymentEntry[] = [];
       for (const entry of arr) {
         if (!entry || typeof entry !== "object") continue;
         const rec = entry as Record<string, unknown>;
         const m = rec["method"] ?? rec["type"] ?? rec["payment_method"] ?? rec["name"];
-        if (typeof m === "string" && m.trim()) {
-          methods.push(normalizePaymentMethod(m));
-        }
+        if (typeof m !== "string" || !m.trim()) continue;
+        const rawAmt = rec["amount"] ?? rec["value"] ?? rec["total"] ?? rec["price"];
+        const amount = (typeof rawAmt === "number" && isFinite(rawAmt)) ? rawAmt
+                     : (typeof rawAmt === "string" && isFinite(parseFloat(rawAmt))) ? parseFloat(rawAmt)
+                     : null;
+        entries.push({ method: normalizePaymentMethod(m), amount });
       }
-      if (methods.length > 0) return methods;
+      if (entries.length > 0) return { entries, source: "array_field" };
     }
   }
 
@@ -542,12 +572,14 @@ function extractPaymentEntries(order: Record<string, unknown>): string[] {
     const rec = nested as Record<string, unknown>;
     const m = rec["method"] ?? rec["type"] ?? rec["name"];
     if (typeof m === "string" && m.trim()) {
-      methods.push(normalizePaymentMethod(m));
-      return methods;
+      return {
+        entries: [{ method: normalizePaymentMethod(m), amount: null }],
+        source: "nested_object",
+      };
     }
   }
 
-  return methods;
+  return { entries: [], source: "none" };
 }
 
 function getTimeFaixa(hour: number): "madrugada" | "manha" | "tarde" | "noite" {
@@ -574,6 +606,12 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
   const hourRevMap:     Record<string, number> = {};
   const paymentOrdMap:  Record<string, number> = {};
   const paymentRevMap:  Record<string, number> = {};
+  let paymentOrdersWithData    = 0;
+  let paymentOrdersWithoutData = 0;
+  let pedidosComPagamentoMisto = 0;
+  let paymentDataSourceCounts: Record<PaymentSource, number> = {
+    single_field: 0, array_field: 0, nested_object: 0, none: 0,
+  };
   const faixaMap: Record<string, { orders: number; revenue: number }> = {
     madrugada: { orders: 0, revenue: 0 },
     manha:     { orders: 0, revenue: 0 },
@@ -636,15 +674,39 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
       itemCounts[name] = (itemCounts[name] ?? 0) + (qty as number);
     }
 
-    const payMethods = extractPaymentEntries(order);
-    if (payMethods.length > 0) {
-      for (const pm of payMethods) {
-        paymentOrdMap[pm] = (paymentOrdMap[pm] ?? 0) + 1;
-        paymentRevMap[pm] = (paymentRevMap[pm] ?? 0) + total / payMethods.length;
-      }
-    } else {
+    const { entries: payEntries, source: paySource } = extractPaymentEntries(order);
+    paymentDataSourceCounts[paySource]++;
+
+    if (payEntries.length === 0) {
+      // No payment data for this order
+      paymentOrdersWithoutData++;
       paymentOrdMap["desconhecido"] = (paymentOrdMap["desconhecido"] ?? 0) + 1;
       paymentRevMap["desconhecido"] = (paymentRevMap["desconhecido"] ?? 0) + total;
+    } else if (payEntries.length === 1) {
+      // Single payment method
+      paymentOrdersWithData++;
+      const pm = payEntries[0].method;
+      paymentOrdMap[pm] = (paymentOrdMap[pm] ?? 0) + 1;
+      paymentRevMap[pm] = (paymentRevMap[pm] ?? 0) + total;
+    } else {
+      // Multiple payment methods — check if we have individual amounts
+      paymentOrdersWithData++;
+      const hasAmounts = payEntries.every(e => e.amount !== null);
+      if (hasAmounts) {
+        // Sum of individual amounts known — use them directly, don't ratiometrically split
+        const sumAmounts = payEntries.reduce((s, e) => s + (e.amount ?? 0), 0);
+        for (const entry of payEntries) {
+          paymentOrdMap[entry.method] = (paymentOrdMap[entry.method] ?? 0) + 1;
+          // Distribute proportionally only when sum matches total (within 1% rounding)
+          const frac = sumAmounts > 0 ? (entry.amount ?? 0) / sumAmounts : 1 / payEntries.length;
+          paymentRevMap[entry.method] = (paymentRevMap[entry.method] ?? 0) + total * frac;
+        }
+      } else {
+        // No individual amounts — classify as misto, never split revenue
+        pedidosComPagamentoMisto++;
+        paymentOrdMap["misto"] = (paymentOrdMap["misto"] ?? 0) + 1;
+        paymentRevMap["misto"] = (paymentRevMap["misto"] ?? 0) + total;
+      }
     }
   }
 
@@ -667,12 +729,23 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
     .map(([date, v]) => ({ date, ...v }));
 
-  const pedidos_recentes = orders.slice(0, 10).map((order) => ({
-    id:     extractOrderId(order),
-    date:   extractDate(order),
-    status: extractStatus(order),
-    total:  extractTotal(order),
-  }));
+  const pedidos_recentes = orders.slice(0, 10).map((order) => {
+    const { entries: prEntries } = extractPaymentEntries(order);
+    let payment: string | null = null;
+    if (prEntries.length === 1) {
+      payment = prEntries[0].method;
+    } else if (prEntries.length > 1) {
+      const hasAmounts = prEntries.every(e => e.amount !== null);
+      payment = hasAmounts ? prEntries.map(e => e.method).join("+") : "misto";
+    }
+    return {
+      id:      extractOrderId(order),
+      date:    extractDate(order),
+      status:  extractStatus(order),
+      total:   extractTotal(order),
+      payment,
+    };
+  });
 
   const heatmap = Object.values(heatmapMap).sort((a, b) =>
     a.weekday !== b.weekday ? a.weekday - b.weekday : a.hour - b.hour
@@ -703,6 +776,40 @@ function computeMetrics(orders: Record<string, unknown>[]): OrderMetrics {
     faturamentoPorDia,
     pedidosPorFormaPagamento:     paymentOrdMap,
     faturamentoPorFormaPagamento: paymentRevMap,
+    ticketMedioPorFormaPagamento: (() => {
+      const result: Record<string, number | null> = {};
+      for (const [k, cnt] of Object.entries(paymentOrdMap)) {
+        result[k] = cnt > 0 ? (paymentRevMap[k] ?? 0) / cnt : null;
+      }
+      return result;
+    })(),
+    percentualPorFormaPagamento: (() => {
+      const result: Record<string, number> = {};
+      const totalWithData = paymentOrdersWithData + paymentOrdersWithoutData;
+      for (const [k, cnt] of Object.entries(paymentOrdMap)) {
+        result[k] = totalWithData > 0 ? Math.round((cnt / totalWithData) * 1000) / 10 : 0;
+      }
+      return result;
+    })(),
+    pagamentosNaoIdentificados: paymentOrdMap["desconhecido"] ?? 0,
+    pedidosComPagamentoMisto,
+    paymentDataCompleteness: (() => {
+      const total2 = paymentOrdersWithData + paymentOrdersWithoutData;
+      if (total2 === 0) return "unknown" as const;
+      if (paymentOrdersWithoutData === 0 && paymentDataSourceCounts.none === 0) return "complete" as const;
+      if (paymentOrdersWithData === 0) return "unavailable" as const;
+      return "partial" as const;
+    })(),
+    paymentDataSource: (() => {
+      const counts = paymentDataSourceCounts;
+      if (counts.single_field >= counts.array_field && counts.single_field >= counts.nested_object) return "single_field" as const;
+      if (counts.array_field >= counts.nested_object) return "array_field" as const;
+      if (counts.nested_object > 0) return "nested_object" as const;
+      return "none" as const;
+    })(),
+    paymentSampledOrders:    paymentOrdersWithData + paymentOrdersWithoutData,
+    paymentOrdersWithData,
+    paymentOrdersWithoutData,
   };
 }
 
