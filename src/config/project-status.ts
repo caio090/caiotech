@@ -287,9 +287,9 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
   },
 
-  // ── Conteúdo (ContenOS) ────────────────────────────────────
+  // ── Conteúdo (REC OS) ────────────────────────────────────
   {
-    id: "contentos", name: "ContenOS", category: "conteudo",
+    id: "contentos", name: "REC OS", category: "conteudo",
     description: "Calendário editorial, aprovação por link, fluxo.",
     phase: "v1", readiness: "implemented",
     qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
@@ -488,8 +488,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "not_started" },
     sql_dependency: "SQL 87 — design_projects (persistência em nuvem bloqueada até execução)",
-    last_updated: "2026-07-14",
-    notes: "V2.2.1: chave de draft migrada para editor_os_draft_v1_{clientId}_{preset}. Isolamento por clientId (UUID). Pointer Events substituem Mouse Events (suporte touch/pen/trackpad). Motor real: HTML5 Canvas API nativo.",
+    last_updated: "2026-07-15",
+    notes: "V2.2.1: chave de draft migrada para editor_os_draft_v1_{clientId}_{preset}. Sprint 3.0: export PNG trocado para Blob + link anexado ao body; ainda qa_pending ate validar download em producao.",
   },
   {
     id: "rec_os_information_architecture",
@@ -497,10 +497,10 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "conteudo",
     description: "Navegação reduzida a 5 itens: Visão Geral, Campanhas, ✦ Criar, Calendário, Resultados. Redirects legados. Tabs por URL. Fusão Calendário+Agendamento e Insights+Radar+Relatórios. Cards de ação rápida na Visão Geral consolidados: 6 ações de negócio, sem cards redundantes de Agendamento/EditorOS.",
     phase: "v2",
-    readiness: "qa_pending",
-    qa: { status: "not_started" },
-    last_updated: "2026-07-14",
-    notes: "V2.2.1: Cards Agendamento e EditorOS removidos da Visão Geral (duplicavam subnav). Substituídos por 6 ações de negócio: Criar conteúdo, Abrir campanha, Ver calendário, Ver resultados, Pendências, Tarefa no Operacional. Todos os redirects preservam ?client=.",
+    readiness: "validated",
+    qa: { status: "approved_with_p2", date: "2026-07-15", auditor: "Codex", p2: ["Rotas técnicas /contentos preservadas por compatibilidade"] },
+    last_updated: "2026-07-15",
+    notes: "Sprint 3.0: arquitetura visual validada como REC OS. Criar unificado em 5 etapas; links antigos visíveis corrigidos para /admin/contentos/* quando há client.",
   },
   {
     id: "olaclick_payment_methods",
@@ -510,8 +510,9 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     phase: "v2",
     readiness: "qa_pending",
     qa: { status: "not_started" },
-    last_updated: "2026-07-14",
-    notes: "V2.2.1: paymentDataCompleteness, ticketMedioPorFormaPagamento, percentualPorFormaPagamento, pedidosComPagamentoMisto. Sem duplicação de receita: misto = valor inteiro quando sem amounts individuais. Coluna Pagamento adicionada a pedidos_recentes. Diagnóstico: /api/olaclick/payment-methods/diagnostics?client_id=X.",
+    blockers: ["Provider OlaClick não retornou dados suficientes de formas de pagamento para validação fiscal"],
+    last_updated: "2026-07-15",
+    notes: "state=blocked_provider_data. V2.2.1 preserva paymentDataCompleteness, ticketMedioPorFormaPagamento, percentualPorFormaPagamento, pedidosComPagamentoMisto; falta dado real completo do provider.",
   },
   {
     id: "fiscal_integration",
@@ -543,7 +544,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
     sql_dependency: "SQL 88 — conversation_links",
     last_updated: "2026-07-14",
-    notes: "CustomerInboxProvider interface e chatwoot-disabled provider implementados. Feature flag crm_inbox=disabled. Painel de integrações mostra status 'não instalado'.",
+    notes: "state=blocked_external_infra. CustomerInboxProvider interface e chatwoot-disabled provider implementados. Feature flag crm_inbox=disabled. Painel de integrações mostra status 'não instalado'.",
   },
   {
     id: "social_scheduler",
@@ -560,7 +561,40 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
     sql_dependency: "SQL 89 — scheduled_publications, publication_attempts",
     last_updated: "2026-07-14",
-    notes: "SocialSchedulerProvider interface e postiz-disabled provider implementados. Feature flag social_scheduler=disabled. Painel de integrações mostra status 'não instalado'.",
+    notes: "state=blocked_external_infra. SocialSchedulerProvider interface e postiz-disabled provider implementados. Feature flag social_scheduler=disabled. Painel de integrações mostra status 'não instalado'.",
+  },
+  {
+    id: "global_calendar",
+    name: "Calendário Global",
+    category: "operacional",
+    description: "Visão consolidada cross-cliente para conteúdo, produção, aprovações, financeiro e tarefas.",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-15",
+    notes: "state=planned. Arquitetura documentada em docs/architecture/GLOBAL_CALENDAR_V1.md.",
+  },
+  {
+    id: "client_360",
+    name: "Cliente 360",
+    category: "crm",
+    description: "Página única de contexto do cliente: dados, integrações, produção, relatórios, financeiro e histórico.",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-15",
+    notes: "state=planned. Arquitetura documentada em docs/architecture/CLIENT_360_V1.md.",
+  },
+  {
+    id: "client_finance",
+    name: "Financeiro por Cliente",
+    category: "billing",
+    description: "Visão financeira por cliente com contratos, cobranças, status, repasses e conciliação.",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-15",
+    notes: "state=planned. Arquitetura documentada em docs/architecture/CLIENT_FINANCE_V1.md.",
   },
 ];
 
@@ -629,7 +663,7 @@ export interface SQLBlocker {
   number: number;
   label: string;
   file: string;
-  status: "executed" | "failed" | "pending" | "created";
+  status: "executed" | "failed" | "pending" | "created" | "partial_unknown" | "not_executed";
   errorCode?: string;
   errorMessage?: string;
   affectedAreas: string[];
@@ -645,7 +679,7 @@ export const SQL_BLOCKERS: SQLBlocker[] = [
     number: 82,
     label: "Especialidades e comentários de tarefas",
     file: "docs/supabase/82-team-specialties-and-task-comments.sql",
-    status: "failed",
+    status: "partial_unknown",
     errorCode: "42703",
     errorMessage: "column \"is_internal\" does not exist",
     affectedAreas: ["task_comments"],
@@ -659,7 +693,7 @@ export const SQL_BLOCKERS: SQLBlocker[] = [
     number: 84,
     label: "Time tracking e previsão de entrega",
     file: "docs/supabase/84-project-effort-and-sessions.sql",
-    status: "failed",
+    status: "partial_unknown",
     errorCode: "42703",
     errorMessage: "column \"profile_id\" does not exist",
     affectedAreas: ["project_time_tracking"],
@@ -673,10 +707,49 @@ export const SQL_BLOCKERS: SQLBlocker[] = [
     number: 85,
     label: "Correção: is_internal + profile_id e recriação de políticas RLS",
     file: "docs/supabase/85-fix-team-comments-and-work-sessions.sql",
-    status: "pending",
+    status: "not_executed",
     affectedAreas: ["task_comments", "project_time_tracking"],
     fixStatus: "created",
     rootCause: "Criado como patch idempotente: ADD COLUMN IF NOT EXISTS + DROP/CREATE de policies.",
+    bankAltered: false,
+  },
+  {
+    number: 86,
+    label: "Foundation de integrações genéricas",
+    file: "docs/supabase/86-integration-foundations.sql",
+    status: "partial_unknown",
+    affectedAreas: ["integration_connections", "provider_user_links"],
+    rootCause: "Historico indica tentativa parcial; catalogo live nao foi auditado nesta rodada.",
+    bankAltered: false,
+  },
+  {
+    number: 87,
+    label: "Foundation de design/editor",
+    file: "docs/supabase/87-design-provider-foundations.sql",
+    status: "partial_unknown",
+    affectedAreas: ["editor_os", "design_projects", "design_versions"],
+    fix: "SQL 90 proposto para reconciliacao apos auditoria manual",
+    fixFile: "docs/supabase/90-reconcile-partial-foundations.sql",
+    fixStatus: "created",
+    rootCause: "Arquivo local contem constraints inconsistentes NOT NULL + ON DELETE SET NULL e unique ausente em design_versions.",
+    bankAltered: false,
+  },
+  {
+    number: 88,
+    label: "Foundation de conversas externas",
+    file: "docs/supabase/88-conversation-links.sql",
+    status: "partial_unknown",
+    affectedAreas: ["crm_inbox", "conversation_links"],
+    rootCause: "Historico indica tentativa parcial; catalogo live nao foi auditado nesta rodada.",
+    bankAltered: false,
+  },
+  {
+    number: 89,
+    label: "Foundation de publicações sociais",
+    file: "docs/supabase/89-scheduled-publications.sql",
+    status: "partial_unknown",
+    affectedAreas: ["social_scheduler", "scheduled_publications"],
+    rootCause: "Historico indica tentativa parcial; catalogo live nao foi auditado nesta rodada.",
     bankAltered: false,
   },
 ];

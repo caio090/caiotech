@@ -237,6 +237,8 @@ function SQLBlockersSection() {
     pending:  "bg-yellow-100 text-yellow-700 border-yellow-200",
     failed:   "bg-red-100 text-red-700 border-red-200",
     created:  "bg-blue-100 text-blue-700 border-blue-200",
+    partial_unknown: "bg-orange-100 text-orange-700 border-orange-200",
+    not_executed: "bg-slate-100 text-slate-700 border-slate-200",
   } as const;
 
   const statusLabel = {
@@ -244,6 +246,8 @@ function SQLBlockersSection() {
     pending:  "Pendente",
     failed:   "Falhou",
     created:  "Criado",
+    partial_unknown: "Parcial/desconhecido",
+    not_executed: "Não executado",
   } as const;
 
   return (
