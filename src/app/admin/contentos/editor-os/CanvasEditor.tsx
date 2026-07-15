@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import {
   Type, ImageIcon, Square, Trash2, Copy, ChevronUp, ChevronDown,
   Undo2, Redo2, ZoomIn, ZoomOut, Download, Bold, Italic,
-  AlignLeft, AlignCenter, AlignRight, FlaskConical,
+  AlignLeft, AlignCenter, AlignRight, FlaskConical, Loader2,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -271,6 +271,7 @@ export function CanvasEditor({ clientId, clientName }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [savedMsg, setSavedMsg]   = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [cursor, setCursor]       = useState("default");
 
   const { w: cw, h: ch } = PRESETS[preset];
@@ -603,61 +604,118 @@ export function CanvasEditor({ clientId, clientName }: Props) {
   }
 
   // ── Export PNG ─────────────────────────────────────────────────────────────
-  function exportPNG() {
+  async function ensureExportImagesLoaded(items: EditorElement[]) {
+    const images = items.filter((el) => el.type === "image" && el.src);
+    await Promise.all(images.map((el) => new Promise<void>((resolve, reject) => {
+      if (!el.src) {
+        resolve();
+        return;
+      }
+
+      let img = imgCache.current.get(el.src);
+      if (!img) {
+        img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = el.src;
+        imgCache.current.set(el.src, img);
+      }
+
+      if (img.complete && img.naturalWidth > 0) {
+        resolve();
+        return;
+      }
+
+      img.onload = () => {
+        if (img?.naturalWidth && img.naturalWidth > 0) resolve();
+        else reject(new Error("image_not_ready"));
+      };
+      img.onerror = () => reject(new Error("image_load_failed"));
+    })));
+  }
+
+  function canvasToPngBlob(canvas: HTMLCanvasElement) {
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob && blob.size > 0) resolve(blob);
+        else reject(new Error("invalid_png_blob"));
+      }, "image/png");
+    });
+  }
+
+  async function exportPNG() {
+    if (exporting) return;
+    setExporting(true);
+    showSaved("Preparando PNG...");
+
     const offscreen = document.createElement("canvas");
     offscreen.width  = cw;
     offscreen.height = ch;
     const ctx = offscreen.getContext("2d");
-    if (!ctx) return;
 
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, cw, ch);
+    try {
+      if (!ctx) throw new Error("canvas_context_unavailable");
+      await ensureExportImagesLoaded(elements);
 
-    const sorted = [...elements].sort((a, b) => a.z - b.z);
-    for (const el of sorted) {
-      ctx.save();
-      ctx.globalAlpha = el.opacity ?? 1;
-      const cx2 = el.x + el.w / 2;
-      const cy2 = el.y + el.h / 2;
-      ctx.translate(cx2, cy2);
-      ctx.rotate((el.rot * Math.PI) / 180);
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, cw, ch);
 
-      if (el.type === "rect") {
-        ctx.fillStyle = el.fill ?? "#7c3aed";
-        ctx.fillRect(-el.w / 2, -el.h / 2, el.w, el.h);
-      } else if (el.type === "text" && el.text) {
-        const fs = el.fontSize ?? 48;
-        const weight = el.bold ? "bold" : "normal";
-        const style  = el.italic ? "italic" : "normal";
-        ctx.font = `${style} ${weight} ${fs}px ${el.fontFamily ?? "Inter, sans-serif"}`;
-        ctx.fillStyle = el.textColor ?? "#000000";
-        ctx.textBaseline = "top";
-        ctx.textAlign = el.textAlign ?? "left";
-        const lines = wrapText(ctx, el.text, el.w);
-        const lineH = fs * 1.3;
-        const totalH = lines.length * lineH;
-        let sy = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
-        let sx = -el.w / 2;
-        if (ctx.textAlign === "center") sx = 0;
-        else if (ctx.textAlign === "right") sx = el.w / 2;
-        for (let i = 0; i < lines.length; i++) {
-          ctx.fillText(lines[i], sx, sy + i * lineH);
-        }
-      } else if (el.type === "image" && el.src) {
-        const img = imgCache.current.get(el.src);
-        if (img?.complete && img.naturalWidth > 0) {
+      const sorted = [...elements].sort((a, b) => a.z - b.z);
+      for (const el of sorted) {
+        ctx.save();
+        ctx.globalAlpha = el.opacity ?? 1;
+        const cx2 = el.x + el.w / 2;
+        const cy2 = el.y + el.h / 2;
+        ctx.translate(cx2, cy2);
+        ctx.rotate((el.rot * Math.PI) / 180);
+
+        if (el.type === "rect") {
+          ctx.fillStyle = el.fill ?? "#7c3aed";
+          ctx.fillRect(-el.w / 2, -el.h / 2, el.w, el.h);
+        } else if (el.type === "text" && el.text) {
+          const fs = el.fontSize ?? 48;
+          const weight = el.bold ? "bold" : "normal";
+          const style  = el.italic ? "italic" : "normal";
+          ctx.font = `${style} ${weight} ${fs}px ${el.fontFamily ?? "Inter, sans-serif"}`;
+          ctx.fillStyle = el.textColor ?? "#000000";
+          ctx.textBaseline = "top";
+          ctx.textAlign = el.textAlign ?? "left";
+          const lines = wrapText(ctx, el.text, el.w);
+          const lineH = fs * 1.3;
+          const totalH = lines.length * lineH;
+          let sy = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
+          let sx = -el.w / 2;
+          if (ctx.textAlign === "center") sx = 0;
+          else if (ctx.textAlign === "right") sx = el.w / 2;
+          for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], sx, sy + i * lineH);
+          }
+        } else if (el.type === "image" && el.src) {
+          const img = imgCache.current.get(el.src);
+          if (!img?.complete || img.naturalWidth <= 0) {
+            throw new Error("image_not_ready");
+          }
           ctx.drawImage(img, -el.w / 2, -el.h / 2, el.w, el.h);
         }
+        ctx.restore();
       }
-      ctx.restore();
+
+      const blob = await canvasToPngBlob(offscreen);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = `editor-os-${preset}-${Date.now()}.png`;
+      link.href = url;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showSaved("PNG exportado!");
+    } catch (error) {
+      console.error("[EditorOS] PNG export failed:", error instanceof Error ? error.message : "unknown_error");
+      showSaved("Não foi possível exportar o PNG. Verifique se as imagens carregaram e tente novamente.");
+    } finally {
+      setExporting(false);
     }
-
-    const link = document.createElement("a");
-    link.download = `editor-os-${preset}-${Date.now()}.png`;
-    link.href = offscreen.toDataURL("image/png");
-    link.click();
-
-    showSaved("PNG exportado!");
   }
 
   // ── Local draft ────────────────────────────────────────────────────────────
@@ -846,15 +904,27 @@ export function CanvasEditor({ clientId, clientName }: Props) {
           Salvar rascunho
         </button>
 
-        <button onClick={exportPNG}
-          className="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
-          <Download className="w-3.5 h-3.5" /> Exportar PNG
+        <button
+          onClick={exportPNG}
+          disabled={exporting}
+          data-testid="editor-os-export-png-button"
+          className="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {exporting ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparando PNG...
+            </>
+          ) : (
+            <>
+              <Download className="w-3.5 h-3.5" /> Exportar PNG
+            </>
+          )}
         </button>
       </div>
 
       {/* Saved message */}
       {savedMsg && (
-        <div className="bg-zinc-800/80 text-zinc-300 text-xs text-center py-1 px-4">
+        <div data-testid="editor-os-export-status" className="bg-zinc-800/80 text-zinc-300 text-xs text-center py-1 px-4">
           {savedMsg}
         </div>
       )}
