@@ -167,7 +167,7 @@ function calcProgress(data: OnboardingState, serverOnb: DbOnboardingProfile | nu
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-function getNextStep(data: OnboardingState, canva: CanvaConfig, serverOnb: DbOnboardingProfile | null) {
+function getNextStep(data: OnboardingState, canva: CanvaConfig, serverOnb: DbOnboardingProfile | null, clientId?: string | null) {
   const brandName = serverOnb?.brand_name ?? data.marca?.nome;
   const obj       = serverOnb?.objective_primary ?? getObjetivoPrincipal(data);
   const pub       = serverOnb?.ideal_customer ?? data.publico?.clienteIdeal;
@@ -177,8 +177,8 @@ function getNextStep(data: OnboardingState, canva: CanvaConfig, serverOnb: DbOnb
   if (!obj)                   return { label: "Definir objetivo principal", href: "/onboarding/objetivo", desc: "O que a marca quer alcançar?" };
   if (!pub)                   return { label: "Descrever público-alvo",     href: "/onboarding/publico",  desc: "Quem é o cliente ideal da marca?" };
   if (tom.length === 0)       return { label: "Definir tom de voz",         href: "/onboarding/estilo",   desc: "Como a marca se comunica?" };
-  if (canva.status === null)  return { label: "Configurar Canva",           href: "/contentos/canva",     desc: "Conecte o Canva para criar artes" };
-  return                             { label: "Criar primeiro conteúdo",    href: "/contentos/criar",     desc: "A marca está pronta para produzir!" };
+  if (canva.status === null)  return { label: "Configurar Canva",           href: clientId ? `/admin/contentos/criar?client=${clientId}&step=visual` : "/contentos/canva", desc: "Conecte o Canva para criar artes" };
+  return                             { label: "Criar primeiro conteúdo",    href: clientId ? `/admin/contentos/criar?client=${clientId}` : "/contentos/criar", desc: "A marca está pronta para produzir!" };
 }
 
 function canvaChip(canva: CanvaConfig): { label: string; cls: string } {
@@ -470,7 +470,7 @@ export function ContentOSHomeContent({
   const data  = useOnboardingStore();
   const canva = useCanvaStore();
 
-  const isAdmin    = userRole === "admin";
+  const isAdmin    = userRole === "admin" || userRole === "super_admin";
   const isDemo     = !isSupabaseActive;
   const isRealData = !!serverOnboarding;
 
@@ -486,7 +486,7 @@ export function ContentOSHomeContent({
   const tomFinal   = tomDeVoz.length > 0 ? tomDeVoz : ["popular", "direto"];
 
   const progress   = calcProgress(data, serverOnboarding);
-  const nextStep   = getNextStep(data, canva, serverOnboarding);
+  const nextStep   = getNextStep(data, canva, serverOnboarding, clientId);
   const sugestoes  = getSugestoes(brandSeg || "Serviços", principal);
   const chip       = canvaChip(canva);
   const academy    = academyPorObjetivo[principal] ?? { title: "✍️ Copywriting para Redes Sociais", progress: 75 };
@@ -624,7 +624,7 @@ export function ContentOSHomeContent({
           )}
 
           {/* Canva */}
-          <Link href="/contentos/canva" className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors hover:opacity-80 ${chip.cls}`}>
+          <Link href={clientId ? `/admin/contentos/criar?client=${clientId}&step=visual` : "/contentos/canva"} className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors hover:opacity-80 ${chip.cls}`}>
             <Palette className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
             <div className="min-w-0">
               <p className="text-[10px] font-bold truncate">{chip.label.split("·")[0]?.trim()}</p>
@@ -836,7 +836,7 @@ export function ContentOSHomeContent({
               <div key={i} className="bg-white rounded-xl border border-gray-100 p-3 flex items-start gap-2.5">
                 <span className="text-xl flex-shrink-0">{s.emoji}</span>
                 <p className="text-xs text-gray-700 leading-relaxed flex-1">{s.text}</p>
-                <Link href="/contentos/criar" className="text-[10px] text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-colors flex-shrink-0 font-medium">
+                <Link href={clientId ? `/admin/contentos/criar?client=${clientId}` : "/contentos/criar"} className="text-[10px] text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-colors flex-shrink-0 font-medium">
                   Criar
                 </Link>
               </div>

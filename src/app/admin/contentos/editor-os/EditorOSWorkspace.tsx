@@ -25,7 +25,7 @@ export default function EditorOSWorkspace({
   socialChannels,
 }: EditorOSWorkspaceProps) {
   const backHref = client
-    ? `/admin/contentos/criar?tab=editor&client=${client.id}`
+    ? `/admin/contentos/criar?client=${client.id}&step=visual`
     : "/admin/contentos/selecionar-cliente";
 
   const displayName = brandName ?? client?.company_name ?? "";
