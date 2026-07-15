@@ -2,6 +2,15 @@
 
 Registro de decisoes do projeto Lokat OS.
 
+## 2026-07-15
+
+- Todo agente deve ler `docs/CODEX_CURRENT_CONTEXT.md`, `docs/IMPLEMENTATION_LEDGER.md` e `docs/UNTOUCHED_BACKLOG.md` antes de alterar codigo. Estes arquivos viram checkpoint permanente do Codex para estado atual, ledger append-only e backlog intocado.
+- SQLs 86, 87, 88 e 89 nao devem ser tratados como "nao executados" nem como "concluidos". Estado oficial ate reconciliacao: `attempted_failed_partial_unknown`.
+- SQL 85 permanece `not_executed`. Nao executar SQL 82 a 90 automaticamente; auditoria permitida somente por SELECT no catalogo PostgreSQL.
+- OlaClick formas de pagamento permanece `blocked_provider_data` quando o provider nao retorna campo de pagamento. Nao inferir Pix/cartao/dinheiro a partir de texto livre.
+- EditorOS deve ser apresentado como motor da etapa Visual Final, nao como modulo concorrente da REC OS.
+- Calendario global, Cliente 360 e financeiro do cliente serao documentados antes de criar novas tabelas.
+
 ## 2026-07-13
 
 - `/admin/plataforma` foi aposentada como página funcional por duplicar Dashboard, Clientes e Central de Contas sem adicionar valor próprio. A rota agora redireciona permanentemente para `/admin/super/accounts`. O arquivo `page.tsx` é mantido por compatibilidade de link, mas executa apenas `redirect()`.

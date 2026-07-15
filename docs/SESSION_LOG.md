@@ -111,3 +111,21 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum servidor foi iniciado.
 - Nenhum navegador foi aberto.
 - Nenhum commit ou push foi executado.
+
+## 2026-07-15 - Sprint 3.0 checkpoint permanente
+
+- Projeto confirmado em `C:\Users\Trabalho\Desktop\COde\lokat-os`, branch `main`, sincronizado com `origin/main` no inicio.
+- Criados `docs/CODEX_CURRENT_CONTEXT.md`, `docs/IMPLEMENTATION_LEDGER.md` e `docs/UNTOUCHED_BACKLOG.md`.
+- Atualizado `docs/DECISIONS.md` com regra de nao executar SQLs parciais sem auditoria live.
+- Criado `docs/supabase/AUDIT_SQL_82_89_2026-07-15.md`.
+- Criado `docs/supabase/90-reconcile-partial-foundations.sql` como proposta com `rollback` final.
+- Corrigido export PNG em `CanvasEditor.tsx` com Blob, `URL.createObjectURL`, estado de exportacao e `data-testid`.
+- Criado fluxo unico `/admin/contentos/criar` com etapas Brief, Conteudo, Visual Final, Revisao e Destino.
+- Corrigidos links visiveis antigos para preservar `client` e apontar para rotas admin quando aplicavel.
+- Atualizado `project-status.ts` para REC OS, estados planejados e SQLs parciais.
+- Criados documentos `GLOBAL_CALENDAR_V1.md`, `CLIENT_360_V1.md` e `CLIENT_FINANCE_V1.md`.
+- Validado `npx tsc --noEmit`.
+- Validado `$env:TURBOPACK='0'; npm run build`.
+- Nenhum SQL foi executado.
+- Nenhum dado Supabase foi alterado.
+- Nenhum asset local foi apagado, movido ou commitado.

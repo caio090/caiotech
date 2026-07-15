@@ -523,3 +523,75 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Nao altere `src`, `app`, `components`, `lib`, `api` ou banco de dados sem plano aprovado.
 - Preserve arquivos modificados e nao rastreados existentes.
 - Nao rode `npm run dev`, nao abra navegador, nao commite e nao envie push sem instrucao explicita do usuario.
+
+## 2026-07-15 - Sprint 3.0 checkpoint permanente
+
+### O que foi feito
+
+- Criados documentos permanentes de contexto e backlog para sincronizacao Codex/Claude.
+- Registrada decisao de tratar SQL 82, 84, 86, 87, 88 e 89 como `partial_unknown` ate auditoria live.
+- Criada auditoria local dos SQLs 82-89 sem executar DDL.
+- Criado SQL 90 como proposta de reconciliacao, terminado em `rollback` e marcado como nao executar automaticamente.
+- Corrigido export PNG do EditorOS para usar Blob, URL temporaria, link anexado ao `body`, estado `exporting` e erro sanitizado.
+- Corrigidos links visiveis antigos da Visao Geral para usar `/admin/contentos/*` quando ha `client`.
+- Substituida a pagina admin `/admin/contentos/criar` por fluxo unico REC OS em 5 etapas.
+- Criadas notas de arquitetura para Calendario Global, Cliente 360 e Financeiro por Cliente.
+- Atualizado `src/config/project-status.ts` com estados da Sprint 3.0 sem alterar `V1_PROGRESS` e `V2_PROGRESS`.
+
+### Arquivos alterados/criados
+
+- `docs/CODEX_CURRENT_CONTEXT.md`
+- `docs/IMPLEMENTATION_LEDGER.md`
+- `docs/UNTOUCHED_BACKLOG.md`
+- `docs/DECISIONS.md`
+- `docs/HANDOFF.md`
+- `docs/SESSION_LOG.md`
+- `docs/supabase/AUDIT_SQL_82_89_2026-07-15.md`
+- `docs/supabase/90-reconcile-partial-foundations.sql`
+- `docs/architecture/GLOBAL_CALENDAR_V1.md`
+- `docs/architecture/CLIENT_360_V1.md`
+- `docs/architecture/CLIENT_FINANCE_V1.md`
+- `src/app/admin/contentos/criar/page.tsx`
+- `src/app/admin/contentos/criar/_guided-create-flow.tsx`
+- `src/app/admin/contentos/editor-os/CanvasEditor.tsx`
+- `src/app/admin/contentos/editor-os/EditorOSWorkspace.tsx`
+- `src/app/admin/contentos/visual/page.tsx`
+- `src/app/admin/status/page.tsx`
+- `src/app/contentos/home/_client-content.tsx`
+- `src/config/project-status.ts`
+
+### Comandos executados
+
+- `git fetch origin`
+- `git status --short --branch`
+- `git branch --show-current`
+- `git log --oneline -30`
+- `git log origin/main..HEAD --oneline`
+- `git diff --stat`
+- `git diff --name-status`
+- `git diff --check`
+- `npx tsc --noEmit`
+- `$env:TURBOPACK='0'; npm run build`
+
+### Pendencias
+
+- Nao foi possivel auditar o catalogo live do Supabase nesta sessao porque nao havia canal autenticado de SQL read-only no workspace.
+- Rodar manualmente as queries SELECT em `docs/supabase/AUDIT_SQL_82_89_2026-07-15.md`.
+- Nao executar `docs/supabase/90-reconcile-partial-foundations.sql` sem revisar o resultado da auditoria live.
+- Validar em producao o download PNG do EditorOS.
+- Validar em producao o novo fluxo `/admin/contentos/criar?client=<uuid>`.
+
+### Proximo passo recomendado
+
+1. Fazer commit/push dos grupos desta entrega.
+2. Aguardar deploy automatico da Vercel.
+3. Rodar smoke test autenticado em producao para EditorOS PNG, REC OS Criar e `/admin/status`.
+4. Depois, executar somente SELECTs de auditoria no Supabase antes de qualquer SQL corretivo.
+
+### Instrucoes para o proximo agente
+
+- Nao classificar SQL 86-89 como completos nem como nao executados; o estado oficial e `partial_unknown`.
+- SQL 85 continua `not_executed`.
+- SQL 90 e proposta, nao migracao aplicada.
+- Nao renomear rotas tecnicas `/contentos`; apenas manter nome publico visivel como REC OS.
+- Assets locais nao rastreados continuam fora do escopo e nao devem ser apagados.
