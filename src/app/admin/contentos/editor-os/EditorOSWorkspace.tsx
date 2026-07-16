@@ -17,16 +17,20 @@ interface EditorOSWorkspaceProps {
   campaignId: string | null;
   contentId: string | null;
   briefingId: string | null;
+  returnTo?: string | null;
 }
 
 export default function EditorOSWorkspace({
   client,
   brandName,
   socialChannels,
+  contentId,
+  returnTo,
 }: EditorOSWorkspaceProps) {
-  const backHref = client
-    ? `/admin/contentos/criar?client=${client.id}&step=visual`
-    : "/admin/contentos/selecionar-cliente";
+  const backHref = returnTo
+    ?? (client
+      ? `/admin/contentos/criar?client=${client.id}&step=visual`
+      : "/admin/contentos/selecionar-cliente");
 
   const displayName = brandName ?? client?.company_name ?? "";
 
@@ -39,7 +43,7 @@ export default function EditorOSWorkspace({
           className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-100 text-xs transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Voltar
+          {returnTo ? "Voltar ao conteúdo" : "Voltar"}
         </Link>
 
         <div className="w-px h-3.5 bg-zinc-700" />
@@ -75,6 +79,7 @@ export default function EditorOSWorkspace({
         <CanvasEditor
           clientId={client?.id ?? "default"}
           clientName={displayName || undefined}
+          contentId={contentId ?? undefined}
         />
       </div>
     </div>

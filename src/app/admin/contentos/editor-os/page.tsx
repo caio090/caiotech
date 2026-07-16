@@ -3,6 +3,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFeatureFlag } from "@/lib/feature-flags";
 import EditorOSWorkspace from "./EditorOSWorkspace";
 
+const ALLOWED_RETURN_TO_PREFIX = "/admin/contentos/";
+const BLOCKED_RETURN_TO_PREFIXES = ["http://", "https://", "//", "javascript:", "data:"];
+
+function sanitizeReturnTo(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const decoded = decodeURIComponent(raw);
+  if (BLOCKED_RETURN_TO_PREFIXES.some((p) => decoded.startsWith(p))) return null;
+  if (!decoded.startsWith(ALLOWED_RETURN_TO_PREFIX)) return null;
+  return decoded;
+}
+
 interface PageProps {
   searchParams: Promise<{
     client?: string;
@@ -10,6 +21,7 @@ interface PageProps {
     campaign_id?: string;
     content_id?: string;
     briefing_id?: string;
+    return_to?: string;
   }>;
 }
 
@@ -71,6 +83,8 @@ export default async function EditorOSPage({ searchParams }: PageProps) {
       : null;
   }
 
+  const returnTo = sanitizeReturnTo(params.return_to);
+
   return (
     <EditorOSWorkspace
       client={client}
@@ -79,6 +93,7 @@ export default async function EditorOSPage({ searchParams }: PageProps) {
       campaignId={params.campaign_id ?? null}
       contentId={params.content_id ?? null}
       briefingId={params.briefing_id ?? null}
+      returnTo={returnTo}
     />
   );
 }

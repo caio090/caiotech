@@ -249,12 +249,23 @@ function drawSelection(ctx: CanvasRenderingContext2D, el: EditorElement) {
 
 const DRAFT_VERSION = "v1";
 
+const SESSION_IMG_PREFIX = "rec_os_visual_import_v1_";
+
+interface SessionImportPayload {
+  fileName: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  createdAt: string;
+}
+
 interface Props {
   clientId: string;
   clientName?: string;
+  contentId?: string;
 }
 
-export function CanvasEditor({ clientId, clientName }: Props) {
+export function CanvasEditor({ clientId, clientName, contentId }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -273,6 +284,7 @@ export function CanvasEditor({ clientId, clientName }: Props) {
   const [savedMsg, setSavedMsg]   = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cursor, setCursor]       = useState("default");
+  const [pendingImport, setPendingImport] = useState<SessionImportPayload | null>(null);
 
   const { w: cw, h: ch } = PRESETS[preset];
 
@@ -765,9 +777,52 @@ export function CanvasEditor({ clientId, clientName }: Props) {
     loadDraft();
   }, [preset]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Detect visual import from guided create flow
+  useEffect(() => {
+    if (!contentId) { setPendingImport(null); return; }
+    try {
+      const key = `${SESSION_IMG_PREFIX}${clientId}_${contentId}`;
+      const raw = sessionStorage.getItem(key);
+      if (!raw) { setPendingImport(null); return; }
+      const payload = JSON.parse(raw) as SessionImportPayload;
+      if (payload?.dataUrl) setPendingImport(payload);
+    } catch { setPendingImport(null); }
+  }, [clientId, contentId]);
+
   function showSaved(msg: string) {
     setSavedMsg(msg);
     setTimeout(() => setSavedMsg(null), 2500);
+  }
+
+  function addImportToCanvas(payload: SessionImportPayload) {
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      const w = Math.round(cw * 0.5);
+      const h = Math.round(w / aspect);
+      imgCache.current.set(payload.dataUrl, img);
+      const el: EditorElement = {
+        id: uid(), type: "image",
+        x: cw / 2 - w / 2, y: ch / 2 - h / 2, w, h,
+        rot: 0, z: elements.length, src: payload.dataUrl, opacity: 1,
+      };
+      const next = [...elements, el];
+      setElements(next);
+      pushHistory(next);
+      setSelectedId(el.id);
+      setPendingImport(null);
+      showSaved("Imagem adicionada ao canvas.");
+    };
+    img.src = payload.dataUrl;
+  }
+
+  function discardImport() {
+    if (!contentId) return;
+    try {
+      const key = `${SESSION_IMG_PREFIX}${clientId}_${contentId}`;
+      sessionStorage.removeItem(key);
+    } catch {}
+    setPendingImport(null);
   }
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
@@ -926,6 +981,29 @@ export function CanvasEditor({ clientId, clientName }: Props) {
       {savedMsg && (
         <div data-testid="editor-os-export-status" className="bg-zinc-800/80 text-zinc-300 text-xs text-center py-1 px-4">
           {savedMsg}
+        </div>
+      )}
+
+      {/* Visual import banner */}
+      {pendingImport && (
+        <div className="bg-indigo-950 border-b border-indigo-700 px-4 py-2.5 flex items-center gap-3">
+          <ImageIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-indigo-200">Imagem temporária encontrada</p>
+            <p className="text-[10px] text-indigo-400 truncate">{pendingImport.fileName}</p>
+          </div>
+          <button
+            onClick={() => addImportToCanvas(pendingImport)}
+            className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Adicionar ao canvas
+          </button>
+          <button
+            onClick={discardImport}
+            className="text-xs text-indigo-400 hover:text-indigo-200 px-2 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Descartar
+          </button>
         </div>
       )}
 
