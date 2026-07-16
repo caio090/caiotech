@@ -13,10 +13,30 @@
 - Deploy oficial: GitHub `main` -> Vercel projeto `caiotech`
 - Nao usar `vercel --prod` como padrao.
 
-## 3. Commit atual
+## 3. Sprint atual
 
-- Commit inicial desta sprint: `99e370a804e28dbaaeb3ea5c6d8592bcc71183c7`
-- HEAD local/origin no checkpoint inicial: `99e370a`
+- Sprint: 3.0.1 — Operacionalização do Fluxo Criar
+- Executor: Claude Code
+- Data: 2026-07-16
+- Commit HEAD pré-sprint: `bc4d66a`
+- Estado: implementado, aguardando commit/push/deploy
+
+## 4. O que foi feito na Sprint 3.0.1
+
+- APIs POST/GET/PATCH /drafts e POST send-to-production / send-to-approval criadas.
+- _guided-create-flow.tsx reescrito com persistência real, autosave, URL update, visual bridge.
+- EditorOS: return_to sanitizado, botão Voltar ao conteúdo, CanvasEditor com banner de import.
+- Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
+- SubNav: initialClientId passado server-side em todas as páginas REC OS.
+- TypeScript: zero erros. Build: limpo.
+- Nenhum SQL executado. V1=81, V2=12 imutáveis.
+
+## 5. Próximos passos
+
+- QA manual: testar fluxo completo Criar → salvar → recarregar → EditorOS → Aprovações.
+- QA Codex Web: testar endpoints sem autenticação (deve retornar 401/redirect).
+- Commits focados por área (feat/fix/docs).
+- git push origin main + aguardar Vercel READY.
 
 ## 4. Deployment atual
 

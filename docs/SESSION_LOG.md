@@ -112,6 +112,50 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum navegador foi aberto.
 - Nenhum commit ou push foi executado.
 
+## 2026-07-16 - Sprint 3.0.1 — Operacionalização do Fluxo Criar (Claude Code)
+
+- Executor: Claude Code (claude-sonnet-4-6).
+- Retomada após sessão Codex que não chegou a alterar os arquivos principais.
+- Verificado working tree: 9 arquivos M, APIs já em ??.
+
+### APIs criadas (src/app/api/admin/contentos/)
+- POST /drafts — cria content_item com status ideia e metadata.guided_create.
+- GET /drafts/[id] e PATCH /drafts/[id] — preserva metadata fora de guided_create.
+- POST /actions/send-to-production — idempotente em operational_tasks.
+- POST /actions/send-to-approval — idempotente em approvals (gera public_token via DB).
+
+### GuidedCreateFlow (_guided-create-flow.tsx) — reescrito
+- Exporta GuidedCreateDraft, aceita initialDraft e initialContentId.
+- Inicializa estado a partir do rascunho carregado server-side.
+- saveDraft(): POST na primeira vez, PATCH nas seguintes.
+- URL atualizada com ?content_id após primeiro save.
+- Autosave debounced 1400 ms (só após contentId existir, só quando isDirty).
+- saveState: idle | saving | saved | error — mensagens honestas.
+- openEditorOS(): salva primeiro, só então navega com return_to.
+- handleVisualFile(): MIME validation (PNG/JPG/WEBP), max 5 MB, sessionStorage com payload JSON.
+- Destinos reais: Calendário (URL), Produção (API), Aprovação (API).
+
+### EditorOS
+- page.tsx: aceita return_to, sanitiza server-side (só /admin/contentos/).
+- EditorOSWorkspace: passa contentId ao CanvasEditor, botão "Voltar ao conteúdo".
+- CanvasEditor: detecta rec_os_visual_import_v1_{clientId}_{contentId}, banner Adicionar/Descartar.
+
+### Aprovações
+- aprovacoes/page.tsx: busca company_name, passa activeClientId/activeClientName.
+- _client-content.tsx: isDemo suprimido quando activeClientId presente, header com nome do cliente.
+
+### SubNav
+- ContentosSubNavServer com initialClientId em: home, campanhas, criar, calendário, resultados, produção, aprovações.
+
+### Qualidade
+- npx tsc --noEmit --skipLibCheck: zero erros.
+- npm run build: build limpo, zero erros, zero warnings.
+- Nenhum SQL executado.
+- Nenhum schema alterado.
+- Nenhum dado Supabase alterado.
+- V1_PROGRESS = 81 (imutável).
+- V2_PROGRESS = 12 (imutável).
+
 ## 2026-07-15 - Sprint 3.0 checkpoint permanente
 
 - Projeto confirmado em `C:\Users\Trabalho\Desktop\COde\lokat-os`, branch `main`, sincronizado com `origin/main` no inicio.
