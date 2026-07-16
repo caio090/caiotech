@@ -23,6 +23,7 @@ export default async function AdminContentosAprovacoesPage({
 
   let serverApprovals: DbApprovalWithContent[] | null = null;
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let activeClientName: string | null = null;
 
   if (isSupabaseConfigured) {
     const validClient = await validateContentOSClient(activeClientId);
@@ -35,6 +36,13 @@ export default async function AdminContentosAprovacoesPage({
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
+        const { data: clientRow } = await supabase
+          .from("clients")
+          .select("company_name")
+          .eq("id", activeClientId)
+          .maybeSingle();
+        activeClientName = clientRow?.company_name ?? null;
+
         const { data } = await supabase
           .from("approvals")
           .select("*, content_items(id, title, type, channel, objective, caption, script, status, scheduled_date)")
@@ -50,11 +58,16 @@ export default async function AdminContentosAprovacoesPage({
 
   return (
     <>
-      <ContentosSubNavServer />
+      <ContentosSubNavServer initialClientId={activeClientId} />
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} compact className="mb-5" />
       )}
-      <ContentosAprovacoesContent serverApprovals={serverApprovals} initialApprovalId={initialApprovalId} />
+      <ContentosAprovacoesContent
+        serverApprovals={serverApprovals}
+        initialApprovalId={initialApprovalId}
+        activeClientId={activeClientId}
+        activeClientName={activeClientName}
+      />
     </>
   );
 }

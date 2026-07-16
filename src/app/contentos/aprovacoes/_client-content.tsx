@@ -308,9 +308,11 @@ function ApprovalDetailModal({
 interface Props {
   serverApprovals: DbApprovalWithContent[] | null;
   initialApprovalId?: string | null;
+  activeClientId?: string | null;
+  activeClientName?: string | null;
 }
 
-export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId }: Props) {
+export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId, activeClientId, activeClientName }: Props) {
   const [activeTab,   setActiveTab]   = useState<TabKey>("pending");
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
   const [openItem,    setOpenItem]    = useState<UiApproval | null>(null);
@@ -348,7 +350,8 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId 
   }, [serverHasReal]);
 
   const resolvedApprovals = serverApprovals ?? clientSideApprovals;
-  const isDemo = !isFetching && resolvedApprovals === null;
+  // When activeClientId is supplied (admin context), an empty real array is not demo mode
+  const isDemo = !isFetching && resolvedApprovals === null && !activeClientId;
 
   // Build UI items
   let items: UiApproval[];
@@ -480,7 +483,10 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId 
 
   return (
     <div>
-      <PageHeader title="Aprovações" description="Conteúdos aguardando feedback dos clientes" />
+      <PageHeader
+        title="Aprovações"
+        description={activeClientName ? `${activeClientName} — Conteúdos aguardando feedback` : "Conteúdos aguardando feedback dos clientes"}
+      />
 
       {isFetching ? (
         <div className="mb-4 flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 w-fit">
