@@ -93,7 +93,7 @@ export default async function AdminContentosHomePage({
 
   return (
     <>
-      <ContentosSubNavServer />
+      <ContentosSubNavServer initialClientId={activeClientId} />
       {isSupabaseConfigured && !hasClientContext && (
         <BriefGate clientId={activeClientId} companyName={companyName} />
       )}

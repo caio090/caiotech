@@ -1,25 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  Copy,
-  FileCheck2,
-  ImageIcon,
-  Layers,
-  PenLine,
-  Send,
-  Upload,
-  Wand2,
+  ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList,
+  Copy, FileCheck2, ImageIcon, Layers, Loader2, PenLine, Send, Upload, Wand2,
 } from "lucide-react";
 
 type StepId = "brief" | "content" | "visual" | "review" | "destination";
 type BriefMode = "manual" | "ai";
+type SaveState = "idle" | "saving" | "saved" | "error";
+type DestinationResult = { type: "calendar" | "production" | "approval"; id?: string; token?: string } | null;
+
+export interface GuidedCreateDraft {
+  schema_version?: number;
+  current_step?: string;
+  brief?: Record<string, string>;
+  content?: Record<string, string>;
+  visual?: {
+    mode?: string;
+    local_file_name?: string | null;
+    local_file_type?: string | null;
+    editor_draft_available?: boolean;
+  };
+  review_state?: string;
+  source?: string;
+  updated_at?: string;
+}
 
 interface GuidedCreateFlowProps {
   clientId: string;
@@ -27,74 +34,57 @@ interface GuidedCreateFlowProps {
   clientSegment: string | null;
   initialStep?: string | null;
   isSuperAdmin: boolean;
+  initialDraft?: GuidedCreateDraft | null;
+  initialContentId?: string | null;
 }
 
 const steps: Array<{ id: StepId; label: string; desc: string }> = [
-  { id: "brief", label: "Brief", desc: "Contexto e objetivo" },
-  { id: "content", label: "Conteudo", desc: "Texto e estrutura" },
-  { id: "visual", label: "Visual Final", desc: "Imagem, arte ou EditorOS" },
-  { id: "review", label: "Revisao", desc: "Checklist antes de aprovar" },
-  { id: "destination", label: "Destino", desc: "Calendario, producao ou aprovacao" },
+  { id: "brief",       label: "Brief",        desc: "Contexto e objetivo" },
+  { id: "content",     label: "Conteúdo",     desc: "Texto e estrutura" },
+  { id: "visual",      label: "Visual Final", desc: "Imagem, arte ou EditorOS" },
+  { id: "review",      label: "Revisão",      desc: "Checklist antes de aprovar" },
+  { id: "destination", label: "Destino",      desc: "Calendário, produção ou aprovação" },
 ];
 
-const validSteps = new Set<StepId>(steps.map((step) => step.id));
+const validSteps = new Set<StepId>(steps.map((s) => s.id));
 
 function normalizeStep(value?: string | null): StepId {
   if (value && validSteps.has(value as StepId)) return value as StepId;
   return "brief";
 }
 
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+const SESSION_IMG_PREFIX = "rec_os_visual_import_v1_";
+
+function imgSessionKey(clientId: string, contentId: string) {
+  return `${SESSION_IMG_PREFIX}${clientId}_${contentId}`;
+}
+
 function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  textarea,
+  label, value, onChange, placeholder, textarea,
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  textarea?: boolean;
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; textarea?: boolean;
 }) {
   const cls = "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
   return (
     <label className="block">
       <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</span>
-      {textarea ? (
-        <textarea className={cls} rows={4} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
-      ) : (
-        <input className={cls} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
-      )}
+      {textarea
+        ? <textarea className={cls} rows={4} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+        : <input className={cls} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />}
     </label>
   );
 }
 
-function StepButton({
-  step,
-  index,
-  active,
-  done,
-  onClick,
-}: {
-  step: (typeof steps)[number];
-  index: number;
-  active: boolean;
-  done: boolean;
-  onClick: () => void;
+function StepButton({ step, index, active, done, onClick }: {
+  step: (typeof steps)[number]; index: number; active: boolean; done: boolean; onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex min-w-[160px] flex-1 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-        active
-          ? "border-indigo-300 bg-indigo-50"
-          : done
-            ? "border-emerald-200 bg-emerald-50"
-            : "border-gray-200 bg-white hover:bg-gray-50"
-      }`}
-    >
+    <button type="button" onClick={onClick}
+      className={`flex min-w-[140px] flex-1 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+        active ? "border-indigo-300 bg-indigo-50" : done ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white hover:bg-gray-50"
+      }`}>
       <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black ${
         active ? "bg-indigo-600 text-white" : done ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"
       }`}>
@@ -109,119 +99,407 @@ function StepButton({
 }
 
 export function GuidedCreateFlow({
-  clientId,
-  clientName,
-  clientSegment,
-  initialStep,
-  isSuperAdmin,
+  clientId, clientName, clientSegment,
+  initialStep, isSuperAdmin,
+  initialDraft, initialContentId,
 }: GuidedCreateFlowProps) {
-  const [activeStep, setActiveStep] = useState<StepId>(() => normalizeStep(initialStep));
+  const router = useRouter();
+  const [activeStep, setActiveStep] = useState<StepId>(() =>
+    normalizeStep(initialDraft?.current_step ?? initialStep)
+  );
   const [briefMode, setBriefMode] = useState<BriefMode>("manual");
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
-  const [visualFileName, setVisualFileName] = useState("");
+
+  // Persistence state
+  const [contentId, setContentId] = useState<string | null>(initialContentId ?? null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  // Destination state
+  const [destLoading, setDestLoading] = useState<string | null>(null);
+  const [destResult, setDestResult] = useState<DestinationResult>(null);
+  const [destError, setDestError] = useState<string | null>(null);
+
+  // Visual file state
+  const [visualFileName, setVisualFileName] = useState(initialDraft?.visual?.local_file_name ?? "");
+  const [visualFileError, setVisualFileError] = useState<string | null>(null);
+  const [visualHasSession, setVisualHasSession] = useState(false);
+
+  // Form state
   const [brief, setBrief] = useState({
-    objective: "",
-    format: "Post estatico",
-    campaign: "",
-    offer: "",
-    audience: "",
-    message: "",
-    cta: "",
-    references: "",
-    notes: "",
-    deadline: "",
+    objective: initialDraft?.brief?.objective ?? "",
+    format:    initialDraft?.brief?.format ?? "Post estático",
+    campaign:  initialDraft?.brief?.campaign ?? "",
+    offer:     initialDraft?.brief?.offer ?? "",
+    audience:  initialDraft?.brief?.audience ?? "",
+    message:   initialDraft?.brief?.message ?? "",
+    cta:       initialDraft?.brief?.cta ?? "",
+    references:initialDraft?.brief?.references ?? "",
+    notes:     initialDraft?.brief?.notes ?? "",
+    deadline:  initialDraft?.brief?.deadline ?? "",
   });
   const [content, setContent] = useState({
-    title: "",
-    mainText: "",
-    caption: "",
-    script: "",
-    slides: "",
-    visualNotes: "",
+    title:       initialDraft?.content?.title ?? "",
+    mainText:    initialDraft?.content?.mainText ?? "",
+    caption:     initialDraft?.content?.caption ?? "",
+    script:      initialDraft?.content?.script ?? "",
+    slides:      initialDraft?.content?.slides ?? "",
+    visualNotes: initialDraft?.content?.visualNotes ?? "",
   });
 
-  const editorHref = `/admin/contentos/editor-os?client=${clientId}&return_to=${encodeURIComponent(`/admin/contentos/criar?client=${clientId}&step=visual`)}`;
-  const currentIndex = steps.findIndex((step) => step.id === activeStep);
-  const summary = useMemo(() => [
-    ["Cliente", clientName],
-    ["Segmento", clientSegment ?? "Nao informado"],
-    ["Campanha", brief.campaign || "Nao definida"],
-    ["Formato", brief.format || "Nao definido"],
-    ["Prazo", brief.deadline || "Sem prazo"],
-  ], [brief.campaign, brief.deadline, brief.format, clientName, clientSegment]);
+  const currentIndex = steps.findIndex((s) => s.id === activeStep);
+
+  // Check session storage for visual import when contentId is known
+  useEffect(() => {
+    if (!contentId) { setVisualHasSession(false); return; }
+    try {
+      const key = imgSessionKey(clientId, contentId);
+      setVisualHasSession(!!sessionStorage.getItem(key));
+    } catch { setVisualHasSession(false); }
+  }, [clientId, contentId]);
+
+  // ── Autosave debounce ──────────────────────────────────────────────────────
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstSave = useRef(!initialContentId);
+
+  const buildDraftPayload = useCallback((): GuidedCreateDraft => ({
+    current_step: activeStep,
+    brief: { ...brief },
+    content: { ...content },
+    visual: {
+      mode: visualFileName ? "local_file" : "none",
+      local_file_name: visualFileName || null,
+      local_file_type: null,
+      editor_draft_available: false,
+    },
+    review_state: "draft",
+  }), [activeStep, brief, content, visualFileName]);
+
+  const persistDraft = useCallback(async (gc: GuidedCreateDraft, targetId: string | null): Promise<string | null> => {
+    if (!targetId) {
+      // First save — POST
+      const res = await fetch("/api/admin/contentos/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, guided_create: gc }),
+      });
+      if (!res.ok) throw new Error("post_failed");
+      const data = await res.json() as { id: string };
+      return data.id;
+    } else {
+      // Subsequent save — PATCH
+      const res = await fetch(`/api/admin/contentos/drafts/${targetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, guided_create: gc }),
+      });
+      if (!res.ok) throw new Error("patch_failed");
+      return targetId;
+    }
+  }, [clientId]);
+
+  const doSave = useCallback(async (gc: GuidedCreateDraft) => {
+    setSaveState("saving");
+    setSaveMessage("Salvando…");
+    try {
+      const newId = await persistDraft(gc, contentId);
+      if (!newId) throw new Error("no_id");
+
+      if (!contentId) {
+        // First save — update URL and state
+        setContentId(newId);
+        isFirstSave.current = false;
+        const url = new URL(window.location.href);
+        url.searchParams.set("content_id", newId);
+        url.searchParams.set("client", clientId);
+        url.searchParams.set("step", gc.current_step ?? "brief");
+        router.replace(url.pathname + url.search, { scroll: false });
+      }
+
+      const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      setSavedAt(now);
+      setSaveState("saved");
+      setSaveMessage(`Rascunho salvo no LOKAT OS às ${now}.`);
+    } catch {
+      setSaveState("error");
+      setSaveMessage("Não foi possível salvar. Seus dados continuam nesta tela.");
+    }
+  }, [contentId, clientId, persistDraft, router]);
+
+  // Debounced autosave (only after first manual save)
+  useEffect(() => {
+    if (isFirstSave.current || !contentId) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      void doSave(buildDraftPayload());
+    }, 1400);
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brief, content, activeStep, visualFileName]);
 
   function setBriefField(key: keyof typeof brief, value: string) {
     setBrief((prev) => ({ ...prev, [key]: value }));
   }
-
   function setContentField(key: keyof typeof content, value: string) {
     setContent((prev) => ({ ...prev, [key]: value }));
   }
 
-  function showSaved(message: string) {
-    setSavedMessage(message);
-    window.setTimeout(() => setSavedMessage(null), 2400);
-  }
-
-  function copyContent() {
-    const text = [
-      content.title,
-      content.mainText,
-      content.caption,
-      content.script,
-      content.slides,
-    ].filter(Boolean).join("\n\n");
-    void navigator.clipboard?.writeText(text || "Rascunho vazio");
-    showSaved("Conteudo copiado para a area de transferencia.");
-  }
-
   function next() {
-    const idx = steps.findIndex((step) => step.id === activeStep);
-    setActiveStep(steps[Math.min(steps.length - 1, idx + 1)].id);
+    const idx = steps.findIndex((s) => s.id === activeStep);
+    const nextStep = steps[Math.min(steps.length - 1, idx + 1)];
+    setActiveStep(nextStep.id);
+    // Update URL step
+    if (contentId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("step", nextStep.id);
+      router.replace(url.pathname + url.search, { scroll: false });
+    }
   }
-
   function prev() {
-    const idx = steps.findIndex((step) => step.id === activeStep);
+    const idx = steps.findIndex((s) => s.id === activeStep);
     setActiveStep(steps[Math.max(0, idx - 1)].id);
   }
 
+  function copyContent() {
+    const text = [content.title, content.mainText, content.caption, content.script, content.slides]
+      .filter(Boolean).join("\n\n");
+    void navigator.clipboard?.writeText(text || "Rascunho vazio");
+  }
+
+  async function handleManualSave() {
+    await doSave(buildDraftPayload());
+  }
+
+  async function handleReviewInterna() {
+    if (!contentId) {
+      await doSave(buildDraftPayload());
+      return;
+    }
+    setSaveState("saving");
+    setSaveMessage("Salvando…");
+    try {
+      const res = await fetch(`/api/admin/contentos/drafts/${contentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          status: "revisao_interna",
+          guided_create: { ...buildDraftPayload(), review_state: "internal_review" },
+        }),
+      });
+      if (!res.ok) throw new Error("patch_failed");
+      const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      setSavedAt(now);
+      setSaveState("saved");
+      setSaveMessage(`Conteúdo marcado para revisão interna às ${now}.`);
+    } catch {
+      setSaveState("error");
+      setSaveMessage("Não foi possível marcar revisão. Seus dados continuam nesta tela.");
+    }
+  }
+
+  async function handleVisualFile(file: File) {
+    setVisualFileError(null);
+    if (!ALLOWED_MIME.includes(file.type)) {
+      setVisualFileError("Tipo de arquivo não suportado. Use PNG, JPG, WEBP ou SVG.");
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setVisualFileError("Arquivo maior que 5 MB. Reduza o tamanho antes de importar.");
+      return;
+    }
+    // Ensure draft is saved first
+    let targetId = contentId;
+    if (!targetId) {
+      try {
+        const newId = await persistDraft(buildDraftPayload(), null);
+        if (!newId) throw new Error("no_id");
+        setContentId(newId);
+        targetId = newId;
+        const url = new URL(window.location.href);
+        url.searchParams.set("content_id", newId);
+        url.searchParams.set("client", clientId);
+        router.replace(url.pathname + url.search, { scroll: false });
+      } catch {
+        setVisualFileError("Salve o rascunho primeiro antes de importar a imagem.");
+        return;
+      }
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        try {
+          const payload = JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type,
+            size: file.size,
+            dataUrl,
+            createdAt: new Date().toISOString(),
+          });
+          sessionStorage.setItem(imgSessionKey(clientId, targetId!), payload);
+          setVisualFileName(file.name);
+          setVisualHasSession(true);
+        } catch {
+          setVisualFileError("Imagem maior do que o sessionStorage consegue guardar.");
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setVisualFileError("Erro ao ler o arquivo.");
+    }
+  }
+
+  async function handleOpenEditor() {
+    // Must have a saved draft before opening EditorOS
+    let targetId = contentId;
+    if (!targetId) {
+      setSaveState("saving");
+      setSaveMessage("Salvando antes de abrir EditorOS…");
+      try {
+        const newId = await persistDraft(buildDraftPayload(), null);
+        if (!newId) throw new Error("no_id");
+        setContentId(newId);
+        targetId = newId;
+        const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        setSaveState("saved");
+        setSaveMessage(`Rascunho salvo às ${now}.`);
+        const url = new URL(window.location.href);
+        url.searchParams.set("content_id", newId);
+        url.searchParams.set("client", clientId);
+        router.replace(url.pathname + url.search, { scroll: false });
+      } catch {
+        setSaveState("error");
+        setSaveMessage("Não foi possível salvar. EditorOS não foi aberto.");
+        return;
+      }
+    }
+    const returnTo = `/admin/contentos/criar?client=${clientId}&content_id=${targetId}&step=visual`;
+    router.push(`/admin/contentos/editor-os?client=${clientId}&content_id=${targetId}&return_to=${encodeURIComponent(returnTo)}`);
+  }
+
+  // ── Destination handlers ───────────────────────────────────────────────────
+
+  async function ensureSaved(): Promise<string | null> {
+    if (contentId) return contentId;
+    try {
+      const newId = await persistDraft(buildDraftPayload(), null);
+      if (!newId) return null;
+      setContentId(newId);
+      const url = new URL(window.location.href);
+      url.searchParams.set("content_id", newId);
+      url.searchParams.set("client", clientId);
+      router.replace(url.pathname + url.search, { scroll: false });
+      return newId;
+    } catch { return null; }
+  }
+
+  async function handleDestCalendario() {
+    setDestLoading("calendar"); setDestError(null);
+    const id = await ensureSaved();
+    setDestLoading(null);
+    if (!id) { setDestError("Salve o rascunho antes de ir ao Calendário."); return; }
+    router.push(`/admin/contentos/calendario?client=${clientId}&content_id=${id}`);
+  }
+
+  async function handleDestProducao() {
+    setDestLoading("production"); setDestError(null);
+    const id = await ensureSaved();
+    if (!id) { setDestLoading(null); setDestError("Salve o rascunho antes de enviar para Produção."); return; }
+    try {
+      const res = await fetch("/api/admin/contentos/actions/send-to-production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content_id: id, client_id: clientId }),
+      });
+      const data = await res.json() as { task_id?: string; existed?: boolean; error?: string };
+      setDestLoading(null);
+      if (!res.ok) { setDestError(data.error ?? "Erro ao criar tarefa."); return; }
+      setDestResult({ type: "production", id: data.task_id });
+    } catch { setDestLoading(null); setDestError("Erro de conexão."); }
+  }
+
+  async function handleDestAprovacao() {
+    setDestLoading("approval"); setDestError(null);
+    const id = await ensureSaved();
+    if (!id) { setDestLoading(null); setDestError("Salve o rascunho antes de enviar para Aprovação."); return; }
+    try {
+      const dueDate = brief.deadline
+        ? new Date(brief.deadline).toISOString().split("T")[0] !== "Invalid Date"
+          ? new Date(brief.deadline).toISOString()
+          : undefined
+        : undefined;
+      const res = await fetch("/api/admin/contentos/actions/send-to-approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content_id: id, client_id: clientId, due_date: dueDate }),
+      });
+      const data = await res.json() as { approval_id?: string; token?: string; existed?: boolean; error?: string };
+      setDestLoading(null);
+      if (!res.ok) { setDestError(data.error ?? "Erro ao criar aprovação."); return; }
+      setDestResult({ type: "approval", id: data.approval_id, token: data.token });
+    } catch { setDestLoading(null); setDestError("Erro de conexão."); }
+  }
+
+  const summary = useMemo(() => [
+    ["Cliente", clientName],
+    ["Segmento", clientSegment ?? "Não informado"],
+    ["Campanha", brief.campaign || "Não definida"],
+    ["Formato", brief.format || "Não definido"],
+    ["Prazo", brief.deadline || "Sem prazo"],
+  ], [brief.campaign, brief.deadline, brief.format, clientName, clientSegment]);
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-500">REC OS / Criar</p>
-            <h1 className="mt-1 text-2xl font-black text-gray-950">Novo conteudo guiado</h1>
+            <h1 className="mt-1 text-2xl font-black text-gray-950">
+              {contentId ? "Editar conteúdo" : "Novo conteúdo guiado"}
+            </h1>
             <p className="mt-1 text-sm text-gray-500">
-              Fluxo unico para brief, texto, visual, revisao e destino de publicacao.
+              Fluxo único para brief, texto, visual, revisão e destino.
             </p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-            <p className="font-bold text-gray-900">{clientName}</p>
-            <p className="text-xs text-gray-500">{clientSegment ?? "Sem segmento"} · {clientId.slice(0, 8)}</p>
+          <div className="flex flex-col gap-2 items-end">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+              <p className="font-bold text-gray-900">{clientName}</p>
+              <p className="text-xs text-gray-500">{clientSegment ?? "Sem segmento"} · {clientId.slice(0, 8)}</p>
+            </div>
+            {contentId && (
+              <p className="text-[10px] text-gray-400">ID: {contentId.slice(0, 8)}</p>
+            )}
           </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
           {steps.map((step, index) => (
-            <StepButton
-              key={step.id}
-              step={step}
-              index={index}
-              active={activeStep === step.id}
-              done={index < currentIndex}
-              onClick={() => setActiveStep(step.id)}
-            />
+            <StepButton key={step.id} step={step} index={index}
+              active={activeStep === step.id} done={index < currentIndex}
+              onClick={() => setActiveStep(step.id)} />
           ))}
         </div>
       </section>
 
-      {savedMessage && (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-          {savedMessage}
+      {/* Save status banner */}
+      {saveMessage && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+          saveState === "saved"  ? "border-emerald-100 bg-emerald-50 text-emerald-700" :
+          saveState === "error"  ? "border-red-100 bg-red-50 text-red-700" :
+          saveState === "saving" ? "border-blue-100 bg-blue-50 text-blue-700" :
+          "border-gray-100 bg-gray-50 text-gray-600"
+        }`}>
+          <span className="flex items-center gap-2">
+            {saveState === "saving" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saveMessage}
+          </span>
         </div>
       )}
 
+      {/* STEP: Brief */}
       {activeStep === "brief" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -230,10 +508,12 @@ export function GuidedCreateFlow({
               <p className="text-sm text-gray-500">Defina o que deve ser criado antes de abrir texto ou visual.</p>
             </div>
             <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
-              <button type="button" onClick={() => setBriefMode("manual")} className={`rounded-lg px-3 py-2 text-xs font-bold ${briefMode === "manual" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500"}`}>
+              <button type="button" onClick={() => setBriefMode("manual")}
+                className={`rounded-lg px-3 py-2 text-xs font-bold ${briefMode === "manual" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500"}`}>
                 Manual
               </button>
-              <button type="button" onClick={() => setBriefMode("ai")} className={`rounded-lg px-3 py-2 text-xs font-bold ${briefMode === "ai" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500"}`}>
+              <button type="button" onClick={() => setBriefMode("ai")}
+                className={`rounded-lg px-3 py-2 text-xs font-bold ${briefMode === "ai" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500"}`}>
                 IA assistida
               </button>
             </div>
@@ -244,69 +524,80 @@ export function GuidedCreateFlow({
               <div className="flex items-start gap-3">
                 <Wand2 className="mt-0.5 h-5 w-5 text-amber-600" />
                 <div>
-                  <p className="text-sm font-bold text-amber-900">Geracao por IA ainda nao configurada para producao.</p>
-                  <p className="mt-1 text-xs text-amber-700">
-                    O fluxo ja coleta comando, campanha, objetivo e referencias. O botao de gerar permanece bloqueado ate provider aprovado.
-                  </p>
+                  <p className="text-sm font-bold text-amber-900">Geração por IA ainda não configurada para produção.</p>
+                  <p className="mt-1 text-xs text-amber-700">O fluxo coleta todos os campos. O botão permanece bloqueado até provider aprovado.</p>
                 </div>
               </div>
             </div>
           )}
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Objetivo" value={brief.objective} onChange={(v) => setBriefField("objective", v)} placeholder="Ex: vender combo de almoco, divulgar servico, reforcar autoridade" />
+            <Field label="Objetivo" value={brief.objective} onChange={(v) => setBriefField("objective", v)} placeholder="Ex: vender combo de almoço, divulgar serviço, reforçar autoridade" />
             <Field label="Formato" value={brief.format} onChange={(v) => setBriefField("format", v)} placeholder="Post, story, carrossel, reel, roteiro" />
             <Field label="Campanha" value={brief.campaign} onChange={(v) => setBriefField("campaign", v)} placeholder="Nome da campanha ou tema" />
-            <Field label="Oferta / produto" value={brief.offer} onChange={(v) => setBriefField("offer", v)} placeholder="Produto, servico ou oferta principal" />
-            <Field label="Publico" value={brief.audience} onChange={(v) => setBriefField("audience", v)} placeholder="Para quem este conteudo fala" />
-            <Field label="CTA" value={brief.cta} onChange={(v) => setBriefField("cta", v)} placeholder="Chamar no WhatsApp, acessar link, pedir orcamento" />
+            <Field label="Oferta / produto" value={brief.offer} onChange={(v) => setBriefField("offer", v)} placeholder="Produto, serviço ou oferta principal" />
+            <Field label="Público" value={brief.audience} onChange={(v) => setBriefField("audience", v)} placeholder="Para quem este conteúdo fala" />
+            <Field label="CTA" value={brief.cta} onChange={(v) => setBriefField("cta", v)} placeholder="Chamar no WhatsApp, acessar link, pedir orçamento" />
             <Field label="Mensagem principal" textarea value={brief.message} onChange={(v) => setBriefField("message", v)} placeholder="Qual ideia precisa ficar clara?" />
-            <Field label="Referencias" textarea value={brief.references} onChange={(v) => setBriefField("references", v)} placeholder="Links, marcas, exemplos ou observacoes visuais" />
-            <Field label="Observacoes" textarea value={brief.notes} onChange={(v) => setBriefField("notes", v)} placeholder="Restrições, tom, palavras obrigatorias, nao usar..." />
-            <Field label="Prazo" value={brief.deadline} onChange={(v) => setBriefField("deadline", v)} placeholder="Ex: publicar sexta, aprovar ate 18h" />
+            <Field label="Referências" textarea value={brief.references} onChange={(v) => setBriefField("references", v)} placeholder="Links, marcas, exemplos ou observações visuais" />
+            <Field label="Observações" textarea value={brief.notes} onChange={(v) => setBriefField("notes", v)} placeholder="Restrições, tom, palavras obrigatórias, não usar..." />
+            <Field label="Prazo" value={brief.deadline} onChange={(v) => setBriefField("deadline", v)} placeholder="Ex: publicar sexta, aprovar até 18h" />
           </div>
 
           <div className="mt-5 flex justify-end gap-2">
             {briefMode === "ai" && (
-              <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-bold text-gray-400">
-                <Wand2 className="h-4 w-4" /> Gerar com IA indisponivel
+              <button type="button" disabled
+                className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-bold text-gray-400">
+                <Wand2 className="h-4 w-4" /> Gerar com IA indisponível
               </button>
             )}
-            <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-              Ir para conteudo <ArrowRight className="h-4 w-4" />
+            <button type="button" onClick={() => void handleManualSave()} disabled={saveState === "saving"}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+              {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+              Salvar rascunho
+            </button>
+            <button type="button" onClick={next}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+              Ir para conteúdo <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </section>
       )}
 
+      {/* STEP: Content */}
       {activeStep === "content" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-black text-gray-900">2. Conteudo</h2>
-              <p className="text-sm text-gray-500">Escreva a estrutura que sera revisada e enviada para visual.</p>
+              <h2 className="text-lg font-black text-gray-900">2. Conteúdo</h2>
+              <p className="text-sm text-gray-500">Escreva a estrutura que será revisada e enviada para visual.</p>
             </div>
-            <button type="button" onClick={copyContent} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={copyContent}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">
               <Copy className="h-4 w-4" /> Copiar
             </button>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Titulo / headline" value={content.title} onChange={(v) => setContentField("title", v)} />
+            <Field label="Título / headline" value={content.title} onChange={(v) => setContentField("title", v)} />
             <Field label="Legenda" value={content.caption} onChange={(v) => setContentField("caption", v)} />
             <Field label="Texto principal" textarea value={content.mainText} onChange={(v) => setContentField("mainText", v)} />
             <Field label="Roteiro" textarea value={content.script} onChange={(v) => setContentField("script", v)} />
             <Field label="Estrutura de slides" textarea value={content.slides} onChange={(v) => setContentField("slides", v)} />
-            <Field label="Observacoes visuais" textarea value={content.visualNotes} onChange={(v) => setContentField("visualNotes", v)} />
+            <Field label="Observações visuais" textarea value={content.visualNotes} onChange={(v) => setContentField("visualNotes", v)} />
           </div>
           <div className="mt-5 flex justify-between gap-2">
-            <button type="button" onClick={prev} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={prev}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4" /> Voltar ao brief
             </button>
             <div className="flex gap-2">
-              <button type="button" onClick={() => showSaved("Rascunho salvo localmente nesta sessao.")} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
-                <ClipboardList className="h-4 w-4" /> Salvar rascunho
+              <button type="button" onClick={() => void handleManualSave()} disabled={saveState === "saving"}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+                Salvar rascunho
               </button>
-              <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+              <button type="button" onClick={next}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
                 Ir para visual <ArrowRight className="h-4 w-4" />
               </button>
             </div>
@@ -314,6 +605,7 @@ export function GuidedCreateFlow({
         </section>
       )}
 
+      {/* STEP: Visual */}
       {activeStep === "visual" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
@@ -321,54 +613,82 @@ export function GuidedCreateFlow({
             <p className="text-sm text-gray-500">Use upload manual, EditorOS ou aguarde provider de imagem aprovado.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
+            {/* IA */}
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <ImageIcon className="h-6 w-6 text-gray-500" />
               <p className="mt-3 text-sm font-bold text-gray-900">Gerar com IA</p>
-              <p className="mt-1 text-xs text-gray-500">Bloqueado ate provider oficial ser configurado.</p>
-              <button type="button" disabled className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
-                Geracao indisponivel
+              <p className="mt-1 text-xs text-gray-500">Bloqueado até provider oficial ser configurado.</p>
+              <button type="button" disabled
+                className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
+                Geração indisponível
               </button>
             </div>
-            <label className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">
+
+            {/* Upload local */}
+            <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">
               <Upload className="h-6 w-6 text-indigo-600" />
               <p className="mt-3 text-sm font-bold text-indigo-950">Importar visual</p>
-              <p className="mt-1 text-xs text-indigo-700">Aceita PNG, JPG, WEBP e SVG. PDF entra em etapa futura.</p>
-              <input
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp,.svg"
+              <p className="mt-1 text-xs text-indigo-700">PNG, JPG, WEBP ou SVG · máx. 5 MB.</p>
+              <input type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
                 className="mt-4 block w-full text-xs text-indigo-800"
-                onChange={(event) => setVisualFileName(event.target.files?.[0]?.name ?? "")}
-              />
-              {visualFileName && <p className="mt-2 text-xs font-bold text-indigo-800">{visualFileName}</p>}
-            </label>
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleVisualFile(f);
+                }} />
+              {visualFileName && !visualFileError && (
+                <p className="mt-2 text-xs font-bold text-indigo-800">{visualFileName}</p>
+              )}
+              {visualHasSession && (
+                <p className="mt-1 text-[10px] text-indigo-500">
+                  Imagem temporária neste navegador. Não salva no servidor.
+                </p>
+              )}
+              {visualFileError && (
+                <p className="mt-2 text-xs text-red-600">{visualFileError}</p>
+              )}
+            </div>
+
+            {/* EditorOS */}
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <Layers className="h-6 w-6 text-purple-600" />
               <p className="mt-3 text-sm font-bold text-gray-900">Editar no EditorOS</p>
-              <p className="mt-1 text-xs text-gray-500">Abre o editor tecnico mantendo o cliente atual no retorno.</p>
+              <p className="mt-1 text-xs text-gray-500">Salva o rascunho e abre o editor mantendo o cliente.</p>
               {isSuperAdmin ? (
-                <Link href={editorHref} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700">
-                  <PenLine className="h-4 w-4" /> Abrir EditorOS
-                </Link>
+                <button type="button" onClick={() => void handleOpenEditor()} disabled={saveState === "saving"}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-60">
+                  {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Abrir EditorOS
+                </button>
               ) : (
-                <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">EditorOS restrito a super_admin.</p>
+                <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                  EditorOS restrito a super_admin.
+                </p>
+              )}
+              {contentId && (
+                <p className="mt-2 text-[10px] text-gray-400">
+                  Projeto visual salvo neste navegador pelo EditorOS.
+                </p>
               )}
             </div>
           </div>
           <div className="mt-5 flex justify-between">
-            <button type="button" onClick={prev} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={prev}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4" /> Voltar
             </button>
-            <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+            <button type="button" onClick={next}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
               Revisar <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </section>
       )}
 
+      {/* STEP: Review */}
       {activeStep === "review" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
-            <h2 className="text-lg font-black text-gray-900">4. Revisao</h2>
+            <h2 className="text-lg font-black text-gray-900">4. Revisão</h2>
             <p className="text-sm text-gray-500">Confirme o pacote antes de escolher o destino.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -379,6 +699,17 @@ export function GuidedCreateFlow({
                   <p className="text-sm font-semibold text-gray-800">{value}</p>
                 </div>
               ))}
+              {contentId && (
+                <div className="border-b border-gray-200 py-2 last:border-b-0">
+                  <p className="text-[10px] font-black uppercase text-gray-400">ID</p>
+                  <p className="text-xs font-mono text-gray-500">{contentId.slice(0, 8)}</p>
+                </div>
+              )}
+              {savedAt && (
+                <div className="pt-2">
+                  <p className="text-[10px] text-gray-400">Salvo às {savedAt}</p>
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               <div className="rounded-xl border border-gray-200 p-3">
@@ -386,27 +717,36 @@ export function GuidedCreateFlow({
                 <p className="mt-1 text-sm text-gray-800">{brief.objective || brief.message || "Brief ainda sem objetivo principal."}</p>
               </div>
               <div className="rounded-xl border border-gray-200 p-3">
-                <p className="text-xs font-bold text-gray-500">Conteudo</p>
-                <p className="mt-1 text-sm text-gray-800">{content.title || content.mainText || "Conteudo ainda sem texto principal."}</p>
+                <p className="text-xs font-bold text-gray-500">Conteúdo</p>
+                <p className="mt-1 text-sm text-gray-800">{content.title || content.mainText || "Conteúdo ainda sem texto principal."}</p>
               </div>
               <div className="rounded-xl border border-gray-200 p-3">
                 <p className="text-xs font-bold text-gray-500">Visual</p>
-                <p className="mt-1 text-sm text-gray-800">{visualFileName || "Sem arquivo importado. EditorOS pode ser usado para montar o visual final."}</p>
+                <p className="mt-1 text-sm text-gray-800">
+                  {visualFileName
+                    ? `${visualFileName} — Imagem temporária neste navegador.`
+                    : "Sem arquivo importado. EditorOS pode ser usado para montar o visual final."}
+                </p>
               </div>
             </div>
           </div>
           <div className="mt-5 flex flex-wrap justify-between gap-2">
-            <button type="button" onClick={prev} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={prev}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4" /> Voltar e editar
             </button>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => showSaved("Rascunho salvo para continuidade manual.")} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
-                <ClipboardList className="h-4 w-4" /> Salvar rascunho
+              <button type="button" onClick={() => void handleManualSave()} disabled={saveState === "saving"}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+                Salvar rascunho
               </button>
-              <button type="button" onClick={() => showSaved("Marcado para revisao interna. Persistencia definitiva fica para a proxima etapa.")} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100">
-                <FileCheck2 className="h-4 w-4" /> Revisao interna
+              <button type="button" onClick={() => void handleReviewInterna()} disabled={saveState === "saving"}
+                className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-60">
+                <FileCheck2 className="h-4 w-4" /> Revisão interna
               </button>
-              <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+              <button type="button" onClick={next}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
                 Enviar para destino <Send className="h-4 w-4" />
               </button>
             </div>
@@ -414,37 +754,66 @@ export function GuidedCreateFlow({
         </section>
       )}
 
+      {/* STEP: Destination */}
       {activeStep === "destination" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
             <h2 className="text-lg font-black text-gray-900">5. Destino</h2>
-            <p className="text-sm text-gray-500">Escolha a proxima etapa sem publicar automaticamente.</p>
+            <p className="text-sm text-gray-500">Escolha a próxima etapa sem publicar automaticamente.</p>
           </div>
+
+          {destError && (
+            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {destError}
+            </div>
+          )}
+
+          {destResult?.type === "production" && (
+            <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Tarefa criada em Produção. ID: {destResult.id?.slice(0, 8)}.
+              <a href={`/admin/contentos/producao?client=${clientId}`} className="ml-2 underline">Ver produção</a>
+            </div>
+          )}
+
+          {destResult?.type === "approval" && (
+            <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Aprovação criada. Link gerado internamente.
+              <a href={`/admin/contentos/aprovacoes?client=${clientId}`} className="ml-2 underline">Ver aprovações</a>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Link href={`/admin/contentos/calendario?client=${clientId}`} className="rounded-2xl border border-gray-200 p-4 hover:bg-gray-50">
-              <CalendarDays className="h-6 w-6 text-indigo-600" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Calendario</p>
-              <p className="mt-1 text-xs text-gray-500">Planejar data e janela de publicacao.</p>
-            </Link>
-            <Link href={`/admin/contentos/producao?client=${clientId}`} className="rounded-2xl border border-gray-200 p-4 hover:bg-gray-50">
-              <ClipboardList className="h-6 w-6 text-emerald-600" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Producao</p>
+            <button type="button" onClick={() => void handleDestCalendario()} disabled={destLoading === "calendar"}
+              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
+              {destLoading === "calendar" ? <Loader2 className="h-6 w-6 animate-spin text-indigo-600" /> : <CalendarDays className="h-6 w-6 text-indigo-600" />}
+              <p className="mt-3 text-sm font-bold text-gray-900">Calendário</p>
+              <p className="mt-1 text-xs text-gray-500">Planejar data e janela de publicação.</p>
+            </button>
+
+            <button type="button" onClick={() => void handleDestProducao()} disabled={!!destLoading}
+              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
+              {destLoading === "production" ? <Loader2 className="h-6 w-6 animate-spin text-emerald-600" /> : <ClipboardList className="h-6 w-6 text-emerald-600" />}
+              <p className="mt-3 text-sm font-bold text-gray-900">Produção</p>
               <p className="mt-1 text-xs text-gray-500">Enviar para fila operacional.</p>
-            </Link>
-            <Link href={`/admin/contentos/aprovacoes?client=${clientId}`} className="rounded-2xl border border-gray-200 p-4 hover:bg-gray-50">
-              <FileCheck2 className="h-6 w-6 text-amber-600" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Aprovacao</p>
+            </button>
+
+            <button type="button" onClick={() => void handleDestAprovacao()} disabled={!!destLoading}
+              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
+              {destLoading === "approval" ? <Loader2 className="h-6 w-6 animate-spin text-amber-600" /> : <FileCheck2 className="h-6 w-6 text-amber-600" />}
+              <p className="mt-3 text-sm font-bold text-gray-900">Aprovação</p>
               <p className="mt-1 text-xs text-gray-500">Revisar antes de compartilhar link.</p>
-            </Link>
+            </button>
+
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <Send className="h-6 w-6 text-gray-400" />
-              <p className="mt-3 text-sm font-bold text-gray-700">Publicacao manual</p>
-              <p className="mt-1 text-xs text-gray-500">Social Scheduler/Postiz ainda bloqueado por infraestrutura externa.</p>
+              <p className="mt-3 text-sm font-bold text-gray-700">Publicação manual</p>
+              <p className="mt-1 text-xs text-gray-500">Publicação automática ainda não configurada.</p>
             </div>
           </div>
           <div className="mt-5">
-            <button type="button" onClick={prev} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
-              <ArrowLeft className="h-4 w-4" /> Voltar para revisao
+            <button type="button" onClick={prev}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
+              <ArrowLeft className="h-4 w-4" /> Voltar para revisão
             </button>
           </div>
         </section>

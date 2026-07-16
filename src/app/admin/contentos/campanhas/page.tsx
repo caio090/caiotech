@@ -49,7 +49,7 @@ export default async function AdminContentosCampanhasPage({
 
   return (
     <>
-      <ContentosSubNavServer />
+      <ContentosSubNavServer initialClientId={clientId} />
 
       <div className="mb-5">
         <h1 className="text-lg font-bold text-gray-900">Campanhas</h1>

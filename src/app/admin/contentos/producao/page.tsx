@@ -67,7 +67,7 @@ export default async function AdminContentosProducaoPage({
 
   return (
     <>
-      <ContentosSubNavServer />
+      <ContentosSubNavServer initialClientId={clientId} />
       <PageHeader
         title="Produção"
         description={`Conteúdos em execução para ${companyName}`}

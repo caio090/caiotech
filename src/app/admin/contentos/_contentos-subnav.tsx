@@ -17,10 +17,10 @@ const BASE_LINKS: NavLink[] = [
   { href: "/admin/contentos/resultados", label: "Resultados" },
 ];
 
-export function ContentosSubNav() {
+export function ContentosSubNav({ initialClientId }: { initialClientId?: string }) {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(initialClientId ?? "");
   const activeRef = useRef<HTMLAnchorElement>(null);
   const navRef    = useRef<HTMLElement>(null);
 
@@ -38,8 +38,12 @@ export function ContentosSubNav() {
       setClientId(urlClient);
       return;
     }
+    if (initialClientId) {
+      setClientId(initialClientId);
+      return;
+    }
     setClientId(localStorage.getItem(ACTIVE_CLIENT_KEY) ?? "");
-  }, [searchParams]);
+  }, [searchParams, initialClientId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Determine active base path (handles sub-routes like /resultados, /campanhas)

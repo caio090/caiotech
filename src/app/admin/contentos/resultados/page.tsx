@@ -104,7 +104,7 @@ export default async function ResultadosPage({
 
   return (
     <>
-      <ContentosSubNavServer />
+      <ContentosSubNavServer initialClientId={clientId} />
 
       {/* Section header */}
       <div className="mb-5">
