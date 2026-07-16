@@ -88,6 +88,7 @@ export interface DbContentItem {
   carousel_pages_count?: number | null;
   responsible_id: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface DbApproval {

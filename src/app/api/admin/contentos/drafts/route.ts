@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+async function getAdminUser(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (!profile) return null;
+  if (profile.role !== "admin" && profile.role !== "super_admin") return null;
+  return { user, role: profile.role as string };
+}
+
+async function validateClient(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, clientId: string) {
+  const { data } = await supabase.from("clients").select("id").eq("id", clientId).is("deleted_at", null).single();
+  return !!data;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const admin = await getAdminUser(supabase);
+    if (!admin) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
+    const body: unknown = await req.json();
+    if (!body || typeof body !== "object") return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
+
+    const { client_id, guided_create } = body as Record<string, unknown>;
+    if (typeof client_id !== "string" || !client_id) return NextResponse.json({ error: "client_id obrigatório." }, { status: 400 });
+
+    const valid = await validateClient(supabase, client_id);
+    if (!valid) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+
+    const gc = typeof guided_create === "object" && guided_create !== null ? guided_create as Record<string, unknown> : {};
+    const brief = (gc.brief as Record<string, string> | undefined) ?? {};
+    const content = (gc.content as Record<string, string> | undefined) ?? {};
+
+    const { data, error } = await supabase
+      .from("content_items")
+      .insert({
+        client_id,
+        title:     String(content.title || brief.objective || "Rascunho sem título").slice(0, 200),
+        type:      String(brief.format || "").slice(0, 100) || null,
+        objective: String(brief.objective || "").slice(0, 500) || null,
+        caption:   String(content.caption || "").slice(0, 1000) || null,
+        script:    String(content.script || "").slice(0, 5000) || null,
+        status:    "ideia",
+        metadata:  {
+          guided_create: {
+            schema_version: 1,
+            source: "rec_os_guided_create",
+            ...gc,
+            updated_at: new Date().toISOString(),
+          },
+        },
+      })
+      .select("id, client_id, status, created_at")
+      .single();
+
+    if (error) {
+      console.error("[drafts POST] supabase error:", error.message);
+      return NextResponse.json({ error: "Erro ao criar rascunho." }, { status: 500 });
+    }
+
+    return NextResponse.json({ id: data.id, client_id: data.client_id, status: data.status, created_at: data.created_at }, { status: 201 });
+  } catch (e) {
+    console.error("[drafts POST] unexpected:", e instanceof Error ? e.message : "unknown");
+    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
+  }
+}
