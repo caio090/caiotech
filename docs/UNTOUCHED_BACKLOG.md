@@ -6,15 +6,13 @@ Itens conhecidos que nao devem ser tratados como concluidos sem sprint propria, 
 
 ### SQL 82
 
-- Estado: `attempted_failed_partial_unknown`
-- Nao reexecutar nesta sprint.
-- Requer auditoria de catalogo e conciliacao futura.
+- Estado: `failed` — erro 42703, column "is_internal" does not exist.
+- Nao reexecutar. Requer auditoria de catalogo e conciliacao futura.
 
 ### SQL 84
 
-- Estado: `attempted_failed_partial_unknown`
-- Nao reexecutar nesta sprint.
-- Requer auditoria de catalogo e conciliacao futura.
+- Estado: `failed` — erro 42703, column "profile_id" does not exist.
+- Nao reexecutar. Requer auditoria de catalogo e conciliacao futura.
 
 ### SQL 85
 
@@ -89,6 +87,24 @@ Itens conhecidos que nao devem ser tratados como concluidos sem sprint propria, 
 - Contratos TypeScript/documentacao existem.
 - Nenhuma emissao fiscal ativa.
 - Nao integrar SEFAZ/NF-e/NFS-e nesta sprint.
+
+## Admin clientes preso em "Carregando"
+
+- Rota /admin/clientes nunca resolve o estado de loading.
+- Registrado no QA da Sprint 3.0.3. Nao corrigido nesta sprint.
+- Requer investigacao de query ou RLS em clients.
+
+## Admin financeiro com dados demo
+
+- /admin/financeiro exibe dados declarados (hardcoded demo).
+- Registrado no QA da Sprint 3.0.3. Nao corrigido nesta sprint.
+- Requer sprint propria para conectar dados reais de faturamento.
+
+## CopyIdButton — integracao pendente
+
+- Componente criado em src/components/copy-id-button.tsx (Sprint 3.0.4).
+- Ainda nao integrado em: card de tarefa em Produção, modal de aprovação, resultado de Criar.
+- Integrar em proxima sprint.
 
 ## Regra para execucoes futuras
 

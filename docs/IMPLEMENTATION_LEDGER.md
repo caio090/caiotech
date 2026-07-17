@@ -2,6 +2,50 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-17
+
+### Sprint
+
+Sprint 3.0.4 — Encerramento Técnico do REC OS: Hidratação, Produção Consolidada, IDs e Status dos SQLs
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Corrigir React #418 em todas as rotas admin, resolver empty state contraditório em Produção, criar CopyIdButton, remover SVG do upload, e corrigir status dos SQLs 82 e 84.
+
+### Arquivos alterados
+
+- `src/app/admin/_layout-client.tsx` — getDaysRemainingV1() → useEffect (Fix #418 causa 1)
+- `src/app/contentos/aprovacoes/_client-content.tsx` — serverNow em todos os Date.now() de render (Fix #418 causa 2)
+- `src/app/admin/contentos/aprovacoes/page.tsx` — serverNow calculado e propagado para ContentosAprovacoesContent
+- `src/app/contentos/aprovacoes/page.tsx` — serverNow propagado (fix TS)
+- `src/app/admin/contentos/producao/page.tsx` — empty state diferenciado por tasks.length; highlight reforçado
+- `src/components/copy-id-button.tsx` — novo componente CopyIdButton
+- `src/app/admin/contentos/criar/_guided-create-flow.tsx` — SVG removido de ALLOWED_MIME e accept
+- `src/config/project-status.ts` — SQL 82 e 84: partial_unknown → failed
+- `docs/CODEX_CURRENT_CONTEXT.md` — sprint e SQLs atualizados
+- `docs/IMPLEMENTATION_LEDGER.md` — esta entrada
+
+### SQL
+
+- Nenhum SQL executado. Nenhuma RLS alterada. Schema inalterado.
+- SQL 82 e 84 reclassificados como `failed` com base nos erros 42703 já documentados.
+
+### Resultado
+
+- TypeScript: zero erros
+- Build: limpo
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis)
+
+### Pendências registradas (fora do escopo)
+
+- /admin/clientes preso em "Carregando" (backlog)
+- /admin/financeiro com dados demo declarados (backlog)
+- CopyIdButton ainda não integrado em: card de tarefa em Produção, modal de aprovação, resultado de Criar (próxima sprint)
+
 ## 2026-07-15
 
 ### Sprint

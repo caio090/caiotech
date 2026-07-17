@@ -15,11 +15,11 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.3 — Visibilidade dos Destinos, Contexto Completo e Correção do Status dos SQLs
+- Sprint: 3.0.4 — Encerramento Técnico do REC OS: Hidratação, Produção Consolidada, IDs e Status dos SQLs
 - Executor: Claude Code
-- Data: 2026-07-16
-- Commit HEAD pré-sprint: `b7be920` (Sprint 3.0.2)
-- Estado: implementado, commits pushados, deploy em andamento (dpl_EPMCQcFovLUWdmVL6Dq8hHv6JUZL)
+- Data: 2026-07-17
+- Commit HEAD pré-sprint: `d27ebe5` (Sprint 3.0.3 docs)
+- Estado: implementado, build limpo, commits pendentes de push
 
 ## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
@@ -29,6 +29,17 @@
 - Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
 - SubNav: initialClientId passado server-side em todas as páginas REC OS.
 - REPROVADA: POST /drafts falhou com RLS em content_items.
+
+## 4d. O que foi feito na Sprint 3.0.4 (hidratação + produção + IDs + SQLs)
+
+- React #418 corrigido: getDaysRemainingV1() movido para useEffect em _layout-client.tsx.
+- React #418 corrigido: serverNow propagado de page.tsx → ContentosAprovacoesContent; todos os Date.now() em render substituídos por serverNow em _client-content.tsx.
+- producao/page.tsx: empty state contraditório corrigido — quando tasks > 0 e inProduction = 0, mostra aviso em vez de "Nenhum conteúdo em produção". Highlight de tarefa reforçado (badge "Tarefa selecionada", ring, aria-current, id HTML estável).
+- CopyIdButton criado em src/components/copy-id-button.tsx: texto visível, feedback "Copiado" 1.5s, fallback execCommand, sem hidratação.
+- SVG removido de ALLOWED_MIME e do input accept em _guided-create-flow.tsx (risco XSS).
+- SQL 82: status partial_unknown → failed (erro 42703 confirmado).
+- SQL 84: status partial_unknown → failed (erro 42703 confirmado).
+- TypeScript: zero erros. Build: limpo.
 
 ## 4c. O que foi feito na Sprint 3.0.3 (P1 + P2)
 
@@ -111,13 +122,13 @@
 
 ## 12. SQLs
 
-- SQL 82: `attempted_failed_partial_unknown`
-- SQL 84: `attempted_failed_partial_unknown`
+- SQL 82: `failed` — erro 42703 (column "is_internal" does not exist). Nao re-executar.
+- SQL 84: `failed` — erro 42703 (column "profile_id" does not exist). Nao re-executar.
 - SQL 85: `not_executed`
-- SQL 86: `attempted_failed_partial_unknown`
-- SQL 87: `attempted_failed_partial_unknown`
-- SQL 88: `attempted_failed_partial_unknown`
-- SQL 89: `attempted_failed_partial_unknown`
+- SQL 86: `partial_unknown` — historico indica tentativa parcial; catalogo nao auditado.
+- SQL 87: `partial_unknown` — constraints inconsistentes; SQL 90 tentado como fix e falhou.
+- SQL 88: `partial_unknown` — historico indica tentativa parcial; catalogo nao auditado.
+- SQL 89: `partial_unknown` — historico indica tentativa parcial; catalogo nao auditado.
 - SQL 90: `failed` — tentado/executado e falhou. Nao re-executar.
 
 ## 13. Integracoes
