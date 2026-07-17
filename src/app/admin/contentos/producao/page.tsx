@@ -166,14 +166,23 @@ export default async function AdminContentosProducaoPage({
               return (
                 <div
                   key={task.id}
+                  id={`task-${task.id}`}
+                  aria-current={isHighlighted ? "true" : undefined}
                   className={`bg-white rounded-2xl p-4 flex flex-col gap-1.5 ${
                     isHighlighted
-                      ? "border-2 border-indigo-400 ring-2 ring-indigo-100"
+                      ? "border-2 border-indigo-500 ring-4 ring-indigo-100 shadow-md"
                       : "border border-gray-100"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-bold text-gray-900 truncate">{task.title ?? "Sem título"}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{task.title ?? "Sem título"}</p>
+                      {isHighlighted && (
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-600 text-white flex-shrink-0">
+                          Tarefa selecionada
+                        </span>
+                      )}
+                    </div>
                     <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${
                       TASK_STATUS_COLOR[task.status ?? ""] ?? "bg-gray-50 text-gray-600 border-gray-100"
                     }`}>
@@ -231,14 +240,21 @@ export default async function AdminContentosProducaoPage({
         <FileText className="w-3.5 h-3.5" /> Conteúdos
       </h2>
 
-      {inProduction.length === 0 ? (
+      {inProduction.length === 0 && tasks.length > 0 ? (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 text-center">
+          <p className="text-sm font-bold text-amber-800 mb-1">Tarefas operacionais ativas acima</p>
+          <p className="text-xs text-amber-700 max-w-sm mx-auto">
+            Os conteúdos associados podem ter avançado para revisão ou aprovação. Verifique a seção de Aprovações se esperava encontrá-los aqui.
+          </p>
+        </div>
+      ) : inProduction.length === 0 ? (
         <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center">
           <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <Video className="w-6 h-6 text-purple-400" />
           </div>
           <p className="text-sm font-bold text-gray-700 mb-1">Nenhum conteúdo em produção</p>
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            Quando um conteúdo aprovado for enviado para produção, ele aparecerá aqui com briefing, tipo, prazo e responsável.
+            Quando um conteúdo for enviado para produção, ele aparecerá aqui com briefing, tipo, prazo e responsável.
           </p>
           <Link
             href={criarHref}
