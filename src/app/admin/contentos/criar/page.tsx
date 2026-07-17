@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  createServerSupabaseClient,
+  createRequiredSupabaseAdminClient,
+  hasSupabaseServiceRoleKey,
+} from "@/lib/supabase/server";
 import { validateContentOSClient } from "@/lib/admin-contentos-clients";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { GuidedCreateFlow } from "./_guided-create-flow";
@@ -32,10 +36,10 @@ export default async function AdminContentosCriarPage({
     }
 
     try {
-      const supabase = await createServerSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const authClient = await createServerSupabaseClient();
+      const { data: { user } } = await authClient.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile } = await authClient
           .from("profiles")
           .select("role")
           .eq("id", user.id)
@@ -43,7 +47,7 @@ export default async function AdminContentosCriarPage({
         role = profile?.role ?? "";
       }
 
-      const { data: client } = await supabase
+      const { data: client } = await authClient
         .from("clients")
         .select("company_name, segment")
         .eq("id", clientId)
@@ -52,23 +56,31 @@ export default async function AdminContentosCriarPage({
       clientName = client?.company_name ?? clientName;
       clientSegment = client?.segment ?? null;
 
-      if (contentId) {
-        const { data: item } = await supabase
-          .from("content_items")
-          .select("id, client_id, metadata")
-          .eq("id", contentId)
-          .eq("client_id", clientId)
-          .maybeSingle();
+      // Load draft with service-role client to bypass RLS on content_items
+      if (contentId && hasSupabaseServiceRoleKey()) {
+        try {
+          const adminDb = createRequiredSupabaseAdminClient();
+          const { data: item } = await adminDb
+            .from("content_items")
+            .select("id, client_id, metadata")
+            .eq("id", contentId)
+            .eq("client_id", clientId)
+            .maybeSingle();
 
-        if (item?.metadata) {
-          const meta = item.metadata as Record<string, unknown>;
-          if (meta.guided_create && typeof meta.guided_create === "object") {
-            initialDraft = meta.guided_create as GuidedCreateDraft;
-            initialContentId = item.id;
+          if (item?.metadata) {
+            const meta = item.metadata as Record<string, unknown>;
+            if (meta.guided_create && typeof meta.guided_create === "object") {
+              initialDraft = meta.guided_create as GuidedCreateDraft;
+              initialContentId = item.id;
+            }
           }
+        } catch (loadErr) {
+          console.error("[criar/page] draft load error:", loadErr instanceof Error ? loadErr.message : "unknown");
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error("[criar/page] auth/client error:", e instanceof Error ? e.message : "unknown");
+    }
   }
 
   return (
