@@ -15,11 +15,11 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.4 — Encerramento Técnico do REC OS: Hidratação, Produção Consolidada, IDs e Status dos SQLs
+- Sprint: 3.0.5 — Hotfix final de hidratação (React #418)
 - Executor: Claude Code
 - Data: 2026-07-17
-- Commit HEAD pré-sprint: `d27ebe5` (Sprint 3.0.3 docs)
-- Estado: implementado, build limpo, commits pendentes de push
+- Commit HEAD pré-sprint: `940834f` (Sprint 3.0.4 docs)
+- Estado: implementado, build limpo, push feito (commit a6f0f91)
 
 ## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
@@ -29,6 +29,13 @@
 - Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
 - SubNav: initialClientId passado server-side em todas as páginas REC OS.
 - REPROVADA: POST /drafts falhou com RLS em content_items.
+
+## 4e. O que foi feito na Sprint 3.0.5 (hotfix final de hidratação)
+
+- admin/status/page.tsx: getDaysRemainingV1() removido de render em EffortSection() e StatusPage(); substituído por useState(0) + useEffect em ambas as funções. useEffect adicionado aos imports.
+- admin/equipe/_client-content.tsx: Math.random() em escopo de módulo em MOCK_PROFILES (causa definitiva de #418) substituído por timestamps determinísticos fixos (1748736000000 - i * 45 dias).
+- rec/page.tsx: useIsMobile e introComplete tinham useState(() => window.innerWidth...) — SSR retornava false, cliente mobile retornava true → #418. Corrigido para useState(false) + useEffect com check() imediato.
+- TypeScript: zero erros. Build: limpo.
 
 ## 4d. O que foi feito na Sprint 3.0.4 (hidratação + produção + IDs + SQLs)
 

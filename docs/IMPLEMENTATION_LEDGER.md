@@ -2,7 +2,44 @@
 
 Formato append-only para continuidade entre agentes.
 
-## 2026-07-17
+## 2026-07-17 (Sprint 3.0.5)
+
+### Sprint
+
+Sprint 3.0.5 — Hotfix final de hidratação (React #418)
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Eliminar todas as fontes restantes de React minified error #418 identificadas após QA da Sprint 3.0.4.
+
+### Arquivos alterados
+
+- `src/app/admin/status/page.tsx` — getDaysRemainingV1() em EffortSection e StatusPage → useEffect; useEffect adicionado aos imports
+- `src/app/admin/equipe/_client-content.tsx` — Math.random() em módulo em MOCK_PROFILES → timestamps determinísticos fixos
+- `src/app/rec/page.tsx` — useState(() => window.innerWidth) em useIsMobile e introComplete → useState(false) + useEffect
+
+### SQL
+
+- Nenhum SQL executado. Nenhuma RLS alterada. Schema inalterado.
+
+### Resultado
+
+- TypeScript: zero erros
+- Build: limpo
+- Commit: a6f0f91 — push feito
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis)
+
+### Pendências registradas (deferred)
+
+- CopyIdButton ainda não integrado em: card de tarefa em Produção, modal de aprovação, resultado de Criar
+
+---
+
+## 2026-07-17 (Sprint 3.0.4)
 
 ### Sprint
 
