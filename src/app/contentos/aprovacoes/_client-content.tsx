@@ -34,7 +34,6 @@ const PLATFORM_EMOJI: Record<string, string> = {
 };
 
 const CONTENT_THUMBNAILS = ["🍬", "🎂", "🍫", "🎁", "🌸", "✨", "🎉", "🍰", "💝", "🎀"];
-const _NOW = Date.now();
 const OBJECTIVE_LABELS: Record<string, string> = {
   vender: "💰 Vender", leads: "🎯 Leads", autoridade: "🏆 Autoridade",
   engajamento: "❤️ Engajamento", marketing: "📊 Marketing", atendimento: "💬 Atendimento",
@@ -48,7 +47,7 @@ function copyToClipboard(text: string) {
 
 function hoursAgo(iso: string | null | undefined): number | null {
   if (!iso) return null;
-  return Math.floor((_NOW - new Date(iso).getTime()) / 3600000);
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
 }
 
 function formatDueDate(iso: string | null | undefined): string | null {
@@ -94,7 +93,7 @@ function ApprovalDetailModal({
   const hAgo = hoursAgo(item.approvalSentAt);
   const dueStr = formatDueDate(item.approvalDueAt);
   const isLate = item.approvalDueAt
-    ? _NOW > new Date(item.approvalDueAt).getTime()
+    ? Date.now() > new Date(item.approvalDueAt).getTime()
     : hAgo !== null && hAgo > 48;
 
   function handleCopy() {
@@ -393,10 +392,10 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
         ? "✨ Novidade especial que você vai adorar! Conheça nossa linha exclusiva."
         : "🎉 Chegou a hora de celebrar! Peça pelo link na bio e receba em casa. 🍬",
       objetivo:       Object.keys(OBJECTIVE_LABELS)[i % 6],
-      dataPrevista:   new Date(_NOW + (i + 1) * 2 * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR"),
+      dataPrevista:   new Date(Date.now() + (i + 1) * 2 * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR"),
       token:          null,
-      approvalSentAt: new Date(_NOW - i * 8 * 3600000).toISOString(),
-      approvalDueAt:  new Date(_NOW + (48 - i * 8) * 3600000).toISOString(),
+      approvalSentAt: new Date(Date.now() - i * 8 * 3600000).toISOString(),
+      approvalDueAt:  new Date(Date.now() + (48 - i * 8) * 3600000).toISOString(),
       clientComment:     null,
       operationalTaskId: null,
     }));
@@ -478,7 +477,7 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
 
   // Count late items
   const lateCount = byStatus.pending.filter((a) =>
-    a.approvalDueAt ? _NOW > new Date(a.approvalDueAt).getTime() : false
+    a.approvalDueAt ? Date.now() > new Date(a.approvalDueAt).getTime() : false
   ).length;
 
   return (
@@ -550,7 +549,7 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
             const hAgo = hoursAgo(a.approvalSentAt);
             const dueStr = formatDueDate(a.approvalDueAt);
             const isLate = a.approvalDueAt
-              ? _NOW > new Date(a.approvalDueAt).getTime()
+              ? Date.now() > new Date(a.approvalDueAt).getTime()
               : hAgo !== null && hAgo > 48;
             return (
               <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
