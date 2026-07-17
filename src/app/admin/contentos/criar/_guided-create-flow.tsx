@@ -54,7 +54,7 @@ function normalizeStep(value?: string | null): StepId {
 }
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
 const SESSION_IMG_PREFIX = "rec_os_visual_import_v1_";
 
 function imgSessionKey(clientId: string, contentId: string) {
@@ -308,7 +308,7 @@ export function GuidedCreateFlow({
   async function handleVisualFile(file: File) {
     setVisualFileError(null);
     if (!ALLOWED_MIME.includes(file.type)) {
-      setVisualFileError("Tipo de arquivo não suportado. Use PNG, JPG, WEBP ou SVG.");
+      setVisualFileError("Tipo de arquivo não suportado. Use PNG, JPG ou WEBP.");
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
@@ -635,8 +635,8 @@ export function GuidedCreateFlow({
             <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">
               <Upload className="h-6 w-6 text-indigo-600" />
               <p className="mt-3 text-sm font-bold text-indigo-950">Importar visual</p>
-              <p className="mt-1 text-xs text-indigo-700">PNG, JPG, WEBP ou SVG · máx. 5 MB.</p>
-              <input type="file" accept=".png,.jpg,.jpeg,.webp,.svg"
+              <p className="mt-1 text-xs text-indigo-700">PNG, JPG ou WEBP · máx. 5 MB</p>
+              <input type="file" accept=".png,.jpg,.jpeg,.webp"
                 className="mt-4 block w-full text-xs text-indigo-800"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
