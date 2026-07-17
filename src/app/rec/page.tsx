@@ -676,13 +676,10 @@ function ContactForm() {
 
 // ── Hook: detecta mobile para desligar parallax ───────────────────────────────
 function useIsMobile() {
-  // Inicia detectando imediatamente para evitar re-render que causa flash
-  const [mobile, setMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < 768 || navigator.maxTouchPoints > 0;
-  });
+  const [mobile, setMobile] = useState(false);
   useEffect(() => {
     const check = () => setMobile(window.innerWidth < 768 || navigator.maxTouchPoints > 0);
+    check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
@@ -692,11 +689,10 @@ function useIsMobile() {
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function LokatRecPage() {
   const isMobile = useIsMobile();
-  // Mobile pula intro — animação pesada com drop-shadow trava GPU mobile
-  const [introComplete, setIntroComplete] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < 768 || navigator.maxTouchPoints > 0;
-  });
+  const [introComplete, setIntroComplete] = useState(false);
+  useEffect(() => {
+    if (window.innerWidth < 768 || navigator.maxTouchPoints > 0) setIntroComplete(true);
+  }, []);
   const [dropPhase,     setDropPhase]     = useState<"purple" | "red">("purple");
   const [activeIdx,      setActiveIdx]     = useState(0);
   const [modalVideo,     setModalVideo]    = useState<RecVideo | null>(null);

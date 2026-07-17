@@ -73,14 +73,14 @@ interface AccessRequest {
 
 // ── Mock fallback ─────────────────────────────────────────────────────────────
 
-const MOCK_PROFILES: DbProfile[] = mockUsers.map((u) => ({
+const MOCK_PROFILES: DbProfile[] = mockUsers.map((u, i) => ({
   id: u.id,
   name: u.name,
   email: u.email,
   role: u.role === "client" ? "cliente" : u.role,
   phone: "",
   avatar_url: null,
-  created_at: new Date(Date.now() - Math.random() * 60 * 24 * 60 * 60 * 1000).toISOString(),
+  created_at: new Date(1748736000000 - i * 45 * 24 * 60 * 60 * 1000).toISOString(),
 }));
 
 const MOCK_REQUESTS: AccessRequest[] = [

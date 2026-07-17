@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   CheckCircle2, AlertCircle, Clock, AlertTriangle,
@@ -390,7 +390,8 @@ function FireMap() {
 
 // ── Seção de esforço e ritmo ──────────────────────────────────
 function EffortSection() {
-  const days = getDaysRemainingV1();
+  const [days, setDays] = useState(0);
+  useEffect(() => { setDays(getDaysRemainingV1()); }, []);
   const scenarios = [
     { label: "2h/dia", hPerDay: 2 },
     { label: "3-4h/dia", hPerDay: 3.5 },
@@ -493,7 +494,8 @@ export default function StatusPage() {
   const [selectedArea, setSelectedArea] = useState<ProjectAreaStatus | null>(null);
 
   const readiness = useMemo(() => calcV1Readiness(), []);
-  const days = getDaysRemainingV1();
+  const [days, setDays] = useState(0);
+  useEffect(() => { setDays(getDaysRemainingV1()); }, []);
 
   const filteredAreas = useMemo(
     () => filterAreas(PROJECT_AREAS, filter),
