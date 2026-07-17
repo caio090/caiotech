@@ -54,5 +54,6 @@ export default async function ContentosAprovacoesPage({
     }
   }
 
-  return <ContentosAprovacoesContent serverApprovals={serverApprovals} />;
+  const serverNow = Date.now();
+  return <ContentosAprovacoesContent serverApprovals={serverApprovals} serverNow={serverNow} />;
 }

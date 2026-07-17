@@ -15,6 +15,7 @@ import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
 import { cn } from "@/lib/utils";
 import { V1_PROGRESS, getDaysRemainingV1, PROJECT_DEADLINE_V1 } from "@/lib/project-status";
+// getDaysRemainingV1 uses Date.now() — must not be called during SSR to avoid React #418
 
 // ── Admin notification helpers ────────────────────────────────
 const ADMIN_SEEN_KEY = "lokat_admin_notif_seen_count";
@@ -68,6 +69,7 @@ export function AdminLayoutShell({ children }: Props) {
   const [hasUnread,        setHasUnread]        = useState(false);
   const [showBell,         setShowBell]         = useState(false);
   const [pendingTeamCount, setPendingTeamCount] = useState(0);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
 
   const isOnContentosPage = pathname.startsWith("/admin/contentos");
@@ -213,6 +215,11 @@ export function AdminLayoutShell({ children }: Props) {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // Compute days remaining client-side only to avoid React #418 (Date.now() differs between SSR and hydration)
+  useEffect(() => {
+    setDaysRemaining(getDaysRemainingV1());
   }, []);
 
   // Close bell on outside click
@@ -438,7 +445,7 @@ export function AdminLayoutShell({ children }: Props) {
                 <Activity className="w-4 h-4" />
                 <div className="hidden md:block leading-none">
                   <p className="text-[10px] font-black">V1 {V1_PROGRESS}%</p>
-                  <p className="text-[9px] text-gray-400">{getDaysRemainingV1()}d restantes</p>
+                  <p className="text-[9px] text-gray-400">{daysRemaining !== null ? `${daysRemaining}d restantes` : "—"}</p>
                 </div>
               </Link>
             )}

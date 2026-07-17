@@ -45,9 +45,9 @@ function copyToClipboard(text: string) {
 
 // ── Timing helpers ────────────────────────────────────────────
 
-function hoursAgo(iso: string | null | undefined): number | null {
+function hoursAgo(iso: string | null | undefined, now: number): number | null {
   if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+  return Math.floor((now - new Date(iso).getTime()) / 3600000);
 }
 
 function formatDueDate(iso: string | null | undefined): string | null {
@@ -83,17 +83,19 @@ function ApprovalDetailModal({
   item,
   onClose,
   onSendToProd,
+  serverNow,
 }: {
   item: UiApproval;
   onClose: () => void;
   onSendToProd: (item: UiApproval) => void;
+  serverNow: number;
 }) {
   const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending;
   const StatusIcon = cfg.icon;
-  const hAgo = hoursAgo(item.approvalSentAt);
+  const hAgo = hoursAgo(item.approvalSentAt, serverNow);
   const dueStr = formatDueDate(item.approvalDueAt);
   const isLate = item.approvalDueAt
-    ? Date.now() > new Date(item.approvalDueAt).getTime()
+    ? serverNow > new Date(item.approvalDueAt).getTime()
     : hAgo !== null && hAgo > 48;
 
   function handleCopy() {
@@ -309,9 +311,10 @@ interface Props {
   initialApprovalId?: string | null;
   activeClientId?: string | null;
   activeClientName?: string | null;
+  serverNow: number;
 }
 
-export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId, activeClientId, activeClientName }: Props) {
+export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId, activeClientId, activeClientName, serverNow }: Props) {
   const [activeTab,   setActiveTab]   = useState<TabKey>("pending");
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
   const [openItem,    setOpenItem]    = useState<UiApproval | null>(null);
@@ -392,10 +395,10 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
         ? "✨ Novidade especial que você vai adorar! Conheça nossa linha exclusiva."
         : "🎉 Chegou a hora de celebrar! Peça pelo link na bio e receba em casa. 🍬",
       objetivo:       Object.keys(OBJECTIVE_LABELS)[i % 6],
-      dataPrevista:   new Date(Date.now() + (i + 1) * 2 * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR"),
+      dataPrevista:   new Date(serverNow + (i + 1) * 2 * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza" }),
       token:          null,
-      approvalSentAt: new Date(Date.now() - i * 8 * 3600000).toISOString(),
-      approvalDueAt:  new Date(Date.now() + (48 - i * 8) * 3600000).toISOString(),
+      approvalSentAt: new Date(serverNow - i * 8 * 3600000).toISOString(),
+      approvalDueAt:  new Date(serverNow + (48 - i * 8) * 3600000).toISOString(),
       clientComment:     null,
       operationalTaskId: null,
     }));
@@ -477,7 +480,7 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
 
   // Count late items
   const lateCount = byStatus.pending.filter((a) =>
-    a.approvalDueAt ? Date.now() > new Date(a.approvalDueAt).getTime() : false
+    a.approvalDueAt ? serverNow > new Date(a.approvalDueAt).getTime() : false
   ).length;
 
   return (
@@ -546,10 +549,10 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
           {activeItems.map((a) => {
             const cfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.pending;
             const StatusIcon = cfg.icon;
-            const hAgo = hoursAgo(a.approvalSentAt);
+            const hAgo = hoursAgo(a.approvalSentAt, serverNow);
             const dueStr = formatDueDate(a.approvalDueAt);
             const isLate = a.approvalDueAt
-              ? Date.now() > new Date(a.approvalDueAt).getTime()
+              ? serverNow > new Date(a.approvalDueAt).getTime()
               : hAgo !== null && hAgo > 48;
             return (
               <div key={a.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -650,6 +653,7 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
           item={openItem}
           onClose={() => setOpenItem(null)}
           onSendToProd={(item) => { setProdItem(item); }}
+          serverNow={serverNow}
         />
       )}
 

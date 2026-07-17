@@ -67,6 +67,8 @@ export default async function AdminContentosAprovacoesPage({
     suggestions = await getContentOSSuggestions(adminDb, activeClientId);
   }
 
+  const serverNow = Date.now();
+
   return (
     <>
       <ContentosSubNavServer initialClientId={activeClientId} />
@@ -78,6 +80,7 @@ export default async function AdminContentosAprovacoesPage({
         initialApprovalId={initialApprovalId}
         activeClientId={activeClientId}
         activeClientName={activeClientName}
+        serverNow={serverNow}
       />
     </>
   );
