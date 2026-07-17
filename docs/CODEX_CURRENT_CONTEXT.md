@@ -15,11 +15,11 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.2 — Hotfix RLS Fluxo Criar
+- Sprint: 3.0.3 — Visibilidade dos Destinos, Contexto Completo e Correção do Status dos SQLs
 - Executor: Claude Code
 - Data: 2026-07-16
-- Commit HEAD pré-sprint: `d0b5b6f` (Sprint 3.0.1)
-- Estado: implementado, commits pendentes
+- Commit HEAD pré-sprint: `b7be920` (Sprint 3.0.2)
+- Estado: implementado, commits pushados, deploy em andamento (dpl_EPMCQcFovLUWdmVL6Dq8hHv6JUZL)
 
 ## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
@@ -29,6 +29,16 @@
 - Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
 - SubNav: initialClientId passado server-side em todas as páginas REC OS.
 - REPROVADA: POST /drafts falhou com RLS em content_items.
+
+## 4c. O que foi feito na Sprint 3.0.3 (P1 + P2)
+
+- producao/page.tsx: requireAdminContentOSContext + adminDb; filtro expandido para "producao"/"em_producao"; STATUS_LABEL/COLOR para producao e alteracao_solicitada; seção operational_tasks; searchParams content_id e task.
+- aprovacoes/page.tsx: requireAdminContentOSContext + adminDb para approvals; fallback sem join; searchParam content_id.
+- _guided-create-flow.tsx: DestinationResult com contentId/existed (token removido); links incluem content_id+task/approval; microcopy differencia existed=true/false; IDs completos com Copy.
+- _client-content.tsx: removido const _NOW = Date.now() em escopo de módulo (React #418); substituído por Date.now() inline.
+- SQL 90: marcado como failed em todos os docs.
+- project-status.ts: production_destination_visibility e approval_destination_visibility adicionados.
+- TypeScript: zero erros. Build: limpo. 5 commits. Push: feito.
 
 ## 4b. O que foi feito na Sprint 3.0.2 (hotfix)
 
@@ -42,9 +52,9 @@
 
 ## 5. Próximos passos
 
-- QA Codex Web: testar POST /drafts autenticado, PATCH, destinos, reload.
-- Verificar READY no projeto lokat-os (prj_DjSreQY8WOm1UweAAI7OvnRLrKas).
-- Testar flash "Nenhum cliente selecionado" após hotfix SubNav Suspense.
+- QA Sprint 3.0.3: testar destino Produção (tarefa aparece na página), destino Aprovação (aparece em Aprovações), IDs copiáveis, links corretos.
+- Verificar READY no projeto lokat-os (dpl_EPMCQcFovLUWdmVL6Dq8hHv6JUZL).
+- Flash "Nenhum cliente selecionado": P2 investigar — _layout-client.tsx usa localStorage/fetch async; fix requer cookie ou header server-side.
 
 ## 4. Deployment atual
 
