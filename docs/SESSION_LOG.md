@@ -112,6 +112,46 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum navegador foi aberto.
 - Nenhum commit ou push foi executado.
 
+## 2026-07-16 - Sprint 3.0.2 — Hotfix RLS do Fluxo Criar (Claude Code)
+
+- Executor: Claude Code (claude-sonnet-4-6).
+- Sprint 3.0.1 reprovada por RLS: POST /api/admin/contentos/drafts retornava "new row violates row-level security policy for table content_items".
+- Causa: todas as 5 rotas API usavam createServerSupabaseClient() (anon + session) para operações de banco, sujeitas à RLS.
+- Correção: separação explícita authClient (auth + role) / adminDb (service role para DB).
+
+### Helper criado: src/lib/admin-contentos-api.ts
+- requireAdminContentOSContext(): auth com authClient, role admin/super_admin, então adminDb.
+- validateAdminClient(): verifica existência e deleted_at/archived_at com fallback de compatibilidade.
+
+### APIs corrigidas (authClient + adminDb)
+- POST /drafts: adminDb.from("content_items").insert(...).
+- GET e PATCH /drafts/[id]: adminDb para select e update; client_id obrigatório no GET.
+- POST /actions/send-to-production: adminDb para operational_tasks e content_items.
+- POST /actions/send-to-approval: adminDb para approvals e content_items; public_token removido da resposta admin.
+
+### criar/page.tsx
+- authClient para auth + role + clients; adminDb para content_items (somente se service role disponível).
+- catch vazio substituído por log estruturado.
+
+### Frontend (_guided-create-flow.tsx)
+- persistDraft mapeia status HTTP para mensagens: 401 → sessão; 403 → permissão; 404 → não encontrado; 503 → indisponível; 500 → dados preservados.
+- doSave propaga mensagem do erro em vez de string fixa.
+
+### SubNav (_contentos-subnav-server.tsx)
+- Adicionado Suspense com fallback animado para isolar useSearchParams e evitar React #418.
+
+### Qualidade
+- npx tsc --noEmit --skipLibCheck: zero erros.
+- npm run build: limpo.
+- git diff --check: apenas avisos CRLF.
+- Nenhum SQL executado. Nenhum schema alterado. Nenhuma RLS alterada.
+- V1_PROGRESS = 81 (imutável). V2_PROGRESS = 12 (imutável).
+
+### React #418 — análise
+- Causa determinística mais provável: useSearchParams() em ContentosSubNav sem Suspense boundary.
+- Corrigido com Suspense em ContentosSubNavServer.
+- Flash "Nenhum cliente selecionado": vem de activeClientName = null inicial em _layout-client.tsx; resolvido assincronamente via localStorage/fetch. Comportamento esperado; fix mais profundo requer passar nome via cookie ou header.
+
 ## 2026-07-16 - Sprint 3.0.1 — Operacionalização do Fluxo Criar (Claude Code)
 
 - Executor: Claude Code (claude-sonnet-4-6).

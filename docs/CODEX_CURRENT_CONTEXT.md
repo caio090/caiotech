@@ -15,28 +15,36 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.1 — Operacionalização do Fluxo Criar
+- Sprint: 3.0.2 — Hotfix RLS Fluxo Criar
 - Executor: Claude Code
 - Data: 2026-07-16
-- Commit HEAD pré-sprint: `bc4d66a`
-- Estado: implementado, aguardando commit/push/deploy
+- Commit HEAD pré-sprint: `d0b5b6f` (Sprint 3.0.1)
+- Estado: implementado, commits pendentes
 
-## 4. O que foi feito na Sprint 3.0.1
+## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
 - APIs POST/GET/PATCH /drafts e POST send-to-production / send-to-approval criadas.
 - _guided-create-flow.tsx reescrito com persistência real, autosave, URL update, visual bridge.
 - EditorOS: return_to sanitizado, botão Voltar ao conteúdo, CanvasEditor com banner de import.
 - Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
 - SubNav: initialClientId passado server-side em todas as páginas REC OS.
+- REPROVADA: POST /drafts falhou com RLS em content_items.
+
+## 4b. O que foi feito na Sprint 3.0.2 (hotfix)
+
+- Criado src/lib/admin-contentos-api.ts: requireAdminContentOSContext() e validateAdminClient().
+- Todas as 5 rotas API corrigidas: authClient para auth/role, adminDb para DB.
+- criar/page.tsx: adminDb para content_items com guard hasSupabaseServiceRoleKey().
+- Frontend: mensagens de erro mapeadas por status HTTP.
+- SubNav: Suspense boundary adicionado para isolar useSearchParams (React #418).
 - TypeScript: zero erros. Build: limpo.
-- Nenhum SQL executado. V1=81, V2=12 imutáveis.
+- Nenhum SQL executado. Nenhuma RLS alterada. V1=81, V2=12 imutáveis.
 
 ## 5. Próximos passos
 
-- QA manual: testar fluxo completo Criar → salvar → recarregar → EditorOS → Aprovações.
-- QA Codex Web: testar endpoints sem autenticação (deve retornar 401/redirect).
-- Commits focados por área (feat/fix/docs).
-- git push origin main + aguardar Vercel READY.
+- QA Codex Web: testar POST /drafts autenticado, PATCH, destinos, reload.
+- Verificar READY no projeto lokat-os (prj_DjSreQY8WOm1UweAAI7OvnRLrKas).
+- Testar flash "Nenhum cliente selecionado" após hotfix SubNav Suspense.
 
 ## 4. Deployment atual
 
