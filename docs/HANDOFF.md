@@ -531,7 +531,7 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Criados documentos permanentes de contexto e backlog para sincronizacao Codex/Claude.
 - Registrada decisao de tratar SQL 82, 84, 86, 87, 88 e 89 como `partial_unknown` ate auditoria live.
 - Criada auditoria local dos SQLs 82-89 sem executar DDL.
-- Criado SQL 90 como proposta de reconciliacao, terminado em `rollback` e marcado como nao executar automaticamente.
+- SQL 90 foi tentado/executado e falhou. Status: `failed`. Nao re-executar.
 - Corrigido export PNG do EditorOS para usar Blob, URL temporaria, link anexado ao `body`, estado `exporting` e erro sanitizado.
 - Corrigidos links visiveis antigos da Visao Geral para usar `/admin/contentos/*` quando ha `client`.
 - Substituida a pagina admin `/admin/contentos/criar` por fluxo unico REC OS em 5 etapas.
@@ -592,6 +592,6 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 - Nao classificar SQL 86-89 como completos nem como nao executados; o estado oficial e `partial_unknown`.
 - SQL 85 continua `not_executed`.
-- SQL 90 e proposta, nao migracao aplicada.
+- SQL 90: `failed` — tentado e falhou. Nao re-executar. Ver `docs/supabase/90-reconcile-partial-foundations.sql` para contexto.
 - Nao renomear rotas tecnicas `/contentos`; apenas manter nome publico visivel como REC OS.
 - Assets locais nao rastreados continuam fora do escopo e nao devem ser apagados.

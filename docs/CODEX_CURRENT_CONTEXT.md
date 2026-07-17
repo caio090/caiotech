@@ -108,7 +108,7 @@
 - SQL 87: `attempted_failed_partial_unknown`
 - SQL 88: `attempted_failed_partial_unknown`
 - SQL 89: `attempted_failed_partial_unknown`
-- SQL 90: proposta reconciliadora a ser criada, nao executada.
+- SQL 90: `failed` — tentado/executado e falhou. Nao re-executar.
 
 ## 13. Integracoes
 

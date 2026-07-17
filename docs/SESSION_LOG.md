@@ -112,6 +112,33 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum navegador foi aberto.
 - Nenhum commit ou push foi executado.
 
+## 2026-07-16 - Sprint 3.0.3 — Visibilidade dos Destinos, Contexto Completo e Correção do Status dos SQLs (Claude Code)
+
+- Executor: Claude Code (claude-sonnet-4-6).
+- Sprint 3.0.2 aprovada com P1 e P2 identificados em re-QA.
+
+### P1 corrigidos
+
+- producao/page.tsx: substituído createServerSupabaseClient por requireAdminContentOSContext + adminDb. Filtro de status expandido para incluir "producao" (canonical), "em_producao" (legado), "alteracao_solicitada". STATUS_LABEL e STATUS_COLOR atualizados. Adicionada seção de operational_tasks por client_id. Página aceita searchParams content_id e task para highlight.
+- aprovacoes/page.tsx: substituído createServerSupabaseClient por requireAdminContentOSContext + adminDb para query de approvals. Fallback sem join relacional se query falhar. Aceita content_id como searchParam.
+
+### P2 corrigidos
+
+- _guided-create-flow.tsx: DestinationResult type atualizado (contentId, existed; token removido). handleDestProducao e handleDestAprovacao preservam contentId e existed. Links de destino incluem content_id + task/approval. Microcopy diferencia existed=true vs false. IDs completos exibidos com botões Copy.
+- _client-content.tsx: removido const _NOW = Date.now() em escopo de módulo (causa de React #418 quando servidor cached módulo por horas). hoursAgo agora usa Date.now() inline.
+
+### Documentação
+
+- SQL 90: status corrigido para failed em CODEX_CURRENT_CONTEXT.md, HANDOFF.md, AUDIT_SQL_82_89_2026-07-15.md.
+- project-status.ts: adicionadas áreas production_destination_visibility e approval_destination_visibility.
+
+### Qualidade
+
+- npx tsc --noEmit --skipLibCheck: zero erros.
+- npm run build: limpo.
+- Nenhum SQL executado. Nenhum schema alterado. Nenhuma RLS alterada.
+- V1_PROGRESS = 81 (imutável). V2_PROGRESS = 12 (imutável).
+
 ## 2026-07-16 - Sprint 3.0.2 — Hotfix RLS do Fluxo Criar (Claude Code)
 
 - Executor: Claude Code (claude-sonnet-4-6).
