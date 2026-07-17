@@ -10,7 +10,7 @@ import {
 type StepId = "brief" | "content" | "visual" | "review" | "destination";
 type BriefMode = "manual" | "ai";
 type SaveState = "idle" | "saving" | "saved" | "error";
-type DestinationResult = { type: "calendar" | "production" | "approval"; id?: string; token?: string } | null;
+type DestinationResult = { type: "calendar" | "production" | "approval"; id?: string; contentId?: string; existed?: boolean } | null;
 
 export interface GuidedCreateDraft {
   schema_version?: number;
@@ -423,7 +423,7 @@ export function GuidedCreateFlow({
       const data = await res.json() as { task_id?: string; existed?: boolean; error?: string };
       setDestLoading(null);
       if (!res.ok) { setDestError(data.error ?? "Erro ao criar tarefa."); return; }
-      setDestResult({ type: "production", id: data.task_id });
+      setDestResult({ type: "production", id: data.task_id, contentId: id, existed: data.existed });
     } catch { setDestLoading(null); setDestError("Erro de conexão."); }
   }
 
@@ -442,10 +442,10 @@ export function GuidedCreateFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content_id: id, client_id: clientId, due_date: dueDate }),
       });
-      const data = await res.json() as { approval_id?: string; token?: string; existed?: boolean; error?: string };
+      const data = await res.json() as { approval_id?: string; existed?: boolean; error?: string };
       setDestLoading(null);
       if (!res.ok) { setDestError(data.error ?? "Erro ao criar aprovação."); return; }
-      setDestResult({ type: "approval", id: data.approval_id, token: data.token });
+      setDestResult({ type: "approval", id: data.approval_id, contentId: id, existed: data.existed });
     } catch { setDestLoading(null); setDestError("Erro de conexão."); }
   }
 
@@ -776,16 +776,90 @@ export function GuidedCreateFlow({
           )}
 
           {destResult?.type === "production" && (
-            <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Tarefa criada em Produção. ID: {destResult.id?.slice(0, 8)}.
-              <a href={`/admin/contentos/producao?client=${clientId}`} className="ml-2 underline">Ver produção</a>
+            <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 space-y-2">
+              <p className="font-semibold">
+                {destResult.existed
+                  ? "Este conteúdo já possui uma tarefa de produção."
+                  : "Tarefa de produção criada."}
+              </p>
+              {destResult.id && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Tarefa:</span>
+                  <span className="font-mono break-all">{destResult.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(destResult.id!).catch(() => {})}
+                    className="flex-shrink-0 rounded p-0.5 hover:bg-emerald-100"
+                    title="Copiar ID da tarefa"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              {destResult.contentId && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Conteúdo:</span>
+                  <span className="font-mono break-all">{destResult.contentId}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(destResult.contentId!).catch(() => {})}
+                    className="flex-shrink-0 rounded p-0.5 hover:bg-emerald-100"
+                    title="Copiar ID do conteúdo"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              <a
+                href={`/admin/contentos/producao?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&task=${destResult.id}` : ""}`}
+                className="inline-block text-xs font-bold underline"
+              >
+                Ver em Produção →
+              </a>
             </div>
           )}
 
           {destResult?.type === "approval" && (
-            <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Aprovação criada. Link gerado internamente.
-              <a href={`/admin/contentos/aprovacoes?client=${clientId}`} className="ml-2 underline">Ver aprovações</a>
+            <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-2">
+              <p className="font-semibold">
+                {destResult.existed
+                  ? "Este conteúdo já possui uma aprovação em andamento."
+                  : "Aprovação criada com sucesso."}
+              </p>
+              {destResult.id && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Aprovação:</span>
+                  <span className="font-mono break-all">{destResult.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(destResult.id!).catch(() => {})}
+                    className="flex-shrink-0 rounded p-0.5 hover:bg-amber-100"
+                    title="Copiar ID da aprovação"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              {destResult.contentId && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Conteúdo:</span>
+                  <span className="font-mono break-all">{destResult.contentId}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(destResult.contentId!).catch(() => {})}
+                    className="flex-shrink-0 rounded p-0.5 hover:bg-amber-100"
+                    title="Copiar ID do conteúdo"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              <a
+                href={`/admin/contentos/aprovacoes?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&approval=${destResult.id}` : ""}`}
+                className="inline-block text-xs font-bold underline"
+              >
+                Ver em Aprovações →
+              </a>
             </div>
           )}
 
