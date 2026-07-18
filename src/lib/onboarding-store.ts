@@ -130,10 +130,14 @@ function _clientSnapshot(): OnboardingState {
   return _snap;
 }
 
+const EMPTY_ONBOARDING: OnboardingState = Object.freeze({});
+const noopSubscribe = () => () => {};
+const getOnboardingServerSnapshot = () => EMPTY_ONBOARDING;
+
 export function useOnboardingStore(): OnboardingState {
   return useSyncExternalStore(
-    () => () => {},
+    noopSubscribe,
     _clientSnapshot,
-    () => ({}) as OnboardingState
+    getOnboardingServerSnapshot
   );
 }

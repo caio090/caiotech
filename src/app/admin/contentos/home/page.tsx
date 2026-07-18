@@ -17,6 +17,7 @@ export default async function AdminContentosHomePage({
 }) {
   const params         = await searchParams;
   const activeClientId = params.client ?? null;
+  const serverNow      = Date.now();
 
   if (!activeClientId) {
     redirect("/admin/contentos/selecionar-cliente");
@@ -111,6 +112,7 @@ export default async function AdminContentosHomePage({
         metaAsset={metaAsset}
         clientId={activeClientId}
         hasOlaClick={hasOlaClick}
+        serverNow={serverNow}
       />
     </>
   );

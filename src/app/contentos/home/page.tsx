@@ -10,6 +10,7 @@ export default async function ContentOSHomePage({
 }) {
   const params = await searchParams;
   const activeClientId = params.client ?? null;
+  const serverNow = Date.now();
 
   let serverOnboarding: DbOnboardingProfile | null = null;
   let serverContents: DbContentItem[] | null = null;
@@ -88,6 +89,7 @@ export default async function ContentOSHomePage({
       userRole={userRole}
       isSupabaseActive={isSupabaseConfigured}
       companyName={companyName}
+      serverNow={serverNow}
     />
   );
 }

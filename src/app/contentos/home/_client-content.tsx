@@ -1,7 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const _NOW = Date.now();
 import { PageHeader } from "@/components/page-header";
 import { DashboardCard } from "@/components/dashboard-card";
 import { ContentCard } from "@/components/content-card";
@@ -345,12 +344,14 @@ function ApprovalsPreviewModal({
   pending,
   clientId,
   isAdmin,
+  now,
   onClose,
 }: {
   late: DbApprovalWithContent[];
   pending: DbApprovalWithContent[];
   clientId: string | null;
   isAdmin: boolean;
+  now: number;
   onClose: () => void;
 }) {
   const all = [
@@ -390,7 +391,7 @@ function ApprovalsPreviewModal({
             const c = a.content_items;
             const isLate = late.find((l) => l.id === a.id) !== undefined;
             const hAgo = a.approval_sent_at
-              ? Math.floor((_NOW - new Date(a.approval_sent_at).getTime()) / 3600000)
+              ? Math.floor((now - new Date(a.approval_sent_at).getTime()) / 3600000)
               : null;
             return (
               <Link
@@ -450,6 +451,7 @@ interface Props {
   metaAsset?: { page_name: string | null; instagram_username: string | null } | null;
   clientId?: string | null;
   hasOlaClick?: boolean;
+  serverNow: number;
 }
 
 export function ContentOSHomeContent({
@@ -462,10 +464,16 @@ export function ContentOSHomeContent({
   metaAsset = null,
   clientId = null,
   hasOlaClick = false,
+  serverNow,
 }: Props) {
   const [scheduleItem,          setScheduleItem]          = useState<DbContentItem | null>(null);
   const [scheduledIds,          setScheduledIds]          = useState<Set<string>>(new Set());
   const [showApprovalsPreview,  setShowApprovalsPreview]  = useState(false);
+  const [currentNow,            setCurrentNow]            = useState(serverNow);
+
+  useEffect(() => {
+    setCurrentNow(Date.now());
+  }, []);
 
   const data  = useOnboardingStore();
   const canva = useCanvaStore();
@@ -521,7 +529,7 @@ export function ContentOSHomeContent({
   const approvalsPending = (serverApprovals ?? []).filter((a) => a.status === "aguardando");
   const approvalsLate    = approvalsPending.filter((a) => {
     const due = a.approval_due_at ?? (a.created_at ? new Date(new Date(a.created_at).getTime() + 48 * 3600000).toISOString() : null);
-    return due ? _NOW > new Date(due).getTime() : false;
+    return due ? currentNow > new Date(due).getTime() : false;
   });
 
   // "Prontos para agendar" — real content items with status pronto_para_agendar
@@ -889,6 +897,7 @@ export function ContentOSHomeContent({
           pending={approvalsPending}
           clientId={(serverApprovals ?? [])[0]?.client_id ?? null}
           isAdmin={isAdmin}
+          now={currentNow}
           onClose={() => setShowApprovalsPreview(false)}
         />
       )}

@@ -11,6 +11,7 @@ import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import type { DbApprovalWithContent } from "@/lib/supabase/types";
 import { dbApprovalStatusToUi, contentTypeEmoji } from "@/lib/supabase/types";
 import { SendToProdModal, type SendToProdConfig } from "@/components/send-to-prod-modal";
+import { CopyIdButton } from "@/components/copy-id-button";
 
 type TabKey = "pending" | "change_requested" | "approved" | "rejected";
 
@@ -50,9 +51,23 @@ function hoursAgo(iso: string | null | undefined, now: number): number | null {
   return Math.floor((now - new Date(iso).getTime()) / 3600000);
 }
 
+const APPROVAL_TZ = "America/Fortaleza";
+
 function formatDueDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: APPROVAL_TZ });
+}
+
+/** Formats a scheduled_date (YYYY-MM-DD, no time component) as DD/MM/YYYY without
+ * going through `new Date()`, which would shift the day when server/browser timezones differ. */
+function formatScheduledDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(dateStr).toLocaleDateString("pt-BR", { timeZone: APPROVAL_TZ });
 }
 
 // ── UiApproval ────────────────────────────────────────────────
@@ -98,12 +113,17 @@ function ApprovalDetailModal({
     ? serverNow > new Date(item.approvalDueAt).getTime()
     : hAgo !== null && hAgo > 48;
 
+  const [browserOrigin, setBrowserOrigin] = useState("");
+  useEffect(() => {
+    setBrowserOrigin(window.location.origin);
+  }, []);
+
   function handleCopy() {
-    const link = item.token ? `${window.location.origin}/aprovar/${item.token}` : null;
+    const link = item.token && browserOrigin ? `${browserOrigin}/aprovar/${item.token}` : null;
     if (link) copyToClipboard(link);
   }
 
-  const approvalLink = item.token ? `${window.location.origin}/aprovar/${item.token}` : null;
+  const approvalLink = item.token && browserOrigin ? `${browserOrigin}/aprovar/${item.token}` : null;
 
   // History steps based on status
   const steps: { label: string; done: boolean; active: boolean }[] = [
@@ -235,6 +255,25 @@ function ApprovalDetailModal({
               </div>
             </div>
           )}
+
+          {/* Technical IDs */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">IDs técnicos</p>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500">Aprovação:</span>
+                <span className="font-mono text-gray-700 truncate">{item.id}</span>
+                <CopyIdButton id={item.id} label="Copiar ID da aprovação" />
+              </div>
+              {item.contentId && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">Conteúdo:</span>
+                  <span className="font-mono text-gray-700 truncate">{item.contentId}</span>
+                  <CopyIdButton id={item.contentId} label="Copiar ID do conteúdo" />
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* History timeline */}
           <div>
@@ -372,7 +411,7 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
         thumbnail:      c ? contentTypeEmoji(c.type) : CONTENT_THUMBNAILS[i % CONTENT_THUMBNAILS.length],
         legenda:        c?.caption ?? null,
         objetivo:       c?.objective ?? null,
-        dataPrevista:   c?.scheduled_date ? new Date(c.scheduled_date).toLocaleDateString("pt-BR") : "—",
+        dataPrevista:   formatScheduledDate(c?.scheduled_date),
         token:          a.public_token,
         approvalSentAt: a.approval_sent_at ?? a.created_at,
         approvalDueAt:  a.approval_due_at ?? null,

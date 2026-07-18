@@ -56,10 +56,13 @@ function _clientSnapshot(): CanvaConfig {
   return _snap;
 }
 
+const noopSubscribe = () => () => {};
+const getCanvaServerSnapshot = () => EMPTY;
+
 export function useCanvaStore(): CanvaConfig {
   return useSyncExternalStore(
-    () => () => {},
+    noopSubscribe,
     _clientSnapshot,
-    () => EMPTY
+    getCanvaServerSnapshot
   );
 }
