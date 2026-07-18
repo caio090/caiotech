@@ -6,6 +6,7 @@ import {
   ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList,
   Copy, FileCheck2, ImageIcon, Layers, Loader2, PenLine, Send, Upload, Wand2,
 } from "lucide-react";
+import { CopyIdButton } from "@/components/copy-id-button";
 
 type StepId = "brief" | "content" | "visual" | "review" | "destination";
 type BriefMode = "manual" | "ai";
@@ -786,28 +787,14 @@ export function GuidedCreateFlow({
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium">Tarefa:</span>
                   <span className="font-mono break-all">{destResult.id}</span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(destResult.id!).catch(() => {})}
-                    className="flex-shrink-0 rounded p-0.5 hover:bg-emerald-100"
-                    title="Copiar ID da tarefa"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
+                  <CopyIdButton id={destResult.id} label="Copiar ID da tarefa" />
                 </div>
               )}
               {destResult.contentId && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium">Conteúdo:</span>
                   <span className="font-mono break-all">{destResult.contentId}</span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(destResult.contentId!).catch(() => {})}
-                    className="flex-shrink-0 rounded p-0.5 hover:bg-emerald-100"
-                    title="Copiar ID do conteúdo"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
+                  <CopyIdButton id={destResult.contentId} label="Copiar ID do conteúdo" />
                 </div>
               )}
               <a
@@ -830,28 +817,14 @@ export function GuidedCreateFlow({
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium">Aprovação:</span>
                   <span className="font-mono break-all">{destResult.id}</span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(destResult.id!).catch(() => {})}
-                    className="flex-shrink-0 rounded p-0.5 hover:bg-amber-100"
-                    title="Copiar ID da aprovação"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
+                  <CopyIdButton id={destResult.id} label="Copiar ID da aprovação" />
                 </div>
               )}
               {destResult.contentId && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium">Conteúdo:</span>
                   <span className="font-mono break-all">{destResult.contentId}</span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(destResult.contentId!).catch(() => {})}
-                    className="flex-shrink-0 rounded p-0.5 hover:bg-amber-100"
-                    title="Copiar ID do conteúdo"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
+                  <CopyIdButton id={destResult.contentId} label="Copiar ID do conteúdo" />
                 </div>
               )}
               <a

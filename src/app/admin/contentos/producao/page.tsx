@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
+import { CopyIdButton } from "@/components/copy-id-button";
 
 const STATUS_LABEL: Record<string, string> = {
   briefing:           "Briefing",
@@ -190,14 +191,16 @@ export default async function AdminContentosProducaoPage({
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-1">
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-gray-400 flex items-center gap-1.5 flex-wrap">
                       <span className="font-semibold text-gray-500">ID tarefa:</span>{" "}
                       <span className="font-mono">{task.id}</span>
+                      <CopyIdButton id={task.id} label="Copiar ID da tarefa" />
                     </p>
                     {task.content_item_id && (
-                      <p className="text-[11px] text-gray-400">
+                      <p className="text-[11px] text-gray-400 flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-gray-500">Conteúdo:</span>{" "}
                         <span className="font-mono">{task.content_item_id}</span>
+                        <CopyIdButton id={task.content_item_id} label="Copiar ID do conteúdo" />
                       </p>
                     )}
                     {task.department && (
