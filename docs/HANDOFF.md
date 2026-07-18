@@ -2,7 +2,20 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-06 — waitlist, leads, landing REC OS
+## Última sessão — 2026-07-18 — Sprint 3.0.5b, conclusão do hotfix de hidratação + CopyIdButton
+
+**Commit:** pendente (push ainda não executado nesta sessão)
+
+- Home: `_NOW` de escopo de módulo removido; `serverNow` gerado no Server Component e propagado; atualização dinâmica via `useState(serverNow)` + `useEffect`.
+- `onboarding-store.ts` / `canva-store.ts`: `getServerSnapshot`/`subscribe` estabilizados (referências fixas, sem recriação a cada chamada).
+- Aprovações: datas formatadas com timezone explícito (`America/Fortaleza`) ou por composição direta dos componentes YYYY-MM-DD; `window.location.origin` movido para depois da montagem no modal técnico.
+- EditorOS: `CanvasEditor` agora client-only via `next/dynamic({ ssr: false })`.
+- CopyIdButton conectado em Criar, Produção e Aprovações (task_id, content_id, approval_id — nunca public_token).
+- TypeScript zero erros, build limpo. ESLint acusa `react-hooks/purity` e `react-hooks/set-state-in-effect` nos arquivos alterados, mas são os mesmos padrões pré-existentes no restante do projeto (confirmado isoladamente em `aprovacoes/page.tsx` e no commit `a6f0f91` já aceito) — não são regressão desta sessão.
+- **Pendente**: QA Codex Web (Playwright, navegador real com/sem extensão) não foi executado — sem navegador disponível neste ambiente. Push para `main` e deploy no Vercel também não executados; aguardando confirmação do usuário.
+- SQL: nenhum executado. RLS/schema: inalterados. V1=81, V2=12 imutáveis.
+
+## Sessão anterior — 2026-07-06 — waitlist, leads, landing REC OS
 
 **Commit:** `c0f4a6a` — fix: waitlist leads e landing rec os
 

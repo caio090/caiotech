@@ -15,11 +15,11 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.5 — Hotfix final de hidratação (React #418)
+- Sprint: 3.0.5b — Conclusão do hotfix de hidratação (Home/Aprovações/EditorOS) + CopyIdButton real
 - Executor: Claude Code
-- Data: 2026-07-17
-- Commit HEAD pré-sprint: `940834f` (Sprint 3.0.4 docs)
-- Estado: implementado, build limpo, push feito (commit a6f0f91)
+- Data: 2026-07-18
+- Commit HEAD pré-sprint: `77efe13` (Sprint 3.0.5 docs, pós a6f0f91)
+- Estado: implementado, TypeScript zero erros, build limpo. QA Codex Web ainda pendente. Push não executado nesta sessão (aguardando confirmação do usuário antes de publicar em produção).
 
 ## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
@@ -29,6 +29,17 @@
 - Aprovações: activeClientId/activeClientName no server component, demo mode suprimido para admin.
 - SubNav: initialClientId passado server-side em todas as páginas REC OS.
 - REPROVADA: POST /drafts falhou com RLS em content_items.
+
+## 4f. O que foi feito na Sprint 3.0.5b (conclusão do hotfix + CopyIdButton)
+
+- Home: `const _NOW = Date.now()` (escopo de módulo) removido de `_client-content.tsx`. `serverNow` agora gerado em ambos `page.tsx` (admin e não-admin) e propagado como prop obrigatória; primeiro render usa `serverNow`, atualização dinâmica via `useState(serverNow)` + `useEffect`.
+- `onboarding-store.ts`: `getServerSnapshot` estabilizado (`EMPTY_ONBOARDING` congelado, mesma referência sempre); `subscribe` estabilizado em `noopSubscribe`.
+- `canva-store.ts`: `subscribe` estabilizado em `noopSubscribe`.
+- Aprovações: `formatDueDate()` com `timeZone: "America/Fortaleza"` explícito; nova `formatScheduledDate()` monta data a partir dos componentes YYYY-MM-DD sem passar por `new Date()` (evita shift de dia); `window.location.origin` no modal técnico movido para `useState + useEffect`.
+- EditorOS: `CanvasEditor` agora importado via `next/dynamic({ ssr: false })` com fallback estático; cabeçalho/autenticação continuam no fluxo server-side original.
+- CopyIdButton conectado de fato em: resultado de Criar (task/content/approval), cards de Produção (task_id/content_item_id), modal técnico de Aprovações (approval_id/content_id).
+- TypeScript: zero erros. Build: limpo.
+- QA Codex Web (Playwright, com/sem extensão) NÃO executado — sem navegador real disponível nesta sessão. Ver seção 5.
 
 ## 4e. O que foi feito na Sprint 3.0.5 (hotfix final de hidratação)
 
@@ -73,6 +84,7 @@
 - QA Sprint 3.0.3: testar destino Produção (tarefa aparece na página), destino Aprovação (aparece em Aprovações), IDs copiáveis, links corretos.
 - Verificar READY no projeto lokat-os (dpl_EPMCQcFovLUWdmVL6Dq8hHv6JUZL).
 - Flash "Nenhum cliente selecionado": P2 investigar — _layout-client.tsx usa localStorage/fetch async; fix requer cookie ou header server-side.
+- QA Codex Web pendente para Sprint 3.0.5b: validar ausência de React #418 em Home/Aprovações/EditorOS em navegador real (com e sem extensão), validar CopyIdButton nas 3 telas, confirmar upload PNG/JPEG/WEBP e rejeição de SVG.
 
 ## 4. Deployment atual
 

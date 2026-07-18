@@ -39,6 +39,61 @@ Eliminar todas as fontes restantes de React minified error #418 identificadas ap
 
 ---
 
+## 2026-07-18 (Sprint 3.0.5b)
+
+### Sprint
+
+Sprint 3.0.5b — hotfix final de hidratação (Home/Aprovações/EditorOS) + integração real do CopyIdButton
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Concluir os itens deferidos da Sprint 3.0.5: remover `_NOW` de escopo de módulo na Home,
+estabilizar server snapshots dos stores, corrigir datas sem timezone em Aprovações,
+tornar o CanvasEditor client-only e conectar o CopyIdButton nas telas operacionais.
+
+### Arquivos alterados
+
+- `src/app/contentos/home/_client-content.tsx` — removido `const _NOW = Date.now()` de escopo de módulo; adicionado `serverNow` via props + `useState(serverNow)` + `useEffect` para `currentNow`; usado em `approvalsLate` e em `ApprovalsPreviewModal` (nova prop `now`).
+- `src/app/admin/contentos/home/page.tsx` e `src/app/contentos/home/page.tsx` — geram `serverNow = Date.now()` no Server Component e propagam para `ContentOSHomeContent`.
+- `src/lib/onboarding-store.ts` — `getServerSnapshot` agora retorna `EMPTY_ONBOARDING` (constante `Object.freeze({})`) em vez de literal novo a cada chamada; `subscribe` estabilizado em `noopSubscribe`.
+- `src/lib/canva-store.ts` — `subscribe` estabilizado em `noopSubscribe` (o `EMPTY` de server snapshot já era estável).
+- `src/app/contentos/aprovacoes/_client-content.tsx` — `formatDueDate()` agora usa `timeZone: "America/Fortaleza"` explícito; nova `formatScheduledDate()` monta `DD/MM/YYYY` a partir dos componentes da string `YYYY-MM-DD` em vez de `new Date(...)`, evitando shift de dia por timezone; `window.location.origin` no `ApprovalDetailModal` movido para `useState("") + useEffect`; adicionado bloco "IDs técnicos" com `CopyIdButton` (approval_id, content_id).
+- `src/app/admin/contentos/editor-os/EditorOSWorkspace.tsx` — `CanvasEditor` importado via `next/dynamic` com `ssr: false` e fallback estático "Carregando EditorOS…"; cabeçalho/autenticação/contexto permanecem no fluxo original.
+- `src/app/admin/contentos/criar/_guided-create-flow.tsx` — botões de copiar ID (ícone only) substituídos por `CopyIdButton` com texto visível, nos resultados de Produção (task_id, content_id) e Aprovação (approval_id, content_id).
+- `src/app/admin/contentos/producao/page.tsx` — `CopyIdButton` adicionado a cada tarefa (task_id, content_item_id).
+
+### Auditoria (sem alteração)
+
+- `CanvasEditor.tsx`: `Date.now()`/`Math.random()` só ocorrem dentro de `uid()` chamado por `addText`, `addImportToCanvas`, duplicação de elemento e export PNG — nunca em render/module scope. Nenhum `suppressHydrationWarning` presente.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build` (Turbopack): compilado com sucesso, TypeScript ok, 59 páginas estáticas geradas.
+- ESLint (`react-hooks/purity`, `react-hooks/set-state-in-effect`): apontou erros nos arquivos alterados, mas os mesmos padrões (Date.now() em Server Component, setState em useEffect de montagem) já existem pré-existentes em `src/app/admin/contentos/aprovacoes/page.tsx:70` e no próprio commit aceito `a6f0f91` (`src/app/rec/page.tsx`), confirmado por execução isolada do ESLint nesses arquivos antes desta sprint. `npm run build` não roda esse lint como gate bloqueante. Não é uma regressão desta sprint.
+
+### SQL
+
+- Nenhum SQL executado. Nenhuma RLS alterada. Schema inalterado.
+
+### Resultado
+
+- TypeScript: zero erros. Build: limpo.
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis)
+- Commit: pendente (aguardando push)
+
+### Pendências registradas (deferred)
+
+- QA Codex Web (Playwright multi-contexto, com/sem extensão) não executado nesta sessão — sem acesso a navegador real neste ambiente. Ver `docs/CODEX_CURRENT_CONTEXT.md`.
+- Upload bloqueado pela extensão Chrome (P2 já registrado) — não re-testado.
+- Financeiro demo — fora de escopo, já registrado.
+
+---
+
 ## 2026-07-17 (Sprint 3.0.4)
 
 ### Sprint

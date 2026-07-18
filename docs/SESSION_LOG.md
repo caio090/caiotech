@@ -240,3 +240,21 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum SQL foi executado.
 - Nenhum dado Supabase foi alterado.
 - Nenhum asset local foi apagado, movido ou commitado.
+
+## 2026-07-18 - Sprint 3.0.5b - conclusao do hotfix de hidratacao + CopyIdButton real
+
+- Auditoria git inicial: branch `main`, HEAD `77efe13`, sincronizado com `origin/main`, nenhum arquivo rastreado inesperado.
+- Confirmado que o commit `a6f0f91` (Sprint 3.0.5) ja havia corrigido React #418 em admin/status, admin/equipe e rec/page, mas NAO em Home/Aprovacoes/EditorOS/CopyIdButton, que permaneciam pendentes.
+- `src/app/contentos/home/_client-content.tsx`: removido `const _NOW = Date.now()` de escopo de modulo; `serverNow` passado via props desde `page.tsx` (admin e nao-admin); `currentNow` via `useState(serverNow)` + `useEffect`.
+- `src/lib/onboarding-store.ts` e `src/lib/canva-store.ts`: `getServerSnapshot`/`subscribe` estabilizados com referencias constantes fora do hook.
+- `src/app/contentos/aprovacoes/_client-content.tsx`: `formatDueDate()` com `timeZone: "America/Fortaleza"`; nova `formatScheduledDate()` monta DD/MM/YYYY sem `new Date()` para strings YYYY-MM-DD; `window.location.origin` no modal movido para `useState + useEffect`; bloco de IDs tecnicos (approval_id, content_id) com CopyIdButton.
+- `src/app/admin/contentos/editor-os/EditorOSWorkspace.tsx`: `CanvasEditor` importado via `next/dynamic({ ssr: false })` com fallback estatico.
+- CopyIdButton conectado em `_guided-create-flow.tsx` (task/content/approval), `producao/page.tsx` (task_id/content_item_id) e no modal de Aprovacoes.
+- Auditoria do `CanvasEditor.tsx`: `Date.now()`/`Math.random()` confirmados apenas em `uid()` chamado por acoes do usuario (criar elemento, duplicar, exportar) — nunca em render ou escopo de modulo.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build` (Turbopack): compilado com sucesso, 59 paginas.
+- ESLint nos arquivos alterados aponta `react-hooks/purity` (Date.now em Server Component) e `react-hooks/set-state-in-effect` (setState em useEffect de montagem) — confirmado que sao padroes pre-existentes no projeto (mesmo erro isolado em `aprovacoes/page.tsx:70` e no commit ja aceito `a6f0f91`), nao regressao desta sessao.
+- Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado. Nenhuma env alterada.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- QA Codex Web (Playwright, navegador real com/sem extensao) NAO executado nesta sessao — sem navegador disponivel neste ambiente; fica pendente para proxima validacao.
+- Push para `main` e deploy Vercel NAO executados nesta sessao — aguardando confirmacao do usuario antes de publicar em producao.

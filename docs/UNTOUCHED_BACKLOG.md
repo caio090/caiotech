@@ -100,11 +100,13 @@ Itens conhecidos que nao devem ser tratados como concluidos sem sprint propria, 
 - Registrado no QA da Sprint 3.0.3. Nao corrigido nesta sprint.
 - Requer sprint propria para conectar dados reais de faturamento.
 
-## CopyIdButton — integracao pendente
+## CopyIdButton — integracao concluida (Sprint 3.0.5b)
 
 - Componente criado em src/components/copy-id-button.tsx (Sprint 3.0.4).
-- Ainda nao integrado em: card de tarefa em Produção, modal de aprovação, resultado de Criar.
-- Integrar em proxima sprint.
+- Integrado em: resultado de Criar (task_id/content_id, approval_id/content_id),
+  card de tarefa em Produção (task_id, content_item_id), modal técnico de Aprovações
+  (approval_id, content_id).
+- QA Codex Web ainda pendente para validar em navegador real.
 
 ## Regra para execucoes futuras
 
