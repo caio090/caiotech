@@ -2,7 +2,22 @@
 
 import { ArrowLeft, Layers } from "lucide-react";
 import Link from "next/link";
-import { CanvasEditor } from "./CanvasEditor";
+import dynamic from "next/dynamic";
+
+const CanvasEditor = dynamic(
+  () => import("./CanvasEditor").then((mod) => mod.CanvasEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full bg-zinc-950 text-zinc-400">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-zinc-700 border-t-indigo-400 rounded-full animate-spin" />
+          <p className="text-xs">Carregando EditorOS…</p>
+        </div>
+      </div>
+    ),
+  }
+);
 
 interface Client {
   id: string;
