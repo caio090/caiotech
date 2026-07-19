@@ -2,9 +2,21 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-18 — Sprint 3.0.5b, conclusão do hotfix de hidratação + CopyIdButton
+## Última sessão — 2026-07-19 — Encerramento formal da Sprint 3.0
 
-**Commit:** pendente (push ainda não executado nesta sessão)
+**Commit validado em produção:** `71350309fcee615de0262f821d60e30beaf13877` (curto: `7135030`)
+**Deployment validado:** `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
+
+- Sprint 3.0 encerrada e aprovada após QA final Codex Web: zero P0, zero P1, React #418 não reproduzido, nenhum hydration mismatch. Criar, Persistência, Produção, Aprovação, CopyIdButton e EditorOS (bridge) validados. Mobile aprovado. Nenhum runtime error.
+- Resultado do QA reportado pelo usuário/Codex Web; não reexecutado nesta sessão, que foi puramente de fechamento documental/status.
+- `src/config/project-status.ts` atualizado: `guided_create_flow`, `guided_create_persistence`, `approval_client_context`, `production_destination_visibility`, `approval_destination_visibility` → `validated`. `editor_os` mantido `qa_pending` (escopo futuro maior do editor não coberto por este QA), com nota clara do que foi validado.
+- V1_PROGRESS = 81, V2_PROGRESS = 12 — inalterados.
+- Pendências não bloqueantes: favicon.ico ausente, Financeiro com dados demo, upload dependente de extensão do Chrome, SQLs 82/84/86-89/90 aguardando auditoria de catálogo.
+- **Próxima sprint autorizada: Sprint 3.1** — não iniciada nesta execução.
+
+## Sessão anterior — 2026-07-18 — Sprint 3.0.5b, conclusão do hotfix de hidratação + CopyIdButton
+
+**Commit:** `7135030` (push confirmado na sessão de encerramento acima)
 
 - Home: `_NOW` de escopo de módulo removido; `serverNow` gerado no Server Component e propagado; atualização dinâmica via `useState(serverNow)` + `useEffect`.
 - `onboarding-store.ts` / `canva-store.ts`: `getServerSnapshot`/`subscribe` estabilizados (referências fixas, sem recriação a cada chamada).

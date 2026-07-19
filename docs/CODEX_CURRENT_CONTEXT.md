@@ -15,11 +15,19 @@
 
 ## 3. Sprint atual
 
-- Sprint: 3.0.5b — Conclusão do hotfix de hidratação (Home/Aprovações/EditorOS) + CopyIdButton real
+- Sprint: 3.0 — **ENCERRADA E APROVADA** em 2026-07-19
+- Commit validado em produção: `71350309fcee615de0262f821d60e30beaf13877` (curto: `7135030`)
+- Deployment validado: `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
+- QA final Codex Web: **APROVADO** — zero P0, zero P1, React #418 não reproduzido, nenhum hydration mismatch. Criar, Persistência, Produção, Aprovação, CopyIdButton e EditorOS (bridge) validados. Mobile aprovado. Nenhum runtime error. Nenhuma regressão crítica.
+- Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
+- Próxima sprint autorizada: **Sprint 3.1** (não iniciada nesta execução — apenas o fechamento de status/documentação da 3.0 foi feito).
+
+## 3b. Sprint 3.0.5b — Conclusão do hotfix de hidratação (Home/Aprovações/EditorOS) + CopyIdButton real
+
 - Executor: Claude Code
 - Data: 2026-07-18
 - Commit HEAD pré-sprint: `77efe13` (Sprint 3.0.5 docs, pós a6f0f91)
-- Estado: implementado, TypeScript zero erros, build limpo. QA Codex Web ainda pendente. Push não executado nesta sessão (aguardando confirmação do usuário antes de publicar em produção).
+- Estado: implementado, TypeScript zero erros, build limpo, commitado e enviado para produção (commit `7135030`). Validado pelo QA final Codex Web da Sprint 3.0 (ver seção 3).
 
 ## 4. O que foi feito na Sprint 3.0.1 (reprovada por RLS)
 
@@ -84,7 +92,14 @@
 - QA Sprint 3.0.3: testar destino Produção (tarefa aparece na página), destino Aprovação (aparece em Aprovações), IDs copiáveis, links corretos.
 - Verificar READY no projeto lokat-os (dpl_EPMCQcFovLUWdmVL6Dq8hHv6JUZL).
 - Flash "Nenhum cliente selecionado": P2 investigar — _layout-client.tsx usa localStorage/fetch async; fix requer cookie ou header server-side.
-- QA Codex Web pendente para Sprint 3.0.5b: validar ausência de React #418 em Home/Aprovações/EditorOS em navegador real (com e sem extensão), validar CopyIdButton nas 3 telas, confirmar upload PNG/JPEG/WEBP e rejeição de SVG.
+- QA Codex Web da Sprint 3.0.5b/3.0: **concluído e aprovado** em 2026-07-19 (zero P0, zero P1). Ver seção 3.
+
+### Pendências não bloqueantes (não impedem o encerramento da Sprint 3.0)
+
+- favicon.ico ausente.
+- Financeiro (`/admin/financeiro`) ainda exibe dados demo declarados — requer sprint própria para dados reais de faturamento.
+- Upload automatizado pode depender de permissão da extensão do Chrome (já registrado como P2 desde Sprint 3.0.4).
+- SQLs 82, 84, 86-89, 90 aguardam auditoria controlada de catálogo antes de qualquer nova tentativa.
 
 ## 4. Deployment atual
 

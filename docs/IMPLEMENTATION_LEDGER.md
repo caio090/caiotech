@@ -2,6 +2,60 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-19 (Encerramento formal da Sprint 3.0)
+
+### Sprint
+
+Sprint 3.0 — encerrada e aprovada após QA final Codex Web.
+
+### Executor
+
+Claude Code (fechamento documental/status apenas — nenhuma alteração funcional).
+
+### Commit validado em produção
+
+`71350309fcee615de0262f821d60e30beaf13877` (curto: `7135030`)
+
+### Deployment validado
+
+`dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
+
+### Resultado do QA (reportado pelo usuário/Codex Web, não reexecutado nesta sessão)
+
+- Zero P0, zero P1.
+- React #418 não reproduzido, nenhum hydration mismatch.
+- Criar aprovado, Persistência aprovada, Produção aprovada, Aprovação aprovada.
+- CopyIdButton aprovado, EditorOS bridge aprovado, mobile aprovado.
+- Nenhum runtime error, nenhuma regressão crítica.
+
+### Arquivos alterados
+
+- `src/config/project-status.ts` — `guided_create_flow`, `guided_create_persistence`, `approval_client_context`, `production_destination_visibility`, `approval_destination_visibility` marcados `readiness: "validated"` / `qa.status: "approved"` com commit/deployment/resultado. `editor_os` mantido `readiness: "qa_pending"` (escopo futuro maior do editor ainda não coberto), mas `qa` atualizado para `approved_with_p2` refletindo o que foi de fato validado (abertura, contexto, content_id, return_to, Canvas, ausência de React #418). Nova entrada em `V1_HISTORY`. `V1_PROGRESS`/`V2_PROGRESS` inalterados.
+- `docs/CODEX_CURRENT_CONTEXT.md`, `docs/IMPLEMENTATION_LEDGER.md`, `docs/HANDOFF.md`, `docs/SESSION_LOG.md`, `docs/UNTOUCHED_BACKLOG.md` — fechamento documental da sprint.
+
+### Pendências não bloqueantes registradas
+
+- favicon.ico ausente.
+- Financeiro (`/admin/financeiro`) com dados demo declarados.
+- Upload automatizado pode depender de permissão de extensão do Chrome.
+- SQLs 82, 84, 86-89, 90 aguardam auditoria controlada de catálogo.
+
+### SQL
+
+- Nenhum SQL executado. Nenhuma RLS alterada. Schema inalterado. Env inalterada. Supabase não tocado manualmente.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis).
+- Próxima sprint autorizada: Sprint 3.1 (não iniciada nesta execução).
+
+---
+
 ## 2026-07-17 (Sprint 3.0.5)
 
 ### Sprint

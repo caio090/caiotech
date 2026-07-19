@@ -100,13 +100,23 @@ Itens conhecidos que nao devem ser tratados como concluidos sem sprint propria, 
 - Registrado no QA da Sprint 3.0.3. Nao corrigido nesta sprint.
 - Requer sprint propria para conectar dados reais de faturamento.
 
-## CopyIdButton — integracao concluida (Sprint 3.0.5b)
+## CopyIdButton — integracao concluida e validada (Sprint 3.0.5b / Sprint 3.0)
 
 - Componente criado em src/components/copy-id-button.tsx (Sprint 3.0.4).
 - Integrado em: resultado de Criar (task_id/content_id, approval_id/content_id),
   card de tarefa em Produção (task_id, content_item_id), modal técnico de Aprovações
   (approval_id, content_id).
-- QA Codex Web ainda pendente para validar em navegador real.
+- QA Codex Web final aprovado em 2026-07-19 — item encerrado.
+
+## Favicon ausente
+
+- favicon.ico nao encontrado. Nao bloqueia a Sprint 3.0. Requer sprint propria.
+
+## Upload dependente de extensao do Chrome
+
+- Upload automatizado (ex.: testes) pode ser bloqueado pela extensao do Chrome, ja
+  registrado desde a Sprint 3.0.4. Nao bloqueia a Sprint 3.0. Nao alterar a
+  implementacao de upload por causa dessa limitacao de ferramenta de teste.
 
 ## Regra para execucoes futuras
 

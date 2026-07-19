@@ -257,4 +257,16 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado. Nenhuma env alterada.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - QA Codex Web (Playwright, navegador real com/sem extensao) NAO executado nesta sessao — sem navegador disponivel neste ambiente; fica pendente para proxima validacao.
-- Push para `main` e deploy Vercel NAO executados nesta sessao — aguardando confirmacao do usuario antes de publicar em producao.
+- Push para `main` confirmado pelo usuario e executado: commit `7135030` publicado em `origin/main`. Smoke test via curl nas rotas publicas/protegidas sem 404/500.
+
+## 2026-07-19 - Encerramento formal da Sprint 3.0
+
+- QA final Codex Web reportado como APROVADO pelo usuario: zero P0, zero P1, React #418 nao reproduzido, nenhum hydration mismatch, Criar/Persistencia/Producao/Aprovacao/CopyIdButton/EditorOS bridge aprovados, mobile aprovado, nenhum runtime error. Resultado reportado externamente, nao reexecutado nesta sessao (que foi de fechamento documental/status apenas).
+- `src/config/project-status.ts`: `guided_create_flow`, `guided_create_persistence`, `approval_client_context`, `production_destination_visibility`, `approval_destination_visibility` marcados `validated` com commit `7135030` / deployment `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1` e resultado do QA. `editor_os` mantido `qa_pending` (escopo futuro maior do editor ainda nao coberto), com `qa.status: approved_with_p2` documentando o que foi de fato validado (abertura, contexto, content_id, return_to, Canvas, ausencia de React #418). Nova entrada em `V1_HISTORY`. Nenhum flag ficticio criado.
+- Documentos atualizados: `CODEX_CURRENT_CONTEXT.md`, `IMPLEMENTATION_LEDGER.md`, `HANDOFF.md`, `SESSION_LOG.md`, `UNTOUCHED_BACKLOG.md`.
+- Pendencias nao bloqueantes registradas: favicon.ico ausente, Financeiro com dados demo, upload dependente de extensao do Chrome, SQLs 82/84/86-89/90 aguardando auditoria de catalogo.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `git diff --check`: sem erros.
+- Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado. Nenhuma env alterada. Supabase nao tocado manualmente. Nenhum conteudo publicado. Nenhum cliente alterado.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Proxima sprint autorizada: Sprint 3.1 (nao iniciada nesta execucao).
