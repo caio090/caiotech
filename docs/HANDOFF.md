@@ -2,7 +2,30 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Encerramento formal da Sprint 3.0
+## Última sessão — 2026-07-19 — Sprint 3.1A, Calendário Global somente leitura
+
+- Nova rota `/admin/calendario` (admin/super_admin apenas): agrega `content_items`,
+  `operational_tasks` e `approvals` de todos os clientes via `src/lib/global-calendar.ts`
+  (modelo `GlobalCalendarEvent` + normalizadores puros), grade mensal, agenda do dia,
+  filtro por cliente/fonte, modal de detalhe, deep-link para a tela de origem. Somente
+  leitura — nenhuma criação/edição de evento.
+- Reuniões (`commercial_meetings`, `productivity_meetings`) **não** entraram nesta
+  sprint — ficam para 3.1C, junto com uma decisão sobre auditar/executar o SQL 38
+  (nunca rodado, não faz parte da lista SQL 82-90).
+- Item "Calendário Global" adicionado à sidebar admin.
+- `src/config/project-status.ts`: área `global_calendar` (já existia, v2) passou de
+  `planned` para `qa_pending`.
+- Sem framework de teste no projeto — normalizadores verificados via script ad-hoc
+  (`tsc` + `node`), não commitado; todas as asserções passaram.
+- "Projeto São Paulo": pesquisado no repositório e docs — **nenhuma referência real
+  encontrada** (só menções de "São Paulo" como texto de exemplo de cidade em
+  formulários). Trilha paralela ativa, escopo aguardando recuperação do briefing
+  original — não inventado, não implementado.
+- TypeScript zero erros, build limpo, ESLint sem erros novos.
+- Push desta sessão: ver Fase de push do relatório correspondente antes de assumir
+  que já está em produção.
+
+## Sessão anterior — 2026-07-19 — Encerramento formal da Sprint 3.0
 
 **Commit validado em produção:** `71350309fcee615de0262f821d60e30beaf13877` (curto: `7135030`)
 **Deployment validado:** `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`

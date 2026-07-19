@@ -20,7 +20,17 @@
 - Deployment validado: `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
 - QA final Codex Web: **APROVADO** — zero P0, zero P1, React #418 não reproduzido, nenhum hydration mismatch. Criar, Persistência, Produção, Aprovação, CopyIdButton e EditorOS (bridge) validados. Mobile aprovado. Nenhum runtime error. Nenhuma regressão crítica.
 - Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
-- Próxima sprint autorizada: **Sprint 3.1** (não iniciada nesta execução — apenas o fechamento de status/documentação da 3.0 foi feito).
+- Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A (implementação, somente leitura)** — ver seção 3a. QA Codex Web da 3.1A pendente.
+
+## 3a. Sprint 3.1A — Calendário Global somente leitura
+
+- Data: 2026-07-19
+- Rota criada: `/admin/calendario` (`src/app/admin/calendario/page.tsx` + `_client-content.tsx`), admin/super_admin somente, via `requireAdminContentOSContext()` + `adminDb`. Não substitui `/admin/contentos/calendario` (calendário por cliente do REC OS, preservado).
+- Modelo normalizado: `src/lib/global-calendar.ts` — `GlobalCalendarEvent`, normalizadores puros para `content_item`/`operational_task`/`approval`, grade mensal (`buildMonthWindow`) e resolução de mês (`resolveRequestedMonth`) calculados via `Date.UTC`/`Intl.DateTimeFormat` com `America/Fortaleza` explícito — nunca `new Date()` cru no primeiro render.
+- Fontes: `content_items` (scheduled_date), `operational_tasks` (due_date ?? start_date), `approvals` (approval_due_at ?? approval_sent_at ?? created_at). `commercial_meetings`, `productivity_meetings`/`productivity_tasks` e `content_campaigns` **não** entraram nesta sprint (reuniões ficaram para 3.1C).
+- Verificação: sem framework de teste no projeto — normalizadores verificados via script ad-hoc (`tsc` standalone + `node`) cobrindo os casos A–L da Fase 21 do prompt (fallbacks de data, group_key compartilhado, ids únicos, ausência de public_token, origin_href interno, exclusão de eventos sem client_id). QA Codex Web em navegador real ainda pendente.
+- Item "Calendário Global" adicionado à sidebar admin (`src/components/app-sidebar.tsx`), ícone `CalendarDays` já existente.
+- Nenhum SQL executado. `productivity_meetings`/`productivity_tasks` (SQL 38) permanecem não executados/não auditados.
 
 ## 3b. Sprint 3.0.5b — Conclusão do hotfix de hidratação (Home/Aprovações/EditorOS) + CopyIdButton real
 

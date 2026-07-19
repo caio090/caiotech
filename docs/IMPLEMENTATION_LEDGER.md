@@ -2,6 +2,94 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-19 (Sprint 3.1A — Calendário Global somente leitura)
+
+### Sprint
+
+Sprint 3.1A — primeira versão do Calendário Global administrativo, somente leitura.
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Agregar content_items, operational_tasks e approvals de todos os clientes em uma
+única tela administrativa, sem criar/editar eventos e sem SQL.
+
+### Arquivos criados
+
+- `src/lib/global-calendar.ts` — tipos (`GlobalCalendarEvent`, `CalendarEventSource`),
+  normalizadores puros (`normalizeContentItems`, `normalizeOperationalTasks`,
+  `normalizeApprovals`), grade mensal (`buildMonthWindow`, 42 células/6 semanas via
+  `Date.UTC`), resolução de mês (`resolveRequestedMonth`), hoje em Fortaleza
+  (`getFortalezaToday` via `Intl.DateTimeFormat`), limites de janela para
+  timestamptz (`timestampWindowBounds`, offset `-03:00` fixo — sem DST em Fortaleza).
+- `src/app/admin/calendario/page.tsx` — Server Component. `requireAdminContentOSContext()`
+  gate (redirect `/login` se falhar); 3 queries em paralelo via `Promise.allSettled`
+  (uma por fonte, cada uma não derruba as outras); lookup em lote de títulos de
+  conteúdo relacionados a aprovações e de nomes de clientes (apenas os IDs
+  referenciados, não `SELECT *`); normaliza e passa para o client component.
+- `src/app/admin/calendario/_client-content.tsx` — grade mensal + agenda do dia +
+  filtros (cliente, fonte) + modal de detalhe + navegação por URL
+  (`?year=&month=`) + botão Hoje. Primeiro render determinístico: `selectedDay`
+  inicia em `serverToday` (string vinda do servidor), nunca `new Date()`.
+
+### Arquivos alterados
+
+- `src/components/app-sidebar.tsx` — item "Calendário Global" adicionado ao nav
+  admin (ícone `CalendarDays`, já usado no projeto). Sem gate extra de role no
+  componente — a sidebar admin já só é renderizada para admin/super_admin.
+- `src/config/project-status.ts` — área `global_calendar` (já existente,
+  `phase: v2`) atualizada de `readiness: planned` para `qa_pending`, descrição e
+  notas refletindo o escopo real implementado.
+
+### Segurança
+
+- Nenhum Client Component importa `adminDb`/service role — `_client-content.tsx`
+  só recebe props já normalizadas e autorizadas pelo Server Component.
+- `public_token` nunca é selecionado nem incluído no modelo.
+- `origin_href` sempre construído a partir de rotas internas conhecidas
+  (`/admin/contentos/...`), nunca aceito vindo do banco.
+- Tarefas operacionais sem `client_id` são excluídas da agregação (não viram
+  evento "genérico") — decisão registrada em `docs/architecture/GLOBAL_CALENDAR_V1.md`.
+
+### Verificação (sem framework de testes no projeto)
+
+- Nenhum test runner (jest/vitest) está instalado no repositório; instalar um
+  novo estava fora de escopo desta sprint.
+- Verificação feita via script ad-hoc: `npx tsc` compilou `global-calendar.ts`
+  isoladamente para JS, executado com `node` cobrindo os casos A–L pedidos
+  (fallback de data devido/enviado/criado, group_key compartilhado entre
+  content/task/approval do mesmo content_item_id, ids visuais únicos,
+  ausência de `public_token`, origin_href interno, exclusão de tarefa sem
+  client_id, grade de 42 dias, validação de `resolveRequestedMonth`). Todas as
+  asserções passaram. Script descartado após a verificação (não commitado).
+
+### SQL
+
+- Nenhum SQL executado. `productivity_meetings`/`productivity_tasks` (SQL 38,
+  nunca executado) e `commercial_meetings` não foram usados nesta sprint.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso, `/admin/calendario` presente na lista
+  de rotas.
+- ESLint nos arquivos alterados/criados: zero erros novos (um warning
+  pré-existente e não relacionado, `Sparkles` não utilizado em
+  `app-sidebar.tsx`, já existia antes desta sprint).
+- `git diff --check`: sem erros (apenas avisos de LF/CRLF).
+
+### Resultado
+
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis).
+- Reuniões (Sprint 3.1C), Google Calendar/Meet (Sprint 3.1D) e Projeto São
+  Paulo (trilha paralela, sem escopo recuperável no repositório) não foram
+  tratados nesta sprint.
+
+---
+
 ## 2026-07-19 (Encerramento formal da Sprint 3.0)
 
 ### Sprint

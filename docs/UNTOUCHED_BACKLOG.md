@@ -118,6 +118,42 @@ Itens conhecidos que nao devem ser tratados como concluidos sem sprint propria, 
   registrado desde a Sprint 3.0.4. Nao bloqueia a Sprint 3.0. Nao alterar a
   implementacao de upload por causa dessa limitacao de ferramenta de teste.
 
+## Calendário Global — hidratação herdada (não corrigida)
+
+- `src/app/contentos/calendario/_client-content.tsx` tem `const _TODAY = new Date()`
+  em escopo de módulo e `new Date()` durante o corpo do render de
+  `ContentosCalendarioContent`; `src/components/calendar-mock.tsx` também chama
+  `new Date()` durante render. Mesma classe de bug já corrigida na Home
+  (Sprint 3.0.5b). Identificado na auditoria da Sprint 3.1 Fase 0, não corrigido
+  — a Sprint 3.1A implementou uma rota nova (`/admin/calendario`) sem reutilizar
+  esse código, mas o calendário antigo por cliente continua com o risco.
+
+## Calendário Global — reuniões (adiado para Sprint 3.1C)
+
+- `commercial_meetings` (CRM comercial, sem client_id) e
+  `productivity_meetings`/`productivity_tasks` (SQL 38, com client_id, nunca
+  executado/auditado) não entraram no Calendário Global da Sprint 3.1A.
+- Antes de decidir a estratégia de reuniões, é preciso auditar manualmente
+  (somente `SELECT`) se o SQL 38 já foi executado no Supabase de produção —
+  isso não pode ser confirmado por leitura de código.
+
+## Calendário Global — Google Calendar/Meet (adiado para Sprint 3.1D)
+
+- Não existe integração real hoje — `meet_link`/`meet_url` são apenas campos de
+  texto livre. Requer OAuth Google, infraestrutura própria e é bloqueado até a
+  Sprint 3.1C (reuniões) existir.
+
+## Projeto São Paulo — trilha paralela ativa
+
+- Solicitação mencionada pelo usuário fora do escopo do Calendário Global.
+  Pesquisado no repositório e documentos por "Projeto São Paulo", "São Paulo",
+  "projeto_sp", "sao_paulo", "projeto-sao-paulo": nenhuma referência real
+  encontrada — apenas ocorrências de "São Paulo" como texto de exemplo de
+  cidade em formulários (onboarding, equipe, solicitar-acesso), sem relação com
+  um projeto ou iniciativa.
+- Escopo aguardando recuperação do briefing original. Não inventado, não
+  implementado, não misturado ao Calendário Global.
+
 ## Regra para execucoes futuras
 
 Antes de alterar codigo, ler:

@@ -270,3 +270,63 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado. Nenhuma env alterada. Supabase nao tocado manualmente. Nenhum conteudo publicado. Nenhum cliente alterado.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - Proxima sprint autorizada: Sprint 3.1 (nao iniciada nesta execucao).
+
+## 2026-07-19 - Sprint 3.1 Fase 0 - auditoria e arquitetura do Calendario Global e Reunioes
+
+- Auditoria somente leitura, sem codigo alterado. Mapeadas 5 rotas de calendario
+  (admin/contentos/calendario, contentos/calendario, operacional/calendario,
+  client/calendario, agendamento como redirect) e 1 rota de reunioes
+  (operacional/comercial/reunioes, tabela commercial_meetings).
+  Achado nao reportado antes: `const _TODAY = new Date()` em escopo de modulo
+  em contentos/calendario/_client-content.tsx e `new Date()` durante render em
+  ContentosCalendarioContent/CalendarMock - mesma classe de bug ja corrigida na
+  Home (Sprint 3.0.5b), nao corrigida aqui (fora de escopo da Fase 0).
+  Tabelas confirmadas em uso: content_items, operational_tasks, approvals,
+  commercial_meetings. Tabelas so em migration, zero uso em codigo:
+  productivity_tasks/productivity_meetings (SQL 38, nunca executado),
+  content_campaigns. calendar_events/appointments nao existem.
+  Proposto modelo GlobalCalendarEvent (TypeScript, nao implementado) e plano
+  faseado 3.1A (somente leitura) / 3.1B (filtros) / 3.1C (reunioes) / 3.1D
+  (Google Calendar/Meet).
+
+## 2026-07-19 - Sprint 3.1A - Calendario Global somente leitura
+
+- Pesquisa por "Projeto Sao Paulo" no repositorio e docs: nenhuma referencia
+  real encontrada (so "Sao Paulo" como exemplo de cidade em formularios).
+  Registrado como trilha paralela ativa, escopo aguardando recuperacao do
+  briefing original - nao inventado, nao implementado.
+- Criado `src/lib/global-calendar.ts`: tipos GlobalCalendarEvent/CalendarEventSource,
+  normalizadores puros para content_items/operational_tasks/approvals, grade
+  mensal de 42 dias via Date.UTC (nunca depende do timezone local do servidor),
+  resolucao de mes via searchParams com fallback para hoje em America/Fortaleza
+  (Intl.DateTimeFormat), limites de janela timestamptz com offset -03:00 fixo.
+- Criado `src/app/admin/calendario/page.tsx`: Server Component,
+  requireAdminContentOSContext() + adminDb, 3 queries em paralelo via
+  Promise.allSettled (uma fonte falhar nao derruba as outras), lookup em lote
+  de nomes de clientes e titulos de conteudo relacionados a aprovacoes.
+- Criado `src/app/admin/calendario/_client-content.tsx`: grade mensal, agenda
+  do dia, filtro por cliente/fonte, modal de detalhe, navegacao por URL
+  (?year=&month=), botao Hoje. selectedDay inicia em serverToday (string do
+  servidor), nunca new Date() no primeiro render.
+- Item "Calendario Global" adicionado a sidebar admin (CalendarDays, icone ja
+  usado no projeto). Sem biblioteca nova instalada.
+- `src/config/project-status.ts`: area global_calendar (ja existia, v2) de
+  `planned` para `qa_pending`.
+- Sem framework de teste no projeto (nenhum jest/vitest, nenhum arquivo
+  .test.ts fora de node_modules) - instalar um estava fora de escopo. Verificado
+  via script ad-hoc: `npx tsc` compilou global-calendar.ts isoladamente, `node`
+  executou asserções cobrindo os casos A-L da Fase 21 do prompt (fallback de
+  data devido/enviado/criado, group_key compartilhado entre content/task/approval
+  do mesmo content_item_id, ids visuais unicos, ausencia de public_token,
+  origin_href interno, exclusao de tarefa sem client_id, grade de 42 dias,
+  validacao de resolveRequestedMonth). Todas as asserções passaram. Script
+  descartado, nao commitado.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso, /admin/calendario presente
+  na lista de rotas.
+- ESLint nos arquivos alterados/criados: zero erros novos (um warning
+  pre-existente e nao relacionado - Sparkles nao utilizado em app-sidebar.tsx -
+  ja existia antes desta sessao).
+- Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Reunioes (3.1C) e Google Calendar/Meet (3.1D) nao tratados nesta sessao.
