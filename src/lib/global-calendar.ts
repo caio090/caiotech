@@ -20,6 +20,40 @@ export function resolveRequestedSource(sourceParam: string | undefined): Calenda
   return VALID_SOURCES.includes(sourceParam as CalendarEventSource) ? (sourceParam as CalendarEventSource) : "all";
 }
 
+/**
+ * Adds `delta` months to year/month (1-12), rolling over the year in either
+ * direction. Pure arithmetic — no Date object, no timezone involved.
+ */
+export function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const zeroBased = month - 1 + delta;
+  const y = year + Math.floor(zeroBased / 12);
+  const m = ((zeroBased % 12) + 12) % 12 + 1;
+  return { year: y, month: m };
+}
+
+export interface GlobalCalendarHrefParams {
+  year: number;
+  month: number;
+  client: string; // client id, or "all" for no filter
+  source: CalendarEventSource | "all";
+}
+
+/**
+ * The single canonical builder for /admin/calendario URLs. Always creates a
+ * fresh URLSearchParams (never mutates/reuses one across calls), always
+ * includes year/month, and only includes client/source when they aren't the
+ * "no filter" value — so the URL itself is the one source of truth for
+ * month, day-of-view and filters, instead of parallel component state.
+ */
+export function buildGlobalCalendarHref({ year, month, client, source }: GlobalCalendarHrefParams): string {
+  const params = new URLSearchParams();
+  params.set("year", String(year));
+  params.set("month", String(month));
+  if (client && client !== "all") params.set("client", client);
+  if (source && source !== "all") params.set("source", source);
+  return `/admin/calendario?${params.toString()}`;
+}
+
 export interface GlobalCalendarEvent {
   id: string;
   source: CalendarEventSource;

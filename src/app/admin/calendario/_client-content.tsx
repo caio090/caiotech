@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import {
   buildMonthWindow,
+  buildGlobalCalendarHref,
+  shiftMonth,
   groupEventsByDateKey,
   type GlobalCalendarEvent,
   type CalendarEventSource,
@@ -178,12 +180,20 @@ export function GlobalCalendarContent({
   clients, sourceErrors, serverToday, timezone,
 }: Props) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  // Safe to seed state directly from props: page.tsx remounts this component
-  // (via `key`) whenever year/month/client/source change, so these are always
-  // in sync with the URL on first render — no stale state across navigations.
-  const [filterClient, setFilterClient] = useState<string>(initialFilterClient);
-  const [filterSource, setFilterSource] = useState<"all" | CalendarEventSource>(initialFilterSource);
+  // URL is the single source of truth for year/month/client/source: page.tsx
+  // validates them server-side and remounts this component (via `key`)
+  // whenever any of them change, so reading the props directly — instead of
+  // mirroring them into local useState — means the header, the filters and
+  // the agenda can never drift out of sync with each other or with the URL.
+  const filterClient = initialFilterClient;
+  const filterSource = initialFilterSource;
+
+  // selectedDay stays as local state: it's a genuine in-page interaction
+  // (clicking a day in the grid) that doesn't need its own URL param, and it
+  // is correctly reset by the same `key`-driven remount whenever the month,
+  // client or source changes.
   const [selectedDay,   setSelectedDay]   = useState<string>(initialSelectedDay);
   const [selectedEvent, setSelectedEvent] = useState<GlobalCalendarEvent | null>(null);
 
@@ -212,42 +222,25 @@ export function GlobalCalendarContent({
 
   const selectedEvents = eventsByDay.get(selectedDay) ?? [];
 
-  function buildUrl(overrides: { year?: number; month?: number; client?: string; source?: string }) {
-    const params = new URLSearchParams();
-    params.set("year", String(overrides.year ?? initialYear));
-    params.set("month", String(overrides.month ?? initialMonth));
-    const client = overrides.client ?? filterClient;
-    const source = overrides.source ?? filterSource;
-    if (client !== "all") params.set("client", client);
-    if (source !== "all") params.set("source", source);
-    return `/admin/calendario?${params.toString()}`;
-  }
+  // Deterministic hrefs — always derived from the current props, never from
+  // a stale closure or an onClick handler that might read old state.
+  const previous = shiftMonth(initialYear, initialMonth, -1);
+  const next = shiftMonth(initialYear, initialMonth, 1);
+  const [todayYear, todayMonth] = serverToday.split("-").map(Number);
+  const isCurrentMonth = initialYear === todayYear && initialMonth === todayMonth;
 
-  function prevMonth() {
-    const m = initialMonth === 1 ? 12 : initialMonth - 1;
-    const y = initialMonth === 1 ? initialYear - 1 : initialYear;
-    router.push(buildUrl({ year: y, month: m }));
-  }
-
-  function nextMonth() {
-    const m = initialMonth === 12 ? 1 : initialMonth + 1;
-    const y = initialMonth === 12 ? initialYear + 1 : initialYear;
-    router.push(buildUrl({ year: y, month: m }));
-  }
-
-  function goToday() {
-    const [y, m] = serverToday.split("-").map(Number);
-    router.push(buildUrl({ year: y, month: m }));
-  }
+  const previousMonthHref = buildGlobalCalendarHref({ year: previous.year, month: previous.month, client: filterClient, source: filterSource });
+  const nextMonthHref = buildGlobalCalendarHref({ year: next.year, month: next.month, client: filterClient, source: filterSource });
+  const todayHref = buildGlobalCalendarHref({ year: todayYear, month: todayMonth, client: filterClient, source: filterSource });
 
   function onClientChange(value: string) {
-    setFilterClient(value);
-    router.push(buildUrl({ client: value }));
+    const href = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: value, source: filterSource });
+    startTransition(() => router.push(href));
   }
 
   function onSourceChange(value: string) {
-    setFilterSource(value as "all" | CalendarEventSource);
-    router.push(buildUrl({ source: value }));
+    const href = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: value as "all" | CalendarEventSource });
+    startTransition(() => router.push(href));
   }
 
   const totalCount = countsBySource.content_item + countsBySource.operational_task + countsBySource.approval;
@@ -272,25 +265,35 @@ export function GlobalCalendarContent({
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className={cn("flex flex-wrap items-center gap-2 mb-3", isPending && "opacity-60 pointer-events-none")}>
         <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl px-1 py-1">
-          <button onClick={prevMonth} aria-label="Mês anterior" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <Link href={previousMonthHref} aria-label="Mês anterior" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             <ChevronLeft className="w-4 h-4 text-gray-500" />
-          </button>
+          </Link>
           <span className="text-sm font-bold text-gray-800 px-2 min-w-[140px] text-center">
             {MONTHS[initialMonth - 1]} {initialYear}
           </span>
-          <button onClick={nextMonth} aria-label="Próximo mês" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <Link href={nextMonthHref} aria-label="Próximo mês" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             <ChevronRight className="w-4 h-4 text-gray-500" />
-          </button>
+          </Link>
         </div>
-        <button onClick={goToday} className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+        <Link
+          href={todayHref}
+          aria-current={isCurrentMonth ? "date" : undefined}
+          className={cn(
+            "text-xs font-bold px-3 py-2 rounded-xl border transition-colors",
+            isCurrentMonth
+              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50"
+          )}
+        >
           Hoje
-        </button>
+        </Link>
 
         <select
           value={filterClient}
           onChange={(e) => onClientChange(e.target.value)}
+          disabled={isPending}
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600 ml-auto"
         >
           <option value="all">Todos os clientes</option>
@@ -300,6 +303,7 @@ export function GlobalCalendarContent({
         <select
           value={filterSource}
           onChange={(e) => onSourceChange(e.target.value)}
+          disabled={isPending}
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600"
         >
           <option value="all">Todas as fontes ({totalCount})</option>
