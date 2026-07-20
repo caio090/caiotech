@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
+import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 import {
   buildMonthWindow,
   resolveRequestedMonth,
+  resolveRequestedSource,
+  resolveInitialSelectedDay,
   timestampWindowBounds,
   normalizeContentItems,
   normalizeOperationalTasks,
@@ -14,14 +17,16 @@ import {
   type ApprovalRow,
   type ClientNameLookup,
   type ContentTitleLookup,
+  type ResponsibleNameLookup,
   type GlobalCalendarEvent,
+  type CalendarEventSource,
 } from "@/lib/global-calendar";
 import { GlobalCalendarContent } from "./_client-content";
 
 export default async function AdminGlobalCalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; client?: string; source?: string }>;
 }) {
   const params = await searchParams;
 
@@ -30,18 +35,54 @@ export default async function AdminGlobalCalendarioPage({
   const { adminDb } = ctx;
 
   const { year, month } = resolveRequestedMonth(params.year, params.month);
+  const requestedSource = resolveRequestedSource(params.source);
   const window = buildMonthWindow(year, month);
   const { startIso, endIso } = timestampWindowBounds(window.gridStartKey, window.gridEndKey);
+  const serverToday = getFortalezaToday();
+
+  // ── Full authorized client list (Fase 3) — independent of which clients have
+  // events this month, so a client with zero events still shows up in the filter. ──
+  let clientsResult = await adminDb
+    .from("clients")
+    .select("id, company_name, status, deleted_at, archived_at")
+    .in("status", CLIENT_VISIBLE_STATUSES)
+    .order("company_name");
+
+  if (clientsResult.error && isMissingClientVisibilityColumn(clientsResult.error)) {
+    clientsResult = await adminDb
+      .from("clients")
+      .select("id, company_name, status")
+      .in("status", CLIENT_VISIBLE_STATUSES)
+      .order("company_name") as typeof clientsResult;
+  }
+
+  type ClientRow = { id: string; company_name: string | null; status?: string | null; deleted_at?: string | null; archived_at?: string | null };
+  const visibleClients = ((clientsResult.data ?? []) as ClientRow[]).filter(isVisibleClientRecord);
+
+  const clientNames: ClientNameLookup = new Map();
+  for (const c of visibleClients) {
+    if (c.company_name) clientNames.set(c.id, c.company_name);
+  }
+
+  const clients = visibleClients
+    .filter((c) => !!c.company_name)
+    .map((c) => ({ id: c.id, name: c.company_name as string }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+  // Fase 2 — validate `client` param server-side; an unknown id is ignored, never a 500.
+  const requestedClientId = params.client && clientNames.has(params.client) ? params.client : "all";
 
   let events: GlobalCalendarEvent[] = [];
-  const sourceErrors: string[] = [];
+  const sourceErrors: CalendarEventSource[] = [];
 
   const [contentItemsRes, operationalTasksRes, approvalsRes] = await Promise.allSettled([
     adminDb
       .from("content_items")
-      .select("id, client_id, title, type, channel, status, scheduled_date, responsible_id")
-      .gte("scheduled_date", window.gridStartKey)
-      .lte("scheduled_date", window.gridEndKey),
+      .select("id, client_id, title, type, channel, status, scheduled_date, scheduled_at, caption, responsible_id")
+      .or(
+        `and(scheduled_date.gte.${window.gridStartKey},scheduled_date.lte.${window.gridEndKey}),` +
+        `and(scheduled_at.gte.${startIso},scheduled_at.lte.${endIso})`
+      ),
     adminDb
       .from("operational_tasks")
       .select("id, client_id, content_item_id, approval_id, title, description, due_date, start_date, status, department, task_type, priority, assigned_to, assigned_role")
@@ -64,7 +105,7 @@ export default async function AdminGlobalCalendarioPage({
       ? ((contentItemsRes.value.data ?? []) as ContentItemRow[])
       : [];
   if (contentItemsRes.status === "rejected" || contentItemsRes.value?.error) {
-    sourceErrors.push("conteudos");
+    sourceErrors.push("content_item");
     console.error("[admin/calendario] content_items fetch error:", contentItemsRes.status === "rejected" ? contentItemsRes.reason : contentItemsRes.value.error);
   }
 
@@ -73,7 +114,7 @@ export default async function AdminGlobalCalendarioPage({
       ? ((operationalTasksRes.value.data ?? []) as OperationalTaskRow[])
       : [];
   if (operationalTasksRes.status === "rejected" || operationalTasksRes.value?.error) {
-    sourceErrors.push("tarefas");
+    sourceErrors.push("operational_task");
     console.error("[admin/calendario] operational_tasks fetch error:", operationalTasksRes.status === "rejected" ? operationalTasksRes.reason : operationalTasksRes.value.error);
   }
 
@@ -82,7 +123,7 @@ export default async function AdminGlobalCalendarioPage({
       ? ((approvalsRes.value.data ?? []) as ApprovalRow[])
       : [];
   if (approvalsRes.status === "rejected" || approvalsRes.value?.error) {
-    sourceErrors.push("aprovacoes");
+    sourceErrors.push("approval");
     console.error("[admin/calendario] approvals fetch error:", approvalsRes.status === "rejected" ? approvalsRes.reason : approvalsRes.value.error);
   }
 
@@ -103,44 +144,42 @@ export default async function AdminGlobalCalendarioPage({
     }
   }
 
-  // Client names, batched for exactly the clients referenced by the events found.
-  const clientIds = Array.from(new Set([
-    ...contentItemRows.map((c) => c.client_id),
-    ...operationalTaskRows.map((t) => t.client_id).filter((id): id is string => !!id),
-    ...approvalRows.map((a) => a.client_id),
-  ].filter(Boolean)));
-
-  const clientNames: ClientNameLookup = new Map();
-  if (clientIds.length > 0) {
+  // Responsible names (Fase 9) — batched, id -> profiles.name.
+  const responsibleIds = Array.from(new Set([
+    ...contentItemRows.map((c) => c.responsible_id).filter((id): id is string => !!id),
+    ...operationalTaskRows.map((t) => t.assigned_to).filter((id): id is string => !!id),
+  ]));
+  const responsibleNames: ResponsibleNameLookup = new Map();
+  if (responsibleIds.length > 0) {
     const { data, error } = await adminDb
-      .from("clients")
-      .select("id, company_name")
-      .in("id", clientIds);
+      .from("profiles")
+      .select("id, name")
+      .in("id", responsibleIds);
     if (!error && data) {
-      for (const row of data as { id: string; company_name: string | null }[]) {
-        if (row.company_name) clientNames.set(row.id, row.company_name);
+      for (const row of data as { id: string; name: string | null }[]) {
+        if (row.name) responsibleNames.set(row.id, row.name);
       }
     }
   }
 
   events = [
-    ...normalizeContentItems(contentItemRows, clientNames),
-    ...normalizeOperationalTasks(operationalTaskRows, clientNames),
+    ...normalizeContentItems(contentItemRows, clientNames, responsibleNames),
+    ...normalizeOperationalTasks(operationalTaskRows, clientNames, responsibleNames),
     ...normalizeApprovals(approvalRows, clientNames, contentTitles),
   ];
 
-  const clients = Array.from(clientNames.entries())
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-
   return (
     <GlobalCalendarContent
+      key={`${window.year}-${window.month}-${requestedClientId}-${requestedSource}`}
       initialEvents={events}
       initialYear={window.year}
       initialMonth={window.month}
+      initialSelectedDay={resolveInitialSelectedDay(window.year, window.month, serverToday)}
+      initialFilterClient={requestedClientId}
+      initialFilterSource={requestedSource}
       clients={clients}
       sourceErrors={sourceErrors}
-      serverToday={getFortalezaToday().dateKey}
+      serverToday={serverToday.dateKey}
       timezone={GLOBAL_CALENDAR_TIMEZONE}
     />
   );

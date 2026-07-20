@@ -21,10 +21,30 @@ const MONTHS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+const SOURCES: CalendarEventSource[] = ["content_item", "operational_task", "approval"];
+
 const SOURCE_LABEL: Record<CalendarEventSource, string> = {
   content_item: "Conteúdo",
   operational_task: "Produção",
   approval: "Aprovação",
+};
+
+const SOURCE_LABEL_PLURAL: Record<CalendarEventSource, string> = {
+  content_item: "Conteúdos",
+  operational_task: "Produção",
+  approval: "Aprovações",
+};
+
+const SOURCE_EMPTY_LABEL: Record<CalendarEventSource, string> = {
+  content_item: "Nenhum conteúdo agendado neste período.",
+  operational_task: "Nenhuma tarefa com prazo neste período.",
+  approval: "Nenhuma aprovação neste período.",
+};
+
+const SOURCE_ERROR_LABEL: Record<CalendarEventSource, string> = {
+  content_item: "Conteúdos não puderam ser carregados.",
+  operational_task: "Produção não pôde ser carregada.",
+  approval: "Aprovações não puderam ser carregadas.",
 };
 
 const SOURCE_ICON: Record<CalendarEventSource, React.ElementType> = {
@@ -144,23 +164,41 @@ interface Props {
   initialEvents: GlobalCalendarEvent[];
   initialYear: number;
   initialMonth: number; // 1-12
+  initialSelectedDay: string; // YYYY-MM-DD, resolved server-side for this exact month
+  initialFilterClient: string; // client id or "all" — already validated server-side
+  initialFilterSource: CalendarEventSource | "all";
   clients: ClientOption[];
-  sourceErrors: string[];
+  sourceErrors: CalendarEventSource[];
   serverToday: string; // YYYY-MM-DD in America/Fortaleza
   timezone: string;
 }
 
 export function GlobalCalendarContent({
-  initialEvents, initialYear, initialMonth, clients, sourceErrors, serverToday, timezone,
+  initialEvents, initialYear, initialMonth, initialSelectedDay, initialFilterClient, initialFilterSource,
+  clients, sourceErrors, serverToday, timezone,
 }: Props) {
   const router = useRouter();
 
-  const [filterClient, setFilterClient] = useState<string>("all");
-  const [filterSource, setFilterSource] = useState<"all" | CalendarEventSource>("all");
-  const [selectedDay,   setSelectedDay]   = useState<string | null>(serverToday);
+  // Safe to seed state directly from props: page.tsx remounts this component
+  // (via `key`) whenever year/month/client/source change, so these are always
+  // in sync with the URL on first render — no stale state across navigations.
+  const [filterClient, setFilterClient] = useState<string>(initialFilterClient);
+  const [filterSource, setFilterSource] = useState<"all" | CalendarEventSource>(initialFilterSource);
+  const [selectedDay,   setSelectedDay]   = useState<string>(initialSelectedDay);
   const [selectedEvent, setSelectedEvent] = useState<GlobalCalendarEvent | null>(null);
 
   const window_ = useMemo(() => buildMonthWindow(initialYear, initialMonth), [initialYear, initialMonth]);
+
+  const clientLabel = filterClient === "all" ? null : (clients.find((c) => c.id === filterClient)?.name ?? null);
+
+  const countsBySource = useMemo(() => {
+    const counts: Record<CalendarEventSource, number> = { content_item: 0, operational_task: 0, approval: 0 };
+    for (const e of initialEvents) {
+      if (filterClient !== "all" && e.client_id !== filterClient) continue;
+      counts[e.source]++;
+    }
+    return counts;
+  }, [initialEvents, filterClient]);
 
   const filteredEvents = useMemo(() => {
     return initialEvents.filter((e) => {
@@ -172,28 +210,47 @@ export function GlobalCalendarContent({
 
   const eventsByDay = useMemo(() => groupEventsByDateKey(filteredEvents), [filteredEvents]);
 
-  const selectedEvents = selectedDay ? (eventsByDay.get(selectedDay) ?? []) : [];
+  const selectedEvents = eventsByDay.get(selectedDay) ?? [];
 
-  function goToMonth(year: number, month: number) {
-    router.push(`/admin/calendario?year=${year}&month=${month}`);
+  function buildUrl(overrides: { year?: number; month?: number; client?: string; source?: string }) {
+    const params = new URLSearchParams();
+    params.set("year", String(overrides.year ?? initialYear));
+    params.set("month", String(overrides.month ?? initialMonth));
+    const client = overrides.client ?? filterClient;
+    const source = overrides.source ?? filterSource;
+    if (client !== "all") params.set("client", client);
+    if (source !== "all") params.set("source", source);
+    return `/admin/calendario?${params.toString()}`;
   }
 
   function prevMonth() {
     const m = initialMonth === 1 ? 12 : initialMonth - 1;
     const y = initialMonth === 1 ? initialYear - 1 : initialYear;
-    goToMonth(y, m);
+    router.push(buildUrl({ year: y, month: m }));
   }
 
   function nextMonth() {
     const m = initialMonth === 12 ? 1 : initialMonth + 1;
     const y = initialMonth === 12 ? initialYear + 1 : initialYear;
-    goToMonth(y, m);
+    router.push(buildUrl({ year: y, month: m }));
   }
 
   function goToday() {
     const [y, m] = serverToday.split("-").map(Number);
-    goToMonth(y, m);
+    router.push(buildUrl({ year: y, month: m }));
   }
+
+  function onClientChange(value: string) {
+    setFilterClient(value);
+    router.push(buildUrl({ client: value }));
+  }
+
+  function onSourceChange(value: string) {
+    setFilterSource(value as "all" | CalendarEventSource);
+    router.push(buildUrl({ source: value }));
+  }
+
+  const totalCount = countsBySource.content_item + countsBySource.operational_task + countsBySource.approval;
 
   return (
     <div>
@@ -208,14 +265,14 @@ export function GlobalCalendarContent({
       </div>
 
       {sourceErrors.length > 0 && (
-        <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-          Algumas fontes não puderam ser carregadas. Os dados exibidos podem estar incompletos.
+        <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{sourceErrors.map((s) => SOURCE_ERROR_LABEL[s]).join(" ")}</span>
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl px-1 py-1">
           <button onClick={prevMonth} aria-label="Mês anterior" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             <ChevronLeft className="w-4 h-4 text-gray-500" />
@@ -233,7 +290,7 @@ export function GlobalCalendarContent({
 
         <select
           value={filterClient}
-          onChange={(e) => setFilterClient(e.target.value)}
+          onChange={(e) => onClientChange(e.target.value)}
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600 ml-auto"
         >
           <option value="all">Todos os clientes</option>
@@ -242,14 +299,25 @@ export function GlobalCalendarContent({
 
         <select
           value={filterSource}
-          onChange={(e) => setFilterSource(e.target.value as typeof filterSource)}
+          onChange={(e) => onSourceChange(e.target.value)}
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600"
         >
-          <option value="all">Todas as fontes</option>
-          <option value="content_item">Conteúdos</option>
-          <option value="operational_task">Produção</option>
-          <option value="approval">Aprovações</option>
+          <option value="all">Todas as fontes ({totalCount})</option>
+          {SOURCES.map((s) => (
+            <option key={s} value={s}>{SOURCE_LABEL_PLURAL[s]} ({countsBySource[s]})</option>
+          ))}
         </select>
+      </div>
+
+      {/* Source summary badges */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        {SOURCES.map((s) => (
+          <span key={s} className={cn("inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border", SOURCE_BADGE[s])}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", SOURCE_DOT[s])} />
+            {SOURCE_LABEL_PLURAL[s]}: {countsBySource[s]}
+            {sourceErrors.includes(s) && <AlertTriangle className="w-3 h-3 ml-0.5" />}
+          </span>
+        ))}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -299,10 +367,10 @@ export function GlobalCalendarContent({
               })}
             </div>
             <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-50">
-              {(Object.keys(SOURCE_LABEL) as CalendarEventSource[]).map((key) => (
-                <div key={key} className="flex items-center gap-1">
-                  <div className={cn("w-2 h-2 rounded-full", SOURCE_DOT[key])} />
-                  <span className="text-[10px] text-gray-400">{SOURCE_LABEL[key]}</span>
+              {SOURCES.map((s) => (
+                <div key={s} className="flex items-center gap-1">
+                  <div className={cn("w-2 h-2 rounded-full", SOURCE_DOT[s])} />
+                  <span className="text-[10px] text-gray-400">{SOURCE_LABEL[s]}</span>
                 </div>
               ))}
             </div>
@@ -312,12 +380,10 @@ export function GlobalCalendarContent({
         {/* Agenda do dia */}
         <div>
           <h2 className="text-sm font-bold text-gray-800 mb-3">
-            {selectedDay
-              ? `${Number(selectedDay.slice(8, 10))} de ${MONTHS[Number(selectedDay.slice(5, 7)) - 1]}`
-              : "Selecione um dia"}
+            {Number(selectedDay.slice(8, 10))} de {MONTHS[Number(selectedDay.slice(5, 7)) - 1]}
           </h2>
 
-          {selectedDay && selectedEvents.length === 0 && (
+          {selectedEvents.length === 0 && (
             <div className="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
               <CalendarDays className="w-8 h-8 mx-auto mb-2 text-gray-300" />
               <p className="text-xs text-gray-500">Nenhum evento neste dia.</p>
@@ -351,9 +417,19 @@ export function GlobalCalendarContent({
             })}
           </div>
 
-          {filteredEvents.length === 0 && (
+          {/* Contextual period-level empty states (Fase 8) */}
+          {totalCount === 0 && sourceErrors.length === 0 && (
             <div className="mt-4 bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
-              <p className="text-xs text-gray-500">Nenhum evento neste período.</p>
+              <p className="text-xs text-gray-500">
+                {clientLabel
+                  ? `Nenhum evento para ${clientLabel} neste período.`
+                  : "Nenhum evento neste período."}
+              </p>
+            </div>
+          )}
+          {filterSource !== "all" && countsBySource[filterSource] === 0 && !sourceErrors.includes(filterSource) && (
+            <div className="mt-4 bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
+              <p className="text-xs text-gray-500">{SOURCE_EMPTY_LABEL[filterSource]}</p>
             </div>
           )}
         </div>

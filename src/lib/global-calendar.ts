@@ -13,6 +13,13 @@ const FORTALEZA_OFFSET = "-03:00";
 
 export type CalendarEventSource = "content_item" | "operational_task" | "approval";
 
+const VALID_SOURCES: readonly CalendarEventSource[] = ["content_item", "operational_task", "approval"];
+
+/** Validates a `source` search param, falling back to "all" (no filter) for anything unrecognized. */
+export function resolveRequestedSource(sourceParam: string | undefined): CalendarEventSource | "all" {
+  return VALID_SOURCES.includes(sourceParam as CalendarEventSource) ? (sourceParam as CalendarEventSource) : "all";
+}
+
 export interface GlobalCalendarEvent {
   id: string;
   source: CalendarEventSource;
@@ -45,7 +52,9 @@ export interface ContentItemRow {
   type: string | null;
   channel: string | null;
   status: string;
-  scheduled_date: string | null; // date column, "YYYY-MM-DD"
+  scheduled_date: string | null; // date column, "YYYY-MM-DD" — set early in the flow
+  scheduled_at: string | null;   // timestamptz — exact publish time, set later via ScheduleModal
+  caption: string | null;
   responsible_id: string | null;
 }
 
@@ -80,6 +89,8 @@ export interface ApprovalRow {
 export type ContentTitleLookup = Map<string, string>;
 /** Lookup of client id -> company_name. */
 export type ClientNameLookup = Map<string, string>;
+/** Lookup of profile id -> name (content_items.responsible_id / operational_tasks.assigned_to). */
+export type ResponsibleNameLookup = Map<string, string>;
 
 // ── Date-key helpers ─────────────────────────────────────────────────────────
 
@@ -120,12 +131,17 @@ function approvalOriginHref(clientId: string, contentId: string | null, approval
 
 export function normalizeContentItems(
   rows: ContentItemRow[],
-  clientNames: ClientNameLookup
+  clientNames: ClientNameLookup,
+  responsibleNames: ResponsibleNameLookup = new Map()
 ): GlobalCalendarEvent[] {
   const events: GlobalCalendarEvent[] = [];
   for (const row of rows) {
-    if (!row.scheduled_date) continue;
-    const dateKey = row.scheduled_date;
+    // scheduled_at (exact time, set later via ScheduleModal) wins over scheduled_date
+    // (coarser, set earlier in the flow) — a row never produces two events.
+    const hasExactTime = !!row.scheduled_at;
+    const dateKey = hasExactTime ? dateKeyFromTimestamp(row.scheduled_at!) : row.scheduled_date;
+    if (!dateKey) continue;
+
     events.push({
       id: `content_item:${row.id}`,
       source: "content_item",
@@ -133,16 +149,16 @@ export function normalizeContentItems(
       client_id: row.client_id,
       client_name: clientNames.get(row.client_id) ?? null,
       title: row.title?.trim() || "Conteúdo sem título",
-      description: null,
+      description: row.caption?.trim() || null,
       event_type: row.type ?? "conteudo",
       status: row.status,
-      start_at: dateOnlyToStartAt(dateKey),
+      start_at: hasExactTime ? row.scheduled_at! : dateOnlyToStartAt(dateKey),
       end_at: null,
       date_key: dateKey,
-      all_day: true,
+      all_day: !hasExactTime,
       timezone: GLOBAL_CALENDAR_TIMEZONE,
       responsible_id: row.responsible_id,
-      responsible_name: null,
+      responsible_name: row.responsible_id ? (responsibleNames.get(row.responsible_id) ?? null) : null,
       origin_href: contentOriginHref(row.client_id, row.id),
       editable: false,
       group_key: row.id,
@@ -154,7 +170,8 @@ export function normalizeContentItems(
 
 export function normalizeOperationalTasks(
   rows: OperationalTaskRow[],
-  clientNames: ClientNameLookup
+  clientNames: ClientNameLookup,
+  responsibleNames: ResponsibleNameLookup = new Map()
 ): GlobalCalendarEvent[] {
   const events: GlobalCalendarEvent[] = [];
   for (const row of rows) {
@@ -183,7 +200,7 @@ export function normalizeOperationalTasks(
       all_day: true,
       timezone: GLOBAL_CALENDAR_TIMEZONE,
       responsible_id: row.assigned_to,
-      responsible_name: row.assigned_role,
+      responsible_name: (row.assigned_to ? responsibleNames.get(row.assigned_to) : undefined) ?? row.assigned_role ?? null,
       origin_href: taskOriginHref(row.client_id, row.content_item_id, row.id),
       editable: false,
       group_key: row.content_item_id,
@@ -302,6 +319,17 @@ export function timestampWindowBounds(startKey: string, endKeyExclusiveOf: strin
     startIso: `${startKey}T00:00:00${FORTALEZA_OFFSET}`,
     endIso: `${endKeyExclusiveOf}T23:59:59.999${FORTALEZA_OFFSET}`,
   };
+}
+
+/**
+ * The date that should be pre-selected when a month is first shown.
+ * If the displayed month is the current Fortaleza month, select today;
+ * otherwise select the 1st of the displayed month — never a day that
+ * belongs to a different month than the one being viewed.
+ */
+export function resolveInitialSelectedDay(year: number, month: number, serverToday: { year: number; month: number; dateKey: string }): string {
+  if (year === serverToday.year && month === serverToday.month) return serverToday.dateKey;
+  return `${year}-${pad2(month)}-01`;
 }
 
 /** Groups events by date_key for grid/agenda rendering. */
