@@ -420,3 +420,49 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Google Calendar OAuth continua bloqueado ate aprovacao do QA desta sprint.
 - Restauracao UX do REC OS nao foi iniciada - continua na fila.
 - Projeto Sao Paulo continua registrado, sem escopo recuperado.
+
+## 2026-07-19 - Sprint 3.1A.3 - hotfix definitivo: navegacao nativa (sem SPA client-side)
+
+- QA da 3.1A.2 reprovado: mesmo com useState duplicado removido (fix
+  anterior), a navegacao client-side via next/link/router.push continuou
+  instavel em navegador real - mes anterior nao voltava, Hoje foi para
+  Setembro em vez de Julho, selecao de cliente/fonte aplicou com atraso ou
+  invertida. Causa provavel: Client Router Cache do Next.js App Router
+  reaproveitando payload RSC antigo em vez de buscar o servidor de novo para a
+  nova combinacao de searchParams.
+- Auditoria de DOM/controles (Fase 1): nenhuma sobreposicao, z-index ou hitbox
+  incorreto encontrado - layout ja era flex simples com gap visivel. A causa
+  nao era estrutural/visual.
+- Decisao tecnica: Anterior/Proximo/Hoje viraram <a href> HTML nativo (nao
+  next/link) - navegacao de documento completo, fora do Client Router Cache.
+  Selects de cliente/fonte continuam com onChange mas chamam
+  window.location.assign(href) dentro do handler, nunca router.push.
+- useRouter, router.push, useTransition, startTransition removidos por
+  completo de `_client-content.tsx` (confirmado por busca no arquivo - so
+  resta mencao em comentario).
+- Novo isNavigating (estado puramente operacional, nunca guarda
+  year/month/client/source) desabilita os selects e aplica aria-busy apos a
+  escolha; guard evita nova navegacao se href ja e o atual ou navegacao ja em
+  curso.
+- data-testid (calendar-previous-month, calendar-next-month, calendar-today,
+  calendar-client-filter, calendar-source-filter) e aria-label adicionados aos
+  5 controles criticos.
+- todayHref/previousMonthHref/nextMonthHref continuam vindo de
+  buildGlobalCalendarHref/shiftMonth (src/lib/global-calendar.ts, inalterado
+  nesta sprint) - todayHref deriva exclusivamente de serverToday.
+- Verificado: busca por router.push/router.replace/router.refresh/
+  useTransition/startTransition/setFilterClient/setFilterSource no arquivo -
+  zero ocorrencias reais. Suites ad-hoc das sprints 3.1A/3.1A.1/3.1A.2
+  re-executadas sem regressao (logica pura nao mudou).
+- Nao ha navegador disponivel neste ambiente para reproduzir o bug original
+  nem rodar o roteiro de interacao da Fase 13 do prompt - correcao validada
+  por auditoria de codigo + logica pura, nao por observacao visual.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- global_calendar mantido qa_pending - nao marcado validated.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Google Calendar OAuth continua bloqueado. Proxima tarefa apos aprovacao:
+  recuperacao do nucleo V1 do REC OS - nao Google Calendar.
+- Radar, PNG Vidigal, EditorOS nao foram alterados. Projeto Sao Paulo continua
+  registrado, sem escopo recuperado.

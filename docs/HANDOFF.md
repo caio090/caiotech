@@ -2,7 +2,32 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Sprint 3.1A.2, hotfix final de navegação e estado
+## Última sessão — 2026-07-19 — Sprint 3.1A.3, hotfix definitivo: navegação nativa
+
+- QA da 3.1A.2 reprovou: mesmo com a URL como única fonte de verdade (fix
+  anterior), a navegação client-side (`next/link`/`router.push`) continuou
+  instável em navegador real — mês anterior não voltava, Hoje ia para o mês
+  errado, filtros aplicavam com atraso/invertidos. Causa provável: Client
+  Router Cache do Next.js App Router reaproveitando payload RSC antigo.
+- Decisão: trocar Anterior/Próximo/Hoje para `<a href>` HTML nativo (navegação
+  de documento completo, fora do alcance do router cache); selects de
+  cliente/fonte agora usam `window.location.assign(href)` em vez de
+  `router.push`. `useRouter`/`useTransition`/`startTransition` removidos por
+  completo do arquivo (confirmado por busca no código).
+- Adicionado `data-testid` e `aria-label` em todos os 5 controles críticos
+  para facilitar QA automatizado futuro.
+- **Ressalva**: sem navegador disponível neste ambiente, não foi possível
+  reproduzir o bug original nem rodar o roteiro de interação (esperar
+  navegação completa entre cada passo). Correção segue a decisão técnica
+  exigida pelo ticket e foi verificada por auditoria de código + regressão das
+  suites ad-hoc anteriores.
+- `global_calendar` continua `qa_pending`. Depois de aprovado, a próxima tarefa
+  é a recuperação do núcleo V1 do REC OS — não Google Calendar. Google
+  Calendar OAuth, Radar, PNG Vidigal, EditorOS e Projeto São Paulo seguem sem
+  mudança.
+- TypeScript zero erros, build limpo, ESLint sem erros/warnings novos.
+
+## Sessão anterior — 2026-07-19 — Sprint 3.1A.2, hotfix final de navegação e estado
 
 - Segundo QA Codex Web aprovou quase tudo da 3.1A.1, mas reportou 4 P1 de
   navegação: Hoje ficava preso no mês exibido; selects de cliente/fonte não

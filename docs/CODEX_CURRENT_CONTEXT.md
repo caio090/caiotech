@@ -20,7 +20,21 @@
 - Deployment validado: `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
 - QA final Codex Web: **APROVADO** — zero P0, zero P1, React #418 não reproduzido, nenhum hydration mismatch. Criar, Persistência, Produção, Aprovação, CopyIdButton e EditorOS (bridge) validados. Mobile aprovado. Nenhum runtime error. Nenhuma regressão crítica.
 - Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
-- Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A**, **3.1A.1** e **3.1A.2** (hotfixes sucessivos pós-QA) — ver seções 3a-0/3a-i/3a-ii. QA Codex Web da 3.1A.2 pendente. Google Calendar OAuth continua bloqueado até essa aprovação. Restauração UX do REC OS (Aprovações na Home, Radar, Mural de Referências, briefing guiado) é a próxima tarefa registrada, ainda não iniciada.
+- Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A**, **3.1A.1**, **3.1A.2** e **3.1A.3** (hotfixes sucessivos pós-QA) — ver seções 3a-x/3a-0/3a-i/3a-ii. QA Codex Web da 3.1A.3 pendente. Google Calendar OAuth continua bloqueado até essa aprovação; a próxima tarefa depois de validado é a recuperação do núcleo V1 do REC OS (não Google Calendar). Restauração UX do REC OS (Aprovações na Home, Radar, Mural de Referências, briefing guiado) é a tarefa registrada na fila.
+
+## 3a-x. Sprint 3.1A.3 — Hotfix definitivo: navegação nativa (sem SPA client-side)
+
+- Data: 2026-07-19
+- QA da 3.1A.2 reprovado: navegação client-side (Next.js `<Link>`/`router.push`/`useTransition`) mostrou-se instável no navegador real — mês anterior não voltava, "Hoje" ia para o mês errado, seleção de cliente/fonte aplicava com atraso ou invertida. Sintomas consistentes com o Client Router Cache do Next.js App Router reaproveitando um payload RSC antigo em vez de buscar o servidor de novo para a nova combinação de searchParams.
+- Auditoria de DOM/controles (Fase 1 do prompt): nenhuma sobreposição, `z-index` ou hitbox incorreto encontrado — layout já era um flex simples com gap visível. A causa não era estrutural/visual, e sim a navegação client-side em si.
+- **Decisão técnica**: substituída toda a navegação crítica por comportamento nativo determinístico. Anterior/Próximo/Hoje agora são `<a href>` HTML puro (não `next/link`) — navegação de documento completo, fora do alcance do Client Router Cache. Os `<select>` de cliente/fonte continuam com `onChange` (não dá para virar link), mas agora chamam `window.location.assign(href)` dentro do handler, nunca `router.push`.
+- `useRouter`, `router.push`, `useTransition`, `startTransition` removidos por completo do arquivo (confirmado por busca — só resta a palavra em um comentário explicando a decisão).
+- Novo `isNavigating` (estado puramente operacional, nunca guarda year/month/client/source) desabilita os selects e aplica `aria-busy` imediatamente após a escolha; um guard evita nova navegação se o href já é o atual ou se uma navegação já está em curso.
+- `data-testid` (`calendar-previous-month`, `calendar-next-month`, `calendar-today`, `calendar-client-filter`, `calendar-source-filter`) e `aria-label` adicionados a todos os 5 controles críticos.
+- `todayHref`/`previousMonthHref`/`nextMonthHref` continuam vindos de `buildGlobalCalendarHref`/`shiftMonth` (`src/lib/global-calendar.ts`, inalterado desde a 3.1A.2) — `todayHref` deriva exclusivamente de `serverToday`, nunca de `shiftMonth` ou do mês exibido.
+- Verificado via script ad-hoc: as mesmas 16 combinações de URL das sprints anteriores (nenhuma mudou na lógica pura) mais confirmação de que `previousMonthHref`/`nextMonthHref`/`todayHref` nunca coincidem indevidamente. Busca por `router.push`/`router.replace`/`router.refresh`/`useTransition`/`startTransition`/`setFilterClient`/`setFilterSource` no arquivo: zero ocorrências reais.
+- **Não há navegador disponível neste ambiente** para reproduzir o bug original em condições reais nem para rodar o roteiro de interação da Fase 13 do prompt (aguardar navegação completa, clicar em sequência). A correção foi validada por auditoria de código + lógica pura, não por observação visual.
+- `global_calendar` mantido `qa_pending`.
 
 ## 3a-0. Sprint 3.1A.2 — Hotfix final de navegação e estado (URL como fonte única de verdade)
 

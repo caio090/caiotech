@@ -2,6 +2,91 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-19 (Sprint 3.1A.3 — Hotfix definitivo: navegação nativa)
+
+### Sprint
+
+Sprint 3.1A.3 — substitui a navegação client-side (SPA) por links nativos.
+
+### Executor
+
+Claude Code
+
+### QA anterior (reportado pelo usuário/Codex Web, não reexecutado por mim)
+
+Reprovado: mês anterior/próximo/Hoje e seleção de cliente/fonte se comportaram
+de forma instável/invertida/atrasada em navegador real, apesar da correção
+lógica da 3.1A.2 (remoção do `useState` duplicado). Sintomas: Julho→Agosto
+manteve "anterior" em Agosto; "Hoje" partindo de Agosto foi para Setembro;
+seleção de cliente/fonte com atraso ou invertida.
+
+### Causa provável
+
+A navegação client-side via `next/link`/`router.push` fica sujeita ao Client
+Router Cache do Next.js App Router, que pode reaproveitar um payload RSC já
+visitado para uma URL, em vez de buscar o servidor de novo — explicando
+sintomas de "estado antigo"/"direção errada" mesmo com a lógica de href já
+correta. Auditoria de DOM (Fase 1) não encontrou sobreposição, z-index ou
+hitbox incorretos — o layout já era um flex simples.
+
+### Decisão técnica
+
+Navegação crítica (anterior/próximo/Hoje) trocada para `<a href>` HTML nativo
+— documento completo, fora do Client Router Cache. Selects de cliente/fonte
+continuam com `onChange`, mas chamam `window.location.assign(href)` (também
+navegação nativa), nunca `router.push`. `useRouter`/`useTransition` removidos
+do arquivo.
+
+### Arquivos alterados
+
+- `src/app/admin/calendario/_client-content.tsx` — `useRouter`, `useTransition`,
+  `startTransition` removidos. Anterior/Próximo/Hoje viraram `<a>` nativas com
+  `aria-label`, `data-testid` (`calendar-previous-month`, `calendar-next-month`,
+  `calendar-today`) e `onClick` apenas cosmético (`setIsNavigating(true)`, sem
+  `preventDefault`). Novo `isNavigating` (estado puramente operacional) via
+  `useState`, com `navigateToCalendarHref()` usado pelos selects
+  (`window.location.assign`, com guard contra href igual ao atual ou navegação
+  já em curso). `data-testid` também nos dois `<select>`
+  (`calendar-client-filter`, `calendar-source-filter`).
+- `src/lib/global-calendar.ts` — inalterado nesta sprint (a lógica pura de
+  `buildGlobalCalendarHref`/`shiftMonth` já estava correta; o problema era só
+  o mecanismo de navegação client-side).
+
+### Verificação
+
+- Busca explícita no arquivo por `router.push`, `router.replace`,
+  `router.refresh`, `useTransition`, `startTransition`, `setFilterClient`,
+  `setFilterSource`, `useRouter`: zero ocorrências reais (só uma menção em
+  comentário explicando a decisão).
+- Suites ad-hoc das sprints 3.1A/3.1A.1/3.1A.2 re-executadas sem regressão
+  (lógica pura de `global-calendar.ts` não mudou).
+- **Não foi possível reproduzir o bug original nem rodar o roteiro de
+  interação da Fase 13 do prompt** — sem navegador disponível neste ambiente.
+  Correção validada por auditoria de código e lógica pura, não por observação
+  visual direta.
+
+### SQL
+
+- Nenhum SQL executado. Nenhuma consulta a content_items/operational_tasks/
+  approvals/clients/profiles alterada — fora de escopo desta sprint.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- `global_calendar` mantido `qa_pending`.
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis).
+- Google Calendar OAuth continua bloqueado.
+- Próxima tarefa após aprovação: recuperação do núcleo V1 do REC OS (não
+  Google Calendar).
+
+---
+
 ## 2026-07-19 (Sprint 3.1A.2 — Hotfix final de navegação e estado)
 
 ### Sprint
