@@ -2,7 +2,32 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Sprint 3.1A.1, hotfix do Calendário Global pós-QA
+## Última sessão — 2026-07-19 — Sprint 3.1A.2, hotfix final de navegação e estado
+
+- Segundo QA Codex Web aprovou quase tudo da 3.1A.1, mas reportou 4 P1 de
+  navegação: Hoje ficava preso no mês exibido; selects de cliente/fonte não
+  atualizavam a URL; anterior/próximo paravam de funcionar com filtros ativos;
+  cabeçalho/URL/filtros/agenda sem uma única fonte de verdade.
+- Causa raiz: `GlobalCalendarContent` guardava `filterClient`/`filterSource` em
+  `useState` PRÓPRIO, além de já vir da URL via props — dois estados
+  concorrentes para o mesmo dado.
+- Corrigido: removido esse `useState` duplicado; `filterClient`/`filterSource`
+  agora são lidos direto das props (`initialFilterClient`/`initialFilterSource`,
+  já validadas pelo servidor). Anterior/Próximo/Hoje agora são `<Link>`
+  determinísticos, com hrefs pré-computados por uma função pura nova
+  (`buildGlobalCalendarHref` + `shiftMonth` em `src/lib/global-calendar.ts`) —
+  nunca dependem de estado local ou closures de `onClick`.
+- **Ressalva**: não há navegador disponível neste ambiente para reproduzir o
+  bug relatado ao vivo. A correção segue a arquitetura exigida pelo ticket
+  (URL como fonte única de verdade) e foi verificada por script ad-hoc (16
+  casos de navegação) + regressão das suites anteriores — não por observação
+  visual do bug original sendo corrigido.
+- `global_calendar` continua `qa_pending`. Google Calendar OAuth segue
+  bloqueado até essa aprovação. Restauração UX do REC OS e "Projeto São Paulo"
+  seguem na fila, sem mudança.
+- TypeScript zero erros, build limpo, ESLint sem erros/warnings novos.
+
+## Sessão anterior — 2026-07-19 — Sprint 3.1A.1, hotfix do Calendário Global pós-QA
 
 - QA Codex Web (reportado pelo usuário) aprovou a base da 3.1A mas encontrou 4 P1:
   Hoje/navegação mensal prendiam a agenda no mês antigo (bug de `useState` não

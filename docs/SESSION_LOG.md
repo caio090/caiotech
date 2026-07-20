@@ -378,3 +378,45 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - Restauracao UX do REC OS nao foi iniciada nesta sessao - continua proxima tarefa.
 - Projeto Sao Paulo continua registrado como trilha paralela sem escopo recuperado.
+
+## 2026-07-19 - Sprint 3.1A.2 - hotfix final de navegacao e estado do Calendario Global
+
+- Segundo QA Codex Web aprovou quase tudo da 3.1A.1 e reportou 4 P1 de
+  navegacao: (1) botao Hoje permanecia no mes exibido em vez de ir para o mes
+  real; (2) selects de cliente/fonte nao atualizavam a URL; (3) com
+  cliente+fonte selecionados, anterior/proximo paravam de navegar
+  corretamente; (4) cabecalho/URL/filtros/agenda sem uma unica fonte de
+  verdade. Conteudos/Producao com contagem zero legitima - nao tratado como P1.
+- Causa raiz confirmada por auditoria de codigo: GlobalCalendarContent mantinha
+  filterClient/filterSource em useState proprio, alem de ja vir da URL via
+  props (initialFilterClient/initialFilterSource) - dois estados concorrentes
+  para o mesmo dado. Anterior/proximo/Hoje eram onClick handlers chamando uma
+  buildUrl local que lia esse estado (closures), nao a URL/props atuais.
+- Corrigido em `src/lib/global-calendar.ts`: novas funcoes puras
+  shiftMonth(year, month, delta) (aritmetica de mes/ano sem Date) e
+  buildGlobalCalendarHref({year, month, client, source}) (builder canonico de
+  URL, sempre URLSearchParams novo, nunca inclui client/source quando "all").
+- Corrigido em `_client-content.tsx`: useState de filterClient/filterSource
+  removido - agora lidos direto das props. Anterior/Proximo/Hoje viraram
+  <Link href=...> com hrefs pre-computados via buildGlobalCalendarHref +
+  shiftMonth (deterministicos, nunca dependem de estado). Selects de
+  cliente/fonte mantem onChange mas constroem o href a partir das props
+  atuais, nunca de estado local. useTransition adicionado para desabilitar a
+  toolbar durante navegacao. aria-current no botao Hoje quando ja no mes atual.
+- Verificado via script ad-hoc: as 16 combinacoes da Fase 13 do prompt
+  (viradas de mes/ano em ambas direcoes, preservacao de client/source isolados
+  e combinados, "Todos"/"Todas" removendo parametro, source invalido em "all",
+  sem URL duplicada nem undefined) - todas passaram. Suites da 3.1A e 3.1A.1
+  re-executadas sem regressao.
+- Nao foi possivel reproduzir o bug relatado ao vivo em navegador (sem
+  navegador disponivel neste ambiente) - correcao segue a arquitetura
+  prescrita (URL como fonte unica de verdade), verificada por logica pura +
+  regressao, nao por observacao visual direta do bug original.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- global_calendar mantido qa_pending - nao marcado validated.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Google Calendar OAuth continua bloqueado ate aprovacao do QA desta sprint.
+- Restauracao UX do REC OS nao foi iniciada - continua na fila.
+- Projeto Sao Paulo continua registrado, sem escopo recuperado.

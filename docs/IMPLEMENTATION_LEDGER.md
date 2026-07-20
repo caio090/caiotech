@@ -2,6 +2,84 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-19 (Sprint 3.1A.2 — Hotfix final de navegação e estado)
+
+### Sprint
+
+Sprint 3.1A.2 — corrige os 4 P1 do segundo QA Codex Web (navegação/estado).
+
+### Executor
+
+Claude Code
+
+### QA anterior (reportado pelo usuário/Codex Web, não reexecutado por mim)
+
+Aprovado: autenticação, rota, sidebar, isolamento Duh/O Pedreirão, lista completa
+de clientes, client/source direto na URL, estados vazios, Aprovações, deep-link,
+ausência de React #418/hydration mismatch, console, runtime, ausência de
+public_token/service role.
+
+P1: (1) botão Hoje permanecia no mês exibido; (2) selects de cliente/fonte não
+atualizavam a URL; (3) com cliente+fonte selecionados, anterior/próximo paravam
+de navegar; (4) cabeçalho/URL/filtros/agenda sem fonte única de verdade.
+Conteúdos/Produção com zero legítimo — não é P1.
+
+### Causa raiz confirmada
+
+`GlobalCalendarContent` mantinha `filterClient`/`filterSource` em `useState`
+próprio, além de já vir de `initialFilterClient`/`initialFilterSource` (props
+derivadas da URL) — dois estados concorrentes para o mesmo dado. A navegação
+usava `onClick handlers` chamando uma `buildUrl` local que lia esse estado
+(closures), em vez de derivar sempre da URL/props atuais.
+
+### Arquivos alterados
+
+- `src/lib/global-calendar.ts` — novas funções puras `shiftMonth(year, month, delta)`
+  (aritmética de mês/ano sem `Date`) e `buildGlobalCalendarHref({year, month,
+  client, source})` (builder canônico de URL: sempre `URLSearchParams` novo,
+  nunca inclui `client`/`source` quando "all").
+- `src/app/admin/calendario/_client-content.tsx` — `useState` de
+  `filterClient`/`filterSource` removido; agora lidos direto de
+  `initialFilterClient`/`initialFilterSource`. Anterior/Próximo/Hoje viraram
+  `<Link href=...>` com hrefs pré-computados via `buildGlobalCalendarHref` +
+  `shiftMonth` (determinísticos a partir das props, nunca de estado). Selects
+  de cliente/fonte mantêm `onChange` (não dá para virar `Link`), mas agora
+  constroem o href a partir das props atuais, nunca de estado local.
+  `useTransition` adicionado para desabilitar a toolbar durante a navegação.
+  `aria-current` no botão Hoje quando já no mês atual.
+
+### Verificação
+
+- Script ad-hoc (mesma abordagem das sprints anteriores): as 16 combinações da
+  Fase 13 do prompt (viradas de mês/ano em ambas direções, preservação de
+  client/source isolados e combinados, "Todos"/"Todas" removendo parâmetro,
+  source inválido em "all", sem URL duplicada nem `undefined`) — todas
+  passaram. Suites da 3.1A e 3.1A.1 re-executadas sem regressão.
+- **Não foi possível reproduzir o bug relatado ao vivo em navegador** (sem
+  navegador disponível neste ambiente) — a correção segue a arquitetura
+  prescrita (URL como única fonte de verdade) e foi verificada por lógica pura
+  + regressão de teste, não por observação visual direta do bug original.
+
+### SQL
+
+- Nenhum SQL executado.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- `global_calendar` mantido `qa_pending`.
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis).
+- Google Calendar OAuth continua bloqueado até aprovação do QA desta sprint.
+- Restauração UX do REC OS não foi iniciada.
+
+---
+
 ## 2026-07-19 (Sprint 3.1A.1 — Hotfix do Calendário Global após QA)
 
 ### Sprint
