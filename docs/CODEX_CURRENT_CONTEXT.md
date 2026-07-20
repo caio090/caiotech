@@ -20,15 +20,24 @@
 - Deployment validado: `dpl_BXYjpnSfhkMbyQy7WMYCrzZ8pBG1`
 - QA final Codex Web: **APROVADO** — zero P0, zero P1, React #418 não reproduzido, nenhum hydration mismatch. Criar, Persistência, Produção, Aprovação, CopyIdButton e EditorOS (bridge) validados. Mobile aprovado. Nenhum runtime error. Nenhuma regressão crítica.
 - Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
-- Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A (implementação, somente leitura)** — ver seção 3a. QA Codex Web da 3.1A pendente.
+- Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A (implementação, somente leitura)** e **Sprint 3.1A.1 (hotfix pós-QA)** — ver seções 3a/3a-i. QA Codex Web da 3.1A.1 pendente. Restauração UX do REC OS (Aprovações na Home, Radar, Mural de Referências, briefing guiado) é a próxima tarefa registrada, ainda não iniciada.
 
-## 3a. Sprint 3.1A — Calendário Global somente leitura
+## 3a-i. Sprint 3.1A.1 — Hotfix do Calendário Global após QA de produção
+
+- Data: 2026-07-19
+- QA Codex Web anterior aprovou deployment/autenticação/rota/sidebar/grade/agenda/Aprovações/detalhe/deep-link/React #418/hidratação/mobile/runtime/ausência de public_token e service role, mas reportou 4 P1 e 1 P2 (ver seção 3a-ii para os P1 originais).
+- `src/lib/global-calendar.ts`: `ContentItemRow` ganhou `scheduled_at`/`caption`; `normalizeContentItems`/`normalizeOperationalTasks` agora recebem um `ResponsibleNameLookup` (profiles.name) e preenchem `responsible_name` de verdade; nova `resolveInitialSelectedDay()` (mês atual → serverToday, outro mês → dia 1) e `resolveRequestedSource()` (valida `source` param).
+- `src/app/admin/calendario/page.tsx`: `searchParams` agora aceita `client`/`source`; clientes agora vêm de uma query própria e completa (`clients` com `CLIENT_VISIBLE_STATUSES`, mesma lógica de `src/lib/client-visibility.ts`/`admin-contentos-clients.ts`) — não mais derivados só dos eventos do mês, então um cliente sem evento no período continua aparecendo no filtro; `client` param é validado contra essa lista (inválido cai em "all", nunca 500); `content_items` agora também consulta `scheduled_at` (coluna real, timestamptz, usada por `ScheduleModal` da Home) além de `scheduled_date`, sem duplicar evento por linha; `responsible_id`/`assigned_to` são resolvidos em lote via `profiles.name`. O componente cliente é remontado (`key={year-month-client-source}`) a cada mudança de URL, eliminando a classe de bug de estado desatualizado (dia selecionado preso no mês anterior).
+- `src/app/admin/calendario/_client-content.tsx`: estado inicial (`selectedDay`, `filterClient`, `filterSource`) agora vem só de props resolvidas no servidor — seguro porque o componente remonta a cada mudança de URL; navegação de mês/Hoje/filtros preserva os outros parâmetros na URL; badges de contagem por fonte; estados vazios contextuais distintos de "fonte falhou ao carregar".
+- Verificado via script ad-hoc (mesma abordagem da 3.1A, sem framework de teste instalado): `scheduled_at` vence `scheduled_date` sem duplicar evento, `responsible_name` cai para `assigned_role`/null quando o profile não tem nome, `resolveInitialSelectedDay`/`resolveRequestedSource` cobrem os casos do prompt. Suite original da 3.1A também re-executada sem regressões.
+- `global_calendar` mantido `qa_pending` — não marcado `validated` antes de novo QA Codex Web.
+
+## 3a-ii. Sprint 3.1A — Calendário Global somente leitura (implementação original)
 
 - Data: 2026-07-19
 - Rota criada: `/admin/calendario` (`src/app/admin/calendario/page.tsx` + `_client-content.tsx`), admin/super_admin somente, via `requireAdminContentOSContext()` + `adminDb`. Não substitui `/admin/contentos/calendario` (calendário por cliente do REC OS, preservado).
 - Modelo normalizado: `src/lib/global-calendar.ts` — `GlobalCalendarEvent`, normalizadores puros para `content_item`/`operational_task`/`approval`, grade mensal (`buildMonthWindow`) e resolução de mês (`resolveRequestedMonth`) calculados via `Date.UTC`/`Intl.DateTimeFormat` com `America/Fortaleza` explícito — nunca `new Date()` cru no primeiro render.
 - Fontes: `content_items` (scheduled_date), `operational_tasks` (due_date ?? start_date), `approvals` (approval_due_at ?? approval_sent_at ?? created_at). `commercial_meetings`, `productivity_meetings`/`productivity_tasks` e `content_campaigns` **não** entraram nesta sprint (reuniões ficaram para 3.1C).
-- Verificação: sem framework de teste no projeto — normalizadores verificados via script ad-hoc (`tsc` standalone + `node`) cobrindo os casos A–L da Fase 21 do prompt (fallbacks de data, group_key compartilhado, ids únicos, ausência de public_token, origin_href interno, exclusão de eventos sem client_id). QA Codex Web em navegador real ainda pendente.
 - Item "Calendário Global" adicionado à sidebar admin (`src/components/app-sidebar.tsx`), ícone `CalendarDays` já existente.
 - Nenhum SQL executado. `productivity_meetings`/`productivity_tasks` (SQL 38) permanecem não executados/não auditados.
 

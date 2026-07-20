@@ -650,9 +650,26 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Sprint 3.1A: visão administrativa cross-cliente somente leitura, agregando content_items, operational_tasks e approvals em /admin/calendario via modelo normalizado GlobalCalendarEvent. Financeiro ainda não incluído como fonte.",
     phase: "v2",
     readiness: "qa_pending",
-    qa: { status: "not_started" },
+    qa: {
+      status: "pending",
+      date: "2026-07-19",
+      auditor: "Codex Web",
+      result: [
+        "Deployment, autenticação, rota, sidebar, grade mensal e agenda aprovados",
+        "Aprovações, detalhe e deep-link de Aprovação aprovados",
+        "React #418, hidratação, console, mobile e runtime aprovados",
+        "Ausência de public_token e de service role no browser confirmada",
+      ],
+      p2: [
+        "P1 (Sprint 3.1A.1): navegação mensal/Hoje corrigida (bug de estado desatualizado, não hidratação)",
+        "P1 (Sprint 3.1A.1): parâmetro client na URL agora validado e suportado",
+        "P1 (Sprint 3.1A.1): lista de clientes agora independente de eventos do mês",
+        "P1 (Sprint 3.1A.1): content_items agora consulta scheduled_at além de scheduled_date",
+        "Novo QA Codex Web necessário antes de marcar validated",
+      ],
+    },
     last_updated: "2026-07-19",
-    notes: "Sprint 3.1A: rota /admin/calendario (requireAdminContentOSContext, adminDb), src/lib/global-calendar.ts com normalizadores puros (verificados via script ad-hoc, sem framework de teste instalado). Somente leitura, sem SQL, sem reuniões, sem Google Calendar/Meet — adiados para 3.1C/3.1D. Arquitetura original em docs/architecture/GLOBAL_CALENDAR_V1.md.",
+    notes: "Sprint 3.1A: rota /admin/calendario (requireAdminContentOSContext, adminDb), src/lib/global-calendar.ts com normalizadores puros. Sprint 3.1A.1: hotfix dos 4 P1 do QA (navegação mensal, filtro client, lista de clientes, scheduled_at). Verificado via script ad-hoc, sem framework de teste instalado. Somente leitura, sem SQL, sem reuniões, sem Google Calendar/Meet — adiados para 3.1C/3.1D. Arquitetura original em docs/architecture/GLOBAL_CALENDAR_V1.md.",
   },
   {
     id: "client_360",

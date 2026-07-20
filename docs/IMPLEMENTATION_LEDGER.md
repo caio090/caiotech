@@ -2,6 +2,102 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-19 (Sprint 3.1A.1 — Hotfix do Calendário Global após QA)
+
+### Sprint
+
+Sprint 3.1A.1 — corrige os 4 P1 e 1 P2 reportados pelo QA Codex Web da 3.1A.
+
+### Executor
+
+Claude Code
+
+### QA anterior (reportado pelo usuário/Codex Web, não reexecutado por mim)
+
+Aprovado: deployment, autenticação, rota, sidebar, grade mensal, agenda, Aprovações,
+detalhe, deep-link de Aprovação, React #418, hidratação, console, mobile, runtime,
+ausência de public_token, ausência de service role.
+
+P1: (1) Hoje/navegação mensal deixavam `selectedDay` preso no mês anterior;
+(2) parâmetro `client` na URL não era reconhecido; (3) cliente sem evento no mês
+sumia do seletor; (4) Conteúdos e Produção não puderam ser validados (suspeita:
+`content_items.scheduled_at` não estava sendo consultado).
+
+P2: `responsible_name`/descrição ausentes no detalhe.
+
+### Causa raiz confirmada
+
+1. `GlobalCalendarContent` usava `useState(serverToday)`/`useState("all")` — o
+   valor inicial de `useState` só se aplica na montagem; ao navegar entre meses
+   (mesma instância do componente, só props novas via searchParams), o estado
+   não se realinhava com a nova URL. Clássico bug de estado desatualizado, não
+   um problema de hidratação.
+2. `searchParams` do `page.tsx` só aceitava `year`/`month` — `client`/`source`
+   nunca chegavam ao servidor.
+3. A lista de clientes do filtro era derivada só de `clientNames` (que só continha
+   clientes com evento na janela) — nunca existia uma query própria e completa
+   de `clients`.
+4. `content_items` só era consultado por `scheduled_date`; `ScheduleModal` da
+   Home (`src/app/contentos/home/_client-content.tsx`) grava a data real de
+   publicação em `scheduled_at` (timestamptz, coluna real confirmada em
+   `docs/supabase/14-contentos-approval-production-flow.sql`) sem tocar em
+   `scheduled_date` — conteúdo agendado por lá nunca aparecia no calendário.
+
+### Arquivos alterados
+
+- `src/lib/global-calendar.ts` — `ContentItemRow` ganhou `scheduled_at`/`caption`;
+  `normalizeContentItems` prefere `scheduled_at` (all_day=false) sobre
+  `scheduled_date` (all_day=true), nunca gera duas linhas para o mesmo registro;
+  `caption` vira `description`; novo `ResponsibleNameLookup` usado por
+  `normalizeContentItems`/`normalizeOperationalTasks` (profiles.name, com
+  fallback para `assigned_role` nas tarefas); nova `resolveInitialSelectedDay()`
+  e `resolveRequestedSource()`.
+- `src/app/admin/calendario/page.tsx` — `searchParams` aceita `client`/`source`;
+  nova query de `clients` completa e independente de eventos (mesma lógica de
+  `CLIENT_VISIBLE_STATUSES`/`isVisibleClientRecord` de `src/lib/client-visibility.ts`);
+  `client` param validado contra essa lista (inválido → "all", nunca 500);
+  `content_items` consultado por `scheduled_date` OU `scheduled_at`; lookup em
+  lote de `profiles.name` para `responsible_id`/`assigned_to`; componente filho
+  recebe `key={year-month-client-source}` para remontar de forma limpa a cada
+  mudança de URL.
+- `src/app/admin/calendario/_client-content.tsx` — estado inicial 100% derivado
+  de props (seguro por causa do `key` acima); navegação (mês anterior/próximo/
+  Hoje) e os dois `<select>` preservam os demais parâmetros na URL; badges de
+  contagem por fonte; estados vazios contextuais (cliente sem evento, fonte sem
+  evento, fonte com erro) distintos entre si.
+
+### Verificação
+
+- Script ad-hoc atualizado (`tsc` standalone + `node`, sem instalar framework):
+  `scheduled_at` vence `scheduled_date` sem duplicar; `responsible_name` cai
+  corretamente para `assigned_role`/null; `resolveInitialSelectedDay` cobre mês
+  atual vs. outro mês; `resolveRequestedSource` valida/rejeita. Suite da 3.1A
+  original re-executada sem regressões.
+- Não foi possível confirmar contagens reais em produção (sem acesso a
+  ferramenta de query neste ambiente) — a correção do filtro `scheduled_at` foi
+  validada por auditoria de schema/código (coluna real, usada por
+  `ScheduleModal`), não por contagem ao vivo.
+
+### SQL
+
+- Nenhum SQL executado, nenhuma migration criada.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- `global_calendar` mantido `qa_pending` (não marcado `validated`).
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis).
+- Restauração UX do REC OS **não** foi iniciada nesta sprint.
+- Projeto São Paulo continua registrado como trilha paralela sem escopo recuperado.
+
+---
+
 ## 2026-07-19 (Sprint 3.1A — Calendário Global somente leitura)
 
 ### Sprint

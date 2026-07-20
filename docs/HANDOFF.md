@@ -2,7 +2,27 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Sprint 3.1A, Calendário Global somente leitura
+## Última sessão — 2026-07-19 — Sprint 3.1A.1, hotfix do Calendário Global pós-QA
+
+- QA Codex Web (reportado pelo usuário) aprovou a base da 3.1A mas encontrou 4 P1:
+  Hoje/navegação mensal prendiam a agenda no mês antigo (bug de `useState` não
+  ressincronizado com a URL — não hidratação), `client` na URL era ignorado,
+  cliente sem evento sumia do seletor, e Conteúdos/Produção não puderam ser
+  validados (causa real: `content_items.scheduled_at` — coluna real usada pelo
+  `ScheduleModal` da Home — nunca era consultada, só `scheduled_date`).
+- Corrigido: `GlobalCalendarContent` agora remonta (`key={year-month-client-source}`)
+  a cada mudança de URL, então todo estado inicial pode vir direto das props sem
+  risco de ficar desatualizado; `page.tsx` aceita e valida `client`/`source`;
+  lista de clientes vem de uma query própria (não mais derivada só dos eventos);
+  `content_items` consultado por `scheduled_date` OU `scheduled_at` sem duplicar;
+  `responsible_name` agora resolvido via `profiles.name` em lote.
+- `global_calendar` continua `qa_pending` — não marcar `validated` até novo QA.
+- Restauração UX do REC OS (Aprovações→Home, Radar, Mural de Referências,
+  briefing guiado) é a próxima tarefa pendente, ainda **não iniciada**.
+- "Projeto São Paulo" segue registrado como trilha paralela sem escopo recuperado.
+- TypeScript zero erros, build limpo, ESLint sem erros/warnings novos.
+
+## Sessão anterior — 2026-07-19 — Sprint 3.1A, Calendário Global somente leitura
 
 - Nova rota `/admin/calendario` (admin/super_admin apenas): agrega `content_items`,
   `operational_tasks` e `approvals` de todos os clientes via `src/lib/global-calendar.ts`

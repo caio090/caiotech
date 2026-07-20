@@ -330,3 +330,51 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhum SQL executado. Nenhuma RLS alterada. Nenhum schema alterado.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - Reunioes (3.1C) e Google Calendar/Meet (3.1D) nao tratados nesta sessao.
+
+## 2026-07-19 - Sprint 3.1A.1 - hotfix do Calendario Global apos QA de producao
+
+- QA Codex Web (reportado pelo usuario) aprovou a base da 3.1A e reportou 4 P1 +
+  1 P2: (1) botao Hoje/navegacao mensal deixavam selectedDay preso no mes
+  anterior; (2) parametro client na URL nao era reconhecido; (3) O Pedreirao
+  sumia do seletor quando sem evento no mes; (4) Conteudos e Producao nao
+  puderam ser validados; P2: responsavel/descricao ausentes no detalhe.
+- Causa raiz do item 1: useState(serverToday)/useState("all") em
+  GlobalCalendarContent so aplicam o valor inicial na montagem; ao navegar
+  entre meses (mesma instancia, so props novas), o estado nao se realinhava
+  com a nova URL - bug classico de estado desatualizado, nao hidratacao.
+- Causa raiz do item 4: content_items so era consultado por scheduled_date;
+  ScheduleModal da Home grava a data real de publicacao em scheduled_at
+  (timestamptz, coluna real confirmada em
+  docs/supabase/14-contentos-approval-production-flow.sql) sem tocar em
+  scheduled_date - conteudo agendado por la nunca aparecia.
+- Corrigido em `src/lib/global-calendar.ts`: ContentItemRow ganhou
+  scheduled_at/caption; normalizeContentItems prefere scheduled_at (all_day
+  false) sobre scheduled_date (all_day true) sem duplicar evento; caption vira
+  description; novo ResponsibleNameLookup (profiles.name, fallback para
+  assigned_role em tarefas); novas resolveInitialSelectedDay()/
+  resolveRequestedSource().
+- Corrigido em `src/app/admin/calendario/page.tsx`: searchParams aceita
+  client/source; nova query completa de clients (CLIENT_VISIBLE_STATUSES,
+  mesma logica de src/lib/client-visibility.ts), independente de eventos;
+  client param validado contra essa lista (invalido cai em "all", nunca 500);
+  content_items consultado por scheduled_date OU scheduled_at; lookup em lote
+  de profiles.name; componente filho recebe key={year-month-client-source}
+  para remontar de forma limpa a cada mudanca de URL.
+- Corrigido em `_client-content.tsx`: estado inicial 100% derivado de props
+  (seguro por causa do key acima); navegacao e filtros preservam os demais
+  parametros na URL; badges de contagem por fonte; estados vazios contextuais
+  distintos de fonte com erro.
+- Verificado via script ad-hoc (sem framework de teste instalado): scheduled_at
+  vence scheduled_date sem duplicar, responsible_name cai para assigned_role/
+  null corretamente, resolveInitialSelectedDay/resolveRequestedSource cobrem os
+  casos do prompt. Suite da 3.1A original re-executada sem regressoes.
+- Nao foi possivel confirmar contagens reais em producao (sem ferramenta de
+  query neste ambiente) - correcao do scheduled_at validada por auditoria de
+  schema/codigo, nao por contagem ao vivo.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings novos.
+- global_calendar mantido qa_pending - nao marcado validated antes de novo QA.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Restauracao UX do REC OS nao foi iniciada nesta sessao - continua proxima tarefa.
+- Projeto Sao Paulo continua registrado como trilha paralela sem escopo recuperado.
