@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays, ChevronLeft, ChevronRight, X, ArrowRight,
@@ -179,8 +178,10 @@ export function GlobalCalendarContent({
   initialEvents, initialYear, initialMonth, initialSelectedDay, initialFilterClient, initialFilterSource,
   clients, sourceErrors, serverToday, timezone,
 }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  // Purely operational — never holds year/month/client/source, only whether a
+  // full-page navigation was just kicked off, so the selects can disable
+  // themselves immediately and ignore further input.
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // URL is the single source of truth for year/month/client/source: page.tsx
   // validates them server-side and remounts this component (via `key`)
@@ -232,15 +233,24 @@ export function GlobalCalendarContent({
   const previousMonthHref = buildGlobalCalendarHref({ year: previous.year, month: previous.month, client: filterClient, source: filterSource });
   const nextMonthHref = buildGlobalCalendarHref({ year: next.year, month: next.month, client: filterClient, source: filterSource });
   const todayHref = buildGlobalCalendarHref({ year: todayYear, month: todayMonth, client: filterClient, source: filterSource });
+  const currentHref = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: filterSource });
+
+  // A single, exclusive navigation path for the two <select> controls (they
+  // can't be plain <a> links). Native full-page navigation — no router.push,
+  // no client-side route cache involved — so it can't replay a stale RSC
+  // payload from an earlier visit to the same URL.
+  function navigateToCalendarHref(href: string) {
+    if (href === currentHref || isNavigating) return;
+    setIsNavigating(true);
+    window.location.assign(href);
+  }
 
   function onClientChange(value: string) {
-    const href = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: value, source: filterSource });
-    startTransition(() => router.push(href));
+    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: value, source: filterSource }));
   }
 
   function onSourceChange(value: string) {
-    const href = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: value as "all" | CalendarEventSource });
-    startTransition(() => router.push(href));
+    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: value as "all" | CalendarEventSource }));
   }
 
   const totalCount = countsBySource.content_item + countsBySource.operational_task + countsBySource.approval;
@@ -264,22 +274,44 @@ export function GlobalCalendarContent({
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className={cn("flex flex-wrap items-center gap-2 mb-3", isPending && "opacity-60 pointer-events-none")}>
+      {/* Toolbar — Anterior/Próximo/Hoje are plain native <a> links: a full
+          document navigation, not intercepted client-side, so there is no
+          SPA router cache that can replay a stale month/filter combination. */}
+      <div
+        className={cn("flex flex-wrap items-center gap-2 mb-3", isNavigating && "opacity-60")}
+        aria-busy={isNavigating}
+      >
         <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl px-1 py-1">
-          <Link href={previousMonthHref} aria-label="Mês anterior" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <a
+            href={previousMonthHref}
+            aria-label="Mês anterior"
+            data-testid="calendar-previous-month"
+            onClick={() => setIsNavigating(true)}
+            className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <ChevronLeft className="w-4 h-4 text-gray-500" />
-          </Link>
+            <span className="sr-only">Mês anterior</span>
+          </a>
           <span className="text-sm font-bold text-gray-800 px-2 min-w-[140px] text-center">
             {MONTHS[initialMonth - 1]} {initialYear}
           </span>
-          <Link href={nextMonthHref} aria-label="Próximo mês" className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <a
+            href={nextMonthHref}
+            aria-label="Próximo mês"
+            data-testid="calendar-next-month"
+            onClick={() => setIsNavigating(true)}
+            className="p-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <ChevronRight className="w-4 h-4 text-gray-500" />
-          </Link>
+            <span className="sr-only">Próximo mês</span>
+          </a>
         </div>
-        <Link
+        <a
           href={todayHref}
+          aria-label="Ir para hoje"
           aria-current={isCurrentMonth ? "date" : undefined}
+          data-testid="calendar-today"
+          onClick={() => setIsNavigating(true)}
           className={cn(
             "text-xs font-bold px-3 py-2 rounded-xl border transition-colors",
             isCurrentMonth
@@ -288,12 +320,13 @@ export function GlobalCalendarContent({
           )}
         >
           Hoje
-        </Link>
+        </a>
 
         <select
           value={filterClient}
           onChange={(e) => onClientChange(e.target.value)}
-          disabled={isPending}
+          disabled={isNavigating}
+          data-testid="calendar-client-filter"
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600 ml-auto"
         >
           <option value="all">Todos os clientes</option>
@@ -303,7 +336,8 @@ export function GlobalCalendarContent({
         <select
           value={filterSource}
           onChange={(e) => onSourceChange(e.target.value)}
-          disabled={isPending}
+          disabled={isNavigating}
+          data-testid="calendar-source-filter"
           className="text-xs border border-gray-200 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-400 bg-white text-gray-600"
         >
           <option value="all">Todas as fontes ({totalCount})</option>
