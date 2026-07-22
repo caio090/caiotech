@@ -2,7 +2,41 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Sprint 3.1A.3, hotfix definitivo: navegação nativa
+## Última sessão — 2026-07-20 — Sprint Motor LOKAT 1.0 (branch isolada, NÃO mergeada)
+
+- **Trabalho feito inteiramente na branch `feat/motor-lokat-preview-v1`**
+  (criada a partir de `main` no commit `075b023`). Nenhum commit foi para
+  `main`, nenhum push para `main`, nenhum deployment de produção — só
+  `git push -u origin feat/motor-lokat-preview-v1`, aguardando Preview da
+  Vercel.
+- Nova rota `/admin/meu-negocio` ("Meu Negócio", badge "Motor LOKAT"):
+  vertical slice funcional em modo demonstração — sem Supabase, sem
+  persistência, tudo em memória. 6 abas: Visão Geral, Precificação,
+  Campanhas, Fluxo de Caixa, Fontes, Glossário.
+- Motor financeiro determinístico em `src/lib/motor-lokat/` (centavos
+  inteiros, nunca float), verificado via script ad-hoc cobrindo os 7
+  cenários pedidos (custo 40%/margem 60%, preço mínimo R$150, campanha
+  saudável, campanha em prejuízo, CAC > LTV, dados insuficientes, capital de
+  giro com 2 meses de cobertura) — zero NaN/Infinity.
+- Simulador de campanha com CAC/LTV/payback e ponte de contexto para o REC
+  OS (link real para `/admin/contentos/criar?step=brief`, rota auditada
+  antes de usar — contexto só exibido, preenchimento automático é próxima
+  fatia). Interpretador de insights por regras fixas, nenhuma LLM conectada
+  (deixado explícito na tela). Prévia de payload para IA futura, nunca
+  enviada a lugar nenhum.
+- `src/config/project-status.ts`: 8 áreas novas adicionadas, todas anotadas
+  como existentes só nesta branch. `global_calendar` não foi tocado.
+- Item "Meu Negócio" na sidebar admin — só nesta branch.
+- TypeScript zero erros, build limpo (uma falha de alocação de memória do
+  Turbopack se resolveu limpando `.next` — não era um problema de código),
+  ESLint sem erros/warnings, busca por padrões proibidos (Math.random,
+  Date.now, window., Supabase, fetch, etc.) sem ocorrências reais.
+- **Se retomar este trabalho**: confirmar se o Preview ficou READY, decidir
+  se/quando abrir PR para `main`, e planejar o próximo vertical slice
+  (persistência real, importação AiPede/CSV, preenchimento automático do
+  contexto no REC OS).
+
+## Sessão anterior — 2026-07-19 — Sprint 3.1A.3, hotfix definitivo: navegação nativa
 
 - QA da 3.1A.2 reprovou: mesmo com a URL como única fonte de verdade (fix
   anterior), a navegação client-side (`next/link`/`router.push`) continuou

@@ -2,6 +2,114 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-20 (Sprint Motor LOKAT 1.0 — preview "Meu Negócio", branch isolada)
+
+### Branch
+
+`feat/motor-lokat-preview-v1`, criada a partir de `main` no commit `075b023`.
+**Nada desta sprint foi mergeado ou enviado para `main`.**
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Entregar um vertical slice funcional e demonstrável do módulo "Meu Negócio"
+(Motor LOKAT): visão geral financeira, precificação, campanhas, fluxo de
+caixa, fontes e glossário — editável, com cálculos reagindo em tempo real,
+sem depender de Supabase.
+
+### Arquivos criados
+
+- `src/lib/motor-lokat/types.ts` — tipos compartilhados (segmento, perfil
+  financeiro, métrica com origem/confiança/fórmula, precificação, fluxo de
+  caixa, campanha, contexto REC OS, glossário, payload LLM, insight).
+- `src/lib/motor-lokat/money.ts` — cents-based (`formatCents`,
+  `parseCentsInput`, `formatPercent`, `parsePercentInput`, `safeDivide`,
+  `roundFraction`) — nunca float para dinheiro.
+- `src/lib/motor-lokat/financial-engine.ts` — `buildFinancialSnapshot()`:
+  faturamento bruto, receita reconhecida/líquida, custo direto (%),
+  despesas variáveis (%), margem de contribuição (%), despesas fixas,
+  resultado operacional (%), ticket médio, ponto de equilíbrio (faturamento
+  e quantidade), capital de giro sugerido — cada métrica com fórmula,
+  explicação simples/técnica, origem, confiança e status vs. meta
+  configurável (nunca limite universal escondido).
+- `src/lib/motor-lokat/pricing-engine.ts` — `calculatePricing()`: Preço =
+  Custo ÷ [1 − (fixas% + variáveis% + margem%)], com bloqueio quando a soma
+  ≥ 100%.
+- `src/lib/motor-lokat/cash-flow-engine.ts` — `calculateCashFlow()`: saldo
+  projetado/realizado, capital de giro, meses de cobertura, risco.
+- `src/lib/motor-lokat/campaign-engine.ts` — `calculateCampaignProjection()`:
+  desconto financiado pela empresa, receita reconhecida/margem por pedido,
+  investimento fixo, pedidos para equilíbrio, CAC, LTV de receita/
+  contribuição, LTV/CAC, payback, classificação de status (saudável / viável
+  com atenção / margem apertada / prejuízo projetado / dados insuficientes),
+  com tratamento diferenciado para objetivo "fortalecer marca".
+- `src/lib/motor-lokat/segment-presets.ts` — 6 presets (delivery, varejo,
+  clínica, serviços, agência, SaaS) com labels de custo, exemplos de perdas e
+  metas sugeridas.
+- `src/lib/motor-lokat/glossary.ts` — 26 termos com nome simples/técnico,
+  fórmula, exemplo, erros comuns, termos relacionados.
+- `src/lib/motor-lokat/insight-rules.ts` — interpretador determinístico
+  (`generateFinancialInsights`, `generateCampaignInsights`) — nenhuma LLM
+  conectada, cada insight expõe motivo, dado usado, qualidade e limites.
+- `src/app/admin/meu-negocio/page.tsx` + `_client-content.tsx` +
+  `_overview-tab.tsx` + `_pricing-tab.tsx` + `_campaign-tab.tsx` +
+  `_cashflow-tab.tsx` + `_sources-tab.tsx` + `_glossary-tab.tsx` +
+  `_shared.tsx` — shell com seletor de segmento, banner de modo demonstração
+  permanente, 6 abas, cards com detalhe, gráficos em barra CSS (sem
+  biblioteca nova), prévia de payload LLM, contexto REC OS com link real
+  para `/admin/contentos/criar?step=brief` (rota auditada antes de usar).
+
+### Arquivos alterados
+
+- `src/components/app-sidebar.tsx` — item "Meu Negócio" adicionado ao nav
+  admin (ícone `Sparkles`, já importado). Só existe nesta branch.
+- `src/config/project-status.ts` — 8 áreas novas (`business_os_preview`,
+  `financial_intelligence_engine`, `campaign_profitability_simulator`,
+  `financial_glossary`, `financial_data_quality` em `qa_pending`;
+  `campaign_rec_os_bridge`, `aipede_csv_import`, `inventory_and_losses` em
+  `planned`), todas anotadas como existentes somente na branch de preview.
+  `global_calendar` não foi tocado. `V1_PROGRESS`/`V2_PROGRESS` inalterados.
+
+### Verificação
+
+- Sem framework de teste instalado — verificado via script ad-hoc (`tsc`
+  standalone + `node`), cobrindo os 7 cenários do prompt: (1) preço R$40/
+  custo R$16 → custo 40%/margem 60%; (2) custo R$75, fixas 20%/variáveis 10%/
+  margem 20% → preço mínimo R$150; (3) campanha com margem positiva →
+  status saudável; (4) campanha com prejuízo → status prejuízo_projetado;
+  (5) CAC > LTV de contribuição → insight `cac_above_ltv` disparado; (6)
+  dados insuficientes → status dados_insuficientes, CAC/LTV `null` (nunca
+  NaN); (7) capital de giro com 2 meses de cobertura numa meta de 3 →
+  risco "atenção". Mais checagens de divisão por zero/dados ausentes — zero
+  NaN/Infinity em qualquer cenário. Script descartado, não commitado.
+- Busca explícita nos arquivos alterados por `Math.random`, `Date.now`,
+  `new Date(`, `localStorage`, `sessionStorage`, `window.`, `public_token`,
+  `service_role`, `Supabase`, `fetch(`, `axios`: zero ocorrências reais (só
+  menções em comentários explicando a ausência).
+
+### SQL
+
+- Nenhum SQL executado, nenhuma migration criada, nenhuma env real alterada.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso (após limpar `.next` — uma falha de
+  alocação de memória do Turbopack no cache antigo não se repetiu depois).
+- ESLint nos arquivos alterados/criados: zero erros/warnings.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis). `global_calendar` inalterado.
+- Push feito somente da branch `feat/motor-lokat-preview-v1` — `main` nunca
+  tocado, nenhum deployment de produção criado.
+
+---
+
 ## 2026-07-19 (Sprint 3.1A.3 — Hotfix definitivo: navegação nativa)
 
 ### Sprint

@@ -466,3 +466,66 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
   recuperacao do nucleo V1 do REC OS - nao Google Calendar.
 - Radar, PNG Vidigal, EditorOS nao foram alterados. Projeto Sao Paulo continua
   registrado, sem escopo recuperado.
+
+## 2026-07-20 - Sprint Motor LOKAT 1.0 - preview "Meu Negocio" (branch feat/motor-lokat-preview-v1, NAO mergeada)
+
+- Auditoria inicial: branch atual era fix/rec-os-global-navigation, working
+  tree limpo (5 commits ja commitados e enviados ao proprio remoto da
+  branch, nenhum trabalho nao commitado) - condicao de parada do prompt nao
+  se aplicava. Trocado para main, pull --ff-only confirmou HEAD = 075b023
+  (commit oficial esperado da Central Global do REC OS). Criada
+  feat/motor-lokat-preview-v1 a partir dai.
+- Auditoria de reuso: sem biblioteca de graficos instalada (recharts/chart.js/
+  etc ausentes), sem zod, sem componentes ui/*.tsx (design system e
+  hand-rolled com Tailwind). Reaproveitado formatCurrency/cn de
+  src/lib/utils.ts como base conceitual; graficos feitos em barras CSS
+  simples (Fase 28), sem instalar nada.
+- Criado `src/lib/motor-lokat/`: types.ts, money.ts (centavos inteiros,
+  nunca float), financial-engine.ts (buildFinancialSnapshot - faturamento,
+  receita liquida, custo direto, margem de contribuicao, resultado
+  operacional, ponto de equilibrio, capital de giro, cada metrica com
+  formula/origem/confianca/status vs meta configuravel), pricing-engine.ts
+  (Preco = Custo / [1-(fixas%+variaveis%+margem%)]), cash-flow-engine.ts,
+  campaign-engine.ts (desconto financiado pela empresa, CAC, LTV
+  receita/contribuicao, LTV/CAC, payback, status com tratamento especial
+  para objetivo fortalecer_marca), segment-presets.ts (6 segmentos),
+  glossary.ts (26 termos), insight-rules.ts (interpretador deterministico,
+  nenhuma LLM conectada).
+- Criado `src/app/admin/meu-negocio/`: rota nova, modo demonstracao sempre
+  visivel (banner permanente, nada persistido, sem localStorage/
+  sessionStorage), 6 abas (Visao Geral, Precificacao, Campanhas, Fluxo de
+  Caixa, Fontes, Glossario), cards clicaveis com modal de detalhe, simulador
+  de campanha completo, ponte de contexto para o REC OS (auditada a rota
+  real /admin/contentos/criar?step=brief antes de linkar - contexto so
+  exibido, nao enviado), previa de payload LLM (nunca enviado a lugar
+  nenhum).
+- Item "Meu Negocio" adicionado a sidebar admin (Sparkles, ja importado) -
+  so nesta branch.
+- Verificado via script ad-hoc (sem framework de teste instalado): os 7
+  cenarios do prompt (custo 40%/margem 60%; preco minimo R$150; campanha
+  saudavel; campanha em prejuizo; CAC > LTV disparando insight; dados
+  insuficientes com CAC/LTV null, nunca NaN; capital de giro 2 meses de
+  cobertura numa meta de 3 = risco atencao) mais divisao por zero/dados
+  ausentes - zero NaN/Infinity em qualquer cenario.
+- Busca por Math.random/Date.now/new Date(/localStorage/sessionStorage/
+  window./public_token/service_role/Supabase/fetch(/axios nos arquivos
+  alterados: zero ocorrencias reais (so mencoes em comentarios).
+- `src/config/project-status.ts`: 8 areas novas (business_os_preview,
+  financial_intelligence_engine, campaign_profitability_simulator,
+  financial_glossary, financial_data_quality em qa_pending;
+  campaign_rec_os_bridge, aipede_csv_import, inventory_and_losses em
+  planned), todas anotadas como existentes so na branch de preview.
+  global_calendar nao foi tocado.
+- Build do Turbopack falhou duas vezes com erro de alocacao de memoria
+  ("memory allocation of 1048576 bytes failed") - resolvido limpando o
+  cache `.next` antigo; nao era um problema de codigo (tsc ja passava limpo
+  antes da falha de build).
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso, /admin/meu-negocio
+  presente na lista de rotas.
+- ESLint nos arquivos alterados/criados: zero erros/warnings.
+- Nenhum SQL executado. Nenhuma migration criada. Nenhuma env real alterada.
+  Nenhuma biblioteca instalada.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Commits e push feitos somente na branch feat/motor-lokat-preview-v1 -
+  main nunca tocado, nenhum deployment de producao criado.

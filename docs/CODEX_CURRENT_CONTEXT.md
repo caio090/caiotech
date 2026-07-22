@@ -22,6 +22,18 @@
 - Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
 - Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A**, **3.1A.1**, **3.1A.2** e **3.1A.3** (hotfixes sucessivos pós-QA) — ver seções 3a-x/3a-0/3a-i/3a-ii. QA Codex Web da 3.1A.3 pendente. Google Calendar OAuth continua bloqueado até essa aprovação; a próxima tarefa depois de validado é a recuperação do núcleo V1 do REC OS (não Google Calendar). Restauração UX do REC OS (Aprovações na Home, Radar, Mural de Referências, briefing guiado) é a tarefa registrada na fila.
 
+## 3z. Sprint Motor LOKAT 1.0 — preview do módulo "Meu Negócio" (branch isolada, não mergeada)
+
+- Data: 2026-07-20
+- **Esta sprint existe somente na branch `feat/motor-lokat-preview-v1`, criada a partir de `main` no commit `075b023`.** Nenhum commit desta sprint foi enviado para `main`; nenhum deployment de produção foi criado. A branch foi enviada para o remoto (`git push -u origin feat/motor-lokat-preview-v1`) e deve gerar um Preview da Vercel — a URL do Preview não deve ser promovida a produção sem uma sprint própria de validação.
+- Rota nova: `/admin/meu-negocio`, nome visível "Meu Negócio", badge "Motor LOKAT". Roda inteiramente em modo demonstração — nenhuma chamada a Supabase, nenhuma persistência (nem banco, nem localStorage/sessionStorage). Todos os valores são exemplos editáveis, existem só em memória durante a sessão da página.
+- Motor financeiro determinístico em `src/lib/motor-lokat/` (`financial-engine.ts`, `pricing-engine.ts`, `cash-flow-engine.ts`, `campaign-engine.ts`, `insight-rules.ts`, `glossary.ts`, `segment-presets.ts`, `money.ts`, `types.ts`) — todo valor monetário em centavos inteiros, toda métrica carrega origem/confiança/fórmula/comparação com meta.
+- UI em `src/app/admin/meu-negocio/`: seis abas (Visão Geral, Precificação, Campanhas, Fluxo de Caixa, Fontes, Glossário), cards clicáveis com detalhe, simulador de campanha com CAC/LTV/payback, ponte de contexto para o REC OS (`/admin/contentos/criar?step=brief`, rota real auditada antes de implementar — não fictícia), prévia de payload para LLM futura (nunca enviada) e interpretador determinístico por regras (nenhuma IA conectada).
+- Verificado via script ad-hoc (mesma abordagem de sprints anteriores, sem framework de teste instalado): os 7 cenários do prompt (custo 40%/margem 60%, preço mínimo R$150, campanha saudável, campanha em prejuízo, CAC > LTV, dados insuficientes, capital de giro com 2 meses de cobertura) mais checagens de divisão por zero/dados ausentes — nenhum NaN/Infinity encontrado.
+- `src/config/project-status.ts`: 8 novas áreas adicionadas (`business_os_preview`, `financial_intelligence_engine`, `campaign_profitability_simulator`, `financial_glossary`, `financial_data_quality` em `qa_pending`; `campaign_rec_os_bridge`, `aipede_csv_import`, `inventory_and_losses` em `planned`), todas marcadas como existentes somente na branch de preview. `global_calendar` não foi tocado.
+- Item "Meu Negócio" adicionado à sidebar admin (`src/components/app-sidebar.tsx`) — só existe nesta branch até um eventual merge.
+- Nenhum SQL executado, nenhuma migration criada, nenhuma env real alterada, nenhuma biblioteca instalada.
+
 ## 3a-x. Sprint 3.1A.3 — Hotfix definitivo: navegação nativa (sem SPA client-side)
 
 - Data: 2026-07-19
