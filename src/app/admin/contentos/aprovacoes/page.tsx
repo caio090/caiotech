@@ -13,11 +13,12 @@ import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 export default async function AdminContentosAprovacoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; approval?: string; content_id?: string }>;
+  searchParams: Promise<{ client?: string; approval?: string; content_id?: string; status?: string }>;
 }) {
   const params            = await searchParams;
   const activeClientId    = params.client ?? null;
   const initialApprovalId = params.approval ?? null;
+  const initialStatusFilter = params.status ?? null;
 
   if (!activeClientId) {
     redirect("/admin/contentos/selecionar-cliente");
@@ -78,6 +79,7 @@ export default async function AdminContentosAprovacoesPage({
       <ContentosAprovacoesContent
         serverApprovals={serverApprovals}
         initialApprovalId={initialApprovalId}
+        initialStatusFilter={initialStatusFilter}
         activeClientId={activeClientId}
         activeClientName={activeClientName}
         serverNow={serverNow}

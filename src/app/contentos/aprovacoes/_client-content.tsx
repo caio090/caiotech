@@ -348,13 +348,27 @@ function ApprovalDetailModal({
 interface Props {
   serverApprovals: DbApprovalWithContent[] | null;
   initialApprovalId?: string | null;
+  /** Sprint 4.0A.1 — canonical content_items.status value(s), comma-separated,
+   * arriving from the REC OS Hub cards. Mapped to the closest tab; the
+   * underlying data model here is keyed by approval status (TabKey), not
+   * content_items.status, so this is a best-effort initial selection, not
+   * an exact filter. */
+  initialStatusFilter?: string | null;
   activeClientId?: string | null;
   activeClientName?: string | null;
   serverNow: number;
 }
 
-export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId, activeClientId, activeClientName, serverNow }: Props) {
-  const [activeTab,   setActiveTab]   = useState<TabKey>("pending");
+function tabFromStatusFilter(statusFilter?: string | null): TabKey | null {
+  if (!statusFilter) return null;
+  const values = statusFilter.split(",");
+  if (values.some((v) => v === "alteracao_solicitada" || v === "ajuste")) return "change_requested";
+  if (values.some((v) => v === "enviado_aprovacao")) return "pending";
+  return null;
+}
+
+export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId, initialStatusFilter, activeClientId, activeClientName, serverNow }: Props) {
+  const [activeTab,   setActiveTab]   = useState<TabKey>(() => tabFromStatusFilter(initialStatusFilter) ?? "pending");
   const [copiedId,    setCopiedId]    = useState<string | null>(null);
   const [openItem,    setOpenItem]    = useState<UiApproval | null>(null);
   const [prodItem,    setProdItem]    = useState<UiApproval | null>(null);
