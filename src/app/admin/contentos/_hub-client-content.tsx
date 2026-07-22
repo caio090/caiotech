@@ -1,10 +1,10 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Building2, CheckSquare, Factory, Eye, RotateCcw, CalendarCheck,
-  Rocket, ListTodo, Users, ArrowRight, Plus, ScrollText, CalendarDays,
-  Wand2, BarChart3, Cable, Radar as RadarIcon,
+  Rocket, ListTodo, Users, ArrowRight, Plus, Wand2, Cable, Search, Check,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import type { HubCardId, HubCounts, ClientSummaryRow, AttentionItem } from "@/lib/rec-os-hub";
@@ -20,6 +20,7 @@ interface Props {
   clientSummaries: ClientSummaryRow[];
   attentionItems: AttentionItem[];
   sourceErrors: string[];
+  openClientPicker: boolean;
 }
 
 const CARD_ICON: Record<HubCardId, React.ElementType> = {
@@ -51,6 +52,133 @@ function formatDate(iso: string | null): string | null {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+/** Sprint 4.0A.1 — searchable client picker, scales past the handful the
+ * plain <select> was fine for. No new dependency: plain input + list,
+ * keyboard nav (ArrowUp/Down, Enter, Escape), click-outside to close. */
+function ClientPicker({
+  clientOptions,
+  activeClientId,
+  activeClientName,
+  autoOpen,
+}: {
+  clientOptions: ClientOption[];
+  activeClientId: string | null;
+  activeClientName: string | null;
+  autoOpen: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpen);
+  const [query, setQuery] = useState("");
+  const [highlighted, setHighlighted] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const options = q
+      ? clientOptions.filter((c) => c.name.toLowerCase().includes(q))
+      : clientOptions;
+    const showAll = !q || "todos os clientes".includes(q);
+    return { showAll, options };
+  }, [clientOptions, query]);
+
+  const flatCount = (filtered.showAll ? 1 : 0) + filtered.options.length;
+
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function select(clientId: string | null) {
+    setOpen(false);
+    window.location.href = buildClientFilterHref(clientId);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { setOpen(false); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, flatCount - 1)); return; }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (filtered.showAll && highlighted === 0) { select(null); return; }
+      const idx = highlighted - (filtered.showAll ? 1 : 0);
+      const opt = filtered.options[idx];
+      if (opt) select(opt.id);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setHighlighted(0); }}
+        className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 min-w-[220px] justify-between hover:border-purple-200"
+      >
+        <span className="truncate">{activeClientName ?? "Todos os clientes"}</span>
+        <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-72 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-gray-50">
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setHighlighted(0); }}
+              onKeyDown={handleKeyDown}
+              placeholder="Buscar cliente..."
+              className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-gray-100 outline-none focus:border-purple-300"
+            />
+          </div>
+          <div className="max-h-72 overflow-y-auto py-1">
+            {flatCount === 0 ? (
+              <div className="px-3 py-4 text-xs text-gray-400 text-center">Nenhum cliente encontrado</div>
+            ) : (
+              <>
+                {filtered.showAll && (
+                  <button
+                    type="button"
+                    onClick={() => select(null)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left ${
+                      highlighted === 0 ? "bg-purple-50 text-purple-700" : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    Todos os clientes
+                    {!activeClientId && <Check className="w-3.5 h-3.5 text-purple-500" />}
+                  </button>
+                )}
+                {filtered.options.map((c, i) => {
+                  const idx = i + (filtered.showAll ? 1 : 0);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => select(c.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left truncate ${
+                        highlighted === idx ? "bg-purple-50 text-purple-700" : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="truncate">{c.name}</span>
+                      {activeClientId === c.id && <Check className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RecOSHubContent({
   clientOptions,
   activeClientId,
@@ -59,21 +187,18 @@ export function RecOSHubContent({
   clientSummaries,
   attentionItems,
   sourceErrors,
+  openClientPicker,
 }: Props) {
   const activeClientName =
     clientOptions.find((c) => c.id === activeClientId)?.name ?? null;
 
+  // Radar, Produção, Aprovações, Calendário, Resultados e Conexões já estão
+  // na navegação principal (ContentosSubNav) — Acessos rápidos não repete
+  // esses itens (Fase 11), só ações que não têm lugar fixo na nav.
   const quickAccess = [
-    { label: "Criar conteúdo", icon: Plus,        href: activeClientId ? `/admin/contentos/criar?client=${activeClientId}` : "/admin/contentos/selecionar-cliente" },
-    { label: "Produção",       icon: ScrollText,  href: activeClientId ? `/admin/contentos/producao?client=${activeClientId}` : "/admin/contentos/selecionar-cliente" },
-    { label: "Aprovações",     icon: CheckSquare, href: activeClientId ? `/admin/contentos/aprovacoes?client=${activeClientId}` : "/admin/contentos/selecionar-cliente" },
-    { label: "Calendário",     icon: CalendarDays,href: activeClientId ? `/admin/calendario?client=${activeClientId}` : "/admin/calendario" },
-    { label: "EditorOS",       icon: Wand2,       href: activeClientId ? `/admin/contentos/editor-os?client=${activeClientId}` : "/admin/contentos/editor-os" },
-    { label: "Resultados",     icon: BarChart3,   href: activeClientId ? `/admin/contentos/resultados?client=${activeClientId}` : "/admin/contentos/selecionar-cliente" },
-    { label: "Conexões",       icon: Cable,       href: "/admin/conexoes" },
-    // Radar existe hoje como redirect para Resultados > Oportunidades — não é
-    // uma tela própria, então o atalho aponta direto para o destino real.
-    { label: "Radar",          icon: RadarIcon,   href: activeClientId ? `/admin/contentos/resultados?tab=oportunidades&client=${activeClientId}` : "/admin/contentos/selecionar-cliente" },
+    { label: "Criar conteúdo", icon: Plus,   href: activeClientId ? `/admin/contentos/criar?client=${activeClientId}` : "/admin/contentos/criar" },
+    { label: "Abrir EditorOS", icon: Wand2,  href: activeClientId ? `/admin/contentos/editor-os?client=${activeClientId}` : "/admin/contentos/editor-os" },
+    { label: "Conectar canal", icon: Cable,  href: "/admin/conexoes" },
   ];
 
   return (
@@ -83,24 +208,19 @@ export function RecOSHubContent({
         <div>
           <h1 className="text-2xl font-black text-gray-900">REC OS</h1>
           <p className="text-sm text-gray-500">
-            {activeClientName ? `Operação de ${activeClientName}` : "Central global de todos os clientes"}
+            {activeClientName ? `Operação de ${activeClientName}` : "Central global da operação de conteúdo"}
           </p>
         </div>
 
         {/* RecOSClientFilter — a URL é a única fonte de verdade; sem estado paralelo. */}
         <div className="flex items-center gap-2">
-          <label htmlFor="rec-os-client-filter" className="text-sm text-gray-500">Cliente:</label>
-          <select
-            id="rec-os-client-filter"
-            defaultValue={activeClientId ?? ""}
-            onChange={(e) => { window.location.href = buildClientFilterHref(e.target.value || null); }}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 min-w-[220px]"
-          >
-            <option value="">Todos os clientes</option>
-            {clientOptions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <span className="text-sm text-gray-500">Cliente:</span>
+          <ClientPicker
+            clientOptions={clientOptions}
+            activeClientId={activeClientId}
+            activeClientName={activeClientName}
+            autoOpen={openClientPicker}
+          />
         </div>
       </header>
 
@@ -116,6 +236,9 @@ export function RecOSHubContent({
           {HUB_CARDS.map((card) => {
             const Icon = CARD_ICON[card.id];
             const value = countFor(card.id, counts, clientsWithPendencies);
+            const title = card.id === "clientes_com_pendencias" && activeClientId
+              ? "Pendências deste cliente"
+              : card.title;
             return (
               <Link
                 key={card.id}
@@ -129,7 +252,7 @@ export function RecOSHubContent({
                   <ArrowRight className="w-4 h-4 text-gray-300" />
                 </div>
                 <div className="text-2xl font-black text-gray-900">{value}</div>
-                <div className="text-sm font-medium text-gray-700 mt-1">{card.title}</div>
+                <div className="text-sm font-medium text-gray-700 mt-1">{title}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{card.hint}</div>
               </Link>
             );
@@ -138,7 +261,7 @@ export function RecOSHubContent({
       </section>
 
       {/* RecOSAttentionList */}
-      <section>
+      <section id="precisa-da-sua-atencao">
         <h2 className="text-sm font-bold text-gray-900 mb-3">Precisa da sua atenção</h2>
         <div className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50">
           {attentionItems.length === 0 ? (
@@ -224,8 +347,8 @@ export function RecOSHubContent({
 
       {/* RecOSQuickActions */}
       <section>
-        <h2 className="text-sm font-bold text-gray-900 mb-3">Acessos rápidos</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <h2 className="text-sm font-bold text-gray-900 mb-3">Ações rápidas</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {quickAccess.map((qa) => (
             <Link
               key={qa.label}
