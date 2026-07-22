@@ -6,6 +6,18 @@ import { cn } from "@/lib/utils";
 import { formatCents, parseCentsInput, formatPercent, parsePercentInput } from "@/lib/motor-lokat/money";
 import { findGlossaryEntry } from "@/lib/motor-lokat/glossary";
 import type { FinancialDataSource, FinancialConfidence, FinancialMetric } from "@/lib/motor-lokat/types";
+import type { BusinessDataSource } from "@/lib/motor-lokat/business-types";
+
+/**
+ * Module-scope id generator for user-initiated "add item" actions (SWOT rows,
+ * lab tests, cost components, ...). Date.now()/Math.random() only ever run
+ * inside event handlers that call this — never during render — but must live
+ * at module scope (not nested in a component body) for the React Compiler's
+ * purity check to recognize that.
+ */
+export function generateId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 // ── Data-quality badges (Fase 7) ─────────────────────────────────────────────
 
@@ -24,6 +36,69 @@ export function SourceBadge({ source }: { source: FinancialDataSource }) {
     <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border", SOURCE_STYLE[source])}>
       {SOURCE_LABEL[source]}
     </span>
+  );
+}
+
+// ── Business DNA source (5-way: adds "diagnostico" — never claim a field came
+// from the diagnostic flow when it didn't) ──────────────────────────────────
+
+const BUSINESS_SOURCE_LABEL: Record<BusinessDataSource, string> = {
+  diagnostico: "Diagnóstico", manual: "Manual", imported: "Importado", estimated: "Estimado", missing: "Ausente",
+};
+const BUSINESS_SOURCE_STYLE: Record<BusinessDataSource, string> = {
+  diagnostico: "bg-purple-50 text-purple-700 border-purple-100",
+  manual: "bg-blue-50 text-blue-700 border-blue-100",
+  imported: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  estimated: "bg-amber-50 text-amber-700 border-amber-100",
+  missing: "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+export function BusinessSourceSelect({ source, onChange }: { source: BusinessDataSource; onChange: (s: BusinessDataSource) => void }) {
+  return (
+    <select
+      value={source}
+      onChange={(e) => onChange(e.target.value as BusinessDataSource)}
+      className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border outline-none cursor-pointer", BUSINESS_SOURCE_STYLE[source])}
+    >
+      {(Object.keys(BUSINESS_SOURCE_LABEL) as BusinessDataSource[]).map((s) => (
+        <option key={s} value={s}>{BUSINESS_SOURCE_LABEL[s]}</option>
+      ))}
+    </select>
+  );
+}
+
+/** A labeled text field for DNA/SWOT-style content that always carries its own origin selector. */
+export function DnaTextField({
+  label, value, source, onChange, onSourceChange, multiline, dataTestId,
+}: {
+  label: string; value: string; source: BusinessDataSource;
+  onChange: (v: string) => void; onSourceChange: (s: BusinessDataSource) => void;
+  multiline?: boolean; dataTestId?: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="block text-[11px] font-semibold text-gray-600">{label}</span>
+        <BusinessSourceSelect source={source} onChange={onSourceChange} />
+      </div>
+      {multiline ? (
+        <textarea
+          value={value}
+          data-testid={dataTestId}
+          onChange={(e) => onChange(e.target.value)}
+          rows={2}
+          className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 resize-none"
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          data-testid={dataTestId}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400"
+        />
+      )}
+    </div>
   );
 }
 
