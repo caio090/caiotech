@@ -34,6 +34,7 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/admin/inicio",            label: "Início",           icon: Home },
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
+      { href: "/admin/meu-negocio",       label: "Meu Negócio",      icon: Sparkles },
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/recos",             label: "Audiovisual",      icon: Clapperboard },
