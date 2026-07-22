@@ -2,7 +2,48 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-20 — Sprint Motor LOKAT 1.0 (branch isolada, NÃO mergeada)
+## Última sessão — 2026-07-20 — Sprint Motor LOKAT 1.1, DNA do Negócio e Engenharia de Produtos (branch isolada, NÃO mergeada)
+
+- **Branch `feat/product-engineering-preview-v1`**, criada a partir de
+  `origin/feat/motor-lokat-preview-v1` (não de `main` — este módulo depende do
+  Motor LOKAT 1.0, que também ainda não está em `main`). Nenhum commit para
+  `main`, nenhum deployment de produção.
+- Duas abas novas dentro de "Meu Negócio": **Empresa** (DNA do Negócio com 19
+  campos + origem própria cada um, 4 Ps, SWOT/FOFA com exemplos por segmento
+  claramente marcados, Metas de Vendas, Manual do Negócio derivado ao vivo) e
+  **Produtos e Serviços** (Portfólio com campos por segmento, Laboratório de
+  testes reaproveitando o simulador de campanha já existente — nenhum segundo
+  motor financeiro —, Matriz de Desempenho em 4 quadrantes com recomendações
+  determinísticas).
+- Pontes: "Testar em campanha" (Laboratório → aba Campanhas, via `seedInput`
+  + remount por `key`) e "Criar campanha no REC OS" (link real para
+  `/admin/contentos/criar?step=brief`, rota auditada antes de usar — contexto
+  só exibido, não enviado).
+- Reaproveitado sem duplicar: classificadores de meta do motor financeiro
+  (agora exportados), utilitários de dinheiro/percentual, o simulador de
+  campanha, os presets de segmento e todos os componentes visuais
+  compartilhados da Sprint 1.0.
+- Achado de lint corrigido: geração de IDs com `Date.now()`/`Math.random()`
+  dentro de handlers "adicionar item" disparava `react-hooks/purity` por estar
+  textualmente dentro do corpo do componente — extraído para `generateId()`
+  em escopo de módulo (mesmo padrão do `uid()` do `CanvasEditor`).
+- Verificado via script ad-hoc: os 10 cenários do prompt (matriz de
+  desempenho nos 4 quadrantes, serviço sem estoque, produto em teste, produto
+  sazonal, capacidade insuficiente, dados ausentes, margem negativa) — zero
+  NaN/Infinity, zero classificação sem critério exposto. Suite da 1.0
+  re-executada sem regressão.
+- `src/config/project-status.ts`: 13 áreas novas (11 `qa_pending`, 1
+  `planned`, 1 `blocked` — conector AiPede, bloqueado por documentação/
+  autorização de API pendentes), todas anotadas como só desta branch.
+  `global_calendar`/V1/V2 inalterados.
+- TypeScript zero erros, build limpo, ESLint sem erros/warnings.
+- **Se retomar**: confirmar Preview READY, decidir se/quando abrir PR
+  (provavelmente encadeado: primeiro `feat/motor-lokat-preview-v1` → main,
+  depois esta branch → main), e planejar a próxima fatia (persistência real,
+  matriz com dados de vendas reais em vez de resultado de teste, LLM
+  conectada).
+
+## Sessão anterior — 2026-07-20 — Sprint Motor LOKAT 1.0 (branch isolada, NÃO mergeada)
 
 - **Trabalho feito inteiramente na branch `feat/motor-lokat-preview-v1`**
   (criada a partir de `main` no commit `075b023`). Nenhum commit foi para

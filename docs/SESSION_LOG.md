@@ -529,3 +529,69 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - Commits e push feitos somente na branch feat/motor-lokat-preview-v1 -
   main nunca tocado, nenhum deployment de producao criado.
+
+## 2026-07-20 - Sprint Motor LOKAT 1.1 - DNA do Negocio e Engenharia de Produtos (branch feat/product-engineering-preview-v1, NAO mergeada)
+
+- Auditoria inicial: feat/motor-lokat-preview-v1 estava limpa e sincronizada
+  com o proprio remoto (HEAD = 2540886, igual ao esperado). Criada
+  feat/product-engineering-preview-v1 a partir de
+  origin/feat/motor-lokat-preview-v1 (nao de main, pois este modulo depende
+  do Motor LOKAT 1.0, que tambem nao esta em main).
+- Auditoria de reuso (Fase 1): revisado src/app/admin/meu-negocio/,
+  src/lib/motor-lokat/ e project-status.ts da Sprint 1.0 antes de escrever
+  qualquer coisa nova. Reaproveitado sem duplicar: combineConfidence,
+  classifyCostVsGoal/classifyMarginVsGoal (exportados de financial-engine.ts
+  para isso), safeDivide/formatCents/formatPercent, calculateCampaignProjection,
+  SEGMENT_PRESETS, e todos os componentes de _shared.tsx.
+- Criado `src/lib/motor-lokat/business-types.ts` (tipos de DNA/4Ps/SWOT/Metas/
+  Produtos/Laboratorio/Matriz, arquivo separado para nao tocar no codigo ja
+  existente), `product-cost-engine.ts` (custo/margem por unidade reaproveitando
+  os classificadores do motor financeiro), `product-operations-engine.ts`
+  (capacidade/utilizacao/gargalo, nunca inventa demanda), `performance-matrix.ts`
+  (4 quadrantes venda x margem contra meta ou mediana da categoria, sempre
+  expondo o criterio usado, com recomendacoes deterministicas),
+  `lab-decision-rules.ts` (sugestao de decisao pos-teste, nunca automatica),
+  `product-presets.ts` (campos extras por segmento), `ai-pede-contract.ts`
+  (contrato conceitual, zero integracao real).
+- Criado `_business-tab.tsx` (aba Empresa: DNA do Negocio com 19 campos +
+  origem propria de 5 valores incluindo "diagnostico", 4 Ps, SWOT com exemplos
+  por segmento claramente marcados, Metas de Vendas, Manual do Negocio
+  derivado ao vivo - nao e copia separada) e `_products-tab.tsx` (aba Produtos
+  e Servicos: Portfolio com campos por segmento, Laboratorio reaproveitando
+  calculateCampaignProjection - nenhum segundo simulador -, Matriz de
+  Desempenho, pontes "Testar em campanha" e "Criar campanha no REC OS" para
+  /admin/contentos/criar?step=brief, rota real auditada antes de usar).
+- Integrado no shell (_client-content.tsx): duas abas novas na ordem pedida
+  (Visao Geral, Empresa, Produtos e Servicos, Precificacao, Campanhas, Fluxo
+  de Caixa, Fontes, Glossario); estado de DNA/4Ps/SWOT/Metas/Produtos/
+  Laboratorio levantado para o shell, nunca resetado por troca de segmento;
+  CampaignTab ganhou seedInput opcional com remount via key para a ponte de
+  campanha (mesmo padrao determinístico das sprints do Calendario Global).
+- Achado de lint corrigido: geracao de IDs (Date.now()/Math.random()) dentro
+  dos handlers de "adicionar item" (SWOT, produto, componente de custo, teste
+  de laboratorio, meta) disparava react-hooks/purity por estar textualmente
+  dentro do corpo do componente. Corrigido extraindo generateId() para escopo
+  de modulo em _shared.tsx (mesmo padrao do uid() ja usado em CanvasEditor.tsx).
+- Verificado via script ad-hoc: os 10 cenarios do prompt (4 quadrantes da
+  matriz, servico sem estoque, produto em teste, produto sazonal, capacidade
+  insuficiente, dados ausentes, margem negativa) - todos passaram, zero
+  NaN/Infinity. Suite da Sprint 1.0 (7 cenarios) re-executada sem regressao
+  apos exportar os classificadores do motor financeiro.
+- Busca por Math.random/Date.now/new Date(/localStorage/sessionStorage/
+  Supabase/fetch(/axios/public_token/service_role nos arquivos alterados:
+  zero ocorrencias fora do generateId() ja descrito (so roda em handlers de
+  clique).
+- `src/config/project-status.ts`: 13 areas novas (11 qa_pending, 1 planned -
+  product_rec_os_bridge, 1 blocked - aipede_product_connector, motivo:
+  documentacao/autorizacao oficial da API pendentes), todas anotadas como
+  existentes so nesta branch. global_calendar/V1/V2 nao foram tocados.
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados/criados: zero erros/warnings apos o fix do
+  generateId.
+- Nenhum SQL executado. Nenhuma migration criada. Nenhuma env real alterada.
+  Nenhuma biblioteca instalada. Nenhuma chamada de API externa. Nenhum dado
+  real do AiPede.
+- V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
+- Commits e push feitos somente na branch feat/product-engineering-preview-v1 -
+  main nunca tocado, nenhum deployment de producao criado.
