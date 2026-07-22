@@ -1,30 +1,74 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Sparkles, LayoutGrid, Tags, Megaphone, Wallet, Database, BookOpen } from "lucide-react";
+import { Sparkles, LayoutGrid, Building2, Package, Tags, Megaphone, Wallet, Database, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SEGMENT_PRESETS, SEGMENT_ORDER } from "@/lib/motor-lokat/segment-presets";
 import { buildFinancialSnapshot } from "@/lib/motor-lokat/financial-engine";
 import { findGlossaryEntry } from "@/lib/motor-lokat/glossary";
-import type { BusinessSegment, FinancialProfile, FinancialMetric } from "@/lib/motor-lokat/types";
+import type { BusinessSegment, FinancialProfile, FinancialMetric, CampaignInput } from "@/lib/motor-lokat/types";
+import type { BusinessDNA, FourPs, SwotItem, SalesGoal, ProductServiceItem, LabTest } from "@/lib/motor-lokat/business-types";
 import { MetricDetailModal } from "./_shared";
 import { OverviewTab } from "./_overview-tab";
+import { BusinessTab } from "./_business-tab";
+import { ProductsTab } from "./_products-tab";
 import { PricingTab } from "./_pricing-tab";
 import { CampaignTab } from "./_campaign-tab";
 import { CashFlowTab } from "./_cashflow-tab";
 import { SourcesTab } from "./_sources-tab";
 import { GlossaryTab } from "./_glossary-tab";
 
-type TabKey = "overview" | "pricing" | "campaigns" | "cashflow" | "sources" | "glossary";
+type TabKey = "overview" | "business" | "products" | "pricing" | "campaigns" | "cashflow" | "sources" | "glossary";
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
-  { key: "overview",  label: "Visão Geral",   icon: LayoutGrid },
-  { key: "pricing",   label: "Precificação",  icon: Tags },
-  { key: "campaigns", label: "Campanhas",     icon: Megaphone },
-  { key: "cashflow",  label: "Fluxo de Caixa", icon: Wallet },
-  { key: "sources",   label: "Fontes",        icon: Database },
-  { key: "glossary",  label: "Glossário",     icon: BookOpen },
+  { key: "overview",  label: "Visão Geral",           icon: LayoutGrid },
+  { key: "business",  label: "Empresa",               icon: Building2 },
+  { key: "products",  label: "Produtos e Serviços",   icon: Package },
+  { key: "pricing",   label: "Precificação",          icon: Tags },
+  { key: "campaigns", label: "Campanhas",             icon: Megaphone },
+  { key: "cashflow",  label: "Fluxo de Caixa",        icon: Wallet },
+  { key: "sources",   label: "Fontes",                icon: Database },
+  { key: "glossary",  label: "Glossário",             icon: BookOpen },
 ];
+
+function emptyDna(segment: BusinessSegment): BusinessDNA {
+  const field = (value = "") => ({ value, source: "manual" as const });
+  return {
+    companyName: field(""), segment: { value: segment, source: "manual" }, businessModel: field(""),
+    description: field(""), mainProducts: field(""), problemSolved: field(""), desiresServed: field(""),
+    valueProposition: field(""), differentiators: field(""), audiences: field(""), priceRange: field(""),
+    salesChannels: field(""), units: field(""), regionsServed: field(""), seasonality: field(""),
+    goals: field(""), restrictions: field(""), contactNetwork: field(""), competitors: field(""), positioning: field(""),
+  };
+}
+
+function emptyFourPs(): FourPs {
+  const section = () => ({ text: "", evidence: "", notes: "" });
+  return { product: section(), price: section(), place: section(), promotion: section() };
+}
+
+function exampleSwotForSegment(segment: BusinessSegment): SwotItem[] {
+  const examples: Record<BusinessSegment, { forca: string; fraqueza: string; oportunidade: string; ameaca: string }> = {
+    delivery: { forca: "Tempo de entrega rápido na região", fraqueza: "Dependência de uma única plataforma de pedidos", oportunidade: "Crescimento de pedidos por WhatsApp", ameaca: "Aumento das taxas de marketplace" },
+    varejo: { forca: "Localização de fácil acesso", fraqueza: "Estoque parado em itens de baixo giro", oportunidade: "Expansão para venda online", ameaca: "Concorrência de grandes redes" },
+    clinica: { forca: "Equipe qualificada e fidelizada", fraqueza: "Agenda com horários ociosos", oportunidade: "Parcerias com convênios locais", ameaca: "Novos concorrentes na região" },
+    servicos: { forca: "Relacionamento próximo com clientes", fraqueza: "Capacidade limitada da equipe", oportunidade: "Demanda crescente por serviços especializados", ameaca: "Concorrência via freelancers" },
+    agencia: { forca: "Portfólio consolidado", fraqueza: "Dependência de poucos clientes grandes", oportunidade: "Novos formatos de conteúdo em alta", ameaca: "Pressão de preço de agências menores" },
+    saas: { forca: "Produto com baixo custo de manutenção", fraqueza: "Onboarding manual e demorado", oportunidade: "Expansão para novo segmento de clientes", ameaca: "Concorrente com funcionalidade similar mais barata" },
+  };
+  const e = examples[segment];
+  const base = (category: SwotItem["category"], text: string): SwotItem => ({
+    id: `swot-example-${category}`, category, text, source: "estimated", evidence: "", impact: "medio", priority: "media", confirmed: false, isExample: true,
+  });
+  return [base("forca", e.forca), base("fraqueza", e.fraqueza), base("oportunidade", e.oportunidade), base("ameaca", e.ameaca)];
+}
+
+function exampleGoals(): SalesGoal[] {
+  return [
+    { id: "goal-example-1", label: "Faturamento do mês", metric: "faturamento", actualValue: 0, goalValue: 0, period: "Mês atual (demonstração)", channel: "Todos", product: "Todos", unit: "R$" },
+    { id: "goal-example-2", label: "Clientes novos", metric: "clientes_novos", actualValue: 0, goalValue: 0, period: "Mês atual (demonstração)", channel: "Todos", product: "Todos", unit: "clientes" },
+  ];
+}
 
 function demoProfileForSegment(segment: BusinessSegment): FinancialProfile {
   const preset = SEGMENT_PRESETS[segment];
@@ -58,6 +102,23 @@ export function MeuNegocioContent() {
   const [detailMetric, setDetailMetric] = useState<FinancialMetric | null>(null);
   const [glossaryTermId, setGlossaryTermId] = useState<string | null>(null);
 
+  // Sprint Motor LOKAT 1.1 — Business DNA / 4 Ps / SWOT / Goals / Products / Lab.
+  // Lifted here (not reset on segment change) so work in Empresa/Produtos e
+  // Serviços is never discarded just because the segment dropdown changes.
+  const [dna, setDna] = useState<BusinessDNA>(() => emptyDna("delivery"));
+  const [fourPs, setFourPs] = useState<FourPs>(emptyFourPs);
+  const [swotItems, setSwotItems] = useState<SwotItem[]>(() => exampleSwotForSegment("delivery"));
+  const [salesGoals, setSalesGoals] = useState<SalesGoal[]>(exampleGoals);
+  const [products, setProducts] = useState<ProductServiceItem[]>([]);
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
+
+  // Prepared by "Testar em campanha" (Products & Services) — never auto-sent.
+  // `campaignSeedVersion` forces CampaignTab to remount and pick up the fresh
+  // seed, the same key-remount pattern used to keep state deterministic
+  // elsewhere in this project.
+  const [campaignSeed, setCampaignSeed] = useState<CampaignInput | null>(null);
+  const [campaignSeedVersion, setCampaignSeedVersion] = useState(0);
+
   const preset = SEGMENT_PRESETS[segment];
   const snapshot = useMemo(() => buildFinancialSnapshot(profile), [profile]);
 
@@ -68,6 +129,12 @@ export function MeuNegocioContent() {
 
   function openGlossaryTerm(termId: string) {
     if (findGlossaryEntry(termId)) setGlossaryTermId(termId);
+  }
+
+  function handleTestInCampaign(input: CampaignInput) {
+    setCampaignSeed(input);
+    setCampaignSeedVersion((v) => v + 1);
+    setActiveTab("campaigns");
   }
 
   return (
@@ -140,8 +207,23 @@ export function MeuNegocioContent() {
           onOpenDetail={setDetailMetric} onOpenGlossary={openGlossaryTerm}
         />
       )}
+      {activeTab === "business" && (
+        <BusinessTab
+          dna={dna} onDnaChange={setDna}
+          fourPs={fourPs} onFourPsChange={setFourPs}
+          swotItems={swotItems} onSwotChange={setSwotItems}
+          salesGoals={salesGoals} onSalesGoalsChange={setSalesGoals}
+        />
+      )}
+      {activeTab === "products" && (
+        <ProductsTab
+          segment={segment} products={products} onProductsChange={setProducts}
+          labTests={labTests} onLabTestsChange={setLabTests}
+          onTestInCampaign={handleTestInCampaign} onOpenGlossary={openGlossaryTerm}
+        />
+      )}
       {activeTab === "pricing" && <PricingTab onOpenGlossary={openGlossaryTerm} />}
-      {activeTab === "campaigns" && <CampaignTab onOpenGlossary={openGlossaryTerm} />}
+      {activeTab === "campaigns" && <CampaignTab key={campaignSeedVersion} onOpenGlossary={openGlossaryTerm} seedInput={campaignSeed ?? undefined} />}
       {activeTab === "cashflow" && <CashFlowTab snapshot={snapshot} onOpenGlossary={openGlossaryTerm} />}
       {activeTab === "sources" && <SourcesTab />}
       {activeTab === "glossary" && <GlossaryTab initialTermId={glossaryTermId} />}

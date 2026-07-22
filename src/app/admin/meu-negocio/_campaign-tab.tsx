@@ -64,8 +64,14 @@ function defaultCampaignInput(): CampaignInput {
   };
 }
 
-export function CampaignTab({ onOpenGlossary }: { onOpenGlossary: (termId: string) => void }) {
-  const [input, setInput] = useState<CampaignInput>(defaultCampaignInput);
+interface CampaignTabProps {
+  onOpenGlossary: (termId: string) => void;
+  /** Prepared by Products & Services (Fase 17) or the REC OS bridge — never sent anywhere automatically. */
+  seedInput?: CampaignInput;
+}
+
+export function CampaignTab({ onOpenGlossary, seedInput }: CampaignTabProps) {
+  const [input, setInput] = useState<CampaignInput>(() => seedInput ?? defaultCampaignInput());
 
   function update<K extends keyof CampaignInput>(key: K, value: CampaignInput[K]) {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -97,6 +103,13 @@ export function CampaignTab({ onOpenGlossary }: { onOpenGlossary: (termId: strin
 
   return (
     <div className="space-y-6">
+      {seedInput && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3">
+          <p className="text-xs font-bold text-indigo-800">Dados preparados a partir de Produtos e Serviços</p>
+          <p className="text-[11px] text-indigo-700 mt-0.5">Nenhuma campanha foi salva ou enviada automaticamente — revise os campos abaixo antes de simular.</p>
+        </div>
+      )}
+
       {/* Campaign inputs */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-center gap-1.5 mb-3">

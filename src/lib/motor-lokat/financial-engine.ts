@@ -28,8 +28,8 @@ function collectMissing(entries: Array<{ label: string; source: FinancialDataSou
   return entries.filter((e) => e.source === "missing").map((e) => e.label);
 }
 
-/** Compares an actual fraction against a goal fraction — lower-is-better metrics (costs). */
-function classifyCostVsGoal(actual: number, goal: number): { status: FinancialMetric["status"]; reason: string } {
+/** Compares an actual fraction against a goal fraction — lower-is-better metrics (costs). Exported for reuse (e.g. product cost engineering) — never duplicate this logic. */
+export function classifyCostVsGoal(actual: number, goal: number): { status: FinancialMetric["status"]; reason: string } {
   if (!Number.isFinite(actual) || !Number.isFinite(goal) || goal <= 0) {
     return { status: "sem_meta", reason: "Nenhuma meta configurada para comparação." };
   }
@@ -43,8 +43,8 @@ function classifyCostVsGoal(actual: number, goal: number): { status: FinancialMe
   return { status: "critico", reason: `A meta configurada é no máximo ${(goal * 100).toFixed(1)}%. O valor atual está ${diffPoints.toFixed(1)} pontos percentuais acima da meta.` };
 }
 
-/** Compares an actual fraction against a goal fraction — higher-is-better metrics (margin). */
-function classifyMarginVsGoal(actual: number, goal: number): { status: FinancialMetric["status"]; reason: string } {
+/** Compares an actual fraction against a goal fraction — higher-is-better metrics (margin). Exported for reuse — never duplicate this logic. */
+export function classifyMarginVsGoal(actual: number, goal: number): { status: FinancialMetric["status"]; reason: string } {
   if (!Number.isFinite(actual) || !Number.isFinite(goal) || goal <= 0) {
     return { status: "sem_meta", reason: "Nenhuma meta configurada para comparação." };
   }
