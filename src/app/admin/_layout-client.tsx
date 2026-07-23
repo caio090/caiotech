@@ -74,6 +74,7 @@ export function AdminLayoutShell({ children }: Props) {
 
   const isOnContentosPage = pathname.startsWith("/admin/contentos");
   const isSelectingClient = pathname === "/admin/contentos/selecionar-cliente";
+  const isRecOSHubPage    = pathname === "/admin/contentos";
   const isInicioPage      = pathname === "/admin/inicio";
 
   // Efeito "spotlight" — luz suave seguindo o mouse, só na tela Início
@@ -251,27 +252,28 @@ export function AdminLayoutShell({ children }: Props) {
       setActiveClientName(null);
       return;
     }
-    // URL ?client= is the authoritative source — always check it first
+    // URL ?client= is the ONLY source of truth (Sprint 4.0A.1) — no
+    // localStorage fallback. The Hub (/admin/contentos) legitimately has no
+    // client in the URL when showing "todos os clientes"; falling back to a
+    // stale localStorage value from a previous session caused the header to
+    // show a client the current page/selector didn't have selected.
     const urlParams   = new URLSearchParams(window.location.search);
     const urlClientId = urlParams.get("client");
-    const storedClientId = localStorage.getItem(ACTIVE_CLIENT_KEY);
 
-    if (urlClientId && urlClientId === storedClientId) {
-      // URL matches stored ID — use stored name directly
+    if (!urlClientId) { setActiveClientName(null); return; }
+
+    const storedClientId = localStorage.getItem(ACTIVE_CLIENT_KEY);
+    if (urlClientId === storedClientId) {
       const storedName = localStorage.getItem(ACTIVE_CLIENT_NAME_KEY);
       if (storedName) { setActiveClientName(storedName); return; }
     }
 
-    // No URL client and nothing in storage — nothing to show
-    const clientIdToResolve = urlClientId ?? storedClientId;
-    if (!clientIdToResolve) { setActiveClientName(null); return; }
-
     // Resolve name from server (URL client differs from stored, or name missing)
-    fetch(`/api/admin/clients/${clientIdToResolve}`)
+    fetch(`/api/admin/clients/${urlClientId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { company_name?: string } | null) => {
         if (data?.company_name) {
-          localStorage.setItem(ACTIVE_CLIENT_KEY, clientIdToResolve);
+          localStorage.setItem(ACTIVE_CLIENT_KEY, urlClientId);
           localStorage.setItem(ACTIVE_CLIENT_NAME_KEY, data.company_name);
           setActiveClientName(data.company_name);
         }
@@ -470,6 +472,10 @@ export function AdminLayoutShell({ children }: Props) {
                 <span className="text-xs text-purple-200">
                   · Visualizando: <span className="font-bold text-white">{activeClientName}</span>
                 </span>
+              ) : isRecOSHubPage ? (
+                <span className="text-xs text-purple-200">
+                  · Visualizando: <span className="font-bold text-white">Todos os clientes</span>
+                </span>
               ) : (
                 <span className="text-xs text-purple-300">· Nenhum cliente selecionado</span>
               )}
@@ -477,7 +483,7 @@ export function AdminLayoutShell({ children }: Props) {
             {!isSelectingClient && (
               <div className="flex items-center gap-4">
                 <Link
-                  href="/admin/contentos/selecionar-cliente"
+                  href="/admin/contentos?clientPicker=open"
                   className="text-xs text-purple-200 hover:text-white transition-colors"
                 >
                   ↔ Trocar cliente

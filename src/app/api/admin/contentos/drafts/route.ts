@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       .from("content_items")
       .insert({
         client_id,
-        title: String(content.title || brief.objective || "Rascunho sem título").slice(0, 200),
+        title: String(content.title || brief.objective || "Ideia sem título").slice(0, 200),
         type: String(brief.format || "").slice(0, 100) || null,
         objective: String(brief.objective || "").slice(0, 500) || null,
         caption: String(content.caption || "").slice(0, 1000) || null,
