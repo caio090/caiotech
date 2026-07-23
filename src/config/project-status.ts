@@ -505,7 +505,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Somente na branch feat/editor-os-layer-scanner-v1. Auditoria prévia confirmou (git log --all + busca no working tree) que nenhuma implementação de scanner/OCR/segmentação existia antes nesta sprint — construído do zero, arquitetura em src/lib/editor-os/layer-scanner/. Verificado via script ad-hoc (29 checks): agrupamento de palavras em linhas, mapeamento de coordenadas (escala/rotação/offset, sem NaN), pré-seleção por confiança, capacidades honestas, elegibilidade de limpeza de fundo.",
+    notes: "Somente na branch feat/editor-os-layer-scanner-v1 (hotfix na branch fix/editor-os-demo-runtime-v1). Auditoria prévia confirmou (git log --all + busca no working tree) que nenhuma implementação de scanner/OCR/segmentação existia antes nesta sprint — construído do zero, arquitetura em src/lib/editor-os/layer-scanner/. Verificado via script ad-hoc (29 checks): agrupamento de palavras em linhas, mapeamento de coordenadas (escala/rotação/offset, sem NaN), pré-seleção por confiança, capacidades honestas, elegibilidade de limpeza de fundo. Sprint 1.0.1 (QA de dpl_EywfG1V1KsLVXZ2BcbhN4R6DDmUz — P1): a rota /admin/contentos/editor-os retornava 500 sem Supabase configurado porque page.tsx chamava createServerSupabaseClient() incondicionalmente antes de qualquer verificação — dependência indevida corrigida com um runtime de demonstração seguro (src/lib/runtime/demo-runtime.ts) que só habilita o modo demo fora de Production e só com ?demo=1 explícito; Production sem Supabase agora falha fechado (misconfigured) em vez de 500. QA local em navegador (não Codex Web) ainda pendente para este item.",
+    next_actions: ["QA local em navegador: confirmar que /admin/contentos/editor-os?demo=1 abre sem 500 em desenvolvimento/Preview e que Production continua exigindo Supabase"],
   },
   {
     id: "editor_os_text_detection",
@@ -516,7 +517,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Somente na branch feat/editor-os-layer-scanner-v1. Provider real implementado (não é um placeholder) — Cenário C do prompt (nenhum OCR existia, tesseract.js não estava instalado). Os arquivos do motor (core WASM e dados de idioma) são baixados da CDN pública do tesseract.js na primeira utilização — a imagem do usuário em si nunca é enviada a terceiros, todo o reconhecimento roda no navegador.",
+    notes: "Somente na branch feat/editor-os-layer-scanner-v1 (hotfix na branch fix/editor-os-demo-runtime-v1). Provider real implementado (não é um placeholder) — Cenário C do prompt (nenhum OCR existia, tesseract.js não estava instalado). Os arquivos do motor (core WASM e dados de idioma) são baixados da CDN pública do tesseract.js na primeira utilização — a imagem do usuário em si nunca é enviada a terceiros, todo o reconhecimento roda no navegador. Sprint 1.0.1: OCR agora também testável em modo demonstração (sem Supabase, fora de Production) — nenhuma alteração no scanner em si, só no runtime que decide se a rota abre.",
+    next_actions: ["QA local em navegador: escanear camadas usando ?demo=1 e confirmar que o OCR funciona sem sessão/Supabase"],
   },
   {
     id: "editor_os_text_conversion",
@@ -527,7 +529,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Somente na branch feat/editor-os-layer-scanner-v1. Mapeamento de coordenadas verificado para escala, rotação (90°) e imagem não centralizada — sem NaN. Zoom não entra no cálculo por invariante do próprio CanvasEditor (coordenadas dos elementos são sempre no espaço interno do preset, independente do zoom de exibição).",
+    notes: "Somente na branch feat/editor-os-layer-scanner-v1 (hotfix na branch fix/editor-os-demo-runtime-v1). Mapeamento de coordenadas verificado para escala, rotação (90°) e imagem não centralizada — sem NaN. Zoom não entra no cálculo por invariante do próprio CanvasEditor (coordenadas dos elementos são sempre no espaço interno do preset, independente do zoom de exibição). Sprint 1.0.1: conversão agora também testável em modo demonstração — nenhuma alteração na lógica de conversão em si.",
+    next_actions: ["QA local em navegador: converter texto detectado em camada usando ?demo=1"],
   },
   {
     id: "editor_os_layer_review",
@@ -538,7 +541,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Somente na branch feat/editor-os-layer-scanner-v1. data-testid estáveis (baseados em id gerado, nunca índice): editor-layer-scan-button/panel/progress/result-{id}/convert/cancel/confidence-{id}, editor-layer-panel, editor-layer-item-{id}.",
+    notes: "Somente na branch feat/editor-os-layer-scanner-v1 (hotfix na branch fix/editor-os-demo-runtime-v1). data-testid estáveis (baseados em id gerado, nunca índice): editor-layer-scan-button/panel/progress/result-{id}/convert/cancel/confidence-{id}, editor-layer-panel, editor-layer-item-{id}. Sprint 1.0.1: painel de revisão agora acessível também em modo demonstração; novos data-testid de demo (editor-demo-mode-badge, editor-demo-open-link, editor-demo-clear-draft, editor-demo-import-image, editor-demo-canvas) adicionados para QA local.",
+    next_actions: ["QA local em navegador: revisar/aprovar regiões de texto usando ?demo=1"],
   },
   {
     id: "editor_os_layer_serialization",
@@ -549,7 +553,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Somente na branch feat/editor-os-layer-scanner-v1. Continua sendo persistência local do navegador (mesma limitação já registrada na área editor_os — sem persistência em nuvem, bloqueada até SQL 87).",
+    notes: "Somente na branch feat/editor-os-layer-scanner-v1 (hotfix na branch fix/editor-os-demo-runtime-v1). Continua sendo persistência local do navegador (mesma limitação já registrada na área editor_os — sem persistência em nuvem, bloqueada até SQL 87). Sprint 1.0.1: rascunho de demonstração isolado sob chave fixa lokat-editor-os-demo-draft-v1 (sem clientId/contentId/e-mail/nome de cliente), nunca migrado para/de um rascunho autenticado real; ação 'Limpar demonstração' remove só essa chave.",
+    next_actions: ["QA local em navegador: salvar, recarregar e limpar o rascunho de demonstração; confirmar que rascunhos autenticados reais não são afetados"],
   },
   {
     id: "editor_os_object_segmentation",
