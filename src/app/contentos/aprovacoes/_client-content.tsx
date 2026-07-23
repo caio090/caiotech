@@ -418,7 +418,11 @@ export function ContentosAprovacoesContent({ serverApprovals, initialApprovalId,
         contentId:      a.content_id ?? null,
         clientId:       a.client_id ?? null,
         contentTitle:   c?.title ?? "Sem título",
-        clientName:     "",
+        // Populated only when the server query joined clients(company_name)
+        // (REC OS "todos os clientes" mode, Fase 6 do hotfix canônico
+        // 1.0.1) — empty in the single-client view, same as before, since
+        // the client name is already shown once in the page header there.
+        clientName:     a.clients?.company_name ?? "",
         platform:       c?.channel?.split(",")[0]?.trim() ?? "Instagram",
         type:           c?.type ?? null,
         status:         dbApprovalStatusToUi(a.status) as TabKey,
