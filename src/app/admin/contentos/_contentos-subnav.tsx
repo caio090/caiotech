@@ -1,28 +1,41 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { ACTIVE_CLIENT_KEY } from "@/lib/active-client";
+import { useEffect, useRef } from "react";
 
 interface NavLink {
   href: string;
   label: string;
+  /** Whether ?client=<id> should be appended when a client is active. */
+  acceptsClient: boolean;
 }
 
+// Sprint 4.0A.1 — single navigation for the REC OS shell. Replaces the old
+// 5-item subnav (which still had "Campanhas" as a top-level item and no
+// Radar/Produção/Aprovações/Conexões) so pages like Aprovações stop showing
+// a competing menu next to the unified one.
 const BASE_LINKS: NavLink[] = [
-  { href: "/admin/contentos/home",       label: "Visão Geral" },
-  { href: "/admin/contentos/campanhas",  label: "Campanhas" },
-  { href: "/admin/contentos/criar",      label: "✦ Criar" },
-  { href: "/admin/contentos/calendario", label: "Calendário" },
-  { href: "/admin/contentos/resultados", label: "Resultados" },
+  { href: "/admin/contentos",            label: "Visão Geral", acceptsClient: true },
+  { href: "/admin/contentos/radar",      label: "Radar",       acceptsClient: true },
+  { href: "/admin/contentos/criar",      label: "✦ Criar",     acceptsClient: true },
+  { href: "/admin/contentos/producao",   label: "Produção",    acceptsClient: true },
+  { href: "/admin/contentos/aprovacoes", label: "Aprovações",  acceptsClient: true },
+  { href: "/admin/calendario",           label: "Calendário",  acceptsClient: true },
+  { href: "/admin/contentos/resultados", label: "Resultados",  acceptsClient: true },
+  { href: "/admin/conexoes",             label: "Conexões",    acceptsClient: false },
 ];
 
 export function ContentosSubNav({ initialClientId }: { initialClientId?: string }) {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
-  const [clientId, setClientId] = useState(initialClientId ?? "");
   const activeRef = useRef<HTMLAnchorElement>(null);
   const navRef    = useRef<HTMLElement>(null);
+
+  // Client is read straight from the URL/prop — no localStorage fallback
+  // (Sprint 4.0A.1): this nav renders on pages that either always carry a
+  // client (aprovacoes/producao/resultados/criar all redirect otherwise) or
+  // legitimately have none (the Hub in "todos os clientes" view).
+  const clientId = searchParams.get("client") ?? initialClientId ?? "";
 
   useEffect(() => {
     if (activeRef.current && navRef.current) {
@@ -30,32 +43,15 @@ export function ContentosSubNav({ initialClientId }: { initialClientId?: string 
     }
   }, [pathname]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const urlClient = searchParams.get("client");
-    if (urlClient) {
-      localStorage.setItem(ACTIVE_CLIENT_KEY, urlClient);
-      setClientId(urlClient);
-      return;
-    }
-    if (initialClientId) {
-      setClientId(initialClientId);
-      return;
-    }
-    setClientId(localStorage.getItem(ACTIVE_CLIENT_KEY) ?? "");
-  }, [searchParams, initialClientId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Determine active base path (handles sub-routes like /resultados, /campanhas)
   function isActive(href: string): boolean {
-    if (href === "/admin/contentos/home") return pathname === "/admin/contentos/home" || pathname === "/admin/contentos";
+    if (href === "/admin/contentos") return pathname === "/admin/contentos";
     return pathname.startsWith(href);
   }
 
   return (
     <nav ref={navRef} className="flex items-center gap-1 mb-6 bg-purple-50 border border-purple-100 rounded-xl p-1 overflow-x-auto w-full max-w-full scrollbar-none">
-      {BASE_LINKS.map(({ href, label }) => {
-        const dest   = clientId ? `${href}?client=${clientId}` : href;
+      {BASE_LINKS.map(({ href, label, acceptsClient }) => {
+        const dest   = acceptsClient && clientId ? `${href}?client=${clientId}` : href;
         const active = isActive(href);
         return (
           <Link

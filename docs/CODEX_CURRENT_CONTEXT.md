@@ -22,6 +22,45 @@
 - Resultado do QA reportado externamente pelo usuário/Codex Web; não reexecutado nesta sessão de fechamento documental.
 - Sprint 3.1 iniciada em 2026-07-19: Fase 0 (auditoria/arquitetura do Calendário Global) concluída, seguida por **Sprint 3.1A**, **3.1A.1**, **3.1A.2** e **3.1A.3** (hotfixes sucessivos pós-QA) — ver seções 3a-x/3a-0/3a-i/3a-ii. QA Codex Web da 3.1A.3 pendente. Google Calendar OAuth continua bloqueado até essa aprovação; a próxima tarefa depois de validado é a recuperação do núcleo V1 do REC OS (não Google Calendar). Restauração UX do REC OS (Aprovações na Home, Radar, Mural de Referências, briefing guiado) é a tarefa registrada na fila.
 
+## 3y. Sprint Motor LOKAT 1.1 — DNA do Negócio e Engenharia de Produtos e Serviços (branch isolada, não mergeada)
+
+- Data: 2026-07-20
+- **Esta sprint existe somente na branch `feat/product-engineering-preview-v1`, criada a partir de `origin/feat/motor-lokat-preview-v1`** (não de `main` — este módulo depende do Motor LOKAT 1.0, que também não está em `main`). Nenhum commit foi para `main`, nenhum deployment de produção.
+- Dentro de "Meu Negócio", duas abas novas: **Empresa** (sub-abas DNA do Negócio, 4 Ps, SWOT/FOFA, Metas de Vendas, Manual do Negócio) e **Produtos e Serviços** (sub-abas Portfólio, Laboratório, Matriz de Desempenho) — navegação final: Visão Geral, Empresa, Produtos e Serviços, Precificação, Campanhas, Fluxo de Caixa, Fontes, Glossário.
+- Novos módulos em `src/lib/motor-lokat/`: `business-types.ts` (tipos de DNA/4Ps/SWOT/Metas/Produtos/Laboratório/Matriz — arquivo separado de `types.ts` para não tocar no código já existente da 1.0), `product-cost-engine.ts` (reaproveita `classifyCostVsGoal`/`classifyMarginVsGoal`, agora exportados de `financial-engine.ts`, para custo/margem por unidade), `product-operations-engine.ts` (capacidade/utilização/gargalo), `performance-matrix.ts` (classificação em 4 quadrantes + recomendações determinísticas), `lab-decision-rules.ts` (sugestão de decisão pós-teste, nunca executada automaticamente), `product-presets.ts` (campos extras por segmento), `ai-pede-contract.ts` (contrato conceitual, sem integração real).
+- Laboratório de produtos reaproveita `CampaignInput`/`calculateCampaignProjection` (Sprint 1.0) para o teste — nenhum segundo simulador financeiro criado. Ponte "Testar em campanha" prepara os dados e leva à aba Campanhas (`CampaignTab` ganhou um `seedInput` opcional, com remount via `key` para adotar o novo seed com segurança — mesmo padrão de remount determinístico já validado nas sprints do Calendário Global). Ponte "Criar campanha no REC OS" aponta para `/admin/contentos/criar?step=brief` (rota real, auditada antes de usar).
+- Verificado via script ad-hoc (mesma abordagem das sprints anteriores): os 10 cenários do prompt (4 quadrantes da matriz, serviço sem estoque, produto em teste, produto sazonal, capacidade insuficiente, dados ausentes, margem negativa) — nenhum NaN/Infinity, nenhuma classificação sem critério, nenhuma recomendação sem motivo. Suite da 1.0 (7 cenários) re-executada sem regressão após exportar as funções de classificação.
+- Achado de qualidade corrigido durante a sprint: geração de IDs (`Date.now()`/`Math.random()`) dentro de handlers de "adicionar item" (SWOT, produto, componente de custo, teste de laboratório, meta) disparava `react-hooks/purity` por estar textualmente dentro do corpo do componente — extraído para `generateId()` em `_shared.tsx` (função de módulo, mesma lógica do `uid()` já usado em `CanvasEditor.tsx`), zero erros/warnings de ESLint no resultado final.
+- `src/config/project-status.ts`: 13 novas áreas (11 `qa_pending`, 1 `planned`, 1 `blocked` — `aipede_product_connector`, motivo: documentação/autorização oficial da API pendentes), todas anotadas como existentes só nesta branch. `global_calendar`, `V1_PROGRESS` e `V2_PROGRESS` não foram tocados.
+- Nenhum SQL, nenhuma migration, nenhuma env real, nenhuma biblioteca nova, nenhuma chamada de API externa, nenhum dado real do AiPede.
+
+## 3y-i. Sprint Motor LOKAT 1.1.1 — hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, não mergeada)
+
+- Data: 2026-07-22
+- **Esta sprint existe somente na branch `fix/product-engineering-usability-v1`, criada a partir de `origin/feat/product-engineering-preview-v1`** (commit-base `2637cd483dcfbaa010d9fa8147c24371b344deb8`). Nenhum commit foi para `main`, nenhum deployment de produção.
+- Origem: QA do deployment `dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX` (P0=0, P1=1, P2=2, P3=1). O P1 confirmado: depois de criar um produto/serviço no Portfólio, a edição detalhada de composição/custos/operação/posicionamento/campos por segmento não ficava evidente nem acessível — a Sprint 1.1 já calculava tudo isso, mas exibia tudo dentro de um único acordeão plano por card, sem nenhum botão de edição explícito.
+- Correção do P1: `_products-tab.tsx` reescrito para um fluxo de duas telas — o Portfólio agora lista cards com um botão explícito **"Editar produto"/"Editar serviço"** (`data-testid="product-edit-{id}"`), que abre um **workspace** dedicado com 5 abas internas (Geral, Custos, Operação, Posicionamento, Testes e resultados), botão "Voltar ao Portfólio" e botão "Testar no Laboratório". As mesmas seções que já existiam (`ProductCostSection`, `ProductOperationSection`, `ProductPositioningSection`) foram reaproveitadas dentro das abas — nenhuma fórmula ou engine duplicada.
+- Fase 9 (produto vs. serviço): novo tipo `ProductKind = "produto" | "servico"` em `business-types.ts` e campo `ProductServiceItem.kind`. A criação agora exige escolha explícita via um seletor "O que você quer criar? [Produto] [Serviço]" (`NewItemChooser`). `product-presets.ts` ganhou `productSegmentFields(segment, kind)`, que filtra campos de estoque/ingrediente/embalagem/validade/SKU/armazenamento quando `kind === "servico"`, mesmo em segmentos como delivery/varejo — sem alterar `PRODUCT_SEGMENT_FIELDS` nem o motor de custo/operação (que continuam genéricos e reaproveitados; só os rótulos da UI mudam por tipo, ex.: "Perda esperada" -> "Retrabalho esperado", "Entrega" -> "Deslocamento", sem "Embalagem" para serviço).
+- P2 corrigidos: Manual do Negócio (`_business-tab.tsx`) ganhou uma seção explícita "Modelo de negócio" (lida direto de `dna.businessModel.value`, sem cópia separada); SWOT/FOFA foi reagrupada visualmente sob dois títulos — "Ambiente interno" (Forças/Fraquezas) e "Ambiente externo" (Oportunidades/Ameaças) — cada um com uma explicação curta; a estrutura de dados dos itens SWOT não mudou.
+- P3 corrigido + auditoria de acessibilidade mais ampla nas áreas alteradas: inputs de componentes de custo (nome/quantidade/unidade/custo unitário), selects de estágio/decisão do Laboratório, inputs de meta (nome/métrica) e o `BusinessSourceSelect`/botão de fechar do `MetricDetailModal` (ambos em `_shared.tsx`, usados em todo o módulo) ganharam `aria-label`/`<label>` associados — nenhum dependia só de placeholder ou cor.
+- Fase 13: auditoria de `generateId()` confirmou que todas as 5 chamadas (`newProduct`, `addTest`, `addComponent`, SWOT `addItem`, `addGoal`) ocorrem só dentro de handlers de clique, nunca durante render, e a colisão de IDs (timestamp base36 + sufixo aleatório) é considerada desprezível — não foi necessário trocar por contador/UUID.
+- Verificado via script ad-hoc (`hotfix-verify.js`, 22 checks): filtragem de campos por segmento/tipo (delivery, varejo, serviços), cenário "Serviço de consultoria" (custo por hora, sem embalagem, CSV/margem calculados, sem NaN/Infinity), e regressão zero nos motores de operação/matriz/laboratório/campanha reaproveitados (nenhum destes motores foi alterado neste hotfix).
+- `src/config/project-status.ts`: nenhuma área foi marcada `validated` — todas seguem `qa_pending` (ou `planned`/`blocked` onde já estavam). Apenas `next_actions`/`notes`/`last_updated` foram atualizados nas áreas afetadas (`business_manual`, `business_swot`, `product_portfolio`, `product_cost_engineering`, `product_positioning`, `product_laboratory`). `global_calendar`, `V1_PROGRESS` (81) e `V2_PROGRESS` (12) não foram tocados.
+- Nenhum SQL, migration, RLS, Supabase, env, biblioteca nova, integração AiPede ou LLM conectada. Nenhum dado real criado ou persistido.
+- Limitação transparente: testes de clique-a-clique (Fase 14) e verificação mobile real (Critério de Aceite) não puderam ser executados neste ambiente por falta de navegador — a lógica subjacente foi verificada via script ad-hoc e leitura de código; recomenda-se QA manual em navegador antes de qualquer promoção.
+
+## 3z. Sprint Motor LOKAT 1.0 — preview do módulo "Meu Negócio" (branch isolada, não mergeada)
+
+- Data: 2026-07-20
+- **Esta sprint existe somente na branch `feat/motor-lokat-preview-v1`, criada a partir de `main` no commit `075b023`.** Nenhum commit desta sprint foi enviado para `main`; nenhum deployment de produção foi criado. A branch foi enviada para o remoto (`git push -u origin feat/motor-lokat-preview-v1`) e deve gerar um Preview da Vercel — a URL do Preview não deve ser promovida a produção sem uma sprint própria de validação.
+- Rota nova: `/admin/meu-negocio`, nome visível "Meu Negócio", badge "Motor LOKAT". Roda inteiramente em modo demonstração — nenhuma chamada a Supabase, nenhuma persistência (nem banco, nem localStorage/sessionStorage). Todos os valores são exemplos editáveis, existem só em memória durante a sessão da página.
+- Motor financeiro determinístico em `src/lib/motor-lokat/` (`financial-engine.ts`, `pricing-engine.ts`, `cash-flow-engine.ts`, `campaign-engine.ts`, `insight-rules.ts`, `glossary.ts`, `segment-presets.ts`, `money.ts`, `types.ts`) — todo valor monetário em centavos inteiros, toda métrica carrega origem/confiança/fórmula/comparação com meta.
+- UI em `src/app/admin/meu-negocio/`: seis abas (Visão Geral, Precificação, Campanhas, Fluxo de Caixa, Fontes, Glossário), cards clicáveis com detalhe, simulador de campanha com CAC/LTV/payback, ponte de contexto para o REC OS (`/admin/contentos/criar?step=brief`, rota real auditada antes de implementar — não fictícia), prévia de payload para LLM futura (nunca enviada) e interpretador determinístico por regras (nenhuma IA conectada).
+- Verificado via script ad-hoc (mesma abordagem de sprints anteriores, sem framework de teste instalado): os 7 cenários do prompt (custo 40%/margem 60%, preço mínimo R$150, campanha saudável, campanha em prejuízo, CAC > LTV, dados insuficientes, capital de giro com 2 meses de cobertura) mais checagens de divisão por zero/dados ausentes — nenhum NaN/Infinity encontrado.
+- `src/config/project-status.ts`: 8 novas áreas adicionadas (`business_os_preview`, `financial_intelligence_engine`, `campaign_profitability_simulator`, `financial_glossary`, `financial_data_quality` em `qa_pending`; `campaign_rec_os_bridge`, `aipede_csv_import`, `inventory_and_losses` em `planned`), todas marcadas como existentes somente na branch de preview. `global_calendar` não foi tocado.
+- Item "Meu Negócio" adicionado à sidebar admin (`src/components/app-sidebar.tsx`) — só existe nesta branch até um eventual merge.
+- Nenhum SQL executado, nenhuma migration criada, nenhuma env real alterada, nenhuma biblioteca instalada.
+
 ## 3a-x. Sprint 3.1A.3 — Hotfix definitivo: navegação nativa (sem SPA client-side)
 
 - Data: 2026-07-19
@@ -216,6 +255,32 @@
 - Asaas: sandbox nao homologado.
 - Chatwoot: nao instalado.
 - Postiz: nao instalado.
+
+## 3z. Release canônica LOKAT OS 1.0 — consolidação de REC OS e Meu Negócio em `main`
+
+- Data: 2026-07-23
+- Branch local `release/canonical-production-v1`, criada a partir de `main`
+  (`075b023`). Squash-merge de `fix/rec-os-global-navigation` (`71fcf9f`) e
+  `fix/product-engineering-usability-v1` (`d0ba70e`) — as duas branches já
+  estáveis o suficiente para produção nesta consolidação.
+- Não integradas: `feat/motor-lokat-ai-experience-v1` (assistente de IA),
+  `feat/editor-os-layer-scanner-v1` e `fix/editor-os-demo-runtime-v1`
+  (scanner/OCR e runtime de demonstração do EditorOS) — nenhuma passou por
+  QA completo; permanecem preservadas, não apagadas, não rebaseadas.
+- `project-status.ts` resolvido como união real das áreas — nenhuma marcada
+  `validated`; `global_calendar`/`V1_PROGRESS` (81)/`V2_PROGRESS` (12)
+  intocados.
+- `/admin/status` ganhou metadados de ambiente/commit/branch/deployment
+  lidos server-side (`VERCEL_ENV`/`VERCEL_GIT_COMMIT_SHA`/
+  `VERCEL_GIT_COMMIT_REF`/`VERCEL_URL`, nunca segredo).
+- `/admin/contentos/selecionar-cliente` consolidado: redireciona para o hub
+  (seletor pesquisável, `?clientPicker=open`) em vez de manter uma segunda
+  implementação baseada em `localStorage`.
+- Ver `docs/HANDOFF.md` e `docs/SESSION_LOG.md` (entrada 2026-07-23) para o
+  detalhamento completo de verificação (tsc/build/eslint/diff-check/smoke
+  test local) e para o commit final de `main` após o merge/push (Fase 17-19
+  desta release) — esta seção será atualizada com o commit definitivo assim
+  que o push ocorrer.
 
 ## 14. Areas congeladas
 

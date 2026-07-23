@@ -217,34 +217,42 @@ export function approvalDueDates(approvals: ApprovalRow[]): Map<string, string> 
 export type HubClientFilter = string | null; // null = "todos os clientes"
 
 /**
- * Only /admin/calendario genuinely supports a cross-client ("todos os
- * clientes") view with a source filter. /admin/contentos/{producao,
- * aprovacoes,resultados,criar} all require a single client and redirect to
- * the client selector otherwise (confirmed by reading those pages) — so in
- * "todos os clientes" mode, cards route to the Global Calendar instead of a
- * page that would just bounce the user back out. This is a deliberate scope
- * decision, not an oversight: adding all-clients support to those pages is
- * out of scope for this sprint.
+ * Sprint 4.0A.1 fix: "Aguardando aprovação" must never point at the
+ * Calendar (P1 reported against the previous version of this file). With a
+ * client selected, every card now goes to its real page, with a `status`
+ * query param added as minimal URL support (see producao/page.tsx and
+ * aprovacoes/page.tsx, which read it to pre-filter/pre-select a tab).
+ *
+ * Without a client ("todos os clientes"), producao/aprovacoes/resultados/
+ * criar still redirect to the client selector if reached without one
+ * (confirmed by reading those pages) — extending them to render a true
+ * cross-client list is out of scope for a navigation-fix sprint. For the
+ * three cards that are exactly the reasons already modeled in the Hub's own
+ * "Precisa da sua atenção" list (aguardando_aprovacao, em_revisao,
+ * alteracoes_solicitadas), the honest destination is that list — not a
+ * page it doesn't represent. em_producao/agendados/publicados/em_andamento
+ * have no equivalent cross-client list, so they still route to the Global
+ * Calendar, which genuinely supports "todos os clientes".
  */
 export function buildCardHref(cardId: HubCardId, client: HubClientFilter): string {
   if (client) {
     switch (cardId) {
-      case "aguardando_aprovacao":   return `/admin/contentos/aprovacoes?client=${client}`;
-      case "em_producao":
-      case "em_revisao":             return `/admin/contentos/producao?client=${client}`;
-      case "alteracoes_solicitadas": return `/admin/contentos/producao?client=${client}`;
+      case "aguardando_aprovacao":   return `/admin/contentos/aprovacoes?client=${client}&status=enviado_aprovacao`;
+      case "em_producao":            return `/admin/contentos/producao?client=${client}&status=producao,em_producao,edicao`;
+      case "em_revisao":             return `/admin/contentos/producao?client=${client}&status=revisao_interna`;
+      case "alteracoes_solicitadas": return `/admin/contentos/producao?client=${client}&status=alteracao_solicitada,ajuste`;
       case "agendados":              return `/admin/calendario?client=${client}&source=content_item`;
       case "publicados":             return `/admin/contentos/resultados?client=${client}`;
       case "em_andamento":           return `/admin/contentos/resultados?client=${client}`;
-      case "clientes_com_pendencias": return `/admin/contentos?client=${client}#resumo-por-cliente`;
+      case "clientes_com_pendencias": return `/admin/contentos?client=${client}#precisa-da-sua-atencao`;
     }
   }
-  // Todos os clientes: only the Global Calendar is genuinely cross-client.
+  // Todos os clientes.
   switch (cardId) {
-    case "aguardando_aprovacao":    return `/admin/calendario?source=approval`;
-    case "em_producao":
+    case "aguardando_aprovacao":
     case "em_revisao":
-    case "alteracoes_solicitadas":
+    case "alteracoes_solicitadas": return `/admin/contentos#precisa-da-sua-atencao`;
+    case "em_producao":
     case "agendados":
     case "publicados":
     case "em_andamento":            return `/admin/calendario?source=content_item`;

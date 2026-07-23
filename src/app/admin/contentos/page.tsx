@@ -10,11 +10,12 @@ import {
   approvalDueDates,
 } from "@/lib/rec-os-hub";
 import { RecOSHubContent } from "./_hub-client-content";
+import { ContentosSubNavServer } from "./_contentos-subnav-server";
 
 export default async function AdminContentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string }>;
+  searchParams: Promise<{ client?: string; clientPicker?: string }>;
 }) {
   const params = await searchParams;
 
@@ -113,14 +114,18 @@ export default async function AdminContentosPage({
   }));
 
   return (
-    <RecOSHubContent
-      clientOptions={clientOptions}
-      activeClientId={requestedClientId}
-      counts={counts}
-      clientsWithPendencies={clientsWithPendencies}
-      clientSummaries={clientSummaries}
-      attentionItems={attentionItems}
-      sourceErrors={sourceErrors}
-    />
+    <>
+      <ContentosSubNavServer initialClientId={requestedClientId ?? undefined} />
+      <RecOSHubContent
+        clientOptions={clientOptions}
+        activeClientId={requestedClientId}
+        counts={counts}
+        clientsWithPendencies={clientsWithPendencies}
+        clientSummaries={clientSummaries}
+        attentionItems={attentionItems}
+        sourceErrors={sourceErrors}
+        openClientPicker={params.clientPicker === "open"}
+      />
+    </>
   );
 }

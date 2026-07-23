@@ -120,7 +120,7 @@ export async function PATCH(
     };
 
     const title = String(
-      content.title || brief.objective || item.title || "Rascunho sem título"
+      content.title || brief.objective || item.title || "Ideia sem título"
     ).slice(0, 200);
     if (title) patch.title = title;
     if (brief.objective) patch.objective = String(brief.objective).slice(0, 500);

@@ -2,7 +2,158 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-19 — Sprint 3.1A.3, hotfix definitivo: navegação nativa
+## Última sessão — 2026-07-23 — Release canônica LOKAT OS 1.0, consolidação em `main` (branch local `release/canonical-production-v1`, mergeada)
+
+- Objetivo: eliminar a fragmentação entre branches e publicar em `main` só o
+  que já estava estável — navegação global do REC OS
+  (`fix/rec-os-global-navigation`, commit `71fcf9f`) e o módulo Meu Negócio /
+  Motor LOKAT / Engenharia de Produto (`fix/product-engineering-usability-v1`,
+  commit `d0ba70e`). Scanner de camadas do EditorOS e o Assistente de IA
+  ficaram deliberadamente de fora — nenhum dos dois passou por QA completo.
+- Release local criada a partir de `main` (`075b023`), com squash-merge de
+  cada branch de origem em commit próprio, revisão de diff antes de cada
+  commit, sem `git add .`/`-A`.
+- `project-status.ts` resolvido como união real das áreas (REC OS + Meu
+  Negócio), sem escolher um arquivo inteiro de uma branch só — nenhuma área
+  nova marcada `validated`, `global_calendar` e `V1_PROGRESS`/`V2_PROGRESS`
+  (81/12) intocados.
+- `/admin/status` deixou de mostrar uma data fixa: agora lê metadados
+  server-side seguros da Vercel (`VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`,
+  `VERCEL_GIT_COMMIT_REF`, `VERCEL_URL` — nunca segredo) via
+  `src/lib/deployment-info.ts`, e computa "última atualização" a partir do
+  maior `last_updated` real das áreas.
+- `/admin/contentos/selecionar-cliente` deixou de ter uma segunda
+  implementação de seleção de cliente (baseada em `localStorage`, divergindo
+  da regra "URL é a única fonte de verdade" do hub) — agora redireciona para
+  o hub com o seletor pesquisável já aberto, preservando `?client` quando
+  presente.
+- `src/config/admin-routes.ts` criado como registro simples das rotas
+  administrativas canônicas, para auditoria — não substitui a config de
+  sidebar já existente em `app-sidebar.tsx`, que continua sendo a única fonte
+  usada por sidebar/mobile-nav/layouts.
+- Verificado: `tsc --noEmit` limpo, `npm run build` (Turbopack) concluído com
+  sucesso, `eslint` nos arquivos alterados sem erros novos (3 erros
+  pré-existentes confirmados idênticos em `origin/main`/na branch de origem,
+  não introduzidos por esta release), `git diff --check` limpo, busca por
+  padrões proibidos sem ocorrência real de segredo.
+- Scanner de camadas do EditorOS (`feat/editor-os-layer-scanner-v1`) e o
+  hotfix de runtime de demonstração (`fix/editor-os-demo-runtime-v1`,
+  commits `8659805`/`00b8e6f`) permanecem preservados, não mergeados, não
+  apagados — próxima sprint do EditorOS partirá desta nova `main`.
+- Push feito somente de `main`; nenhuma branch de feature ou de release foi
+  enviada ao remoto.
+
+## Sessão anterior — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
+
+- **Branch `fix/product-engineering-usability-v1`**, criada a partir de
+  `origin/feat/product-engineering-preview-v1` (commit-base
+  `2637cd483dcfbaa010d9fa8147c24371b344deb8`). Nenhum commit para `main`,
+  nenhum deployment de produção.
+- Origem: QA do deployment `dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX`
+  (P0=0, P1=1, P2=2, P3=1).
+- **P1** (edição não evidente): `_products-tab.tsx` reescrito — cada card do
+  Portfólio ganhou um botão explícito "Editar produto"/"Editar serviço" que
+  abre um workspace dedicado com 5 abas (Geral, Custos, Operação,
+  Posicionamento, Testes e resultados), "Voltar ao Portfólio" e "Testar no
+  Laboratório". As seções de custo/operação/posicionamento da 1.1 foram
+  reaproveitadas dentro das abas, sem duplicar nenhuma engine.
+- **Fase 9** (Produto vs. Serviço): novo campo `ProductServiceItem.kind`
+  (`"produto" | "servico"`); criação exige escolha explícita; nova função
+  `productSegmentFields(segment, kind)` filtra campos de estoque/ingrediente/
+  embalagem/validade para serviços, mesmo em segmentos como delivery/varejo.
+  Motor de custo/operação inalterado — só rótulos da UI mudam por tipo.
+- **P2**: Manual do Negócio ganhou seção explícita "Modelo de negócio"; SWOT
+  reagrupada sob "Ambiente interno" (Forças/Fraquezas) e "Ambiente externo"
+  (Oportunidades/Ameaças) com explicação curta — dados dos itens inalterados.
+- **P3 + acessibilidade**: inputs de custo/meta/laboratório sem label e o
+  botão de fechar do `MetricDetailModal` ganharam `aria-label`/`<label>`.
+- Verificado via script ad-hoc (22 checks): filtragem por segmento/tipo,
+  cenário "Serviço de consultoria", zero regressão nos motores reaproveitados
+  (não alterados neste hotfix). `tsc`/`eslint`/`build`/`diff --check` limpos.
+- `project-status.ts`: nenhuma área marcada `validated` — só `next_actions`/
+  `notes` atualizados nas 6 áreas afetadas. `global_calendar`, `V1_PROGRESS`
+  (81) e `V2_PROGRESS` (12) não tocados.
+- Limitação declarada: sem navegador neste ambiente, os 17 passos de teste
+  manual (Fase 14) e a verificação mobile real não puderam ser executados —
+  validado por script ad-hoc e leitura de código; recomenda-se QA manual
+  antes de qualquer promoção.
+
+## Sessão anterior — 2026-07-20 — Sprint Motor LOKAT 1.1, DNA do Negócio e Engenharia de Produtos (branch isolada, NÃO mergeada)
+
+- **Branch `feat/product-engineering-preview-v1`**, criada a partir de
+  `origin/feat/motor-lokat-preview-v1` (não de `main` — este módulo depende do
+  Motor LOKAT 1.0, que também ainda não está em `main`). Nenhum commit para
+  `main`, nenhum deployment de produção.
+- Duas abas novas dentro de "Meu Negócio": **Empresa** (DNA do Negócio com 19
+  campos + origem própria cada um, 4 Ps, SWOT/FOFA com exemplos por segmento
+  claramente marcados, Metas de Vendas, Manual do Negócio derivado ao vivo) e
+  **Produtos e Serviços** (Portfólio com campos por segmento, Laboratório de
+  testes reaproveitando o simulador de campanha já existente — nenhum segundo
+  motor financeiro —, Matriz de Desempenho em 4 quadrantes com recomendações
+  determinísticas).
+- Pontes: "Testar em campanha" (Laboratório → aba Campanhas, via `seedInput`
+  + remount por `key`) e "Criar campanha no REC OS" (link real para
+  `/admin/contentos/criar?step=brief`, rota auditada antes de usar — contexto
+  só exibido, não enviado).
+- Reaproveitado sem duplicar: classificadores de meta do motor financeiro
+  (agora exportados), utilitários de dinheiro/percentual, o simulador de
+  campanha, os presets de segmento e todos os componentes visuais
+  compartilhados da Sprint 1.0.
+- Achado de lint corrigido: geração de IDs com `Date.now()`/`Math.random()`
+  dentro de handlers "adicionar item" disparava `react-hooks/purity` por estar
+  textualmente dentro do corpo do componente — extraído para `generateId()`
+  em escopo de módulo (mesmo padrão do `uid()` do `CanvasEditor`).
+- Verificado via script ad-hoc: os 10 cenários do prompt (matriz de
+  desempenho nos 4 quadrantes, serviço sem estoque, produto em teste, produto
+  sazonal, capacidade insuficiente, dados ausentes, margem negativa) — zero
+  NaN/Infinity, zero classificação sem critério exposto. Suite da 1.0
+  re-executada sem regressão.
+- `src/config/project-status.ts`: 13 áreas novas (11 `qa_pending`, 1
+  `planned`, 1 `blocked` — conector AiPede, bloqueado por documentação/
+  autorização de API pendentes), todas anotadas como só desta branch.
+  `global_calendar`/V1/V2 inalterados.
+- TypeScript zero erros, build limpo, ESLint sem erros/warnings.
+- **Se retomar**: confirmar Preview READY, decidir se/quando abrir PR
+  (provavelmente encadeado: primeiro `feat/motor-lokat-preview-v1` → main,
+  depois esta branch → main), e planejar a próxima fatia (persistência real,
+  matriz com dados de vendas reais em vez de resultado de teste, LLM
+  conectada).
+
+## Sessão anterior — 2026-07-20 — Sprint Motor LOKAT 1.0 (branch isolada, NÃO mergeada)
+
+- **Trabalho feito inteiramente na branch `feat/motor-lokat-preview-v1`**
+  (criada a partir de `main` no commit `075b023`). Nenhum commit foi para
+  `main`, nenhum push para `main`, nenhum deployment de produção — só
+  `git push -u origin feat/motor-lokat-preview-v1`, aguardando Preview da
+  Vercel.
+- Nova rota `/admin/meu-negocio` ("Meu Negócio", badge "Motor LOKAT"):
+  vertical slice funcional em modo demonstração — sem Supabase, sem
+  persistência, tudo em memória. 6 abas: Visão Geral, Precificação,
+  Campanhas, Fluxo de Caixa, Fontes, Glossário.
+- Motor financeiro determinístico em `src/lib/motor-lokat/` (centavos
+  inteiros, nunca float), verificado via script ad-hoc cobrindo os 7
+  cenários pedidos (custo 40%/margem 60%, preço mínimo R$150, campanha
+  saudável, campanha em prejuízo, CAC > LTV, dados insuficientes, capital de
+  giro com 2 meses de cobertura) — zero NaN/Infinity.
+- Simulador de campanha com CAC/LTV/payback e ponte de contexto para o REC
+  OS (link real para `/admin/contentos/criar?step=brief`, rota auditada
+  antes de usar — contexto só exibido, preenchimento automático é próxima
+  fatia). Interpretador de insights por regras fixas, nenhuma LLM conectada
+  (deixado explícito na tela). Prévia de payload para IA futura, nunca
+  enviada a lugar nenhum.
+- `src/config/project-status.ts`: 8 áreas novas adicionadas, todas anotadas
+  como existentes só nesta branch. `global_calendar` não foi tocado.
+- Item "Meu Negócio" na sidebar admin — só nesta branch.
+- TypeScript zero erros, build limpo (uma falha de alocação de memória do
+  Turbopack se resolveu limpando `.next` — não era um problema de código),
+  ESLint sem erros/warnings, busca por padrões proibidos (Math.random,
+  Date.now, window., Supabase, fetch, etc.) sem ocorrências reais.
+- **Se retomar este trabalho**: confirmar se o Preview ficou READY, decidir
+  se/quando abrir PR para `main`, e planejar o próximo vertical slice
+  (persistência real, importação AiPede/CSV, preenchimento automático do
+  contexto no REC OS).
+
+## Sessão anterior — 2026-07-19 — Sprint 3.1A.3, hotfix definitivo: navegação nativa
 
 - QA da 3.1A.2 reprovou: mesmo com a URL como única fonte de verdade (fix
   anterior), a navegação client-side (`next/link`/`router.push`) continuou

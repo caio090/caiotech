@@ -1,14 +1,18 @@
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getAdminContentOSClients } from "@/lib/admin-contentos-clients";
-import { AdminSelecionarClienteContent } from "./_client-content";
+import { redirect } from "next/navigation";
 
-export default async function AdminContentosSelecionarClientePage() {
-  const clients = isSupabaseConfigured ? await getAdminContentOSClients() : [];
-
-  return (
-    <AdminSelecionarClienteContent
-      clients={clients}
-      isSupabaseActive={isSupabaseConfigured}
-    />
-  );
+// Sprint canônica — esta rota deixou de ter uma implementação própria de
+// seleção de cliente (que usava localStorage, divergindo da regra "URL é a
+// única fonte de verdade" já adotada pelo hub). Redireciona para o hub com o
+// seletor pesquisável já aberto — mesmo componente canônico, sem fluxo
+// paralelo.
+export default async function AdminSelecionarClientePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string }>;
+}) {
+  const params = await searchParams;
+  const target = params.client
+    ? `/admin/contentos?client=${encodeURIComponent(params.client)}&clientPicker=open`
+    : "/admin/contentos?clientPicker=open";
+  redirect(target);
 }

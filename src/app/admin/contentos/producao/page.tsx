@@ -70,12 +70,17 @@ type OperationalTask = {
 export default async function AdminContentosProducaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; content_id?: string; task?: string }>;
+  searchParams: Promise<{ client?: string; content_id?: string; task?: string; status?: string }>;
 }) {
   const params     = await searchParams;
   const clientId   = params.client ?? null;
   const highlightContentId = params.content_id ?? null;
   const highlightTaskId    = params.task ?? null;
+  // Sprint 4.0A.1 — minimal URL support so the REC OS Hub's cards can deep
+  // link into a specific status instead of the whole production list.
+  const statusFilter = params.status
+    ? new Set(params.status.split(",").map((s) => s.trim()).filter(Boolean))
+    : null;
 
   if (!clientId) redirect("/admin/contentos/selecionar-cliente");
 
@@ -107,6 +112,9 @@ export default async function AdminContentosProducaoPage({
       .order("created_at", { ascending: false })
       .limit(30);
     inProduction = (contentData ?? []) as typeof inProduction;
+    if (statusFilter) {
+      inProduction = inProduction.filter((c) => c.status && statusFilter.has(c.status));
+    }
 
     const { data: taskData } = await adminDb
       .from("operational_tasks")

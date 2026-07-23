@@ -2,6 +2,390 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-23 (Release canônica LOKAT OS 1.0 — consolidação de REC OS e Meu Negócio em `main`)
+
+### Branch
+
+`release/canonical-production-v1`, local, criada a partir de `main`
+(`075b023`). Mergeada em `main` via `--no-ff` após todas as fases desta
+release; `main` é o único ref enviado ao remoto.
+
+### Executor
+
+Claude Code
+
+### Origem
+
+Ticket "RELEASE CANÔNICA LOKAT OS 1.0" — eliminar a fragmentação entre
+branches, publicando em `main` somente o que já era estável.
+
+### O que entrou
+
+- `fix/rec-os-global-navigation` (`71fcf9f`) — squash em `feat(rec-os):
+  consolidate global navigation`.
+- `fix/product-engineering-usability-v1` (`d0ba70e`) — squash em
+  `feat(meu-negocio): integrate Motor LOKAT and product engineering`.
+- `fix(admin): unify canonical routes and navigation` — consolidação de
+  `/admin/contentos/selecionar-cliente` (parou de usar `localStorage`,
+  passou a redirecionar para o hub com o seletor aberto) + criação de
+  `src/config/admin-routes.ts` (registro simples, não substitui a sidebar).
+- `feat(status): consolidate production status metadata` — `/admin/status`
+  ganhou banner de ambiente/branch/commit/deployment lido server-side de
+  variáveis públicas da Vercel.
+- `docs(context): record canonical production release` — este registro.
+
+### O que NÃO entrou (permanece preservado em branch separada)
+
+- `feat/motor-lokat-ai-experience-v1` (assistente de IA — P1 conhecido na
+  rota server-side).
+- `feat/editor-os-layer-scanner-v1` e `fix/editor-os-demo-runtime-v1`
+  (scanner/OCR/conversão/serialização do EditorOS, commits `8659805`/
+  `00b8e6f` — QA completo ainda pendente).
+
+### Verificação
+
+`tsc --noEmit --skipLibCheck` limpo · `npm run build` (Turbopack) concluído
+com exit 0 · `eslint` nos arquivos alterados sem erro novo (3 erros
+pré-existentes, confirmados idênticos em `origin/main`/na branch de origem
+via `git show`, não introduzidos por esta release) · `git diff --check`
+limpo · busca por padrões proibidos (`<<<<<<<`, `OPENAI_API_KEY`,
+`service_role`, `public_token` etc.) sem ocorrência real de segredo — só
+menções em documentação e um campo `public_token` legítimo e pré-existente
+em `_client-content.tsx` (token de aprovação pública, não credencial). Smoke
+test local (servidor com `.env.local` real, sem sessão autenticada):
+`/admin/meu-negocio`, `/admin/status`, `/admin/contentos`,
+`/admin/contentos/aprovacoes`, `/admin/contentos/producao` e
+`/admin/contentos/editor-os` — todos HTTP 307 para `/login`, nenhum 404/500.
+
+### project-status.ts
+
+Resolvido como união das áreas das duas branches integradas (nunca um
+arquivo inteiro escolhido de uma branch só). Nenhuma área nova marcada
+`validated`. `global_calendar`, `V1_PROGRESS` (81) e `V2_PROGRESS` (12)
+intocados.
+
+### Push
+
+Somente `main` foi enviado ao remoto. Nenhuma branch de feature ou de
+release foi enviada.
+
+## 2026-07-22 (Sprint Motor LOKAT 1.1.1 — hotfix de cadastro, edição e acessibilidade, branch isolada)
+
+### Branch
+
+`fix/product-engineering-usability-v1`, criada a partir de
+`origin/feat/product-engineering-preview-v1` (commit-base
+`2637cd483dcfbaa010d9fa8147c24371b344deb8`). **Nada mergeado ou enviado para
+`main`.**
+
+### Executor
+
+Claude Code
+
+### Origem
+
+QA do deployment `dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX` (P0=0, P1=1, P2=2, P3=1).
+
+### P1 — edição detalhada não evidente/acessível
+
+Antes: um único acordeão plano por card do Portfólio mostrava tudo (geral +
+custos + operação + posicionamento) sem nenhum botão de edição explícito.
+Depois: `_products-tab.tsx` reescrito com um fluxo de duas telas —
+lista → botão "Editar produto"/"Editar serviço" → workspace com 5 abas
+internas (Geral, Custos, Operação, Posicionamento, Testes e resultados),
+"Voltar ao Portfólio" e "Testar no Laboratório". As seções de custo/operação/
+posicionamento já existentes foram reaproveitadas dentro das abas — nenhuma
+engine duplicada.
+
+### Fase 9 — Produto vs. Serviço
+
+Novo tipo `ProductKind` (`business-types.ts`) e campo `ProductServiceItem.kind`.
+Criação passa a exigir escolha explícita (`NewItemChooser`). Nova função
+`productSegmentFields(segment, kind)` em `product-presets.ts` filtra campos
+de estoque/ingrediente/embalagem/validade/SKU/armazenamento para serviços,
+mesmo em segmentos como delivery/varejo. Motor de custo/operação inalterado —
+só rótulos da UI mudam por tipo (ex.: "Perda esperada" -> "Retrabalho
+esperado" para serviço).
+
+### P2 — Manual e SWOT
+
+`_business-tab.tsx`: Manual do Negócio ganhou seção explícita "Modelo de
+negócio" (lida de `dna.businessModel.value`); SWOT/FOFA reagrupada sob
+"Ambiente interno" (Forças/Fraquezas) e "Ambiente externo"
+(Oportunidades/Ameaças), cada um com explicação curta — estrutura de dados
+dos itens não mudou.
+
+### P3 + acessibilidade
+
+Inputs de componentes de custo, selects de estágio/decisão do Laboratório,
+inputs de meta e `BusinessSourceSelect`/botão fechar do `MetricDetailModal`
+(`_shared.tsx`) ganharam `aria-label`/`<label>` associados.
+
+### Verificação
+
+`hotfix-verify.js` (script ad-hoc, 22 checks): filtragem de campos por
+segmento/tipo, cenário "Serviço de consultoria" (custo por hora, sem
+embalagem, sem NaN/Infinity), zero regressão nos motores de operação/
+matriz/laboratório/campanha (não alterados neste hotfix). `tsc`, `eslint`,
+`npm run build` e `git diff --check` limpos. Busca por
+`Math.random|Date.now|localStorage|sessionStorage|Supabase|fetch(|axios|
+service_role|public_token` não encontrou nada fora do `generateId()`
+pré-existente (já auditado na 1.1).
+
+### Status
+
+`project-status.ts`: nenhuma área marcada `validated` — todas seguem
+`qa_pending`/`planned`/`blocked` como já estavam. Só `next_actions`/`notes`/
+`last_updated` atualizados em `business_manual`, `business_swot`,
+`product_portfolio`, `product_cost_engineering`, `product_positioning`,
+`product_laboratory`. `global_calendar`, `V1_PROGRESS` (81) e
+`V2_PROGRESS` (12) não tocados.
+
+### Limitação declarada
+
+Testes de clique-a-clique e verificação mobile real não puderam ser
+executados neste ambiente por falta de navegador — verificado via script
+ad-hoc e leitura de código. Recomenda-se QA manual em navegador antes de
+qualquer promoção.
+
+## 2026-07-20 (Sprint Motor LOKAT 1.1 — DNA do Negócio e Engenharia de Produtos, branch isolada)
+
+### Branch
+
+`feat/product-engineering-preview-v1`, criada a partir de
+`origin/feat/motor-lokat-preview-v1` (não de `main`, pois este módulo depende
+do Motor LOKAT 1.0). **Nada mergeado ou enviado para `main`.**
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Expandir o preview do Motor LOKAT com DNA do Negócio (perfil estratégico, 4 Ps,
+SWOT, metas, manual consolidado) e Engenharia de Produtos e Serviços
+(portfólio, composição de custo, operação/capacidade, laboratório de testes,
+matriz de desempenho, recomendações determinísticas, pontes para Campanhas e
+REC OS) — sem duplicar o motor financeiro ou o simulador de campanha já
+existentes.
+
+### Auditoria de reuso (Fase 1)
+
+Antes de escrever qualquer código novo, auditados `src/app/admin/meu-negocio/`,
+`src/lib/motor-lokat/` e `src/config/project-status.ts` da Sprint 1.0.
+Reaproveitado sem duplicar: `combineConfidence`, `classifyCostVsGoal`/
+`classifyMarginVsGoal` (agora exportados de `financial-engine.ts`),
+`safeDivide`/`formatCents`/`formatPercent`/`parseCentsInput`/`parsePercentInput`
+(`money.ts`), `calculateCampaignProjection` (`campaign-engine.ts`),
+`SEGMENT_PRESETS`/`SEGMENT_ORDER`, todos os componentes de `_shared.tsx`
+(`MoneyInput`, `PercentInput`, `NumberInput`, `SourceBadge`, `ConfidenceLabel`,
+`StatusPill`, `GlossaryHelpIcon`, `MetricCard`, `MetricDetailModal`).
+
+### Arquivos criados
+
+- `src/lib/motor-lokat/business-types.ts` — tipos de DNA do Negócio (com
+  `BusinessDataSource` de 5 valores, incluindo "diagnostico"), 4 Ps, SWOT,
+  Metas de Vendas, Produtos/Serviços, Laboratório e Matriz de Desempenho.
+  Mantido separado de `types.ts` para não tocar no código já shipado da 1.0.
+- `src/lib/motor-lokat/product-cost-engine.ts` — custo direto, CMV/CSV e
+  margem de contribuição unitária, reaproveitando os classificadores do motor
+  financeiro em vez de duplicar a lógica de comparação com meta.
+- `src/lib/motor-lokat/product-operations-engine.ts` — capacidade projetada,
+  utilização, vendas possíveis, gargalo e risco operacional — nunca inventa
+  demanda, só compara capacidade informada contra capacidade máxima informada.
+- `src/lib/motor-lokat/performance-matrix.ts` — classificação em 4 quadrantes
+  (venda × margem) contra meta configurada ou mediana da categoria (critério
+  sempre exposto) + recomendações determinísticas por quadrante.
+- `src/lib/motor-lokat/lab-decision-rules.ts` — sugestão de decisão pós-teste
+  (manter/ajustar preço/reformular/retirar/expandir/etc.), nunca executada
+  automaticamente.
+- `src/lib/motor-lokat/product-presets.ts` — campos extras por segmento
+  (delivery, varejo, clínica, serviços/agência, SaaS).
+- `src/lib/motor-lokat/ai-pede-contract.ts` — contrato conceitual de campos
+  (Fase 19) — zero chamada de API, zero endpoint, zero dado real.
+- `src/app/admin/meu-negocio/_business-tab.tsx` — aba Empresa: DNA do Negócio
+  (19 campos com origem própria), 4 Ps, SWOT/FOFA (com exemplos por segmento
+  claramente marcados como exemplo), Metas de Vendas (real/meta/diferença/%
+  atingido), Manual do Negócio (derivado ao vivo, não é cópia separada).
+- `src/app/admin/meu-negocio/_products-tab.tsx` — aba Produtos e Serviços:
+  Portfólio (cadastro em memória com campos por segmento), Laboratório
+  (fluxo Ideia→Planejamento→Teste→Resultado→Decisão reaproveitando
+  `calculateCampaignProjection`), Matriz de Desempenho (4 quadrantes +
+  recomendações), pontes "Testar em campanha" e "Criar campanha no REC OS".
+
+### Arquivos alterados
+
+- `src/lib/motor-lokat/financial-engine.ts` — `classifyCostVsGoal`/
+  `classifyMarginVsGoal` exportados (eram privados) para reuso em
+  `product-cost-engine.ts`. Nenhuma mudança de comportamento.
+- `src/app/admin/meu-negocio/_shared.tsx` — `BusinessSourceSelect`/
+  `DnaTextField` (badge/input com origem de 5 valores) e `generateId()`
+  (gerador de id de módulo, usado por todos os "adicionar item" das novas
+  abas — extraído para resolver um achado de lint, ver abaixo).
+- `src/app/admin/meu-negocio/_campaign-tab.tsx` — novo prop opcional
+  `seedInput`, usado pela ponte de Produtos e Serviços/Laboratório; banner
+  informando que os dados vieram de Produtos e Serviços quando presente.
+- `src/app/admin/meu-negocio/_client-content.tsx` — duas novas abas
+  ("Empresa", "Produtos e Serviços") na ordem pedida; estado de DNA/4Ps/SWOT/
+  Metas/Produtos/Laboratório levantado para o shell (nunca resetado por troca
+  de segmento); `campaignSeed`/`campaignSeedVersion` para a ponte de campanha
+  (remount via `key`, mesmo padrão determinístico das sprints do Calendário
+  Global).
+- `src/config/project-status.ts` — 13 áreas novas.
+
+### Achado de qualidade corrigido
+
+Geração de IDs (`Date.now()`/`Math.random()`) dentro dos handlers de
+"adicionar item" (SWOT, produto, componente de custo, teste de laboratório,
+meta) disparava `react-hooks/purity` — o linter não consegue provar que uma
+chamada textualmente dentro do corpo do componente só roda em handler de
+clique. Corrigido extraindo `generateId()` para escopo de módulo em
+`_shared.tsx` (mesmo padrão do `uid()` já usado em `CanvasEditor.tsx`).
+
+### Verificação
+
+- Script ad-hoc (`tsc` standalone + `node`, sem framework de teste instalado):
+  os 10 cenários do prompt — 4 quadrantes da matriz de desempenho, serviço
+  sem estoque (capacidade sem depender de inventário), produto em teste
+  (Laboratório reaproveitando o simulador), produto sazonal, capacidade
+  insuficiente (utilização >90% → risco alto), dados ausentes (confiança
+  "insuficiente", nenhum NaN), margem negativa (status "crítico") — todos
+  passaram. Suite da Sprint 1.0 (7 cenários) re-executada sem regressão após
+  exportar os classificadores.
+- Busca por `Math.random`/`Date.now`/`new Date(`/`localStorage`/
+  `sessionStorage`/`Supabase`/`fetch(`/`axios`/`public_token`/`service_role`
+  nos arquivos alterados: zero ocorrências fora do `generateId()` já descrito
+  (que só roda em handlers de clique, nunca durante o render).
+
+### SQL
+
+- Nenhum SQL executado, nenhuma migration criada, nenhuma env real alterada,
+  nenhuma biblioteca instalada, nenhuma chamada de API externa.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados/criados: zero erros/warnings (após o fix do
+  `generateId`).
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis). `global_calendar` inalterado.
+- Push feito somente da branch `feat/product-engineering-preview-v1` — `main`
+  nunca tocado, nenhum deployment de produção criado.
+
+---
+
+## 2026-07-20 (Sprint Motor LOKAT 1.0 — preview "Meu Negócio", branch isolada)
+
+### Branch
+
+`feat/motor-lokat-preview-v1`, criada a partir de `main` no commit `075b023`.
+**Nada desta sprint foi mergeado ou enviado para `main`.**
+
+### Executor
+
+Claude Code
+
+### Objetivo
+
+Entregar um vertical slice funcional e demonstrável do módulo "Meu Negócio"
+(Motor LOKAT): visão geral financeira, precificação, campanhas, fluxo de
+caixa, fontes e glossário — editável, com cálculos reagindo em tempo real,
+sem depender de Supabase.
+
+### Arquivos criados
+
+- `src/lib/motor-lokat/types.ts` — tipos compartilhados (segmento, perfil
+  financeiro, métrica com origem/confiança/fórmula, precificação, fluxo de
+  caixa, campanha, contexto REC OS, glossário, payload LLM, insight).
+- `src/lib/motor-lokat/money.ts` — cents-based (`formatCents`,
+  `parseCentsInput`, `formatPercent`, `parsePercentInput`, `safeDivide`,
+  `roundFraction`) — nunca float para dinheiro.
+- `src/lib/motor-lokat/financial-engine.ts` — `buildFinancialSnapshot()`:
+  faturamento bruto, receita reconhecida/líquida, custo direto (%),
+  despesas variáveis (%), margem de contribuição (%), despesas fixas,
+  resultado operacional (%), ticket médio, ponto de equilíbrio (faturamento
+  e quantidade), capital de giro sugerido — cada métrica com fórmula,
+  explicação simples/técnica, origem, confiança e status vs. meta
+  configurável (nunca limite universal escondido).
+- `src/lib/motor-lokat/pricing-engine.ts` — `calculatePricing()`: Preço =
+  Custo ÷ [1 − (fixas% + variáveis% + margem%)], com bloqueio quando a soma
+  ≥ 100%.
+- `src/lib/motor-lokat/cash-flow-engine.ts` — `calculateCashFlow()`: saldo
+  projetado/realizado, capital de giro, meses de cobertura, risco.
+- `src/lib/motor-lokat/campaign-engine.ts` — `calculateCampaignProjection()`:
+  desconto financiado pela empresa, receita reconhecida/margem por pedido,
+  investimento fixo, pedidos para equilíbrio, CAC, LTV de receita/
+  contribuição, LTV/CAC, payback, classificação de status (saudável / viável
+  com atenção / margem apertada / prejuízo projetado / dados insuficientes),
+  com tratamento diferenciado para objetivo "fortalecer marca".
+- `src/lib/motor-lokat/segment-presets.ts` — 6 presets (delivery, varejo,
+  clínica, serviços, agência, SaaS) com labels de custo, exemplos de perdas e
+  metas sugeridas.
+- `src/lib/motor-lokat/glossary.ts` — 26 termos com nome simples/técnico,
+  fórmula, exemplo, erros comuns, termos relacionados.
+- `src/lib/motor-lokat/insight-rules.ts` — interpretador determinístico
+  (`generateFinancialInsights`, `generateCampaignInsights`) — nenhuma LLM
+  conectada, cada insight expõe motivo, dado usado, qualidade e limites.
+- `src/app/admin/meu-negocio/page.tsx` + `_client-content.tsx` +
+  `_overview-tab.tsx` + `_pricing-tab.tsx` + `_campaign-tab.tsx` +
+  `_cashflow-tab.tsx` + `_sources-tab.tsx` + `_glossary-tab.tsx` +
+  `_shared.tsx` — shell com seletor de segmento, banner de modo demonstração
+  permanente, 6 abas, cards com detalhe, gráficos em barra CSS (sem
+  biblioteca nova), prévia de payload LLM, contexto REC OS com link real
+  para `/admin/contentos/criar?step=brief` (rota auditada antes de usar).
+
+### Arquivos alterados
+
+- `src/components/app-sidebar.tsx` — item "Meu Negócio" adicionado ao nav
+  admin (ícone `Sparkles`, já importado). Só existe nesta branch.
+- `src/config/project-status.ts` — 8 áreas novas (`business_os_preview`,
+  `financial_intelligence_engine`, `campaign_profitability_simulator`,
+  `financial_glossary`, `financial_data_quality` em `qa_pending`;
+  `campaign_rec_os_bridge`, `aipede_csv_import`, `inventory_and_losses` em
+  `planned`), todas anotadas como existentes somente na branch de preview.
+  `global_calendar` não foi tocado. `V1_PROGRESS`/`V2_PROGRESS` inalterados.
+
+### Verificação
+
+- Sem framework de teste instalado — verificado via script ad-hoc (`tsc`
+  standalone + `node`), cobrindo os 7 cenários do prompt: (1) preço R$40/
+  custo R$16 → custo 40%/margem 60%; (2) custo R$75, fixas 20%/variáveis 10%/
+  margem 20% → preço mínimo R$150; (3) campanha com margem positiva →
+  status saudável; (4) campanha com prejuízo → status prejuízo_projetado;
+  (5) CAC > LTV de contribuição → insight `cac_above_ltv` disparado; (6)
+  dados insuficientes → status dados_insuficientes, CAC/LTV `null` (nunca
+  NaN); (7) capital de giro com 2 meses de cobertura numa meta de 3 →
+  risco "atenção". Mais checagens de divisão por zero/dados ausentes — zero
+  NaN/Infinity em qualquer cenário. Script descartado, não commitado.
+- Busca explícita nos arquivos alterados por `Math.random`, `Date.now`,
+  `new Date(`, `localStorage`, `sessionStorage`, `window.`, `public_token`,
+  `service_role`, `Supabase`, `fetch(`, `axios`: zero ocorrências reais (só
+  menções em comentários explicando a ausência).
+
+### SQL
+
+- Nenhum SQL executado, nenhuma migration criada, nenhuma env real alterada.
+
+### Qualidade
+
+- `npx tsc --noEmit --skipLibCheck`: zero erros.
+- `npm run build`: compilado com sucesso (após limpar `.next` — uma falha de
+  alocação de memória do Turbopack no cache antigo não se repetiu depois).
+- ESLint nos arquivos alterados/criados: zero erros/warnings.
+- `git diff --check`: sem erros.
+
+### Resultado
+
+- V1_PROGRESS = 81, V2_PROGRESS = 12 (imutáveis). `global_calendar` inalterado.
+- Push feito somente da branch `feat/motor-lokat-preview-v1` — `main` nunca
+  tocado, nenhum deployment de produção criado.
+
+---
+
 ## 2026-07-19 (Sprint 3.1A.3 — Hotfix definitivo: navegação nativa)
 
 ### Sprint
