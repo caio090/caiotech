@@ -5,14 +5,24 @@ import {
   Type, ImageIcon, Square, Trash2, Copy, ChevronUp, ChevronDown,
   Undo2, Redo2, ZoomIn, ZoomOut, Download, Bold, Italic,
   AlignLeft, AlignCenter, AlignRight, FlaskConical, Loader2,
+  ScanText, Layers as LayersIcon, RotateCcw,
 } from "lucide-react";
+import { LayerScanPanel, type ScanStatus } from "./LayerScanPanel";
+import { LayersPanel } from "./LayersPanel";
+import { scanImageForLayers } from "@/lib/editor-os/layer-scanner/scanner";
+import { convertTextLayerToEditorElement } from "@/lib/editor-os/layer-scanner/layer-converter";
+import { evaluateBackgroundCleanup, generateSolidCleanupPatch, type RgbSample } from "@/lib/editor-os/layer-scanner/background-cleanup";
+import { mapImageRegionToCanvasElement } from "@/lib/editor-os/layer-scanner/coordinate-mapper";
+import { shouldPreselectLayer } from "@/lib/editor-os/layer-scanner/confidence";
+import { generateScanId, LAYER_SCANNER_VERSION, type DetectedTextLayer, type LayerScanResult, type LayerBoundingBox } from "@/lib/editor-os/layer-scanner/types";
+import { terminateOcrWorker } from "@/lib/editor-os/layer-scanner/ocr-provider";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ElemType = "text" | "image" | "rect";
+export type ElemType = "text" | "image" | "rect";
 export type Preset = "feed" | "story" | "carousel";
 
-interface EditorElement {
+export interface EditorElement {
   id: string;
   type: ElemType;
   x: number;
@@ -31,6 +41,19 @@ interface EditorElement {
   src?: string;
   fill?: string;
   opacity?: number;
+  /** Fase 16 — layers panel. Optional so existing/older drafts (saved before this sprint) still load correctly: undefined means visible/unlocked. */
+  hidden?: boolean;
+  locked?: boolean;
+  /** Fase 10/18 — present only on elements created by the layer scanner; never set on manually-created elements. */
+  editorOsSource?: "layer_scan" | "background_cleanup";
+  scannerVersion?: string;
+  sourceObjectId?: string;
+  scanResultId?: string;
+  scanConfidence?: number;
+  originalScannedText?: string;
+  backgroundRemovalMode?: "overlay_only" | "solid_background_cleanup";
+  /** Only set on a background_cleanup patch element — lets "Restaurar região original" find and remove just that patch. */
+  cleanupForElementId?: string;
 }
 
 interface DragState {
@@ -67,6 +90,48 @@ const ROT_OFFSET = 28; // how far above bounding box the rotation handle is
 
 function uid() {
   return `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Draws the source image once into an offscreen canvas so the scanner can sample its real pixels (never a screenshot of the page). */
+function buildImagePixelSampler(img: HTMLImageElement): { sampleAverageColor(x: number, y: number, width: number, height: number): RgbSample | null } {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { sampleAverageColor: () => null };
+  ctx.drawImage(img, 0, 0);
+
+  return {
+    sampleAverageColor(x, y, width, height) {
+      try {
+        const sx = Math.max(0, Math.round(x));
+        const sy = Math.max(0, Math.round(y));
+        const sw = Math.max(1, Math.min(Math.round(width), canvas.width - sx));
+        const sh = Math.max(1, Math.min(Math.round(height), canvas.height - sy));
+        const { data } = ctx.getImageData(sx, sy, sw, sh);
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i + 1]; b += data[i + 2];
+          count++;
+        }
+        if (count === 0) return null;
+        return { r: r / count, g: g / count, b: b / count };
+      } catch {
+        return null; // e.g. a tainted canvas from a cross-origin image — never crash the scan for this
+      }
+    },
+  };
+}
+
+/** Samples a thin ring of pixels around (not inside) a bounding box — used to judge whether the background right around a detected text line is uniform enough for the experimental cleanup. */
+function sampleRingAroundBBox(sampler: { sampleAverageColor(x: number, y: number, width: number, height: number): RgbSample | null }, bbox: LayerBoundingBox, ringPx: number): RgbSample[] {
+  const samples: RgbSample[] = [];
+  const top = sampler.sampleAverageColor(bbox.x, Math.max(0, bbox.y - ringPx), bbox.width, ringPx);
+  const bottom = sampler.sampleAverageColor(bbox.x, bbox.y + bbox.height, bbox.width, ringPx);
+  const left = sampler.sampleAverageColor(Math.max(0, bbox.x - ringPx), bbox.y, ringPx, bbox.height);
+  const right = sampler.sampleAverageColor(bbox.x + bbox.width, bbox.y, ringPx, bbox.height);
+  for (const s of [top, bottom, left, right]) if (s) samples.push(s);
+  return samples;
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
@@ -167,7 +232,7 @@ function drawElement(
     const lines = wrapText(ctx, el.text, el.w);
     const lineH = fs * 1.3;
     const totalH = lines.length * lineH;
-    let startY = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
+    const startY = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
     let startX = -el.w / 2;
     if (align === "center") startX = 0;
     else if (align === "right") startX = el.w / 2;
@@ -286,6 +351,18 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
   const [cursor, setCursor]       = useState("default");
   const [pendingImport, setPendingImport] = useState<SessionImportPayload | null>(null);
 
+  // ── Layer scanner (Sprint EditorOS 1.0) ─────────────────────────────────────
+  const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanResult, setScanResult] = useState<LayerScanResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanResultId, setScanResultId] = useState<string | null>(null);
+  const [selectedLayerIds, setSelectedLayerIds] = useState<Set<string>>(new Set());
+  const [textOverrides, setTextOverrides] = useState<Record<string, string>>({});
+  const [backgroundRemovalMode, setBackgroundRemovalMode] = useState<"overlay_only" | "solid_background_cleanup">("overlay_only");
+  const [showLayersPanel, setShowLayersPanel] = useState(false);
+  const scanAbortRef = useRef<AbortController | null>(null);
+
   const { w: cw, h: ch } = PRESETS[preset];
 
   // ── Scale ──────────────────────────────────────────────────────────────────
@@ -309,6 +386,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
 
     const sorted = [...elements].sort((a, b) => a.z - b.z);
     for (const el of sorted) {
+      if (el.hidden) continue;
       drawElement(ctx, el, imgCache.current, redraw);
     }
 
@@ -380,7 +458,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
 
     if (selectedId) {
       const selEl = elements.find(el => el.id === selectedId);
-      if (selEl) {
+      if (selEl && !selEl.locked) {
         const h = hitHandle(px, py, selEl);
         if (h) {
           dragging.current = {
@@ -396,7 +474,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
       }
     }
 
-    const sorted = [...elements].sort((a, b) => b.z - a.z);
+    const sorted = [...elements].sort((a, b) => b.z - a.z).filter(el => !el.hidden && !el.locked);
     for (const el of sorted) {
       if (hitTest(px, py, el)) {
         setSelectedId(el.id);
@@ -421,14 +499,14 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
     if (!dragging.current) {
       if (selectedId) {
         const selEl = elements.find(el => el.id === selectedId);
-        if (selEl) {
+        if (selEl && !selEl.locked) {
           const h = hitHandle(px, py, selEl);
           if (h === "rotate") { setCursor("crosshair"); return; }
           if (h?.startsWith("resize")) { setCursor("nwse-resize"); return; }
           if (hitTest(px, py, selEl)) { setCursor("grab"); return; }
         }
       }
-      const topEl = [...elements].sort((a, b) => b.z - a.z).find(el => hitTest(px, py, el));
+      const topEl = [...elements].sort((a, b) => b.z - a.z).filter(el => !el.hidden && !el.locked).find(el => hitTest(px, py, el));
       setCursor(topEl ? "pointer" : "default");
       return;
     }
@@ -492,6 +570,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
     const [px, py] = toCanvas(e);
     const sorted = [...elements].sort((a, b) => b.z - a.z);
     for (const el of sorted) {
+      if (el.hidden || el.locked) continue;
       if (el.type === "text" && hitTest(px, py, el)) {
         setEditingId(el.id);
         setDraftText(el.text ?? "");
@@ -557,23 +636,39 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
     e.target.value = "";
   }
 
-  function deleteSelected() {
-    if (!selectedId) return;
-    const next = elements.filter(e => e.id !== selectedId);
+  function deleteElement(id: string) {
+    const el = elements.find(e => e.id === id);
+    if (!el) return;
+    const next = elements.filter(e => e.id !== id);
     setElements(next);
     pushHistory(next);
-    setSelectedId(null);
+    if (selectedId === id) setSelectedId(null);
+    // Fase 14 — deleting a scanned text layer only removes the Fabric-equivalent
+    // EditorElement; if no background cleanup was applied for it, the original
+    // pixels are still sitting in the source PNG underneath.
+    if (el.editorOsSource === "layer_scan" && el.backgroundRemovalMode === "overlay_only") {
+      showSaved("O elemento editável foi removido, mas ainda existe na imagem original.");
+    }
   }
 
-  function duplicateSelected() {
+  function deleteSelected() {
     if (!selectedId) return;
-    const el = elements.find(e => e.id === selectedId);
+    deleteElement(selectedId);
+  }
+
+  function duplicateElement(id: string) {
+    const el = elements.find(e => e.id === id);
     if (!el) return;
     const dup: EditorElement = { ...el, id: uid(), x: el.x + 30, y: el.y + 30, z: elements.length };
     const next = [...elements, dup];
     setElements(next);
     pushHistory(next);
     setSelectedId(dup.id);
+  }
+
+  function duplicateSelected() {
+    if (!selectedId) return;
+    duplicateElement(selectedId);
   }
 
   function bringForward() {
@@ -588,6 +683,190 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
     setElements(prev => prev.map(el =>
       el.id === selectedId ? { ...el, z: Math.max(0, el.z - 1) } : el
     ));
+  }
+
+  function moveElementForward(id: string) {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, z: el.z + 1 } : el));
+  }
+
+  function moveElementBackward(id: string) {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, z: Math.max(0, el.z - 1) } : el));
+  }
+
+  function toggleElementHidden(id: string) {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, hidden: !el.hidden } : el));
+  }
+
+  function toggleElementLocked(id: string) {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, locked: !el.locked } : el));
+  }
+
+  function restoreOriginalForElement(scannedTextElementId: string) {
+    const patch = elements.find(e => e.cleanupForElementId === scannedTextElementId);
+    if (!patch) return;
+    deleteElement(patch.id);
+  }
+
+  // ── Layer scanner (Fase 4-14) ────────────────────────────────────────────────
+  // NOTE: `selEl` (the currently selected element) is declared further below,
+  // right before the render return — every function here only *reads* it when
+  // actually invoked (from a click handler), by which point that render's
+  // `selEl` closure is already initialized. `canScanSelected`, however, is a
+  // plain computed value evaluated inline during component-body execution, so
+  // it is declared right after `selEl` itself (see below) instead of here.
+
+  async function startLayerScan() {
+    if (!selEl || selEl.type !== "image" || !selEl.src) {
+      setScanStatus("unsupported");
+      return;
+    }
+    const img = imgCache.current.get(selEl.src);
+    if (!img) {
+      setScanStatus("error");
+      setScanError("Imagem original não encontrada em memória — reabra ou reimporte a imagem.");
+      return;
+    }
+
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setScanResult(null);
+    setScanError(null);
+    setSelectedLayerIds(new Set());
+    setTextOverrides({});
+    setBackgroundRemovalMode("overlay_only");
+    const thisScanId = generateScanId("scanresult");
+    setScanResultId(thisScanId);
+    setScanStatus("preparing");
+    setScanProgress(0);
+
+    try {
+      const sampler = buildImagePixelSampler(img);
+      const result = await scanImageForLayers(
+        {
+          sourceObjectId: selEl.id,
+          imageElement: img,
+          languages: ["por", "eng"],
+          onProgress: (stage, progress) => {
+            setScanProgress(progress);
+            if (stage !== "done") setScanStatus(stage);
+          },
+          signal: controller.signal,
+        },
+        sampler
+      );
+      setScanResult(result);
+      setScanStatus("review");
+      const preselected = new Set(
+        result.layers.filter((l): l is DetectedTextLayer => l.kind === "text" && shouldPreselectLayer(l)).map((l) => l.id)
+      );
+      setSelectedLayerIds(preselected);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setScanStatus("cancelled");
+      } else {
+        setScanStatus("error");
+        setScanError(err instanceof Error ? err.message : "Não foi possível escanear esta imagem.");
+      }
+    }
+  }
+
+  function cancelScan() {
+    scanAbortRef.current?.abort();
+  }
+
+  function closeScanPanel() {
+    if (scanStatus === "preparing" || scanStatus === "scanning_text" || scanStatus === "scanning_objects") {
+      cancelScan();
+    }
+    setScanStatus("idle");
+    setScanResult(null);
+    setScanError(null);
+    setScanResultId(null);
+  }
+
+  function toggleScanLayer(id: string) {
+    setSelectedLayerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function updateScanTextOverride(id: string, text: string) {
+    setTextOverrides(prev => ({ ...prev, [id]: text }));
+  }
+
+  async function convertApprovedScanLayers() {
+    if (!scanResult || !scanResultId) return;
+    const sourceImageEl = elements.find(e => e.id === scanResult.sourceObjectId);
+    if (!sourceImageEl) {
+      setScanStatus("error");
+      setScanError("A imagem original foi removida ou alterada durante a revisão.");
+      return;
+    }
+
+    setScanStatus("converting");
+
+    const approvedLayers = scanResult.layers.filter(
+      (l): l is DetectedTextLayer => l.kind === "text" && selectedLayerIds.has(l.id)
+    );
+
+    const geometry = { x: sourceImageEl.x, y: sourceImageEl.y, w: sourceImageEl.w, h: sourceImageEl.h, rot: sourceImageEl.rot };
+    const conversionOptions = {
+      approvedLayerIds: [...selectedLayerIds],
+      textOverrides,
+      backgroundRemovalMode,
+    };
+
+    const newElements: EditorElement[] = [];
+    let zCursor = elements.length;
+
+    const img = sourceImageEl.src ? imgCache.current.get(sourceImageEl.src) : null;
+    const sampler = img ? buildImagePixelSampler(img) : null;
+
+    for (const layer of approvedLayers) {
+      if (backgroundRemovalMode === "solid_background_cleanup" && sampler) {
+        const ringSamples = sampleRingAroundBBox(sampler, layer.boundingBox, 6);
+        const evaluation = evaluateBackgroundCleanup(ringSamples);
+        if (evaluation.eligible && evaluation.sampledColor) {
+          const padding = 4;
+          const paddedBox: LayerBoundingBox = {
+            x: layer.boundingBox.x - padding, y: layer.boundingBox.y - padding,
+            width: layer.boundingBox.width + padding * 2, height: layer.boundingBox.height + padding * 2,
+          };
+          const patchDataUrl = generateSolidCleanupPatch(paddedBox, evaluation.sampledColor, 8);
+          if (patchDataUrl) {
+            const patchGeometry = mapImageRegionToCanvasElement(geometry, layer.sourceImageWidth, layer.sourceImageHeight, paddedBox);
+            const patchImg = new Image();
+            patchImg.src = patchDataUrl;
+            imgCache.current.set(patchDataUrl, patchImg);
+            const patchId = uid();
+            newElements.push({
+              id: patchId, type: "image",
+              x: patchGeometry.x, y: patchGeometry.y, w: patchGeometry.w, h: patchGeometry.h, rot: patchGeometry.rot,
+              z: zCursor++, src: patchDataUrl, opacity: 1,
+              editorOsSource: "background_cleanup", scannerVersion: LAYER_SCANNER_VERSION,
+              sourceObjectId: sourceImageEl.id, scanResultId,
+            });
+          }
+        }
+      }
+
+      const textEl = convertTextLayerToEditorElement(layer, geometry, conversionOptions, scanResultId);
+      newElements.push({ ...textEl, z: zCursor++ });
+    }
+
+    if (newElements.length === 0) {
+      setScanStatus("review");
+      return;
+    }
+
+    const next = [...elements, ...newElements];
+    setElements(next);
+    pushHistory(next);
+    const firstText = newElements.find(e => e.type === "text");
+    if (firstText) setSelectedId(firstText.id);
+    setScanStatus("completed");
   }
 
   function updateSel(patch: Partial<EditorElement>) {
@@ -694,7 +973,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
           const lines = wrapText(ctx, el.text, el.w);
           const lineH = fs * 1.3;
           const totalH = lines.length * lineH;
-          let sy = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
+          const sy = -el.h / 2 + Math.max(0, (el.h - totalH) / 2);
           let sx = -el.w / 2;
           if (ctx.textAlign === "center") sx = 0;
           else if (ctx.textAlign === "right") sx = el.w / 2;
@@ -767,6 +1046,13 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
     imgCache.current.clear();
     loadDraft();
   }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fase 6 — the OCR worker is created once and reused across scans in the
+  // same session; terminate it when the editor itself unmounts so it never
+  // leaks across page navigations.
+  useEffect(() => {
+    return () => { terminateOcrWorker(); };
+  }, []);
 
   // Reload draft when preset changes (within same client)
   useEffect(() => {
@@ -844,6 +1130,12 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
 
   const selEl = elements.find(e => e.id === selectedId) ?? null;
 
+  // Fase 4 — the "Escanear camadas" button only makes sense for exactly one
+  // selected raster image, and only when no other scan is already active.
+  const canScanSelected = !!selEl && selEl.type === "image" && !!selEl.src &&
+    (scanStatus === "idle" || scanStatus === "completed" || scanStatus === "cancelled" || scanStatus === "error");
+  const linkedCleanupPatch = selEl ? elements.find(e => e.cleanupForElementId === selEl.id) : undefined;
+
   // ── Overlay text input position ────────────────────────────────────────────
   function getOverlayStyle(): React.CSSProperties | null {
     if (!editingId || !canvasRef.current) return null;
@@ -913,6 +1205,28 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
         <button onClick={addRect}
           className="flex items-center gap-1 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800 px-2 py-1.5 rounded-lg transition-colors">
           <Square className="w-3.5 h-3.5" /> Forma
+        </button>
+
+        {canScanSelected && (
+          <button
+            onClick={startLayerScan}
+            data-testid="editor-layer-scan-button"
+            title="Analisa textos e possíveis elementos da imagem para criar camadas editáveis."
+            className="flex items-center gap-1 text-xs text-indigo-300 hover:text-white hover:bg-indigo-900/60 px-2 py-1.5 rounded-lg transition-colors"
+          >
+            <ScanText className="w-3.5 h-3.5" /> Escanear camadas
+          </button>
+        )}
+
+        <button
+          onClick={() => setShowLayersPanel(v => !v)}
+          data-testid="editor-open-layer-panel"
+          title="Lista de camadas"
+          className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg transition-colors ${
+            showLayersPanel ? "bg-zinc-800 text-white" : "text-zinc-300 hover:text-white hover:bg-zinc-800"
+          }`}
+        >
+          <LayersIcon className="w-3.5 h-3.5" /> Camadas
         </button>
 
         <div className="w-px h-4 bg-zinc-700" />
@@ -1046,8 +1360,43 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
           </div>
         </div>
 
+        {/* ── Layer scan panel (Fase 5) — takes over the side slot while a scan/review is active ── */}
+        {scanStatus !== "idle" && (
+          <LayerScanPanel
+            status={scanStatus}
+            progress={scanProgress}
+            result={scanResult}
+            errorMessage={scanError}
+            selectedLayerIds={selectedLayerIds}
+            textOverrides={textOverrides}
+            backgroundRemovalMode={backgroundRemovalMode}
+            onToggleLayer={toggleScanLayer}
+            onTextOverrideChange={updateScanTextOverride}
+            onBackgroundModeChange={setBackgroundRemovalMode}
+            onCancel={cancelScan}
+            onConvert={convertApprovedScanLayers}
+            onClose={closeScanPanel}
+          />
+        )}
+
+        {/* ── Layers panel (Fase 16) ─────────────────────────────────────── */}
+        {scanStatus === "idle" && showLayersPanel && (
+          <LayersPanel
+            elements={elements}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onToggleHidden={toggleElementHidden}
+            onToggleLocked={toggleElementLocked}
+            onDuplicate={duplicateElement}
+            onDelete={deleteElement}
+            onMoveUp={moveElementForward}
+            onMoveDown={moveElementBackward}
+            onClose={() => setShowLayersPanel(false)}
+          />
+        )}
+
         {/* ── Properties panel ────────────────────────────────────────── */}
-        {selEl && (
+        {scanStatus === "idle" && !showLayersPanel && selEl && (
           <aside className="w-52 shrink-0 border-l border-zinc-800 bg-zinc-900 overflow-y-auto">
             <div className="p-3 space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
@@ -1233,12 +1582,29 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
                   <Trash2 className="w-3.5 h-3.5" /> Excluir
                 </button>
               </div>
+
+              {/* Fase 13/14 — only present on a text layer created by the scanner, only when a cleanup patch was actually applied for it. */}
+              {selEl.editorOsSource === "layer_scan" && linkedCleanupPatch && (
+                <div className="pt-1 border-t border-zinc-800">
+                  <button onClick={() => restoreOriginalForElement(selEl.id)}
+                    data-testid={`editor-layer-restore-${selEl.id}`}
+                    className="w-full flex items-center justify-center gap-1 text-xs border border-amber-900/50 text-amber-400 hover:bg-amber-950/40 rounded-lg py-1.5 transition-colors">
+                    <RotateCcw className="w-3.5 h-3.5" /> Restaurar região original
+                  </button>
+                  <p className="text-[9px] text-zinc-600 mt-1">Remove a limpeza de fundo experimental — o PNG original nunca é alterado.</p>
+                </div>
+              )}
+              {selEl.editorOsSource === "layer_scan" && (
+                <p className="text-[9px] text-zinc-600 pt-1 border-t border-zinc-800">
+                  Conversão estimada a partir de OCR (confiança {selEl.scanConfidence !== undefined ? `${Math.round(selEl.scanConfidence * 100)}%` : "—"}) — fonte e tamanho não são os originais.
+                </p>
+              )}
             </div>
           </aside>
         )}
 
         {/* Empty state when no element selected */}
-        {!selEl && elements.length === 0 && (
+        {scanStatus === "idle" && !showLayersPanel && !selEl && elements.length === 0 && (
           <aside className="w-52 shrink-0 border-l border-zinc-800 bg-zinc-900 flex flex-col items-center justify-center p-4 gap-2">
             <FlaskConical className="w-8 h-8 text-zinc-700" />
             <p className="text-xs text-zinc-600 text-center">
