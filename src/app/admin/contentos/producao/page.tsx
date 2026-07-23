@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import {
-  requireAdminContentOSContext,
-  validateAdminClient,
-} from "@/lib/admin-contentos-api";
+import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
+import { resolveClientContext } from "@/lib/rec-os-client-context";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -65,6 +62,13 @@ type OperationalTask = {
   assigned_to: string | null;
   due_date: string | null;
   created_at: string | null;
+  client_name?: string | null;
+};
+
+type ProductionContentRow = {
+  id: string; title: string | null; channel: string | null; type: string | null;
+  status: string | null; scheduled_date: string | null;
+  client_id?: string; client_name?: string | null;
 };
 
 export default async function AdminContentosProducaoPage({
@@ -82,60 +86,89 @@ export default async function AdminContentosProducaoPage({
     ? new Set(params.status.split(",").map((s) => s.trim()).filter(Boolean))
     : null;
 
-  if (!clientId) redirect("/admin/contentos/selecionar-cliente");
-
   let companyName = "";
-  let inProduction: Array<{ id: string; title: string | null; channel: string | null; type: string | null; status: string | null; scheduled_date: string | null }> = [];
+  let inProduction: ProductionContentRow[] = [];
   let tasks: OperationalTask[] = [];
   let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let clientStatus: "absent" | "valid" | "invalid" = "absent";
 
   if (isSupabaseConfigured) {
     const ctx = await requireAdminContentOSContext();
-    if (ctx instanceof Response) redirect("/admin/contentos/selecionar-cliente");
-    const { adminDb } = ctx as Exclude<typeof ctx, Response>;
+    if (!(ctx instanceof Response)) {
+      const { adminDb } = ctx;
+      const PRODUCTION_STATUSES = ["briefing", "producao", "em_producao", "edicao", "revisao_interna", "alteracao_solicitada", "ajuste"];
 
-    const valid = await validateAdminClient(adminDb, clientId);
-    if (!valid) redirect("/admin/contentos/selecionar-cliente");
+      const clientContext = await resolveClientContext(adminDb, clientId);
+      clientStatus = clientContext.status;
 
-    const { data: clientRow } = await adminDb
-      .from("clients")
-      .select("company_name")
-      .eq("id", clientId)
-      .maybeSingle();
-    companyName = (clientRow as { company_name?: string } | null)?.company_name ?? "";
+      if (clientContext.status === "valid") {
+        companyName = clientContext.companyName;
 
-    const { data: contentData } = await adminDb
-      .from("content_items")
-      .select("id, title, channel, type, status, scheduled_date")
-      .eq("client_id", clientId)
-      .in("status", ["briefing", "producao", "em_producao", "edicao", "revisao_interna", "alteracao_solicitada", "ajuste"])
-      .order("created_at", { ascending: false })
-      .limit(30);
-    inProduction = (contentData ?? []) as typeof inProduction;
-    if (statusFilter) {
-      inProduction = inProduction.filter((c) => c.status && statusFilter.has(c.status));
+        const { data: contentData } = await adminDb
+          .from("content_items")
+          .select("id, title, channel, type, status, scheduled_date")
+          .eq("client_id", clientContext.clientId)
+          .in("status", PRODUCTION_STATUSES)
+          .order("created_at", { ascending: false })
+          .limit(30);
+        inProduction = (contentData ?? []) as ProductionContentRow[];
+
+        const { data: taskData } = await adminDb
+          .from("operational_tasks")
+          .select("id, client_id, content_item_id, title, status, task_type, department, assigned_to, due_date, created_at")
+          .eq("client_id", clientContext.clientId)
+          .order("created_at", { ascending: false })
+          .limit(30);
+        tasks = (taskData ?? []) as OperationalTask[];
+
+        suggestions = await getContentOSSuggestions(adminDb, clientContext.clientId);
+      } else if (clientContext.status === "absent") {
+        // Fase 6 do hotfix canônico 1.0.1 — modo global: sem client na URL,
+        // permanece nesta rota mostrando "Todos os clientes" em vez de
+        // redirecionar ao seletor. Sugestões de IA (por cliente) ficam
+        // vazias neste modo, como já era o caso quando o cliente era inválido.
+        const { data: contentData } = await adminDb
+          .from("content_items")
+          .select("id, title, channel, type, status, scheduled_date, client_id, clients(company_name)")
+          .in("status", PRODUCTION_STATUSES)
+          .order("created_at", { ascending: false })
+          .limit(60);
+        inProduction = ((contentData ?? []) as Array<ProductionContentRow & { clients?: { company_name?: string | null } | null }>).map((c) => ({
+          ...c,
+          client_name: c.clients?.company_name ?? null,
+        }));
+
+        const { data: taskData } = await adminDb
+          .from("operational_tasks")
+          .select("id, client_id, content_item_id, title, status, task_type, department, assigned_to, due_date, created_at, clients(company_name)")
+          .order("created_at", { ascending: false })
+          .limit(60);
+        tasks = ((taskData ?? []) as Array<OperationalTask & { clients?: { company_name?: string | null } | null }>).map((t) => ({
+          ...t,
+          client_name: t.clients?.company_name ?? null,
+        }));
+      }
+
+      if (statusFilter) {
+        inProduction = inProduction.filter((c) => c.status && statusFilter.has(c.status));
+      }
     }
-
-    const { data: taskData } = await adminDb
-      .from("operational_tasks")
-      .select("id, client_id, content_item_id, title, status, task_type, department, assigned_to, due_date, created_at")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(30);
-    tasks = (taskData ?? []) as OperationalTask[];
-
-    suggestions = await getContentOSSuggestions(adminDb, clientId);
   }
 
-  const criarHref = `/admin/contentos/criar?client=${clientId}`;
+  const criarHref = clientId ? `/admin/contentos/criar?client=${clientId}` : "/admin/contentos/criar";
 
   return (
     <>
-      <ContentosSubNavServer initialClientId={clientId} />
+      <ContentosSubNavServer initialClientId={clientId ?? undefined} />
       <PageHeader
         title="Produção"
-        description={`Conteúdos em execução para ${companyName}`}
+        description={clientId ? `Conteúdos em execução para ${companyName}` : "Conteúdos em execução — todos os clientes"}
       />
+      {clientStatus === "invalid" && (
+        <div className="mb-5 bg-red-50 border border-red-100 rounded-2xl p-4 text-xs text-red-700">
+          Cliente não encontrado ou sem acesso para o ID informado na URL. Selecione outro cliente ou remova o filtro para ver todos.
+        </div>
+      )}
       {suggestions.length > 0 && (
         <SmartSuggestionsPanel suggestions={suggestions} compact className="mb-5" />
       )}
@@ -186,6 +219,11 @@ export default async function AdminContentosProducaoPage({
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <p className="text-sm font-bold text-gray-900 truncate">{task.title ?? "Sem título"}</p>
+                      {!clientId && task.client_name && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 flex-shrink-0 truncate max-w-[140px]">
+                          {task.client_name}
+                        </span>
+                      )}
                       {isHighlighted && (
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-600 text-white flex-shrink-0">
                           Tarefa selecionada
@@ -292,7 +330,14 @@ export default async function AdminContentosProducaoPage({
                   <Icon className="w-4.5 h-4.5 text-purple-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-gray-900 truncate">{item.title}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{item.title}</p>
+                    {!clientId && item.client_name && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 flex-shrink-0 truncate max-w-[140px]">
+                        {item.client_name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {item.channel ?? "—"} · {item.type ?? "—"}
                     {item.scheduled_date ? ` · ${new Date(item.scheduled_date).toLocaleDateString("pt-BR")}` : ""}

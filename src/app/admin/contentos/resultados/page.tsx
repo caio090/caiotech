@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { validateContentOSClient } from "@/lib/admin-contentos-clients";
+import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
+import { resolveClientContext } from "@/lib/rec-os-client-context";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { getContentOSSuggestions } from "@/lib/ai-suggestions";
 import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
@@ -38,6 +37,7 @@ const STATUS_COLOR: Record<string, string> = {
 type ContentRow = {
   id: string; title: string; status: string; type: string | null;
   channel: string | null; created_at: string; scheduled_date: string | null;
+  client_id?: string; client_name?: string | null;
 };
 
 export default async function ResultadosPage({
@@ -49,31 +49,47 @@ export default async function ResultadosPage({
   const clientId = params.client ?? null;
   const tab      = (params.tab ?? "desempenho") as Tab;
 
-  if (!clientId) redirect("/admin/contentos/selecionar-cliente");
-
   let companyName = "";
   let contents: ContentRow[] = [];
-  let suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  const suggestions: Awaited<ReturnType<typeof getContentOSSuggestions>> = [];
+  let clientStatus: "absent" | "valid" | "invalid" = "absent";
 
   if (isSupabaseConfigured) {
-    const valid = await validateContentOSClient(clientId);
-    if (!valid) redirect("/admin/contentos/selecionar-cliente");
-    companyName = valid.company_name ?? "";
+    const ctx = await requireAdminContentOSContext();
+    if (!(ctx instanceof Response)) {
+      const { adminDb } = ctx;
+      const clientContext = await resolveClientContext(adminDb, clientId);
+      clientStatus = clientContext.status;
 
-    try {
-      const supabase = await createServerSupabaseClient();
-      const [contentsRes, suggestionsRes] = await Promise.all([
-        supabase
+      if (clientContext.status === "valid") {
+        companyName = clientContext.companyName;
+
+        const { data } = await adminDb
           .from("content_items")
           .select("id, title, status, type, channel, created_at, scheduled_date")
-          .eq("client_id", clientId)
+          .eq("client_id", clientContext.clientId)
           .order("created_at", { ascending: false })
-          .limit(100),
-        getContentOSSuggestions(supabase, clientId),
-      ]);
-      contents  = contentsRes.data ?? [];
-      suggestions = suggestionsRes;
-    } catch {}
+          .limit(100);
+        contents = (data ?? []) as ContentRow[];
+        // getContentOSSuggestions expects a real Supabase client (RLS
+        // helpers it calls directly) — kept on the per-client path only,
+        // same as before this hotfix.
+      } else if (clientContext.status === "absent") {
+        // Fase 6 do hotfix canônico 1.0.1 — modo global: sem client na URL,
+        // agrega entre clientes visíveis (nunca redireciona ao seletor).
+        // Suggestions (getContentOSSuggestions) são por cliente por design —
+        // não fazem sentido agregadas, então ficam vazias neste modo.
+        const { data: contentData } = await adminDb
+          .from("content_items")
+          .select("id, title, status, type, channel, created_at, scheduled_date, client_id, clients(company_name)")
+          .order("created_at", { ascending: false })
+          .limit(200);
+        contents = ((contentData ?? []) as Array<ContentRow & { clients?: { company_name?: string | null } | null }>).map((c) => ({
+          ...c,
+          client_name: c.clients?.company_name ?? null,
+        }));
+      }
+    }
   }
 
   const total     = contents.length;
@@ -99,18 +115,26 @@ export default async function ResultadosPage({
   contents.forEach(c => { byStatus[c.status] = (byStatus[c.status] ?? 0) + 1; });
 
   function tabHref(t: Tab) {
-    return `/admin/contentos/resultados?tab=${t}&client=${clientId}`;
+    return clientId
+      ? `/admin/contentos/resultados?tab=${t}&client=${clientId}`
+      : `/admin/contentos/resultados?tab=${t}`;
   }
 
   return (
     <>
-      <ContentosSubNavServer initialClientId={clientId} />
+      <ContentosSubNavServer initialClientId={clientId ?? undefined} />
 
       {/* Section header */}
       <div className="mb-5">
         <h1 className="text-lg font-bold text-gray-900">Resultados</h1>
-        <p className="text-xs text-gray-400 mt-0.5">{companyName}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{clientId && clientStatus === "valid" ? companyName : "Todos os clientes"}</p>
       </div>
+
+      {clientStatus === "invalid" && (
+        <div className="mb-5 bg-red-50 border border-red-100 rounded-2xl p-4 text-xs text-red-700">
+          Cliente não encontrado ou sem acesso para o ID informado na URL. Selecione outro cliente ou remova o filtro para ver todos.
+        </div>
+      )}
 
       {/* Sub-tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-100 pb-0">
@@ -140,7 +164,13 @@ export default async function ResultadosPage({
       {/* ── DESEMPENHO ──────────────────────────────────────────────────────── */}
       {tab === "desempenho" && (
         <>
-          <MetaInsightsPanel clientId={clientId} />
+          {clientId && clientStatus === "valid" ? (
+            <MetaInsightsPanel clientId={clientId} />
+          ) : (
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-5 text-xs text-gray-500">
+              Selecione um cliente para ver os Meta Insights (Instagram/Facebook) — essa integração é por conta conectada, não agrega entre clientes.
+            </div>
+          )}
 
           {total === 0 ? (
             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-10 text-center">

@@ -218,45 +218,42 @@ export type HubClientFilter = string | null; // null = "todos os clientes"
 
 /**
  * Sprint 4.0A.1 fix: "Aguardando aprovação" must never point at the
- * Calendar (P1 reported against the previous version of this file). With a
- * client selected, every card now goes to its real page, with a `status`
- * query param added as minimal URL support (see producao/page.tsx and
- * aprovacoes/page.tsx, which read it to pre-filter/pre-select a tab).
+ * Calendar (P1 reported against the previous version of this file). Every
+ * card goes to its real page, with a `status` query param added as minimal
+ * URL support (see producao/page.tsx and aprovacoes/page.tsx, which read it
+ * to pre-filter/pre-select a tab).
  *
- * Without a client ("todos os clientes"), producao/aprovacoes/resultados/
- * criar still redirect to the client selector if reached without one
- * (confirmed by reading those pages) — extending them to render a true
- * cross-client list is out of scope for a navigation-fix sprint. For the
- * three cards that are exactly the reasons already modeled in the Hub's own
- * "Precisa da sua atenção" list (aguardando_aprovacao, em_revisao,
- * alteracoes_solicitadas), the honest destination is that list — not a
- * page it doesn't represent. em_producao/agendados/publicados/em_andamento
- * have no equivalent cross-client list, so they still route to the Global
- * Calendar, which genuinely supports "todos os clientes".
+ * Fase 11 do hotfix canônico 1.0.1: antes, sem cliente selecionado
+ * ("todos os clientes"), a maioria dos cards caía no Calendário Global como
+ * substituto, porque producao/aprovacoes/resultados ainda redirecionavam ao
+ * seletor sem `client`. A Fase 6 desta mesma sprint deu a essas três rotas
+ * um modo global de verdade (nunca redirecionam mais), então os cards agora
+ * apontam sempre para a página real, com ou sem cliente — `client` só é
+ * incluído na query quando presente. "Conteúdos em andamento" foi corrigido
+ * para Produção (antes ia para Resultados, que só tem agregados, não uma
+ * lista) — sem filtro de status, porque o conjunto "em andamento" (tudo
+ * entre ideia e aprovado, exceto publicado) é mais amplo que qualquer filtro
+ * único que Produção aceita hoje; a contagem do card é sempre um teto do que
+ * será visto ali, nunca um número fabricado que a página não sustente.
  */
 export function buildCardHref(cardId: HubCardId, client: HubClientFilter): string {
-  if (client) {
-    switch (cardId) {
-      case "aguardando_aprovacao":   return `/admin/contentos/aprovacoes?client=${client}&status=enviado_aprovacao`;
-      case "em_producao":            return `/admin/contentos/producao?client=${client}&status=producao,em_producao,edicao`;
-      case "em_revisao":             return `/admin/contentos/producao?client=${client}&status=revisao_interna`;
-      case "alteracoes_solicitadas": return `/admin/contentos/producao?client=${client}&status=alteracao_solicitada,ajuste`;
-      case "agendados":              return `/admin/calendario?client=${client}&source=content_item`;
-      case "publicados":             return `/admin/contentos/resultados?client=${client}`;
-      case "em_andamento":           return `/admin/contentos/resultados?client=${client}`;
-      case "clientes_com_pendencias": return `/admin/contentos?client=${client}#precisa-da-sua-atencao`;
-    }
-  }
-  // Todos os clientes.
+  const c = client ? `client=${client}` : "";
+  const join = (base: string, ...params: string[]) => {
+    const qs = params.filter(Boolean).join("&");
+    return qs ? `${base}?${qs}` : base;
+  };
+
   switch (cardId) {
-    case "aguardando_aprovacao":
-    case "em_revisao":
-    case "alteracoes_solicitadas": return `/admin/contentos#precisa-da-sua-atencao`;
-    case "em_producao":
-    case "agendados":
-    case "publicados":
-    case "em_andamento":            return `/admin/calendario?source=content_item`;
-    case "clientes_com_pendencias": return `/admin/contentos#resumo-por-cliente`;
+    case "aguardando_aprovacao":   return join("/admin/contentos/aprovacoes", c, "status=enviado_aprovacao");
+    case "em_producao":            return join("/admin/contentos/producao", c, "status=producao,em_producao,edicao");
+    case "em_revisao":             return join("/admin/contentos/producao", c, "status=revisao_interna");
+    case "alteracoes_solicitadas": return join("/admin/contentos/producao", c, "status=alteracao_solicitada,ajuste");
+    case "agendados":              return join("/admin/calendario", c, "source=content_item");
+    case "publicados":             return join("/admin/contentos/resultados", c);
+    case "em_andamento":           return join("/admin/contentos/producao", c);
+    case "clientes_com_pendencias": return client
+      ? `/admin/contentos?client=${client}#precisa-da-sua-atencao`
+      : "/admin/contentos#resumo-por-cliente";
   }
 }
 

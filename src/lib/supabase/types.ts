@@ -109,6 +109,9 @@ export interface DbApproval {
 /** Approval joined with its content item (for list pages and public approval page) */
 export interface DbApprovalWithContent extends DbApproval {
   content_items: Pick<DbContentItem, "id" | "title" | "type" | "channel" | "objective" | "caption" | "script" | "status" | "scheduled_date"> | null;
+  /** Only present when the query joins clients(company_name) — used in the
+   * REC OS "todos os clientes" (global) view to label each row's origin. */
+  clients?: { company_name: string | null } | null;
 }
 
 /** Shape of data passed from Server Components to Client Components */
