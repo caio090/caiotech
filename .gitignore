@@ -46,4 +46,7 @@ dev-out*.txt
 dev-err*.txt
 dev-server.log
 
+# local-only dev server logs (Sprint EditorOS 1.0.2 — never committed)
+.tmp/
+
 .vercel
