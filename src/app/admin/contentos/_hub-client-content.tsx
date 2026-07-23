@@ -45,11 +45,18 @@ function countFor(id: HubCardId, counts: HubCounts, clientsWithPendencies: numbe
   return counts[id];
 }
 
+// Fase 1 do hotfix canônico 1.0.1 — sem timeZone explícito, o dia/mês
+// resolvido dependia do fuso do runtime (servidor em UTC, navegador local),
+// produzindo texto diferente entre SSR e hidratação (React #418) para datas
+// próximas da meia-noite local. Mesmo fuso já fixado em
+// src/app/contentos/aprovacoes/_client-content.tsx.
+const REC_OS_TZ = "America/Fortaleza";
+
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: REC_OS_TZ });
 }
 
 /** Sprint 4.0A.1 — searchable client picker, scales past the handful the
