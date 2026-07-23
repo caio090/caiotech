@@ -1,14 +1,44 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   createServerSupabaseClient,
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
-import { validateContentOSClient } from "@/lib/admin-contentos-clients";
+import { validateContentOSClient, getAdminContentOSClients } from "@/lib/admin-contentos-clients";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { GuidedCreateFlow } from "./_guided-create-flow";
 import type { GuidedCreateDraft } from "./_guided-create-flow";
+import { InlineClientPicker } from "@/components/inline-client-picker";
+import { PageHeader } from "@/components/page-header";
+
+async function CriarClientRequiredState({ invalidClientId }: { invalidClientId: string | null }) {
+  const clients = isSupabaseConfigured ? await getAdminContentOSClients() : [];
+  const clientOptions = clients
+    .filter((c) => !!c.company_name)
+    .map((c) => ({ id: c.id, name: c.company_name as string }));
+
+  return (
+    <>
+      <ContentosSubNavServer />
+      <PageHeader title="Criar conteúdo" description="Selecione o cliente para começar o briefing guiado." />
+      {invalidClientId && (
+        <div className="max-w-md mx-auto mb-4 bg-red-50 border border-red-100 rounded-2xl p-4 text-xs text-red-700">
+          Cliente não encontrado ou sem acesso para o ID informado na URL. Escolha um cliente abaixo.
+        </div>
+      )}
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-8 text-center mb-4">
+        <p className="text-sm font-bold text-gray-700 mb-1">Criar conteúdo é sempre para um cliente</p>
+        <p className="text-xs text-gray-400 max-w-sm mx-auto">
+          O briefing guiado usa a marca, o segmento e o histórico do cliente — selecione um abaixo para continuar.
+        </p>
+      </div>
+      <Suspense fallback={<div className="max-w-md mx-auto h-40 bg-gray-50 rounded-2xl animate-pulse" />}>
+        <InlineClientPicker clientOptions={clientOptions} />
+      </Suspense>
+    </>
+  );
+}
 
 export default async function AdminContentosCriarPage({
   searchParams,
@@ -20,7 +50,7 @@ export default async function AdminContentosCriarPage({
   const contentId = params.content_id ?? null;
 
   if (!clientId) {
-    redirect("/admin/contentos/selecionar-cliente");
+    return <CriarClientRequiredState invalidClientId={null} />;
   }
 
   let role = "";
@@ -32,7 +62,7 @@ export default async function AdminContentosCriarPage({
   if (isSupabaseConfigured) {
     const valid = await validateContentOSClient(clientId);
     if (!valid) {
-      redirect("/admin/contentos/selecionar-cliente");
+      return <CriarClientRequiredState invalidClientId={clientId} />;
     }
 
     try {

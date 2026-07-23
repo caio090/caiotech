@@ -29,7 +29,7 @@ const SWOT_CATEGORIES: Array<{ key: SwotCategory; label: string; hint: string; c
 
 const SWOT_ENVIRONMENTS: Array<{ label: string; explanation: string; categories: SwotCategory[] }> = [
   { label: "Ambiente interno", explanation: "Fatores mais próximos do controle da empresa.", categories: ["forca", "fraqueza"] },
-  { label: "Ambiente externo", explanation: "Fatores do mercado e contexto que afetam o negócio.", categories: ["oportunidade", "ameaca"] },
+  { label: "Ambiente externo", explanation: "Fatores do mercado e do contexto que afetam o negócio.", categories: ["oportunidade", "ameaca"] },
 ];
 
 const GOAL_METRIC_LABEL: Record<SalesGoalMetric, string> = {
