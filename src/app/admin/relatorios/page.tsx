@@ -7,6 +7,7 @@ import {
   DollarSign, AtSign, Link2, Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { AdaptiveReportsSection } from "./_adaptive-reports-section";
 
 // ── Modal de exportação ────────────────────────────────────────
 type ExportFormat = "pdf" | "png" | "whatsapp" | "email" | "agendar";
@@ -138,7 +139,7 @@ export default function AdminRelatoriosPage() {
 
   return (
     <div>
-      <PageHeader title="Central de Dados & Insights" description="Relatórios, fontes de dados e análises por cliente">
+      <PageHeader title="Relatórios" description="Faturamento, pedidos, conteúdo e análises por cliente">
         <button
           onClick={() => setShowExport(true)}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
@@ -263,6 +264,8 @@ export default function AdminRelatoriosPage() {
           </div>
         ))}
       </div>
+
+      <AdaptiveReportsSection />
 
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>

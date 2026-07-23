@@ -336,7 +336,7 @@ export default function RelatorioConteudoPage() {
           href="/admin/relatorios"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--lk-muted)", border: "1px solid var(--lk-border)", borderRadius: 10, padding: "7px 12px", textDecoration: "none" }}
         >
-          <ArrowLeft size={13} /> Dados & Insights
+          <ArrowLeft size={13} /> Relatórios
         </Link>
       </PageHeader>
 
