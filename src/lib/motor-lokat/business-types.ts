@@ -121,6 +121,13 @@ export interface SalesGoal {
 
 export type ProductSituation = "ideia" | "teste" | "ativo" | "sazonal" | "descontinuado";
 
+/**
+ * Whether the item is a physical product (stock, ingredients, packaging can
+ * apply) or a service (never requires stock/ingredients/packaging/expiry).
+ * Chosen once at creation (Sprint 1.1.1 hotfix, Fase 9) — never inferred.
+ */
+export type ProductKind = "produto" | "servico";
+
 export interface ProductCostComponent {
   id: string;
   name: string;
@@ -193,6 +200,7 @@ export interface ProductPositioning {
 export interface ProductServiceItem {
   id: string;
   name: string;
+  kind: ProductKind;
   category: string;
   audience: string;
   problemOrDesire: string;
