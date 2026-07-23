@@ -7,12 +7,17 @@
 
 import { safeDivide } from "./money";
 import { classifyCostVsGoal, classifyMarginVsGoal, combineConfidence } from "./financial-engine";
-import type { ProductCostInput, ProductCostResult } from "./business-types";
+import type { ProductCostInput, ProductCostResult, ProductKind } from "./business-types";
 import type { FinancialDataSource } from "./types";
+
+/** Same math for both kinds — only the displayed formula wording changes (product vs. service vocabulary). */
+const PRODUCT_FORMULA = "Custo direto = componentes + embalagem + entrega + taxas + perda esperada. Margem de contribuição unitária = preço − custo direto − (taxa + comissão + desconto + imposto sobre o preço).";
+const SERVICE_FORMULA = "CSV = mão de obra + materiais + ferramentas + deslocamento + terceirização + retrabalho esperado. Margem de contribuição unitária = preço − CSV − (taxa + comissão + desconto + imposto sobre o preço).";
 
 export function calculateProductCost(
   input: ProductCostInput,
   salesPrice: number,
+  kind: ProductKind = "produto",
   goals?: { directCostPctGoal?: number; contributionMarginPctGoal?: number }
 ): ProductCostResult {
   const { components, packagingCost, feePct, commissionPct, discountPct, deliveryCost, taxPct, expectedLossPct } = input;
@@ -56,7 +61,7 @@ export function calculateProductCost(
     directCostPct,
     contributionMarginUnit,
     contributionMarginPct,
-    formula: "Custo direto = componentes + embalagem + entrega + perda esperada. Margem de contribuição unitária = preço − custo direto − (taxa + comissão + desconto + imposto sobre o preço).",
+    formula: kind === "servico" ? SERVICE_FORMULA : PRODUCT_FORMULA,
     confidence,
     missingInputs,
     status,

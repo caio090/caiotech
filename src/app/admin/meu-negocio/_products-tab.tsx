@@ -64,7 +64,7 @@ function buildTestCampaignInput(product: ProductServiceItem): CampaignInput {
     regularPrice: product.salesPrice,
     pricePaidByCustomer: product.salesPrice,
     platformSubsidyPerOrder: 0,
-    directCostPerUnit: calculateProductCost(product.cost, product.salesPrice).directCost,
+    directCostPerUnit: calculateProductCost(product.cost, product.salesPrice, product.kind).directCost,
     projectedQuantity: 100,
     marketplaceFeePct: product.cost.feePct,
     marketplaceFeeBase: "receita_reconhecida",
@@ -243,7 +243,7 @@ function PortfolioSection({
       )}
 
       {products.map((product) => {
-        const costResult = calculateProductCost(product.cost, product.salesPrice);
+        const costResult = calculateProductCost(product.cost, product.salesPrice, product.kind);
         return (
           <div key={product.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="w-full flex items-center justify-between gap-3 px-4 py-3">
@@ -431,8 +431,9 @@ function ProductGeneralSection({
 // ── Aba Custos (Fase 5) ──────────────────────────────────────────────────────
 
 function ProductCostSection({ product, onUpdate, onOpenGlossary }: { product: ProductServiceItem; onUpdate: (id: string, patch: Partial<ProductServiceItem>) => void; onOpenGlossary: (t: string) => void }) {
-  const result = calculateProductCost(product.cost, product.salesPrice);
+  const result = calculateProductCost(product.cost, product.salesPrice, product.kind);
   const isService = product.kind === "servico";
+  const directCostTermId = isService ? "csv" : "cmv";
 
   function addComponent() {
     onUpdate(product.id, { cost: { ...product.cost, components: [...product.cost.components, { id: generateId("comp"), name: "Componente", quantity: 1, unit: "un.", unitCost: 0 }] } });
@@ -519,7 +520,11 @@ function ProductCostSection({ product, onUpdate, onOpenGlossary }: { product: Pr
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 bg-gray-50 rounded-xl p-3">
         <div>
-          <p className="text-[10px] text-gray-500">Custo direto</p>
+          <div className="flex items-center gap-1">
+            <p className="text-[10px] text-gray-500">{isService ? "CSV" : "Custo direto"}</p>
+            <GlossaryHelpIcon termId={directCostTermId} onOpen={onOpenGlossary} />
+          </div>
+          {isService && <p className="text-[9px] text-gray-400">Custo do Serviço Vendido</p>}
           <p className="text-xs font-bold text-gray-800">{formatCents(result.directCost)}{result.directCostPct !== null ? ` (${formatPercent(result.directCostPct)})` : ""}</p>
         </div>
         <div>
@@ -803,7 +808,7 @@ function MatrixSection({ products, labTests }: { products: ProductServiceItem[];
   const performanceInputs = products.map((p) => {
     const latestTest = [...labTests].reverse().find((t) => t.productId === p.id && t.result);
     const unitsSold = latestTest?.result?.quantitySold ?? 0;
-    const costResult = calculateProductCost(p.cost, p.salesPrice);
+    const costResult = calculateProductCost(p.cost, p.salesPrice, p.kind);
     return { productId: p.id, productName: p.name, category: p.category, unitsSold, contributionMarginPct: costResult.contributionMarginPct };
   });
 
