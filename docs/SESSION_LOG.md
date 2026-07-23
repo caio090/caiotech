@@ -665,3 +665,108 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
   recomenda-se QA manual em navegador antes de qualquer promocao.
 - Commits e push feitos somente na branch fix/product-engineering-usability-v1 -
   main nunca tocado, nenhum deployment de producao criado.
+
+## 2026-07-23 - Sprint Motor LOKAT 1.2 - Assistente Inteligente, interpretacao de relatorios e nova experiencia visual (branch feat/motor-lokat-ai-experience-v1, NAO mergeada)
+
+- Branch criada a partir de origin/fix/product-engineering-usability-v1
+  (commit-base d0ba70e, que ja contem Motor LOKAT 1.0 + Engenharia de
+  Produtos 1.1 + hotfixes 1.1.1 e 1.1.2 - este ultimo um hotfix textual de
+  1 commit que nao gerou entrada propria neste log por nao ter sido pedido).
+- Auditoria previa (Fase 1): pacote openai (SDK oficial v6.45.0) ja estava
+  instalado mas nenhuma rota existente o usava - todas chamam a API REST via
+  fetch puro (modelo gpt-4o-mini, fallback 503 sem OPENAI_API_KEY, convencao
+  documentada em docs/16-ai-integration-openai.md). Nenhuma rota com
+  streaming, Responses API ou transcricao de audio antes desta sprint.
+  framer-motion ja instalado (reaproveitado). OPENAI_API_KEY nao configurada
+  neste ambiente local (confirmado sem imprimir o valor, so o comprimento) -
+  arquitetura completa implementada mesmo assim, com fallback visivel
+  "Assistente temporariamente indisponivel".
+- Criada camada server em src/lib/motor-lokat/ai/: types.ts, schemas.ts
+  (JSON Schema estrito), instructions.ts (regras base: nunca recalcular
+  dinheiro, nunca aplicar sozinho, sempre respeitar origem do dado),
+  context-builder.ts (nunca envia campo vazio do DNA nem exemplo de SWOT nao
+  confirmado como fato), tools.ts (wrappers deterministicos dos motores
+  existentes, chamados pelo servidor por modo - sem function-calling
+  automatico e sem nenhuma tool de escrita), report-parser.ts (validacao de
+  anexo + input multimodal), safety.ts (redacao de segredos em log/erro),
+  cost-controls.ts (limites + trava de uma requisicao por sessao), client.ts
+  (unico arquivo autorizado a ler OPENAI_API_KEY, usa responses.create com
+  streaming e text.format json_schema, e audio.transcriptions.create).
+- Criadas rotas POST /api/motor-lokat/assistant (streaming SSE para
+  interpret/explain/diagnosis, JSON estruturado para fill/campaign/product/
+  report, mesma autenticacao Supabase das rotas /api/ai/** existentes) e
+  POST /api/motor-lokat/assistant/transcribe (multipart, audio descartado
+  apos a chamada, nunca persistido).
+- Criada UI em src/app/admin/meu-negocio/_ai/: assistant-panel.tsx (painel
+  persistente, lateral no desktop/bottom sheet no mobile via framer-motion,
+  4 acoes - Perguntar/Falar/Anexar relatorio/Preencher comigo - com
+  saudacao por pagina), chat.tsx (streaming real, estados idle/sending/
+  streaming/completed/error/blocked), use-assistant-session.ts (sem
+  localStorage/sessionStorage), report-upload.tsx, proposed-updates-
+  panel.tsx ("Informacoes encontradas", nunca aplica em silencio),
+  push-to-talk.tsx (MediaRecorder, sem Realtime continuo nesta sprint),
+  campaign-wizard.tsx (10 perguntas, recalculo ao vivo via
+  calculateCampaignProjection - nenhum novo motor), simple-professional-
+  toggle.tsx, progressive-disclosure.tsx (resumo de 6 itens + detalhe em
+  painel lateral/bottom sheet), assistant-availability.ts (reaproveita
+  /api/ai/status existente em vez de criar um segundo endpoint).
+- Identidade visual: tokens --business-* em globals.css, escopados a
+  .lokat-business-theme (nunca :root global) - aplicados ao cabecalho,
+  abas, banner, Assistente LOKAT, resumo da Visao Geral e assistente de
+  campanha. Secoes profundas ja existentes (Custos, Operacao, DNA, SWOT)
+  mantiveram a paleta indigo/roxa anterior - decisao de escopo, sem re-skin
+  completo de todos os formularios nesta sprint.
+- Progressive disclosure: _overview-tab.tsx ganhou BusinessHeroSummary no
+  topo (faturamento, custo de entrega, sobra, situacao, alerta, acao); os
+  inputs editaveis, indicadores completos e grafico da Sprint 1.0 continuam
+  disponiveis atras de um alternador "Ver detalhes completos" - nada
+  removido, so reorganizado em dois niveis.
+- Preenchimento assistido: handleApplyProposedUpdates em _client-content.tsx
+  aplica propostas so ao estado em memoria via lista branca de caminhos
+  (dna.<campo>, profile.<campo>) - qualquer caminho fora dela e ignorado,
+  nunca um escritor de caminho generico.
+- Verificado via script ad-hoc (25 checks): validacao de arquivo de
+  relatorio (PDF/PNG/CSV validos, vazio/oversized/extensao invalida/mime
+  incompativel rejeitados), trava de uma requisicao por sessao,
+  truncamento de contexto, redacao de segredos (string tipo sk-... nunca
+  sobrevive a redactSecrets/sanitizeError), contexto sem campo vazio do DNA
+  nem exemplo de SWOT nao confirmado, tool de custo de produto batendo com
+  o motor determinístico.
+- Tambem verificado via npm run dev + curl: as duas rotas novas exigem
+  autenticacao exatamente como as rotas /api/ai/** ja existentes (mesmo
+  redirecionamento 307 do middleware para requisicao sem sessao).
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros (incluindo a
+  tipagem do SDK openai para streaming e Structured Outputs).
+- Validado `npm run build`: compilado com sucesso (build travou uma vez com
+  "memory allocation failed" do Turbopack - resolvido limpando .next, mesma
+  causa/solucao ja registrada em sprints anteriores).
+- ESLint nos arquivos alterados: zero erros/warnings apos remover 2 imports
+  nao usados.
+- `git diff --check`: limpo (so avisos de CRLF).
+- Busca por OPENAI_API_KEY/NEXT_PUBLIC_OPENAI/public_token/service_role/
+  console.log/localStorage/sessionStorage/Math.random/Date.now/
+  dangerouslySetInnerHTML nos arquivos alterados: OPENAI_API_KEY so aparece
+  em client.ts (unico arquivo autorizado, nunca logado); console.log so em
+  safety.ts (log estruturado sem segredos); Math.random/Date.now so em
+  codigo server-side (geracao de id de requisicao, medicao de duracao) fora
+  de qualquer corpo de componente React; localStorage/sessionStorage so
+  aparecem em comentarios afirmando que NAO sao usados; nenhuma outra
+  ocorrencia.
+- `src/config/project-status.ts`: 7 areas novas (motor_lokat_ai_assistant,
+  motor_lokat_report_interpreter, motor_lokat_assisted_fill,
+  motor_lokat_voice_input, motor_lokat_ai_campaign_planner,
+  motor_lokat_light_experience, motor_lokat_progressive_disclosure), todas
+  qa_pending, nenhuma validated. global_calendar/V1_PROGRESS (81)/
+  V2_PROGRESS (12) nao foram tocados.
+- Nenhum SQL executado. Nenhuma migration criada. Nenhuma env alterada.
+  Nenhuma biblioteca nova instalada (openai e framer-motion ja existiam).
+  Nenhuma chave exposta ao navegador. Nenhum dado real. Nenhuma conversa
+  persistida (so estado React da sessao).
+- Limitacao declarada: sem OPENAI_API_KEY configurada e sem navegador neste
+  ambiente, os fluxos que dependem de uma chamada real ao modelo (resposta
+  de chat, interpretacao real de relatorio, transcricao real) e a maior
+  parte dos 20 testes de UI/mobile da Fase 19 nao puderam ser exercitados de
+  ponta a ponta - arquitetura, contratos e logica deterministica
+  verificados; falta QA com a chave configurada e em navegador real.
+- Commits e push feitos somente na branch feat/motor-lokat-ai-experience-v1 -
+  main nunca tocado, nenhum deployment de producao criado.

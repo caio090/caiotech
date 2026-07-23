@@ -2,6 +2,126 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-23 (Sprint Motor LOKAT 1.2 — Assistente Inteligente, interpretação de relatórios e nova experiência visual, branch isolada)
+
+### Branch
+
+`feat/motor-lokat-ai-experience-v1`, criada a partir de
+`origin/fix/product-engineering-usability-v1` (commit-base `d0ba70e`, que já
+contém Motor LOKAT 1.0 + Engenharia de Produtos 1.1 + hotfixes 1.1.1/1.1.2).
+**Nada mergeado ou enviado para `main`.**
+
+### Executor
+
+Claude Code
+
+### Auditoria prévia (Fase 1)
+
+`openai` SDK v6.45.0 já instalado, mas nenhuma rota existente o usava
+(`src/app/api/ai/**` chama a API REST via `fetch`, modelo `gpt-4o-mini`,
+fallback 503 sem `OPENAI_API_KEY` — convenção em
+`docs/16-ai-integration-openai.md`). Nenhuma rota com streaming, Responses
+API ou transcrição de áudio antes desta sprint. `framer-motion` já
+instalado. `OPENAI_API_KEY` não configurada neste ambiente local
+(confirmado sem imprimir o valor) — arquitetura implementada de qualquer
+forma, com fallback visível "Assistente temporariamente indisponível".
+
+### Arquivos criados — camada server (`src/lib/motor-lokat/ai/`)
+
+- `types.ts` — modos do assistente, `MotorLokatAssistantResponse`,
+  `ProposedUpdate`, `AssistantContextSnapshot`, mapeadores de origem de dado
+  (5 valores: real/manual/estimated/missing/example).
+- `schemas.ts` — JSON Schema estrito (Structured Outputs) para a resposta do
+  assistente e para a interpretação de relatório.
+- `instructions.ts` — regras base (nunca recalcular dinheiro, nunca aplicar
+  sozinho, sempre respeitar a origem do dado) + instrução por modo.
+- `context-builder.ts` — contexto compacto: nunca envia campo vazio do DNA,
+  nunca envia exemplo de SWOT não confirmado como fato.
+- `tools.ts` — wrappers determinísticos dos motores existentes
+  (`buildFinancialSnapshot`, `calculatePricing`, `calculateCampaignProjection`,
+  `calculateProductCost`, `calculateProductOperation`), chamados pelo
+  servidor por modo — não como function-calling automático da LLM. Sem
+  `apply_updates`/`save_data`/`delete_data`.
+- `report-parser.ts` — validação de anexo (tipo/tamanho/nome/extensão/vazio)
+  e construção do input multimodal da Responses API (texto inline para
+  CSV/TXT, `input_file`/`input_image` nativos para PDF/PNG/JPG).
+- `safety.ts` — redação de segredos (`sk-...`) em qualquer log/erro, log
+  estruturado só com requestId/modo/duração/status/tokens/erro sanitizado.
+- `cost-controls.ts` — limites de tamanho de contexto/mensagem/anexo/áudio,
+  timeout, e trava de uma requisição ativa por sessão (sem fila, sem retry).
+- `client.ts` — único arquivo autorizado a ler `OPENAI_API_KEY`; usa
+  `client.responses.create` (streaming de texto para modos de chat,
+  `text.format: json_schema` para modos estruturados) e
+  `client.audio.transcriptions.create` (Whisper) para o push-to-talk.
+
+### Rotas criadas
+
+- `POST /api/motor-lokat/assistant` — autenticação Supabase (mesmo padrão de
+  `/api/ai/**`), streaming SSE para modos interpret/explain/diagnosis, JSON
+  estruturado para fill/campaign/product/report. Uma requisição ativa por
+  sessão; 503 com mensagem clara quando a IA não está configurada.
+- `POST /api/motor-lokat/assistant/transcribe` — multipart, valida
+  tamanho/tipo do áudio, transcreve e descarta o buffer (nunca persiste).
+
+### Arquivos criados — UI (`src/app/admin/meu-negocio/_ai/`)
+
+`assistant-panel.tsx` (painel persistente, lateral no desktop/bottom sheet
+no mobile, framer-motion, 4 ações + saudação por página), `chat.tsx`
+(streaming real, estados idle/sending/streaming/completed/error/blocked),
+`use-assistant-session.ts` (hook de sessão, sem localStorage/sessionStorage),
+`report-upload.tsx`, `proposed-updates-panel.tsx` ("Informações
+encontradas", nunca aplica em silêncio), `push-to-talk.tsx` (MediaRecorder,
+sem Realtime contínuo nesta sprint), `campaign-wizard.tsx` (10 perguntas,
+recálculo ao vivo via `calculateCampaignProjection`), `simple-professional-
+toggle.tsx`, `progressive-disclosure.tsx` (`BusinessHeroSummary` +
+detalhe em painel lateral/bottom sheet), `assistant-availability.ts`
+(reaproveita `/api/ai/status` existente).
+
+### Identidade visual e progressive disclosure
+
+Tokens `--business-*` em `globals.css`, escopados a `.lokat-business-theme`
+(nunca `:root` global) — aplicados ao cabeçalho, abas, banner, Assistente
+LOKAT, resumo da Visão Geral e assistente de campanha; seções profundas já
+existentes mantiveram a paleta anterior (decisão de escopo, sem re-skin
+completo). `_overview-tab.tsx` ganhou `BusinessHeroSummary` no topo (6
+itens) com os detalhes completos da Sprint 1.0 movidos atrás de um
+alternador "Ver detalhes completos" — nada removido.
+
+### Preenchimento assistido
+
+`_client-content.tsx`: `handleApplyProposedUpdates` aplica propostas só ao
+estado em memória via lista branca de caminhos (`dna.<campo>`,
+`profile.<campo>`) — qualquer caminho fora dela é ignorado, nunca um
+escritor de caminho genérico.
+
+### Verificação
+
+Script ad-hoc (25 checks): validação de arquivo de relatório, trava de
+requisição por sessão, truncamento de contexto, redação de segredos,
+contexto sem campo vazio/exemplo não confirmado, tool de custo batendo com
+o motor determinístico. `npm run dev` + `curl`: as duas rotas novas exigem
+autenticação (mesmo redirecionamento 307 do middleware que as rotas
+`/api/ai/**` já existentes recebem sem sessão). `tsc`, `eslint`, `npm run
+build` e `git diff --check` limpos.
+
+### Status
+
+`project-status.ts`: 7 áreas novas (`motor_lokat_ai_assistant`,
+`motor_lokat_report_interpreter`, `motor_lokat_assisted_fill`,
+`motor_lokat_voice_input`, `motor_lokat_ai_campaign_planner`,
+`motor_lokat_light_experience`, `motor_lokat_progressive_disclosure`),
+todas `qa_pending`. `global_calendar`, `V1_PROGRESS` (81) e `V2_PROGRESS`
+(12) não tocados.
+
+### Limitação declarada
+
+Sem `OPENAI_API_KEY` configurada e sem navegador neste ambiente, os fluxos
+que dependem de uma chamada real ao modelo (resposta de chat, interpretação
+real de relatório, transcrição real) e os testes de UI/mobile (Fase 19,
+maior parte dos 20 itens) não puderam ser exercitados de ponta a ponta —
+arquitetura, contratos e lógica determinística verificados; falta QA com a
+chave configurada e em navegador real.
+
 ## 2026-07-22 (Sprint Motor LOKAT 1.1.1 — hotfix de cadastro, edição e acessibilidade, branch isolada)
 
 ### Branch

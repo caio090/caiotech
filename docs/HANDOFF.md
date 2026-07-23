@@ -2,7 +2,68 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
+## Última sessão — 2026-07-23 — Sprint Motor LOKAT 1.2, Assistente Inteligente, interpretação de relatórios e nova experiência visual (branch isolada, NÃO mergeada)
+
+- **Branch `feat/motor-lokat-ai-experience-v1`**, criada a partir de
+  `origin/fix/product-engineering-usability-v1` (commit-base `d0ba70e`).
+  Entre a 1.1.1 e esta sessão houve também a **Sprint 1.1.2** (hotfix textual:
+  "componentes + embalagem + entrega + perda esperada" corrigido para
+  linguagem de serviço — CSV/mão de obra/deslocamento/terceirização —, 1
+  commit, mesma branch de hotfix, sem entrada própria neste arquivo pois o
+  ticket não pediu atualização de docs). Nenhum commit desta sessão foi para
+  `main`, nenhum deployment de produção.
+- Auditoria prévia: `openai` SDK v6.45.0 já instalado mas nunca usado (rotas
+  existentes chamam a API REST via `fetch`); nenhuma rota com streaming,
+  Responses API ou transcrição de áudio antes desta sprint. `framer-motion`
+  já instalado (reaproveitado para as animações). `OPENAI_API_KEY` **não
+  configurada** neste ambiente local — arquitetura completa implementada
+  mesmo assim, com fallback "Assistente temporariamente indisponível".
+- Camada server nova (`src/lib/motor-lokat/ai/`): tipos/schema estrito/
+  instruções por modo/context-builder (nunca envia exemplo de SWOT não
+  confirmado ou campo vazio do DNA)/tools (wrappers determinísticos dos
+  motores existentes, chamados pelo servidor por modo — sem function-calling
+  automático e sem nenhuma tool de escrita)/validação de relatório/redação de
+  segredos em log/limites de custo/cliente OpenAI (único arquivo autorizado a
+  ler a chave). Rotas: `POST /api/motor-lokat/assistant` (streaming SSE para
+  chat, JSON estruturado para preenchimento/campanha/produto/relatório) e
+  `POST /api/motor-lokat/assistant/transcribe` (push-to-talk, áudio
+  descartado após a chamada).
+- UI nova (`src/app/admin/meu-negocio/_ai/`): painel persistente (lateral no
+  desktop, bottom sheet no mobile, animado com framer-motion) com Perguntar/
+  Falar/Anexar relatório/Preencher comigo; chat com streaming real e estados
+  idle/sending/streaming/completed/error/blocked; upload de relatório com
+  validação real de tipo/tamanho/extensão; painel "Informações encontradas"
+  que só aplica ao estado em memória via lista branca de caminhos
+  (`dna.*`/`profile.*`) após confirmação explícita; push-to-talk com
+  MediaRecorder; assistente de campanha guiado (10 perguntas, recálculo ao
+  vivo via `calculateCampaignProjection` — nenhum novo motor); alternância
+  simples/profissional.
+- Identidade visual: tokens `--business-*` em `globals.css`, escopados a
+  `.lokat-business-theme` (nunca no `:root` global) — aplicados ao cabeçalho,
+  abas, banner, Assistente LOKAT, resumo da Visão Geral e assistente de
+  campanha. Decisão de escopo: seções profundas já existentes (Custos,
+  Operação, DNA, SWOT) mantiveram a paleta anterior — sem re-skin completo.
+- Progressive disclosure: Visão Geral abre com um resumo de 6 itens
+  (faturamento, custo de entrega, sobra, situação, alerta, ação); detalhes
+  completos (fórmula, confiança, origem, dados ausentes) movidos para um
+  painel de segundo nível; nada foi removido, só reorganizado atrás de "Ver
+  detalhes completos".
+- Verificado via script ad-hoc (25 checks: validação de arquivo, trava de
+  requisição por sessão, truncamento de contexto, redação de segredos,
+  contexto sem exemplo/campo vazio, tool de custo batendo com o motor) e via
+  `npm run dev` + `curl` (as duas rotas novas exigem autenticação, mesmo
+  redirecionamento 307 das rotas `/api/ai/**` já existentes).
+- `project-status.ts`: 7 áreas novas, todas `qa_pending`, nenhuma
+  `validated`. `global_calendar`/`V1_PROGRESS` (81)/`V2_PROGRESS` (12)
+  intocados.
+- Limitação declarada: sem chave OpenAI configurada e sem navegador neste
+  ambiente, os fluxos que dependem de uma chamada real ao modelo (resposta
+  de chat, interpretação real de relatório, transcrição real) e os testes de
+  UI/mobile não puderam ser exercitados de ponta a ponta — arquitetura e
+  lógica determinística verificadas; falta QA com a chave configurada e em
+  navegador real.
+
+## Sessão anterior — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
 
 - **Branch `fix/product-engineering-usability-v1`**, criada a partir de
   `origin/feat/product-engineering-preview-v1` (commit-base
