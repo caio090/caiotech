@@ -702,3 +702,32 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
   (nenhum 404/500).
 - Push feito somente de main. Nenhuma branch de feature ou de release foi
   enviada ao remoto.
+
+## 2026-07-23 - Hotfix canonico LOKAT OS 1.0.1 - rotas do REC OS, entrada do EditorOS, hydration e Status de producao (branch local hotfix/canonical-routes-hydration-v1, NAO mergeada)
+
+- QA autenticado em Production (commit 1c92be3) reportou P1: React #418,
+  subrotas do REC OS redirecionando ao seletor sem client, EditorOS sem
+  landing sem parametros.
+- React #418: causa real encontrada em _hub-client-content.tsx (formatDate
+  sem timeZone explicito) - corrigido fixando America/Fortaleza. Auditoria
+  das 8 rotas do QA nao encontrou outra fonte real de mismatch.
+- producao/aprovacoes/resultados ganharam modo global de verdade (nunca mais
+  redirecionam sem client). Criar e EditorOS ganharam seletor pesquisavel
+  inline em vez de redirect. Radar parou de trocar de rota (nao ganhou dado
+  real novo). Calendario antigo virou alias para o Calendario Global.
+- Cards do hub corrigidos para sempre apontar para a pagina real, com ou sem
+  cliente. Status ganhou deployment ID real (vs hostname), alternancia
+  Resumo/Detalhes tecnicos, secao Integridade da Producao e contagem de
+  mudancas desde a recalibracao.
+- Verificado: tsc limpo, build via webpack fallback com exit 0 real (Turbopack
+  falhou por erro interno de I/O, nao memoria), eslint sem erro novo (4
+  pre-existentes), diff --check limpo, busca por padroes proibidos limpa.
+  Smoke HTTP em build de Production local (npm run start): todas as rotas
+  200/307, nenhum 404/500; correcao de timezone confirmada no bundle
+  compilado via grep.
+- Limitacao declarada: sem navegador neste ambiente, ausencia real de React
+  #418 no console nao pode ser observada visualmente - so a causa raiz
+  identificada e corrigida por auditoria de codigo. QA local visual (Codex
+  Web) e o proximo passo.
+- Nenhum push, nenhum Preview, nenhuma alteracao em main ou Production nesta
+  sprint.
