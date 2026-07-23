@@ -320,7 +320,7 @@ function SQLBlockersSection() {
 }
 
 // ── Card de área (grade filtrada) ─────────────────────────────
-function AreaCard({ area, onClick }: { area: ProjectAreaStatus; onClick: () => void }) {
+function AreaCard({ area, onClick, technical }: { area: ProjectAreaStatus; onClick: () => void; technical: boolean }) {
   return (
     <button
       className="w-full text-left rounded-xl border border-slate-100 bg-white p-4 hover:border-slate-200 hover:shadow-sm transition-all"
@@ -329,10 +329,19 @@ function AreaCard({ area, onClick }: { area: ProjectAreaStatus; onClick: () => v
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-sm font-medium text-slate-800 leading-tight">{area.name}</p>
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${READINESS_BG[area.readiness]}`}>
-          {READINESS_LABEL[area.readiness]}
+          {technical ? area.readiness : READINESS_LABEL[area.readiness]}
         </span>
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 mb-3">{area.description}</p>
+      {technical ? (
+        <p className="text-[11px] font-mono text-slate-400 mb-1">
+          id: {area.id} · phase: {area.phase} · last_updated: {area.last_updated}
+        </p>
+      ) : (
+        <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 mb-3">{area.description}</p>
+      )}
+      {technical && area.next_actions && area.next_actions.length > 0 && (
+        <p className="text-[11px] font-mono text-slate-500 mb-3 line-clamp-2">next_action: {area.next_actions[0]}</p>
+      )}
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-400 uppercase tracking-wide">{area.category}</span>
         <div className="flex items-center gap-1.5">
@@ -351,6 +360,56 @@ function AreaCard({ area, onClick }: { area: ProjectAreaStatus; onClick: () => v
         </div>
       </div>
     </button>
+  );
+}
+
+// ── Integridade da Produção (Fase 16 do hotfix canônico 1.0.1) ─────────────
+const PRODUCTION_INTEGRITY_ITEMS = [
+  "Rotas canônicas",
+  "Hydration",
+  "Menu administrativo",
+  "Meu Negócio",
+  "REC OS",
+  "EditorOS",
+  "Deployment oficial",
+];
+
+function ProductionIntegritySection({ onSelectArea }: { onSelectArea: (area: ProjectAreaStatus) => void }) {
+  const routeArea = PROJECT_AREAS.find((a) => a.id === "production_route_integrity");
+  const hydrationArea = PROJECT_AREAS.find((a) => a.id === "production_hydration_stability");
+
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-5">
+      <h2 className="text-sm font-semibold text-slate-700 mb-1">Integridade da Produção</h2>
+      <p className="text-xs text-slate-400 mb-4">
+        QA autenticado em Production encontrou React #418, redirect excessivo de subrotas e EditorOS sem landing —
+        corrigidos nesta sprint, QA local ainda pendente antes de qualquer novo deployment.
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {PRODUCTION_INTEGRITY_ITEMS.map((item) => (
+          <span key={item} className="text-xs px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
+            {item}
+          </span>
+        ))}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[routeArea, hydrationArea].filter((a): a is ProjectAreaStatus => !!a).map((area) => (
+          <button
+            key={area.id}
+            onClick={() => onSelectArea(area)}
+            className="text-left rounded-lg border border-slate-100 p-3 hover:border-slate-200 transition-colors"
+          >
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-xs font-semibold text-slate-700">{area.name}</p>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${READINESS_BG[area.readiness]}`}>
+                {READINESS_LABEL[area.readiness]}
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-slate-400">{area.id}</p>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -518,12 +577,19 @@ function DeploymentBanner({ deploymentInfo, lastUpdated }: { deploymentInfo: Dep
           <code className="font-mono">{deploymentInfo.commitShort}</code>
         </div>
       )}
-      {deploymentInfo.deploymentHost && (
+      {deploymentInfo.deploymentId ? (
         <div className="flex items-center gap-1.5 text-slate-500 truncate">
           <Zap size={12} className="text-slate-400" />
+          <span className="text-slate-400">Deployment:</span>
+          <code className="font-mono truncate max-w-[220px]">{deploymentInfo.deploymentId}</code>
+        </div>
+      ) : deploymentInfo.deploymentHost ? (
+        <div className="flex items-center gap-1.5 text-slate-500 truncate">
+          <Zap size={12} className="text-slate-400" />
+          <span className="text-slate-400">Host do deployment:</span>
           <span className="truncate max-w-[220px]">{deploymentInfo.deploymentHost}</span>
         </div>
-      )}
+      ) : null}
       <div className="flex items-center gap-1.5 text-slate-400 ml-auto">
         <span>Última atualização:</span>
         <span className="text-slate-600 font-medium">{lastUpdated ?? "—"}</span>
@@ -536,6 +602,7 @@ function DeploymentBanner({ deploymentInfo, lastUpdated }: { deploymentInfo: Dep
 export default function StatusPage({ deploymentInfo }: { deploymentInfo: DeploymentInfo }) {
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [selectedArea, setSelectedArea] = useState<ProjectAreaStatus | null>(null);
+  const [viewMode, setViewMode] = useState<"resumo" | "tecnico">("resumo");
 
   const readiness = useMemo(() => calcV1Readiness(), []);
   const [days, setDays] = useState(0);
@@ -610,6 +677,20 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
           Percentuais da última recalibração oficial. Áreas novas em QA não alteram automaticamente o percentual — recalibração formal ocorre após validação em Production.
         </p>
 
+        {/* Fase 17 — não há um snapshot persistido de "quando foi a última
+            recalibração" para calcular um delta exato; os números abaixo são
+            uma contagem honesta do estado atual, não uma comparação temporal
+            inventada. */}
+        <div className="rounded-xl border border-slate-100 bg-white p-4">
+          <p className="text-xs font-medium text-slate-500 mb-2">Mudanças desde a última recalibração — nenhuma alterou o percentual acima</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            <span className="text-xs text-slate-500"><b className="text-slate-800">{PROJECT_AREAS.length}</b> áreas registradas</span>
+            <span className="text-xs text-slate-500"><b className="text-slate-800">{PROJECT_AREAS.filter(a => a.readiness === "qa_pending").length}</b> em QA</span>
+            <span className="text-xs text-slate-500"><b className="text-slate-800">{PROJECT_AREAS.filter(a => a.readiness === "blocked").length}</b> bloqueadas</span>
+            <span className="text-xs text-slate-500"><b className="text-slate-800">{PROJECT_AREAS.filter(a => a.readiness === "planned").length}</b> planejadas</span>
+          </div>
+        </div>
+
         {/* ── Barra de saúde ────────────────────────────── */}
         <div className="rounded-xl border border-slate-100 bg-white p-4">
           <div className="flex items-center justify-between mb-2">
@@ -637,6 +718,9 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
             })}
           </div>
         </div>
+
+        {/* ── Integridade da Produção ───────────────────── */}
+        <ProductionIntegritySection onSelectArea={setSelectedArea} />
 
         {/* ── Mapa de fogo ──────────────────────────────── */}
         <FireMap />
@@ -695,19 +779,37 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
 
         {/* ── Filtros ───────────────────────────────────── */}
         <div>
-          <div className="overflow-x-auto pb-2">
-            <div className="flex gap-2 min-w-max">
-              {FILTERS.map(f => (
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="overflow-x-auto pb-2 flex-1">
+              <div className="flex gap-2 min-w-max">
+                {FILTERS.map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium whitespace-nowrap transition-colors ${
+                      filter === f.key
+                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Fase 15 — alternância Resumo / Detalhes técnicos: no modo
+                técnico, cada card mostra id/readiness/phase/last_updated
+                exatos em vez de só o texto humano. */}
+            <div className="shrink-0 flex items-center gap-1 bg-slate-100 rounded-full p-0.5">
+              {(["resumo", "tecnico"] as const).map((mode) => (
                 <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-medium whitespace-nowrap transition-colors ${
-                    filter === f.key
-                      ? "bg-indigo-600 border-indigo-600 text-white"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors ${
+                    viewMode === mode ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"
                   }`}
                 >
-                  {f.label}
+                  {mode === "resumo" ? "Resumo" : "Detalhes técnicos"}
                 </button>
               ))}
             </div>
@@ -720,6 +822,7 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
                 key={area.id}
                 area={area}
                 onClick={() => setSelectedArea(area)}
+                technical={viewMode === "tecnico"}
               />
             ))}
           </div>
