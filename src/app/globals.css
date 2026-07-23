@@ -733,3 +733,48 @@ body {
   animation: rec-lokat-os-shine 2.8s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Motor LOKAT — "Meu Negócio" warm light experience (Sprint 1.2)
+   Scoped to .lokat-business-theme — never applied to the rest of admin.
+   ═══════════════════════════════════════════════════════════════ */
+
+.lokat-business-theme {
+  --business-bg: #F7F1E8;
+  --business-surface: #FFFDF8;
+  --business-surface-soft: #EFE6DA;
+  --business-text: #282320;
+  --business-muted: #766B63;
+  --business-accent: #C44736;
+  --business-accent-soft: #F2D8D1;
+  --business-border: #DED4C8;
+}
+
+/* Assistant panel / bottom sheet entrance is handled by framer-motion (already
+   a project dependency) in the React components — these CSS-only animations
+   cover the pieces that don't need JS-driven physics (report upload shimmer,
+   confirmation pulse on an applied proposed update). */
+@keyframes lokat-business-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.lokat-business-shimmer {
+  background: linear-gradient(90deg, var(--business-surface-soft) 25%, var(--business-surface) 50%, var(--business-surface-soft) 75%);
+  background-size: 200px 100%;
+  animation: lokat-business-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes lokat-business-confirm-pulse {
+  0%   { background-color: var(--business-accent-soft); }
+  100% { background-color: transparent; }
+}
+.lokat-business-confirm-pulse {
+  animation: lokat-business-confirm-pulse 900ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lokat-business-shimmer,
+  .lokat-business-confirm-pulse {
+    animation: none;
+  }
+}

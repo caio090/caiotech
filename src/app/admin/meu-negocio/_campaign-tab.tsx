@@ -36,7 +36,7 @@ const STATUS_STYLE: Record<string, string> = {
   dados_insuficientes: "bg-gray-50 text-gray-500 border-gray-200",
 };
 
-function defaultCampaignInput(): CampaignInput {
+export function defaultCampaignInput(): CampaignInput {
   return {
     name: "Combo de verão",
     objective: "vender",

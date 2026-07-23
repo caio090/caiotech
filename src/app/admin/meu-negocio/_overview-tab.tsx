@@ -1,11 +1,13 @@
 "use client";
 
-import { AlertTriangle, Info, TrendingDown } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ChevronDown, ChevronUp, Info, TrendingDown } from "lucide-react";
 import { formatCents } from "@/lib/motor-lokat/money";
 import { generateFinancialInsights } from "@/lib/motor-lokat/insight-rules";
 import type { FinancialProfile, FinancialSnapshot, FinancialMetric } from "@/lib/motor-lokat/types";
 import type { SegmentPreset } from "@/lib/motor-lokat/segment-presets";
 import { MetricCard, MoneyInput, PercentInput, NumberInput, GlossaryHelpIcon, SimpleBarChart } from "./_shared";
+import { BusinessHeroSummary } from "./_ai/progressive-disclosure";
 
 interface Props {
   profile: FinancialProfile;
@@ -17,6 +19,8 @@ interface Props {
 }
 
 export function OverviewTab({ profile, onProfileChange, snapshot, preset, onOpenDetail, onOpenGlossary }: Props) {
+  const [showFullDetails, setShowFullDetails] = useState(false);
+
   function update<K extends keyof FinancialProfile>(key: K, value: FinancialProfile[K]) {
     onProfileChange({ ...profile, [key]: value });
   }
@@ -39,6 +43,20 @@ export function OverviewTab({ profile, onProfileChange, snapshot, preset, onOpen
 
   return (
     <div className="space-y-6">
+      {/* Fase 8 — progressive disclosure: the 6 numbers that matter first. */}
+      <BusinessHeroSummary snapshot={snapshot} preset={preset} onOpenGlossary={onOpenGlossary} />
+
+      <button
+        onClick={() => setShowFullDetails((v) => !v)}
+        data-testid="overview-toggle-full-details"
+        className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
+      >
+        {showFullDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        {showFullDetails ? "Ocultar detalhes completos" : "Ver detalhes completos (valores editáveis, indicadores, gráfico)"}
+      </button>
+
+      {showFullDetails && (
+      <>
       {/* Inputs */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <p className="text-xs font-bold text-gray-700 mb-3">Valores do período (edite livremente)</p>
@@ -150,13 +168,16 @@ export function OverviewTab({ profile, onProfileChange, snapshot, preset, onOpen
       <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
         <p className="text-xs font-bold text-gray-600 mb-2">Próximas capacidades</p>
         <div className="flex flex-wrap gap-2">
-          {["Controle de estoque", "Importação AiPede", "Importação CSV/Excel", "Preenchimento automático do REC OS", "IA conectada para interpretação"].map((cap) => (
+          {["Controle de estoque", "Importação AiPede", "Importação CSV/Excel", "Preenchimento automático do REC OS"].map((cap) => (
             <span key={cap} className="text-[10px] font-medium bg-white text-gray-500 border border-gray-200 rounded-full px-2.5 py-1">
               {cap} · Planejado
             </span>
           ))}
         </div>
+        <p className="text-[10px] text-gray-400 mt-2">O Assistente LOKAT (botão no canto da tela) já interpreta estes números — veja se está configurado em Fontes.</p>
       </div>
+      </>
+      )}
     </div>
   );
 }

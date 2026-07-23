@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Sparkles, LayoutGrid, Building2, Package, Tags, Megaphone, Wallet, Database, BookOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { SEGMENT_PRESETS, SEGMENT_ORDER } from "@/lib/motor-lokat/segment-presets";
 import { buildFinancialSnapshot } from "@/lib/motor-lokat/financial-engine";
 import { findGlossaryEntry } from "@/lib/motor-lokat/glossary";
@@ -17,6 +16,10 @@ import { CampaignTab } from "./_campaign-tab";
 import { CashFlowTab } from "./_cashflow-tab";
 import { SourcesTab } from "./_sources-tab";
 import { GlossaryTab } from "./_glossary-tab";
+import { buildAssistantContext } from "@/lib/motor-lokat/ai/context-builder";
+import type { ProposedUpdate } from "@/lib/motor-lokat/ai/types";
+import { AssistantPanel } from "./_ai/assistant-panel";
+import { CampaignWizard } from "./_ai/campaign-wizard";
 
 type TabKey = "overview" | "business" | "products" | "pricing" | "campaigns" | "cashflow" | "sources" | "glossary";
 
@@ -119,8 +122,21 @@ export function MeuNegocioContent() {
   const [campaignSeed, setCampaignSeed] = useState<CampaignInput | null>(null);
   const [campaignSeedVersion, setCampaignSeedVersion] = useState(0);
 
+  // Sprint Motor LOKAT 1.2 — guided campaign mode toggle (Fase 14). Kept
+  // separate from campaignSeed/campaignSeedVersion, which stay reserved for
+  // the "Testar em campanha" bridge from Produtos e Serviços.
+  const [campaignMode, setCampaignMode] = useState<"simulador" | "guiado">("simulador");
+
   const preset = SEGMENT_PRESETS[segment];
   const snapshot = useMemo(() => buildFinancialSnapshot(profile), [profile]);
+
+  // Sprint Motor LOKAT 1.2 — compact context sent to the Assistant LOKAT.
+  // Never the whole shell state: buildAssistantContext already drops empty
+  // DNA fields and unconfirmed SWOT examples.
+  const assistantContext = useMemo(() => buildAssistantContext({
+    page: activeTab, segment, dna, fourPs, swotItems, salesGoals, snapshot,
+    currentCampaign: campaignSeed,
+  }), [activeTab, segment, dna, fourPs, swotItems, salesGoals, snapshot, campaignSeed]);
 
   function handleSegmentChange(next: BusinessSegment) {
     setSegment(next);
@@ -137,22 +153,46 @@ export function MeuNegocioContent() {
     setActiveTab("campaigns");
   }
 
+  /**
+   * Fase 12 — applies assistant proposals to in-memory state only, never to
+   * any backend. Deliberately a whitelist of known, safe paths rather than a
+   * generic path-writer: an unrecognized path is simply skipped, never
+   * evaluated dynamically. Only "dna.<field>" and "profile.<field>" are
+   * supported in this first version — enough to cover the DNA and financial
+   * snapshot fill flows without accepting an arbitrary write target.
+   */
+  function handleApplyProposedUpdates(updates: ProposedUpdate[]) {
+    for (const update of updates) {
+      const [namespace, field] = update.path.split(".");
+      if (namespace === "dna" && field && field in dna) {
+        setDna((prev) => ({ ...prev, [field]: { value: String(update.proposedValue), source: "manual" } }));
+      } else if (namespace === "profile" && field && field in profile) {
+        setProfile((prev) => ({
+          ...prev,
+          [field]: { value: Number(update.proposedValue) || 0, source: "manual" },
+        }));
+      }
+      // Any other path is intentionally ignored — never write to an
+      // unrecognized target just because the assistant proposed it.
+    }
+  }
+
   return (
-    <div>
+    <div className="lokat-business-theme rounded-3xl p-4 sm:p-6" style={{ background: "var(--business-bg)" }}>
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-purple-600" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--business-accent-soft)" }}>
+            <Sparkles className="w-5 h-5" style={{ color: "var(--business-accent)" }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-gray-900">Meu Negócio</h1>
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-600 text-white">
+              <h1 className="text-lg font-bold" style={{ color: "var(--business-text)" }}>Meu Negócio</h1>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-white" style={{ background: "var(--business-accent)" }}>
                 Motor LOKAT
               </span>
             </div>
-            <p className="text-xs text-gray-400">Finanças, campanhas e decisões em um só lugar.</p>
+            <p className="text-xs" style={{ color: "var(--business-muted)" }}>Finanças, campanhas e decisões em um só lugar.</p>
           </div>
         </div>
 
@@ -160,7 +200,8 @@ export function MeuNegocioContent() {
           value={segment}
           onChange={(e) => handleSegmentChange(e.target.value as BusinessSegment)}
           data-testid="meu-negocio-segment-select"
-          className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 bg-white text-gray-700"
+          className="text-xs rounded-xl px-3 py-2 outline-none border"
+          style={{ borderColor: "var(--business-border)", background: "var(--business-surface)", color: "var(--business-text)" }}
         >
           {SEGMENT_ORDER.map((s) => (
             <option key={s} value={s}>{SEGMENT_PRESETS[s].label}</option>
@@ -169,15 +210,15 @@ export function MeuNegocioContent() {
       </div>
 
       {/* Demo mode banner (Fase 3 — always visible, never hidden) */}
-      <div className="mb-5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
-        <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5">Modo demonstração</p>
-        <p className="text-xs text-amber-700 leading-relaxed">
+      <div className="mb-5 rounded-2xl px-4 py-3 border" style={{ background: "var(--business-accent-soft)", borderColor: "var(--business-border)" }}>
+        <p className="text-[10px] font-black uppercase tracking-wider mb-0.5" style={{ color: "var(--business-accent)" }}>Modo demonstração</p>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--business-text)" }}>
           Os valores desta tela são exemplos editáveis e não representam a situação financeira real de nenhum cliente.
           Nada aqui é salvo — os dados existem apenas durante esta sessão da página.
         </p>
       </div>
 
-      <p className="text-[11px] text-gray-400 mb-5 italic">
+      <p className="text-[11px] mb-5 italic" style={{ color: "var(--business-muted)" }}>
         Referência inicial. Ajuste conforme a realidade do negócio e a orientação do contador ou gestor financeiro.
       </p>
 
@@ -188,12 +229,10 @@ export function MeuNegocioContent() {
             key={key}
             onClick={() => setActiveTab(key)}
             data-testid={`meu-negocio-tab-${key}`}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border whitespace-nowrap transition-colors",
-              activeTab === key
-                ? "bg-purple-600 text-white border-purple-600"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-            )}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border whitespace-nowrap transition-colors"
+            style={activeTab === key
+              ? { background: "var(--business-accent)", color: "white", borderColor: "var(--business-accent)" }
+              : { background: "var(--business-surface)", color: "var(--business-muted)", borderColor: "var(--business-border)" }}
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
@@ -223,7 +262,28 @@ export function MeuNegocioContent() {
         />
       )}
       {activeTab === "pricing" && <PricingTab onOpenGlossary={openGlossaryTerm} />}
-      {activeTab === "campaigns" && <CampaignTab key={campaignSeedVersion} onOpenGlossary={openGlossaryTerm} seedInput={campaignSeed ?? undefined} />}
+      {activeTab === "campaigns" && (
+        <div className="space-y-4">
+          <div className="flex gap-1.5">
+            {(["simulador", "guiado"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setCampaignMode(m)}
+                data-testid={`campaign-mode-${m}`}
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg border"
+                style={campaignMode === m
+                  ? { background: "var(--business-accent)", color: "white", borderColor: "var(--business-accent)" }
+                  : { background: "var(--business-surface)", color: "var(--business-muted)", borderColor: "var(--business-border)" }}
+              >
+                {m === "simulador" ? "Simulador" : "Planejar campanha comigo"}
+              </button>
+            ))}
+          </div>
+          {campaignMode === "simulador"
+            ? <CampaignTab key={campaignSeedVersion} onOpenGlossary={openGlossaryTerm} seedInput={campaignSeed ?? undefined} />
+            : <CampaignWizard context={assistantContext} onOpenGlossary={openGlossaryTerm} />}
+        </div>
+      )}
       {activeTab === "cashflow" && <CashFlowTab snapshot={snapshot} onOpenGlossary={openGlossaryTerm} />}
       {activeTab === "sources" && <SourcesTab />}
       {activeTab === "glossary" && <GlossaryTab initialTermId={glossaryTermId} />}
@@ -235,6 +295,8 @@ export function MeuNegocioContent() {
       {glossaryTermId && activeTab !== "glossary" && (
         <GlossaryQuickView termId={glossaryTermId} onClose={() => setGlossaryTermId(null)} />
       )}
+
+      <AssistantPanel page={activeTab} context={assistantContext} onApplyProposedUpdates={handleApplyProposedUpdates} />
     </div>
   );
 }
