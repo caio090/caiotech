@@ -256,6 +256,32 @@
 - Chatwoot: nao instalado.
 - Postiz: nao instalado.
 
+## 3z. Release canônica LOKAT OS 1.0 — consolidação de REC OS e Meu Negócio em `main`
+
+- Data: 2026-07-23
+- Branch local `release/canonical-production-v1`, criada a partir de `main`
+  (`075b023`). Squash-merge de `fix/rec-os-global-navigation` (`71fcf9f`) e
+  `fix/product-engineering-usability-v1` (`d0ba70e`) — as duas branches já
+  estáveis o suficiente para produção nesta consolidação.
+- Não integradas: `feat/motor-lokat-ai-experience-v1` (assistente de IA),
+  `feat/editor-os-layer-scanner-v1` e `fix/editor-os-demo-runtime-v1`
+  (scanner/OCR e runtime de demonstração do EditorOS) — nenhuma passou por
+  QA completo; permanecem preservadas, não apagadas, não rebaseadas.
+- `project-status.ts` resolvido como união real das áreas — nenhuma marcada
+  `validated`; `global_calendar`/`V1_PROGRESS` (81)/`V2_PROGRESS` (12)
+  intocados.
+- `/admin/status` ganhou metadados de ambiente/commit/branch/deployment
+  lidos server-side (`VERCEL_ENV`/`VERCEL_GIT_COMMIT_SHA`/
+  `VERCEL_GIT_COMMIT_REF`/`VERCEL_URL`, nunca segredo).
+- `/admin/contentos/selecionar-cliente` consolidado: redireciona para o hub
+  (seletor pesquisável, `?clientPicker=open`) em vez de manter uma segunda
+  implementação baseada em `localStorage`.
+- Ver `docs/HANDOFF.md` e `docs/SESSION_LOG.md` (entrada 2026-07-23) para o
+  detalhamento completo de verificação (tsc/build/eslint/diff-check/smoke
+  test local) e para o commit final de `main` após o merge/push (Fase 17-19
+  desta release) — esta seção será atualizada com o commit definitivo assim
+  que o push ocorrer.
+
 ## 14. Areas congeladas
 
 - Nao alterar Typebot.

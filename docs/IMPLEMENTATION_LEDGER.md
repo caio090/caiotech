@@ -2,6 +2,73 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-23 (Release canônica LOKAT OS 1.0 — consolidação de REC OS e Meu Negócio em `main`)
+
+### Branch
+
+`release/canonical-production-v1`, local, criada a partir de `main`
+(`075b023`). Mergeada em `main` via `--no-ff` após todas as fases desta
+release; `main` é o único ref enviado ao remoto.
+
+### Executor
+
+Claude Code
+
+### Origem
+
+Ticket "RELEASE CANÔNICA LOKAT OS 1.0" — eliminar a fragmentação entre
+branches, publicando em `main` somente o que já era estável.
+
+### O que entrou
+
+- `fix/rec-os-global-navigation` (`71fcf9f`) — squash em `feat(rec-os):
+  consolidate global navigation`.
+- `fix/product-engineering-usability-v1` (`d0ba70e`) — squash em
+  `feat(meu-negocio): integrate Motor LOKAT and product engineering`.
+- `fix(admin): unify canonical routes and navigation` — consolidação de
+  `/admin/contentos/selecionar-cliente` (parou de usar `localStorage`,
+  passou a redirecionar para o hub com o seletor aberto) + criação de
+  `src/config/admin-routes.ts` (registro simples, não substitui a sidebar).
+- `feat(status): consolidate production status metadata` — `/admin/status`
+  ganhou banner de ambiente/branch/commit/deployment lido server-side de
+  variáveis públicas da Vercel.
+- `docs(context): record canonical production release` — este registro.
+
+### O que NÃO entrou (permanece preservado em branch separada)
+
+- `feat/motor-lokat-ai-experience-v1` (assistente de IA — P1 conhecido na
+  rota server-side).
+- `feat/editor-os-layer-scanner-v1` e `fix/editor-os-demo-runtime-v1`
+  (scanner/OCR/conversão/serialização do EditorOS, commits `8659805`/
+  `00b8e6f` — QA completo ainda pendente).
+
+### Verificação
+
+`tsc --noEmit --skipLibCheck` limpo · `npm run build` (Turbopack) concluído
+com exit 0 · `eslint` nos arquivos alterados sem erro novo (3 erros
+pré-existentes, confirmados idênticos em `origin/main`/na branch de origem
+via `git show`, não introduzidos por esta release) · `git diff --check`
+limpo · busca por padrões proibidos (`<<<<<<<`, `OPENAI_API_KEY`,
+`service_role`, `public_token` etc.) sem ocorrência real de segredo — só
+menções em documentação e um campo `public_token` legítimo e pré-existente
+em `_client-content.tsx` (token de aprovação pública, não credencial). Smoke
+test local (servidor com `.env.local` real, sem sessão autenticada):
+`/admin/meu-negocio`, `/admin/status`, `/admin/contentos`,
+`/admin/contentos/aprovacoes`, `/admin/contentos/producao` e
+`/admin/contentos/editor-os` — todos HTTP 307 para `/login`, nenhum 404/500.
+
+### project-status.ts
+
+Resolvido como união das áreas das duas branches integradas (nunca um
+arquivo inteiro escolhido de uma branch só). Nenhuma área nova marcada
+`validated`. `global_calendar`, `V1_PROGRESS` (81) e `V2_PROGRESS` (12)
+intocados.
+
+### Push
+
+Somente `main` foi enviado ao remoto. Nenhuma branch de feature ou de
+release foi enviada.
+
 ## 2026-07-22 (Sprint Motor LOKAT 1.1.1 — hotfix de cadastro, edição e acessibilidade, branch isolada)
 
 ### Branch

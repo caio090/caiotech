@@ -2,7 +2,48 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
+## Última sessão — 2026-07-23 — Release canônica LOKAT OS 1.0, consolidação em `main` (branch local `release/canonical-production-v1`, mergeada)
+
+- Objetivo: eliminar a fragmentação entre branches e publicar em `main` só o
+  que já estava estável — navegação global do REC OS
+  (`fix/rec-os-global-navigation`, commit `71fcf9f`) e o módulo Meu Negócio /
+  Motor LOKAT / Engenharia de Produto (`fix/product-engineering-usability-v1`,
+  commit `d0ba70e`). Scanner de camadas do EditorOS e o Assistente de IA
+  ficaram deliberadamente de fora — nenhum dos dois passou por QA completo.
+- Release local criada a partir de `main` (`075b023`), com squash-merge de
+  cada branch de origem em commit próprio, revisão de diff antes de cada
+  commit, sem `git add .`/`-A`.
+- `project-status.ts` resolvido como união real das áreas (REC OS + Meu
+  Negócio), sem escolher um arquivo inteiro de uma branch só — nenhuma área
+  nova marcada `validated`, `global_calendar` e `V1_PROGRESS`/`V2_PROGRESS`
+  (81/12) intocados.
+- `/admin/status` deixou de mostrar uma data fixa: agora lê metadados
+  server-side seguros da Vercel (`VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`,
+  `VERCEL_GIT_COMMIT_REF`, `VERCEL_URL` — nunca segredo) via
+  `src/lib/deployment-info.ts`, e computa "última atualização" a partir do
+  maior `last_updated` real das áreas.
+- `/admin/contentos/selecionar-cliente` deixou de ter uma segunda
+  implementação de seleção de cliente (baseada em `localStorage`, divergindo
+  da regra "URL é a única fonte de verdade" do hub) — agora redireciona para
+  o hub com o seletor pesquisável já aberto, preservando `?client` quando
+  presente.
+- `src/config/admin-routes.ts` criado como registro simples das rotas
+  administrativas canônicas, para auditoria — não substitui a config de
+  sidebar já existente em `app-sidebar.tsx`, que continua sendo a única fonte
+  usada por sidebar/mobile-nav/layouts.
+- Verificado: `tsc --noEmit` limpo, `npm run build` (Turbopack) concluído com
+  sucesso, `eslint` nos arquivos alterados sem erros novos (3 erros
+  pré-existentes confirmados idênticos em `origin/main`/na branch de origem,
+  não introduzidos por esta release), `git diff --check` limpo, busca por
+  padrões proibidos sem ocorrência real de segredo.
+- Scanner de camadas do EditorOS (`feat/editor-os-layer-scanner-v1`) e o
+  hotfix de runtime de demonstração (`fix/editor-os-demo-runtime-v1`,
+  commits `8659805`/`00b8e6f`) permanecem preservados, não mergeados, não
+  apagados — próxima sprint do EditorOS partirá desta nova `main`.
+- Push feito somente de `main`; nenhuma branch de feature ou de release foi
+  enviada ao remoto.
+
+## Sessão anterior — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
 
 - **Branch `fix/product-engineering-usability-v1`**, criada a partir de
   `origin/feat/product-engineering-preview-v1` (commit-base

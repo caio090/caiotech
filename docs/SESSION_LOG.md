@@ -665,3 +665,40 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
   recomenda-se QA manual em navegador antes de qualquer promocao.
 - Commits e push feitos somente na branch fix/product-engineering-usability-v1 -
   main nunca tocado, nenhum deployment de producao criado.
+
+## 2026-07-23 - Release canonica LOKAT OS 1.0 - consolidacao de REC OS e Meu Negocio em main (branch local release/canonical-production-v1, mergeada)
+
+- Release local criada a partir de main (075b023). Squash-merge de
+  fix/rec-os-global-navigation (71fcf9f) e fix/product-engineering-usability-v1
+  (d0ba70e) - as duas unicas branches ja estaveis o suficiente para producao.
+- Nao integradas nesta release: feat/motor-lokat-ai-experience-v1 (assistente
+  de IA), feat/editor-os-layer-scanner-v1 e fix/editor-os-demo-runtime-v1
+  (scanner/OCR e hotfix de runtime do EditorOS) - nenhuma das tres passou por
+  QA completo. As tres permanecem intactas, nao apagadas, nao rebaseadas.
+- project-status.ts resolvido como uniao real das areas das duas branches
+  integradas (nao substituido por inteiro de nenhuma delas). Nenhuma area
+  nova marcada validated. global_calendar, V1_PROGRESS (81) e V2_PROGRESS
+  (12) intocados.
+- /admin/status: adicionado banner de ambiente/branch/commit/deployment lido
+  server-side de variaveis publicas da Vercel (nunca segredo); "ultima
+  atualizacao" passou a ser calculada a partir do maior last_updated real das
+  areas, em vez de uma data fixa no rodape.
+- /admin/contentos/selecionar-cliente: parou de manter uma segunda
+  implementacao de selecao de cliente baseada em localStorage; agora
+  redireciona para o hub com o seletor pesquisavel ja aberto (preservando
+  ?client), reaproveitando o unico componente canonico.
+- Criado src/config/admin-routes.ts como registro simples de rotas
+  administrativas para auditoria - a sidebar (app-sidebar.tsx) continua
+  sendo a unica fonte usada por menus/mobile-nav/layouts.
+- Verificado: tsc --noEmit limpo; npm run build (Turbopack) concluido com
+  exit 0; eslint nos arquivos alterados sem erro novo (3 erros
+  pre-existentes confirmados identicos em origin/main/na branch de origem);
+  git diff --check limpo; busca por padroes proibidos sem ocorrencia real de
+  segredo (so mencoes em documentacao e um campo public_token legitimo e
+  pre-existente). Smoke test local (servidor com Supabase real, sem sessao):
+  /admin/meu-negocio, /admin/status, /admin/contentos,
+  /admin/contentos/aprovacoes, /admin/contentos/producao e
+  /admin/contentos/editor-os todos redirecionam corretamente para /login
+  (nenhum 404/500).
+- Push feito somente de main. Nenhuma branch de feature ou de release foi
+  enviada ao remoto.
