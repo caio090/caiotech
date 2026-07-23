@@ -53,11 +53,12 @@ const BUSINESS_SOURCE_STYLE: Record<BusinessDataSource, string> = {
   missing: "bg-gray-100 text-gray-500 border-gray-200",
 };
 
-export function BusinessSourceSelect({ source, onChange }: { source: BusinessDataSource; onChange: (s: BusinessDataSource) => void }) {
+export function BusinessSourceSelect({ source, onChange, ariaLabel }: { source: BusinessDataSource; onChange: (s: BusinessDataSource) => void; ariaLabel?: string }) {
   return (
     <select
       value={source}
       onChange={(e) => onChange(e.target.value as BusinessDataSource)}
+      aria-label={ariaLabel ?? "Origem do dado"}
       className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border outline-none cursor-pointer", BUSINESS_SOURCE_STYLE[source])}
     >
       {(Object.keys(BUSINESS_SOURCE_LABEL) as BusinessDataSource[]).map((s) => (
@@ -79,7 +80,7 @@ export function DnaTextField({
     <div>
       <div className="flex items-center justify-between mb-1">
         <span className="block text-[11px] font-semibold text-gray-600">{label}</span>
-        <BusinessSourceSelect source={source} onChange={onSourceChange} />
+        <BusinessSourceSelect source={source} onChange={onSourceChange} ariaLabel={`Origem de ${label}`} />
       </div>
       {multiline ? (
         <textarea
@@ -260,7 +261,7 @@ export function MetricDetailModal({ metric, onClose }: { metric: FinancialMetric
             <p className="text-base font-black text-gray-900 mt-0.5">{metric.label}</p>
             <p className="text-2xl font-black text-gray-900 mt-1">{displayValue}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0">
+          <button onClick={onClose} aria-label="Fechar detalhes" className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>

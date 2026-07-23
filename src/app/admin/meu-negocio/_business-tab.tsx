@@ -27,6 +27,11 @@ const SWOT_CATEGORIES: Array<{ key: SwotCategory; label: string; hint: string; c
   { key: "ameaca", label: "Ameaças", hint: "Ambiente externo", color: "bg-red-50 border-red-100 text-red-700" },
 ];
 
+const SWOT_ENVIRONMENTS: Array<{ label: string; explanation: string; categories: SwotCategory[] }> = [
+  { label: "Ambiente interno", explanation: "Fatores mais próximos do controle da empresa.", categories: ["forca", "fraqueza"] },
+  { label: "Ambiente externo", explanation: "Fatores do mercado e contexto que afetam o negócio.", categories: ["oportunidade", "ameaca"] },
+];
+
 const GOAL_METRIC_LABEL: Record<SalesGoalMetric, string> = {
   unidades: "Unidades", faturamento: "Faturamento", clientes_novos: "Clientes novos",
   recompra: "Recompra (%)", margem_contribuicao: "Margem de contribuição", ticket_medio: "Ticket médio",
@@ -169,59 +174,79 @@ function SwotSection({ items, onChange }: { items: SwotItem[]; onChange: (items:
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-4">
-      {SWOT_CATEGORIES.map(({ key, label, hint, color }) => {
-        const categoryItems = items.filter((i) => i.category === key);
-        return (
-          <div key={key} className={cn("rounded-2xl border p-4", color)}>
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-bold">{label}</p>
-              <button onClick={() => addItem(key)} className="p-1 rounded-lg hover:bg-white/60 transition-colors" aria-label={`Adicionar ${label}`}>
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <p className="text-[9px] opacity-70 mb-3">{hint}</p>
-            <div className="space-y-2">
-              {categoryItems.map((item) => (
-                <div key={item.id} className="bg-white/70 rounded-xl p-2.5 space-y-1.5">
-                  <div className="flex items-start gap-1.5">
-                    <input
-                      value={item.text}
-                      onChange={(e) => updateItem(item.id, { text: e.target.value })}
-                      placeholder={item.isExample ? "Exemplo — edite ou confirme" : "Descreva o item"}
-                      className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-400 bg-white"
-                    />
-                    <button onClick={() => removeItem(item.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors" aria-label="Remover">
-                      <Trash2 className="w-3 h-3" />
+    <div className="space-y-5">
+      {SWOT_ENVIRONMENTS.map((env) => (
+        <div key={env.label}>
+          <div className="mb-2">
+            <p className="text-xs font-black text-gray-800">{env.label}</p>
+            <p className="text-[10px] text-gray-400">{env.explanation}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {SWOT_CATEGORIES.filter((c) => env.categories.includes(c.key)).map(({ key, label, hint, color }) => {
+              const categoryItems = items.filter((i) => i.category === key);
+              return (
+                <div key={key} className={cn("rounded-2xl border p-4", color)}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold">{label}</p>
+                    <button onClick={() => addItem(key)} className="p-1 rounded-lg hover:bg-white/60 transition-colors" aria-label={`Adicionar ${label}`}>
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <BusinessSourceSelect source={item.source} onChange={(s) => updateItem(item.id, { source: s })} />
-                    <select value={item.impact} onChange={(e) => updateItem(item.id, { impact: e.target.value as SwotItem["impact"] })} className="text-[9px] border border-gray-200 rounded-full px-1.5 py-0.5 bg-white">
-                      <option value="alto">Impacto alto</option>
-                      <option value="medio">Impacto médio</option>
-                      <option value="baixo">Impacto baixo</option>
-                    </select>
-                    <select value={item.priority} onChange={(e) => updateItem(item.id, { priority: e.target.value as SwotItem["priority"] })} className="text-[9px] border border-gray-200 rounded-full px-1.5 py-0.5 bg-white">
-                      <option value="alta">Prioridade alta</option>
-                      <option value="media">Prioridade média</option>
-                      <option value="baixa">Prioridade baixa</option>
-                    </select>
-                    <label className="flex items-center gap-1 text-[9px] font-bold ml-auto">
-                      <input type="checkbox" checked={item.confirmed} onChange={(e) => updateItem(item.id, { confirmed: e.target.checked })} />
-                      Confirmado
-                    </label>
+                  <p className="text-[9px] opacity-70 mb-3">{hint}</p>
+                  <div className="space-y-2">
+                    {categoryItems.map((item, index) => (
+                      <div key={item.id} className="bg-white/70 rounded-xl p-2.5 space-y-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <label className="flex-1">
+                            <span className="sr-only">{`${label} — item ${index + 1}`}</span>
+                            <input
+                              value={item.text}
+                              onChange={(e) => updateItem(item.id, { text: e.target.value })}
+                              placeholder={item.isExample ? "Exemplo — edite ou confirme" : "Descreva o item"}
+                              aria-label={`${label} — item ${index + 1}`}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-400 bg-white"
+                            />
+                          </label>
+                          <button onClick={() => removeItem(item.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors" aria-label={`Remover item ${index + 1} de ${label}`}>
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <BusinessSourceSelect source={item.source} onChange={(s) => updateItem(item.id, { source: s })} ariaLabel={`Origem do item ${index + 1} de ${label}`} />
+                          <label className="flex items-center gap-1">
+                            <span className="sr-only">{`Impacto do item ${index + 1} de ${label}`}</span>
+                            <select value={item.impact} onChange={(e) => updateItem(item.id, { impact: e.target.value as SwotItem["impact"] })} aria-label={`Impacto do item ${index + 1} de ${label}`} className="text-[9px] border border-gray-200 rounded-full px-1.5 py-0.5 bg-white">
+                              <option value="alto">Impacto alto</option>
+                              <option value="medio">Impacto médio</option>
+                              <option value="baixo">Impacto baixo</option>
+                            </select>
+                          </label>
+                          <label className="flex items-center gap-1">
+                            <span className="sr-only">{`Prioridade do item ${index + 1} de ${label}`}</span>
+                            <select value={item.priority} onChange={(e) => updateItem(item.id, { priority: e.target.value as SwotItem["priority"] })} aria-label={`Prioridade do item ${index + 1} de ${label}`} className="text-[9px] border border-gray-200 rounded-full px-1.5 py-0.5 bg-white">
+                              <option value="alta">Prioridade alta</option>
+                              <option value="media">Prioridade média</option>
+                              <option value="baixa">Prioridade baixa</option>
+                            </select>
+                          </label>
+                          <label className="flex items-center gap-1 text-[9px] font-bold ml-auto">
+                            <input type="checkbox" checked={item.confirmed} onChange={(e) => updateItem(item.id, { confirmed: e.target.checked })} />
+                            Confirmado
+                          </label>
+                        </div>
+                        {item.isExample && !item.confirmed && (
+                          <p className="text-[9px] text-gray-400 italic">Exemplo de segmento — não confirmado como fato do negócio.</p>
+                        )}
+                      </div>
+                    ))}
+                    {categoryItems.length === 0 && <p className="text-[10px] opacity-60 text-center py-2">Nenhum item adicionado.</p>}
                   </div>
-                  {item.isExample && !item.confirmed && (
-                    <p className="text-[9px] text-gray-400 italic">Exemplo de segmento — não confirmado como fato do negócio.</p>
-                  )}
                 </div>
-              ))}
-              {categoryItems.length === 0 && <p className="text-[10px] opacity-60 text-center py-2">Nenhum item adicionado.</p>}
-            </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -255,10 +280,16 @@ function GoalsSection({ goals, onChange }: { goals: SalesGoal[]; onChange: (goal
           return (
             <div key={goal.id} className="border border-gray-100 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
-                <input value={goal.label} onChange={(e) => updateGoal(goal.id, { label: e.target.value })} className="flex-1 text-xs font-bold border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-400" />
-                <select value={goal.metric} onChange={(e) => updateGoal(goal.id, { metric: e.target.value as SalesGoalMetric })} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
-                  {(Object.keys(GOAL_METRIC_LABEL) as SalesGoalMetric[]).map((m) => <option key={m} value={m}>{GOAL_METRIC_LABEL[m]}</option>)}
-                </select>
+                <label className="flex-1">
+                  <span className="sr-only">Nome da meta</span>
+                  <input value={goal.label} onChange={(e) => updateGoal(goal.id, { label: e.target.value })} aria-label="Nome da meta" className="w-full text-xs font-bold border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-400" />
+                </label>
+                <label>
+                  <span className="sr-only">Métrica da meta</span>
+                  <select value={goal.metric} onChange={(e) => updateGoal(goal.id, { metric: e.target.value as SalesGoalMetric })} aria-label="Métrica da meta" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+                    {(Object.keys(GOAL_METRIC_LABEL) as SalesGoalMetric[]).map((m) => <option key={m} value={m}>{GOAL_METRIC_LABEL[m]}</option>)}
+                  </select>
+                </label>
                 <button onClick={() => removeGoal(goal.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" aria-label="Remover meta">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -305,6 +336,11 @@ function BusinessManual({ dna, fourPs, swotItems, salesGoals }: { dna: BusinessD
         <p className="text-sm font-black text-gray-900">{dna.companyName.value || "Empresa sem nome definido"}</p>
         <p className="text-xs text-gray-500 mt-1">{dna.description.value || "Nenhuma descrição informada."}</p>
       </div>
+
+      <section>
+        <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-1.5">Modelo de negócio</p>
+        <p className="text-xs text-gray-700">{dna.businessModel.value || "—"}</p>
+      </section>
 
       <section>
         <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-1.5">Proposta de valor</p>
