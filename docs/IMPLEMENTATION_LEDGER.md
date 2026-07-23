@@ -2,6 +2,85 @@
 
 Formato append-only para continuidade entre agentes.
 
+## 2026-07-22 (Sprint Motor LOKAT 1.1.1 — hotfix de cadastro, edição e acessibilidade, branch isolada)
+
+### Branch
+
+`fix/product-engineering-usability-v1`, criada a partir de
+`origin/feat/product-engineering-preview-v1` (commit-base
+`2637cd483dcfbaa010d9fa8147c24371b344deb8`). **Nada mergeado ou enviado para
+`main`.**
+
+### Executor
+
+Claude Code
+
+### Origem
+
+QA do deployment `dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX` (P0=0, P1=1, P2=2, P3=1).
+
+### P1 — edição detalhada não evidente/acessível
+
+Antes: um único acordeão plano por card do Portfólio mostrava tudo (geral +
+custos + operação + posicionamento) sem nenhum botão de edição explícito.
+Depois: `_products-tab.tsx` reescrito com um fluxo de duas telas —
+lista → botão "Editar produto"/"Editar serviço" → workspace com 5 abas
+internas (Geral, Custos, Operação, Posicionamento, Testes e resultados),
+"Voltar ao Portfólio" e "Testar no Laboratório". As seções de custo/operação/
+posicionamento já existentes foram reaproveitadas dentro das abas — nenhuma
+engine duplicada.
+
+### Fase 9 — Produto vs. Serviço
+
+Novo tipo `ProductKind` (`business-types.ts`) e campo `ProductServiceItem.kind`.
+Criação passa a exigir escolha explícita (`NewItemChooser`). Nova função
+`productSegmentFields(segment, kind)` em `product-presets.ts` filtra campos
+de estoque/ingrediente/embalagem/validade/SKU/armazenamento para serviços,
+mesmo em segmentos como delivery/varejo. Motor de custo/operação inalterado —
+só rótulos da UI mudam por tipo (ex.: "Perda esperada" -> "Retrabalho
+esperado" para serviço).
+
+### P2 — Manual e SWOT
+
+`_business-tab.tsx`: Manual do Negócio ganhou seção explícita "Modelo de
+negócio" (lida de `dna.businessModel.value`); SWOT/FOFA reagrupada sob
+"Ambiente interno" (Forças/Fraquezas) e "Ambiente externo"
+(Oportunidades/Ameaças), cada um com explicação curta — estrutura de dados
+dos itens não mudou.
+
+### P3 + acessibilidade
+
+Inputs de componentes de custo, selects de estágio/decisão do Laboratório,
+inputs de meta e `BusinessSourceSelect`/botão fechar do `MetricDetailModal`
+(`_shared.tsx`) ganharam `aria-label`/`<label>` associados.
+
+### Verificação
+
+`hotfix-verify.js` (script ad-hoc, 22 checks): filtragem de campos por
+segmento/tipo, cenário "Serviço de consultoria" (custo por hora, sem
+embalagem, sem NaN/Infinity), zero regressão nos motores de operação/
+matriz/laboratório/campanha (não alterados neste hotfix). `tsc`, `eslint`,
+`npm run build` e `git diff --check` limpos. Busca por
+`Math.random|Date.now|localStorage|sessionStorage|Supabase|fetch(|axios|
+service_role|public_token` não encontrou nada fora do `generateId()`
+pré-existente (já auditado na 1.1).
+
+### Status
+
+`project-status.ts`: nenhuma área marcada `validated` — todas seguem
+`qa_pending`/`planned`/`blocked` como já estavam. Só `next_actions`/`notes`/
+`last_updated` atualizados em `business_manual`, `business_swot`,
+`product_portfolio`, `product_cost_engineering`, `product_positioning`,
+`product_laboratory`. `global_calendar`, `V1_PROGRESS` (81) e
+`V2_PROGRESS` (12) não tocados.
+
+### Limitação declarada
+
+Testes de clique-a-clique e verificação mobile real não puderam ser
+executados neste ambiente por falta de navegador — verificado via script
+ad-hoc e leitura de código. Recomenda-se QA manual em navegador antes de
+qualquer promoção.
+
 ## 2026-07-20 (Sprint Motor LOKAT 1.1 — DNA do Negócio e Engenharia de Produtos, branch isolada)
 
 ### Branch

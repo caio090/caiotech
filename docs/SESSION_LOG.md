@@ -595,3 +595,73 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - V1_PROGRESS = 81 (imutavel). V2_PROGRESS = 12 (imutavel).
 - Commits e push feitos somente na branch feat/product-engineering-preview-v1 -
   main nunca tocado, nenhum deployment de producao criado.
+
+## 2026-07-22 - Sprint Motor LOKAT 1.1.1 - Hotfix de cadastro, edicao e acessibilidade de Produtos e Servicos (branch fix/product-engineering-usability-v1, NAO mergeada)
+
+- Origem: QA do deployment dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX (P0=0, P1=1,
+  P2=2, P3=1). Auditoria inicial confirmou feat/product-engineering-preview-v1
+  limpa no commit esperado (2637cd4); branch de hotfix criada a partir de
+  origin/feat/product-engineering-preview-v1.
+- P1 confirmado pelo QA: apos criar um produto/servico no Portfolio, a edicao
+  detalhada de composicao/custos/operacao/posicionamento/campos por segmento
+  nao ficava evidente nem acessivel - tudo ficava dentro de um unico
+  acordeao plano por card, sem nenhum botao de edicao explicito.
+- Corrigido: `_products-tab.tsx` reescrito com um fluxo de duas telas. O
+  Portfolio lista cards com um botao explicito "Editar produto"/"Editar
+  servico" que abre um workspace dedicado com 5 abas internas (Geral,
+  Custos, Operacao, Posicionamento, Testes e resultados), "Voltar ao
+  Portfolio" e "Testar no Laboratorio". As secoes de custo/operacao/
+  posicionamento ja existentes foram reaproveitadas dentro das abas - nenhuma
+  engine duplicada.
+- Fase 9 (Produto vs. Servico): novo tipo ProductKind ("produto"|"servico")
+  em business-types.ts e campo ProductServiceItem.kind. Criacao agora exige
+  escolha explicita via NewItemChooser. Nova funcao productSegmentFields
+  (segment, kind) em product-presets.ts filtra campos de estoque/ingrediente/
+  embalagem/validade/SKU/armazenamento quando kind="servico", mesmo em
+  segmentos como delivery/varejo - motor de custo/operacao inalterado, so
+  rotulos da UI mudam por tipo (ex.: "Perda esperada" -> "Retrabalho
+  esperado", "Entrega" -> "Deslocamento", sem "Embalagem" para servico).
+- P2 corrigidos: Manual do Negocio ganhou secao explicita "Modelo de
+  negocio" (lida direto de dna.businessModel.value); SWOT/FOFA reagrupada
+  visualmente sob dois titulos - "Ambiente interno" (Forcas/Fraquezas) e
+  "Ambiente externo" (Oportunidades/Ameacas) - cada um com explicacao curta;
+  estrutura de dados dos itens SWOT nao mudou.
+- P3 corrigido + auditoria de acessibilidade mais ampla: inputs de
+  componentes de custo (nome/quantidade/unidade/custo unitario), selects de
+  estagio/decisao do Laboratorio, inputs de meta (nome/metrica) e o
+  BusinessSourceSelect/botao de fechar do MetricDetailModal (_shared.tsx,
+  usados em todo o modulo) ganharam aria-label/<label> associados.
+- Fase 13: auditoria de generateId() confirmou que as 5 chamadas (newProduct,
+  addTest, addComponent, SWOT addItem, addGoal) ocorrem so dentro de
+  handlers de clique, nunca durante render; risco de colisao de ID
+  (timestamp base36 + sufixo aleatorio) considerado desprezivel - nao foi
+  necessario trocar por contador/UUID.
+- Verificado via script ad-hoc (hotfix-verify.js, 22 checks): filtragem de
+  campos por segmento/tipo (delivery, varejo, servicos), cenario "Servico de
+  consultoria" (custo por hora, sem embalagem, CSV/margem calculados, sem
+  NaN/Infinity), e regressao zero nos motores de operacao/matriz/
+  laboratorio/campanha reaproveitados (nenhum destes motores foi alterado
+  neste hotfix).
+- Busca por Math.random/Date.now/new Date(/localStorage/sessionStorage/
+  Supabase/fetch(/axios/public_token/service_role nos arquivos alterados:
+  zero ocorrencias fora do generateId() ja descrito (roda so em handlers de
+  clique).
+- Validado `npx tsc --noEmit --skipLibCheck`: zero erros.
+- Validado `npm run build`: compilado com sucesso.
+- ESLint nos arquivos alterados: zero erros/warnings.
+- `git diff --check`: limpo (so avisos de CRLF, sem marcador de conflito).
+- `src/config/project-status.ts`: nenhuma area marcada validated - todas
+  seguem qa_pending (ou planned/blocked onde ja estavam). Apenas
+  next_actions/notes/last_updated atualizados em business_manual,
+  business_swot, product_portfolio, product_cost_engineering,
+  product_positioning, product_laboratory. global_calendar/V1/V2 nao foram
+  tocados.
+- Nenhum SQL executado. Nenhuma migration criada. Nenhuma env real alterada.
+  Nenhuma biblioteca instalada. Nenhuma integracao AiPede. Nenhuma LLM
+  conectada. Nenhum dado real criado ou persistido.
+- Limitacao declarada: testes de clique-a-clique (Fase 14, 17 passos) e
+  verificacao mobile real nao puderam ser executados neste ambiente por
+  falta de navegador - validado via script ad-hoc e leitura de codigo;
+  recomenda-se QA manual em navegador antes de qualquer promocao.
+- Commits e push feitos somente na branch fix/product-engineering-usability-v1 -
+  main nunca tocado, nenhum deployment de producao criado.

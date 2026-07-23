@@ -2,7 +2,42 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
-## Última sessão — 2026-07-20 — Sprint Motor LOKAT 1.1, DNA do Negócio e Engenharia de Produtos (branch isolada, NÃO mergeada)
+## Última sessão — 2026-07-22 — Sprint Motor LOKAT 1.1.1, hotfix de cadastro, edição e acessibilidade de Produtos e Serviços (branch isolada, NÃO mergeada)
+
+- **Branch `fix/product-engineering-usability-v1`**, criada a partir de
+  `origin/feat/product-engineering-preview-v1` (commit-base
+  `2637cd483dcfbaa010d9fa8147c24371b344deb8`). Nenhum commit para `main`,
+  nenhum deployment de produção.
+- Origem: QA do deployment `dpl_EJZuk8trNubpxhi3fqHJs7N4SMJX`
+  (P0=0, P1=1, P2=2, P3=1).
+- **P1** (edição não evidente): `_products-tab.tsx` reescrito — cada card do
+  Portfólio ganhou um botão explícito "Editar produto"/"Editar serviço" que
+  abre um workspace dedicado com 5 abas (Geral, Custos, Operação,
+  Posicionamento, Testes e resultados), "Voltar ao Portfólio" e "Testar no
+  Laboratório". As seções de custo/operação/posicionamento da 1.1 foram
+  reaproveitadas dentro das abas, sem duplicar nenhuma engine.
+- **Fase 9** (Produto vs. Serviço): novo campo `ProductServiceItem.kind`
+  (`"produto" | "servico"`); criação exige escolha explícita; nova função
+  `productSegmentFields(segment, kind)` filtra campos de estoque/ingrediente/
+  embalagem/validade para serviços, mesmo em segmentos como delivery/varejo.
+  Motor de custo/operação inalterado — só rótulos da UI mudam por tipo.
+- **P2**: Manual do Negócio ganhou seção explícita "Modelo de negócio"; SWOT
+  reagrupada sob "Ambiente interno" (Forças/Fraquezas) e "Ambiente externo"
+  (Oportunidades/Ameaças) com explicação curta — dados dos itens inalterados.
+- **P3 + acessibilidade**: inputs de custo/meta/laboratório sem label e o
+  botão de fechar do `MetricDetailModal` ganharam `aria-label`/`<label>`.
+- Verificado via script ad-hoc (22 checks): filtragem por segmento/tipo,
+  cenário "Serviço de consultoria", zero regressão nos motores reaproveitados
+  (não alterados neste hotfix). `tsc`/`eslint`/`build`/`diff --check` limpos.
+- `project-status.ts`: nenhuma área marcada `validated` — só `next_actions`/
+  `notes` atualizados nas 6 áreas afetadas. `global_calendar`, `V1_PROGRESS`
+  (81) e `V2_PROGRESS` (12) não tocados.
+- Limitação declarada: sem navegador neste ambiente, os 17 passos de teste
+  manual (Fase 14) e a verificação mobile real não puderam ser executados —
+  validado por script ad-hoc e leitura de código; recomenda-se QA manual
+  antes de qualquer promoção.
+
+## Sessão anterior — 2026-07-20 — Sprint Motor LOKAT 1.1, DNA do Negócio e Engenharia de Produtos (branch isolada, NÃO mergeada)
 
 - **Branch `feat/product-engineering-preview-v1`**, criada a partir de
   `origin/feat/motor-lokat-preview-v1` (não de `main` — este módulo depende do
