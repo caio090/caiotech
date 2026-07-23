@@ -328,9 +328,11 @@ interface Props {
   clientId: string;
   clientName?: string;
   contentId?: string;
+  /** Sprint 1.0.1 — isolates the draft under a fixed, non-identifying localStorage key and hides the client-switching parts of the UI. */
+  demoMode?: boolean;
 }
 
-export function CanvasEditor({ clientId, clientName, contentId }: Props) {
+export function CanvasEditor({ clientId, clientName, contentId, demoMode = false }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1010,14 +1012,32 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
   }
 
   // ── Local draft ────────────────────────────────────────────────────────────
+  // Fase 7 — the demo key is fixed and never includes clientId/contentId/email
+  // /company name: it must never be able to identify a real client, and must
+  // never collide with (or be migrated into) a real authenticated draft.
   function draftKey(p: Preset) {
+    if (demoMode) return `lokat-editor-os-demo-draft-v1_${p}`;
     return `editor_os_draft_${DRAFT_VERSION}_${clientId}_${p}`;
+  }
+
+  function clearDemoDraft() {
+    if (!demoMode) return;
+    try {
+      localStorage.removeItem(draftKey(preset));
+    } catch {}
+    setElements([]);
+    setSelectedId(null);
+    setHistory([[]]);
+    setHistIdx(0);
+    setBgColor("#ffffff");
+    imgCache.current.clear();
+    showSaved("Demonstração limpa neste navegador.");
   }
 
   function saveDraft() {
     try {
       localStorage.setItem(draftKey(preset), JSON.stringify({ preset, elements, bgColor, clientId }));
-      showSaved("Rascunho salvo neste navegador para este cliente.");
+      showSaved(demoMode ? "Rascunho de demonstração salvo neste navegador." : "Rascunho salvo neste navegador para este cliente.");
     } catch {}
   }
 
@@ -1199,6 +1219,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
           <Type className="w-3.5 h-3.5" /> Texto
         </button>
         <button onClick={() => fileInputRef.current?.click()}
+          data-testid="editor-demo-import-image"
           className="flex items-center gap-1 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800 px-2 py-1.5 rounded-lg transition-colors">
           <ImageIcon className="w-3.5 h-3.5" /> Imagem
         </button>
@@ -1273,6 +1294,14 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
           Salvar rascunho
         </button>
 
+        {demoMode && (
+          <button onClick={clearDemoDraft}
+            data-testid="editor-demo-clear-draft"
+            className="text-xs text-zinc-400 hover:text-red-300 hover:bg-red-950/40 px-2 py-1.5 rounded-lg transition-colors">
+            Limpar demonstração
+          </button>
+        )}
+
         <button
           onClick={exportPNG}
           disabled={exporting}
@@ -1333,6 +1362,7 @@ export function CanvasEditor({ clientId, clientName, contentId }: Props) {
           <div style={{ position: "relative", display: "inline-block" }}>
             <canvas
               ref={canvasRef}
+              data-testid="editor-demo-canvas"
               style={{ cursor, display: "block", boxShadow: "0 0 0 1px #3f3f46", touchAction: "none" }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
