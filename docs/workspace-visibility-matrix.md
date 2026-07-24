@@ -32,6 +32,27 @@ Gerada na Sprint Workspaces 1.0. Reflete `src/config/workspace-capabilities.ts`
 - **Agência → Status técnico**: `platform.view_status` só está em
   `SUPER_ADMIN_CAPABILITIES` — nenhuma outra superfície a possui.
 
+## Matriz de mutação por superfície (Fase 5 do hotfix 1.0.2)
+
+Consolida `docs/workspace-mutation-inventory.md` por módulo e superfície —
+"Bloqueado" significa uma rota real com `withMutationProtection`;
+"Em memória" significa que não há nada a bloquear porque nada persiste
+ainda; "N/A" significa que o módulo não é exposto a essa superfície.
+
+| Módulo | Agência | Cliente da agência | Empresa direta |
+|---|---|---|---|
+| Clientes | Bloqueado (4 rotas: criar, convite, editar/arquivar, hard-delete/restore/bulk) | N/A | N/A |
+| REC OS | Bloqueado (rascunhos, aprovação, produção, rec-projects) | Bloqueado (mesmas rotas, capability `client_portal.*`) | Bloqueado (mesmas rotas, capability `business.*`) |
+| Relatórios | Bloqueado (upload, interpretação IA) | N/A (só leitura de calendário/resultados) | Bloqueado (upload, interpretação IA) |
+| Equipe | Bloqueado (convite, delete-test-account) | N/A | Bloqueado (convite) |
+| Financeiro | N/A (sem card Financeiro na superfície Agência) | Bloqueado (leitura apenas — sem mutação exposta em `/client/financeiro`) | Bloqueado (6 rotas de cobrança/pagamento + coupons) |
+| Integrações | N/A | N/A | Bloqueado (OlaClick, Meta) |
+| Meu Negócio | N/A | Em memória (não é exposto à superfície `agency`, só `direct_business`/`client_portal` conceitualmente) | Em memória (nada a bloquear) |
+| CRM | N/A — nenhuma superfície expõe CRM hoje (ver inventário) | N/A | N/A |
+
+Toda mutação real e alcançável, em toda célula desta tabela, está
+"Bloqueado". Nenhuma célula ficou marcada "pending_protection".
+
 ## Limitação declarada
 
 Esta matriz descreve o que a **arquitetura de capacidades** permite. Ela não

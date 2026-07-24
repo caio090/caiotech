@@ -1,8 +1,10 @@
-# Segurança do modo de visualização (preview) — Workspaces 1.0.1
+# Segurança do modo de visualização (preview) — Workspaces 1.0.2
 
 Criado no hotfix 1.0.1 do Sprint Workspaces, para fechar e documentar a
 lacuna divulgada na Sprint 1.0: o preview era visualmente somente-leitura,
-mas o backend nunca impedia uma mutação real. Este documento descreve o
+mas o backend nunca impedia uma mutação real. Atualizado no hotfix 1.0.2
+(cobertura completa de mutações, chave de assinatura isolada, defesa em
+profundidade no proxy, UX de falha do preview). Este documento descreve o
 desenho atual, o que ele cobre, e o que ainda não cobre.
 
 ## Preview ≠ impersonation
@@ -21,9 +23,33 @@ Antes (Sprint 1.0): `/admin/visualizar?preview_surface=...&workspace_id=...`
 
 Agora (1.0.1): `POST /api/admin/workspaces/preview` grava um cookie
 `HttpOnly`, `SameSite=Lax`, assinado com HMAC-SHA256
-(`src/lib/workspaces/preview-session.ts`, reaproveitando `META_APP_SECRET` —
-nenhuma variável de ambiente nova foi criada). A URL `/admin/visualizar` não
+(`src/lib/workspaces/preview-session.ts`). A URL `/admin/visualizar` não
 recebe mais nenhum parâmetro de autorização — ela só lê o cookie.
+
+**Chave de assinatura (Fase 2 do hotfix 1.0.2):** a 1.0.1 assinava o token
+com `META_APP_SECRET` diretamente — o mesmo segredo usado para assinar o
+`state` do OAuth da Meta em outro módulo. Isso significa que um leak de uma
+chave comprometia a outra. `getWorkspacePreviewSigningKey()` agora resolve
+a chave nesta ordem:
+
+1. `WORKSPACE_PREVIEW_SECRET` (variável dedicada), se configurada — usada
+   como está, em qualquer ambiente.
+2. Fora de Production real (`VERCEL_ENV !== "production"`): uma subchave
+   derivada via **HKDF-SHA256** a partir de `META_APP_SECRET` (contexto fixo
+   `"lokat-workspace-preview-v1"`, salt estável não-secreto) — nunca o
+   segredo bruto. Um leak desta chave derivada não permite forjar nada que
+   dependa de `META_APP_SECRET` diretamente.
+3. Em Production real sem `WORKSPACE_PREVIEW_SECRET`: **falha fechado**,
+   lançando `WorkspacePreviewSigningKeyUnavailableError` — nenhum preview
+   pode ser criado ou verificado até o segredo dedicado ser configurado.
+   `verifyPreviewSessionToken()` captura esse erro e devolve
+   `{ ok: false, reason: "key_unavailable" }` em vez de deixá-lo escapar —
+   ela é chamada em toda leitura de `getWorkspacePreviewContext()`, então
+   nunca pode derrubar um request não relacionado.
+
+**Ação pendente antes de qualquer uso em Production:** configurar
+`WORKSPACE_PREVIEW_SECRET` na Vercel. Nenhuma variável de ambiente foi
+alterada nesta sprint — isso é uma ação futura documentada, não executada.
 
 O payload do token (`PreviewSessionPayload`) contém `uid`, `surface`,
 `workspaceId`, `parentWorkspaceId`, `isBlueprint`, um nonce, `iat`/`exp` e
@@ -78,53 +104,69 @@ valor que o cliente possa enviar para desativar o bloqueio. A versão anterior
 (Sprint 1.0) aceitava um booleano `readOnly` vindo do chamador; essa versão
 foi removida.
 
-## Rotas mutáveis reais já protegidas nesta sprint (12)
+## Rotas mutáveis reais protegidas (29 arquivos, 33 handlers)
 
-Amostra representativa, priorizada pelo que é alcançável a partir das três
-superfícies de preview (Agência, Cliente da agência, Empresa direta) — não
-uma varredura completa do projeto:
+Ver `docs/workspace-mutation-inventory.md` para a lista completa,
+classificação módulo a módulo, e o raciocínio de reachability. Resumo por
+módulo: Clientes (6 rotas — criar, editar, convite, hard-delete, restore,
+bulk-delete), REC OS (6 — rascunhos, aprovação, produção, rec-projects),
+Relatórios (2 — upload, interpretação IA), Equipe (2 — convite,
+delete-test-account), Integrações (4 — OlaClick conectar/editar/testar,
+Meta vincular/desvincular), Financeiro (6 — pagamentos, cobrança, cupons,
+checkout de plataforma), chamadas de IA (4 — briefing, legenda,
+diagnóstico, busca do dashboard, protegidas por serem "chamada externa"
+mesmo sem persistência).
 
-| Módulo | Rota | Método(s) |
-|---|---|---|
-| Clientes | `/api/admin/clients` | POST |
-| Clientes | `/api/admin/clients/[id]/invite` | POST |
-| REC OS | `/api/admin/contentos/actions/send-to-approval` | POST |
-| REC OS | `/api/admin/contentos/actions/send-to-production` | POST |
-| REC OS | `/api/admin/contentos/drafts` | POST |
-| REC OS | `/api/admin/contentos/drafts/[id]` | PATCH |
-| Equipe | `/api/team/invite/send-email` | POST |
-| Integrações | `/api/olaclick/connect` | POST, DELETE |
-| Integrações | `/api/olaclick/connections/[id]` | PATCH |
-| Financeiro | `/api/payments/manual-confirm` | POST |
-| Financeiro | `/api/payments/create-charge` | POST |
-| Financeiro | `/api/payments/asaas/create-charge` | POST |
+## Defesa em profundidade no proxy (Fase 6 do hotfix 1.0.2)
+
+`src/proxy.ts` (Proxy roda em runtime Node.js por padrão nesta versão do
+Next.js — confirmado em `node_modules/next/dist/docs`, então reusa
+`verifyPreviewSessionToken()` diretamente, sem duplicar criptografia).
+Bloqueia com 403 `WORKSPACE_PREVIEW_READ_ONLY` qualquer `POST`/`PUT`/
+`PATCH`/`DELETE` para os namespaces `/api/admin/`, `/api/client/`,
+`/api/team/`, `/api/payments/`, `/api/olaclick/`, `/api/meta/`,
+`/api/billing/`, `/api/ai/` sempre que o cookie de preview for
+criptograficamente válido — **sem consultar o Supabase**, verificação
+puramente local e rápida. Duas exceções documentadas:
+`/api/admin/workspaces/preview` (o próprio entrar/sair do preview) e
+`/api/billing/coupons/validate` (nunca persiste nada).
+
+Este bloqueio é **complementar**, não substitui o guard por rota — é uma
+rede de segurança contra uma rota mutável futura que ainda não tenha
+`withMutationProtection`. Verificado de ponta a ponta contra um servidor
+local real (ver `src/lib/workspaces/__tests__/proxy-guard.e2e.test.ts`):
+POST com cookie válido → 403 com o código certo; POST sem cookie, GET,
+HEAD, OPTIONS, os dois exemptos, um cookie expirado e um cookie malformado
+→ nenhum bloqueado, nenhum 500.
+
+## Rota de demonstração removida (Fase 3 do hotfix 1.0.2)
+
+`/api/admin/workspaces/preview-mutation-check`, criada na 1.0.1 só para
+provar que o wrapper funcionava, foi **removida** da árvore de rotas —
+nenhuma referência a ela existia em nenhum componente. O guard agora é
+testado via `proxy-guard.e2e.test.ts` (contra uma rota real já protegida)
+em vez de uma rota de diagnóstico dedicada e mutável.
 
 ## Limitações declaradas (não corrigidas nesta sprint)
 
-- **Cobertura parcial.** Dezenas de outras rotas mutáveis reais — Meu
-  Negócio (Empresa, DNA, SWOT, Metas, Produto, Serviço, Campanha,
-  Precificação, Fluxo de Caixa), CRM (leads), billing/coupons,
-  rec-projects — não foram retrofitadas. Ver
-  `workspace_preview_mutation_enforcement` em `project-status.ts` para a
-  lista completa de pendências.
 - **Páginas reais não são "preview-aware".** As páginas reais (ex.:
   `/admin/contentos/criar`) não sabem que estão sendo acessadas a partir de
   um preview — não desabilitam botões de salvar nem mostram um aviso
-  dedicado. O bloqueio de escrita funciona de qualquer forma, porque o guard
-  está no servidor e independe da UI, mas a experiência de erro é genérica
-  (ex.: a tela de criação guiada de conteúdo já mapeia HTTP 403 para "Seu
-  usuário não possui permissão para salvar este conteúdo", que não é
-  tecnicamente errado, mas também não diz "você está em modo de
-  visualização").
-- **Sem teste automatizado de ponta a ponta.** O projeto não tem um test
-  runner instalado (nenhum jest/vitest em `package.json`). O único teste
-  automatizado desta sprint (`src/lib/workspaces/__tests__/preview-session.test.ts`,
-  28 asserções, roda com `node` puro graças ao suporte nativo a TypeScript do
-  Node 24) cobre a camada de assinatura/verificação do token — a única parte
-  sem dependência de `cookies()`, Supabase ou uma sessão autenticada. O guard
-  completo e o resolvedor de contexto não têm teste automatizado; precisam de
-  um servidor rodando com uma sessão real de super_admin, ou de um framework
-  de teste com suporte a mocks (nenhum dos dois disponível neste sandbox).
+  dedicado de antemão. O bloqueio de escrita funciona de qualquer forma,
+  porque o guard está no servidor e independe da UI. A tela de criação
+  guiada de conteúdo (Fase 15 do hotfix 1.0.2) agora mapeia especificamente
+  o `code: "WORKSPACE_PREVIEW_READ_ONLY"` para "Esta ação está indisponível
+  no modo de visualização." — mas isso só acontece depois de uma tentativa
+  de salvar falhar, nunca antes.
+- **Sem teste automatizado de ponta a ponta do guard por rota.** O guard
+  completo (`assertWorkspaceMutationAllowed`) e o resolvedor de contexto
+  (`getWorkspacePreviewContext`) dependem de `cookies()`, Supabase e uma
+  sessão autenticada real — não têm teste automatizado; precisam de um
+  servidor com login real de super_admin, ou de um framework de teste com
+  suporte a mocks (nenhum dos dois disponível neste sandbox). O que É
+  testável sem login real (a camada de token e o bloqueio do proxy, que não
+  consulta o Supabase) tem 49 asserções reais rodando neste hotfix — ver
+  `src/lib/workspaces/__tests__/`.
 - **Nenhuma verificação em navegador.** O comportamento visual do banner e
   do switcher (persistência entre navegações, comportamento mobile) foi
   revisado por leitura de código, não por um teste manual em navegador —
@@ -147,9 +189,8 @@ O contrato de tipos e o rascunho de schema
 **Pré-condição explícita, adicionada nesta sprint**: nenhum
 `support_access_grants` real pode ser criado enquanto a área
 `workspace_preview_mutation_enforcement` não estiver `validated` em
-`project-status.ts` — hoje ela é `qa_pending` e cobre apenas as 12 rotas
-listadas acima. Um acesso de suporte para um papel que não seja super_admin
-herdaria as mesmas lacunas de cobertura.
+`project-status.ts` — hoje ela é `qa_pending`. Um acesso de suporte para um
+papel que não seja super_admin herdaria as mesmas lacunas de cobertura.
 
 ## Fluxo de saída
 
@@ -160,6 +201,23 @@ ninguém. Dois pontos da UI chamam essa rota antes de navegar: o botão
 funciona mesmo sem preview ativo — é um DELETE idempotente) e "Sair da
 visualização" no banner (`workspace-preview-banner.tsx`, só aparece durante
 um preview ativo).
+
+**Cookie inválido/expirado/revogado (Fase 17 do hotfix 1.0.2):** antes, um
+cookie stale ficava no navegador indefinidamente (funcionalmente inerte,
+mas nunca limpo até o usuário clicar em "Sair"). Agora,
+`/admin/visualizar/page.tsx` renderiza `<ClearInvalidPreviewCookie />`
+sempre que `getWorkspacePreviewContext()` resolve para `invalid`, `expired`
+ou `revoked` — um client component que dispara o mesmo `DELETE` assim que
+monta. `inactive` (nenhum cookie presente) não dispara nada.
+
+**Falha ao iniciar um preview (Fase 16 do hotfix 1.0.2):** antes, o
+switcher fechava o menu silenciosamente quando `POST` retornava
+`ok: false`. Agora o menu permanece aberto, mostra uma mensagem — específica
+para razões conhecidas e seguras (`client_not_found`,
+`no_active_agency_relationship`, `forbidden_not_super_admin`, etc.) ou
+genérica ("Não foi possível abrir esta visualização.") caso contrário —
+preserva a seleção e permite tentar de novo. Nunca navega, nunca expõe
+stack trace ou detalhe de banco.
 
 ## Log de auditoria (contrato, não persistido)
 
@@ -179,8 +237,11 @@ lógico: rastrear quem viu o quê e por quanto tempo).
 Antes de qualquer provisionamento real (ver
 `docs/workspace-provisioning-plan.md`):
 
-- [ ] `workspace_preview_mutation_enforcement` revisado e, se cobertura
-      total for exigida, ampliado além das 12 rotas atuais.
+- [ ] `WORKSPACE_PREVIEW_SECRET` configurado na Vercel (obrigatório para
+      Production — sem ele, `getWorkspacePreviewSigningKey()` falha fechado
+      e nenhum preview pode ser criado).
+- [ ] `workspace_mutation_coverage_check` (`npm run check:workspace-mutations`)
+      rodando limpo, e `docs/workspace-mutation-inventory.md` revisado.
 - [ ] QA local manual confirmando 403 (não 500) em cada rota protegida
       durante um preview ativo, com uma sessão real de super_admin.
 - [ ] `DRAFT-support-access-grants.sql` revisado (numeração final,
