@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, Search, ArrowLeft, CheckSquare,
-  UserRoundPlus, X, UsersRound, Activity, Target, LayoutGrid,
+  UserRoundPlus, X, UsersRound, Activity, Target,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { LokatVoicePanel } from "@/components/lokat-voice-panel";
 import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
+import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
@@ -441,14 +442,7 @@ export function AdminLayoutShell({ children }: Props) {
 
             {userRole === "super_admin" && (
               <>
-                <Link
-                  href="/admin/dashboard"
-                  title="Painel ADM — sair de qualquer visualização"
-                  className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-gray-500"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  <span className="hidden md:inline text-xs font-bold">Painel ADM</span>
-                </Link>
+                <WorkspaceExitButton />
                 <WorkspaceViewSwitcher />
               </>
             )}

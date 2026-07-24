@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, X } from "lucide-react";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
 import type { WorkspaceContext } from "@/lib/workspaces/types";
@@ -10,9 +10,22 @@ import type { WorkspaceContext } from "@/lib/workspaces/types";
  * never disappears during navigation (Fase "Banner de visualização"). Every
  * page under /admin/visualizar renders this by wrapping its content, so
  * there's no route that can lose it.
+ *
+ * "Sair da visualização" now calls DELETE /api/admin/workspaces/preview to
+ * clear the signed cookie before navigating — previously a plain <Link>
+ * that only changed pathname while leaving the preview cookie active.
  */
 export function WorkspacePreviewBanner({ context }: { context: WorkspaceContext }) {
+  const router = useRouter();
   if (!context.isPreview) return null;
+
+  async function exit() {
+    try {
+      await fetch("/api/admin/workspaces/preview", { method: "DELETE" });
+    } finally {
+      router.push("/admin/dashboard");
+    }
+  }
 
   return (
     <div className="sticky top-0 z-40 bg-amber-500 text-white px-4 py-2 flex items-center justify-between gap-3 text-xs font-bold shadow-md">
@@ -25,12 +38,12 @@ export function WorkspacePreviewBanner({ context }: { context: WorkspaceContext 
           {context.readOnly ? " · Somente leitura" : ""}
         </span>
       </div>
-      <Link
-        href="/admin/dashboard"
+      <button
+        onClick={exit}
         className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
       >
         <X className="w-3 h-3" /> Sair da visualização
-      </Link>
+      </button>
     </div>
   );
 }
