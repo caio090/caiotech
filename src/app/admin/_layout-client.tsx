@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell, Search, ArrowLeft, CheckSquare,
-  UserRoundPlus, X, UsersRound, Activity, Target, MoreHorizontal,
+  UserRoundPlus, X, UsersRound, Activity, Target,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -86,8 +86,6 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
   const [pendingTeamCount, setPendingTeamCount] = useState(0);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
-  const [showMobileMore, setShowMobileMore] = useState(false);
-  const mobileMoreRef = useRef<HTMLDivElement>(null);
 
   const isOnContentosPage = pathname.startsWith("/admin/contentos");
   const isSelectingClient = pathname === "/admin/contentos/selecionar-cliente";
@@ -251,18 +249,6 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showBell]);
-
-  // Close mobile "Mais" menu on outside click — same pattern as the bell above
-  useEffect(() => {
-    if (!showMobileMore) return;
-    function handleClick(e: MouseEvent) {
-      if (mobileMoreRef.current && !mobileMoreRef.current.contains(e.target as Node)) {
-        setShowMobileMore(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showMobileMore]);
 
   function handleBellToggle() {
     setShowBell((v) => {
@@ -456,7 +442,7 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
               href="/admin/leads"
               title="CRM — Leads"
               onClick={() => { markCrmSeen(); setNewLeadCount(0); }}
-              className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors hidden md:flex items-center gap-1.5 text-indigo-500"
+              className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
             >
               <Target className="w-4 h-4" />
               <span className="text-[10px] font-bold hidden md:inline">CRM</span>
@@ -467,18 +453,32 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
               )}
             </Link>
 
+            {/* Fase 10/11 do hotfix 1.0.5 — a 1.0.4 tentou caber Painel ADM
+                e Visualizar como na MESMA linha do header ao lado de busca,
+                sino, CRM, Status V1 e avatar, contando com margem de
+                pixels calculada mas nunca confirmada num navegador real —
+                o QA em 390x844 continuou reprovando os dois. Solução mais
+                robusta (Opção C do ticket): em mobile, estes dois controles
+                saem inteiramente da linha do header (que volta a ter
+                exatamente a mesma composição de antes da 1.0.4: busca,
+                sino, CRM, Status V1, avatar — sem "Mais", sem disputa de
+                espaço) e ganham uma barra dedicada, só deles, logo abaixo
+                do header. Nenhum handler é duplicado: são os MESMOS
+                componentes WorkspaceExitButton/WorkspaceViewSwitcher,
+                renderizados aqui (hidden md:flex, some no desktop) e de
+                novo mais abaixo (md:hidden, some no mobile). */}
             {userRole === "super_admin" && (
-              <>
+              <div className="hidden md:flex items-center gap-2">
                 <WorkspaceExitButton />
                 <WorkspaceViewSwitcher />
-              </>
+              </div>
             )}
 
             {userRole === "super_admin" && (
               <Link
                 href="/admin/status"
                 title={`Status V1 — Prazo ${PROJECT_DEADLINE_V1}`}
-                className="p-2 rounded-xl hover:bg-gray-50 transition-colors hidden md:flex items-center gap-1.5 text-emerald-600"
+                className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-emerald-600"
               >
                 <Activity className="w-4 h-4" />
                 <div className="hidden md:block leading-none">
@@ -487,51 +487,6 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
                 </div>
               </Link>
             )}
-
-            {/* Fase 5 do hotfix 1.0.4 — CRM e Status V1 saem do header em
-                mobile (390px não cabe 6 botões + busca sem overflow
-                horizontal) e reaparecem aqui, atrás de um único botão
-                "Mais", reusando exatamente os mesmos href/handlers dos
-                links acima — nada de lógica duplicada, só posição. Painel
-                ADM e Visualizar como NUNCA entram aqui: continuam sempre
-                inline, são a prioridade explícita desta correção. */}
-            <div className="relative md:hidden" ref={mobileMoreRef}>
-              <button
-                onClick={() => setShowMobileMore((v) => !v)}
-                className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center text-gray-500"
-                aria-label="Mais opções"
-                title="Mais"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-                {newLeadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center leading-none px-0.5">
-                    {newLeadCount > 9 ? "9+" : newLeadCount}
-                  </span>
-                )}
-              </button>
-              {showMobileMore && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden p-2">
-                  {userRole === "super_admin" && (
-                    <Link
-                      href="/admin/status"
-                      onClick={() => setShowMobileMore(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      <Activity className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Status V1 · {V1_PROGRESS}% · {daysRemaining !== null ? `${daysRemaining}d restantes` : "—"}</span>
-                    </Link>
-                  )}
-                  <Link
-                    href="/admin/leads"
-                    onClick={() => { markCrmSeen(); setNewLeadCount(0); setShowMobileMore(false); }}
-                    className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                  >
-                    <Target className="w-4 h-4 text-indigo-500 shrink-0" />
-                    <span>CRM — Leads{newLeadCount > 0 ? ` (${newLeadCount > 9 ? "9+" : newLeadCount})` : ""}</span>
-                  </Link>
-                </div>
-              )}
-            </div>
 
             <button
               onClick={handleSignOut}
@@ -542,6 +497,19 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
             </button>
           </div>
         </header>
+
+        {userRole === "super_admin" && (
+          // justify-end (não center): WorkspaceViewSwitcher posiciona seu
+          // próprio dropdown com `absolute right-0 w-72` relativo ao botão —
+          // centralizado nesta barra, o dropdown de 288px estouraria a
+          // borda esquerda da viewport em 390px. Alinhado à direita, ele
+          // replica a mesma posição (perto da borda direita) que já tinha
+          // dentro do header no desktop, onde o dropdown sempre coube.
+          <div className="md:hidden flex items-center justify-end gap-2 px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+            <WorkspaceExitButton />
+            <WorkspaceViewSwitcher />
+          </div>
+        )}
 
         {previewContext?.isPreview && <WorkspacePreviewBanner context={previewContext} />}
 

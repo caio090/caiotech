@@ -25,6 +25,7 @@ export function WorkspaceExitButton() {
     <button
       onClick={handleClick}
       title="Painel ADM — sair de qualquer visualização"
+      aria-label="Painel ADM — sair de qualquer visualização"
       className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-gray-500"
     >
       <LayoutGrid className="w-4 h-4" />
