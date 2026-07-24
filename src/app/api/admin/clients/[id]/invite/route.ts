@@ -6,6 +6,7 @@ import {
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -27,7 +28,7 @@ function getOrigin(hdrs: Headers) {
 
 // POST /api/admin/clients/[id]/invite
 // Gera um convite real de cliente e retorna link copiavel.
-export async function POST(req: NextRequest, { params }: RouteContext) {
+export const POST = withMutationProtection(async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     const { id: clientId } = await params;
     const body = await req.json() as { email?: string };
@@ -169,4 +170,4 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     console.error("[api/admin/clients/invite] erro interno", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

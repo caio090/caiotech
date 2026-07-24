@@ -9,6 +9,7 @@ import {
   isMissingClientVisibilityColumn,
   isVisibleClientRecord,
 } from "@/lib/client-visibility";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface ConnectPayload {
   client_id: string;
@@ -33,7 +34,7 @@ function isRpcUnavailable(err: { code?: string; message?: string } | null) {
 // POST /api/olaclick/connect
 // Salva token OlaClick — nunca retorna token no response.
 // Ordem: 1) RPC SECURITY DEFINER  2) service role  3) session client
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -246,10 +247,10 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});
 
 // DELETE /api/olaclick/connect?id=...
-export async function DELETE(request: NextRequest) {
+export const DELETE = withMutationProtection(async function DELETE(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -279,4 +280,4 @@ export async function DELETE(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});

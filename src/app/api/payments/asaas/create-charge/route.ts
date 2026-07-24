@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ASAAS_BASE =
   process.env.ASAAS_ENVIRONMENT === "production"
@@ -8,7 +9,7 @@ const ASAAS_BASE =
 
 // POST /api/payments/asaas/create-charge
 // Cria cobrança no Supabase e, se gateway configurado, no Asaas.
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Body inválido." }, { status: 400 }); }
@@ -138,4 +139,4 @@ export async function POST(req: NextRequest) {
     payment_link: asaasCharge?.invoiceUrl ?? null,
     charge: data,
   });
-}
+});

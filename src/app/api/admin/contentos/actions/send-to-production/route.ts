@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   try {
     const ctx = await requireAdminContentOSContext();
     if (ctx instanceof NextResponse) return ctx;
@@ -81,4 +82,4 @@ export async function POST(req: NextRequest) {
     console.error("[send-to-production]", e instanceof Error ? e.message : "unknown");
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

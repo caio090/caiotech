@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // POST /api/payments/create-charge
 // Cria cobrança no Supabase e (futuramente) no gateway.
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Body inválido." }, { status: 400 }); }
@@ -69,4 +70,4 @@ export async function POST(req: NextRequest) {
     console.error("[payments/create-charge]", e);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

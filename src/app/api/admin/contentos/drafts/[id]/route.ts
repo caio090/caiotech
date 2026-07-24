@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminContentOSContext, type AdminDb } from "@/lib/admin-contentos-api";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_STATUS = ["ideia", "briefing", "roteiro", "revisao_interna"] as const;
 
@@ -50,7 +51,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+export const PATCH = withMutationProtection(async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -154,4 +155,4 @@ export async function PATCH(
     console.error("[drafts PATCH]", e instanceof Error ? e.message : "unknown");
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});
