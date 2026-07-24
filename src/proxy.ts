@@ -1,9 +1,49 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getRoleHome, OPERACIONAL_ALLOWED } from "@/lib/access-control";
+import { verifyPreviewSessionToken, WORKSPACE_PREVIEW_COOKIE } from "@/lib/workspaces/preview-session";
+import { WORKSPACE_PREVIEW_READ_ONLY_CODE } from "@/lib/workspaces/assert-not-preview";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+/**
+ * Fase 6 do hotfix 1.0.2 — defesa em profundidade, NÃO substitui os guards
+ * explícitos por rota (src/lib/workspaces/assert-not-preview.ts). Proxy
+ * roda no runtime Node.js por padrão nesta versão do Next.js (v16), então
+ * pode reusar verifyPreviewSessionToken() diretamente — sem duplicar lógica
+ * de criptografia, sem exigir Edge runtime.
+ *
+ * Este bloqueio é deliberadamente grosseiro: verifica só se o cookie de
+ * preview é válido (assinatura + expiração), sem revalidar papel/workspace
+ * no banco — essa revalidação completa continua sendo responsabilidade de
+ * getWorkspacePreviewContext() dentro de cada rota. O objetivo aqui é uma
+ * rede de segurança rápida contra qualquer rota mutável dentro dos
+ * namespaces conhecidos que não tenha (ou ainda não tenha) o guard
+ * explícito, não a fonte de verdade.
+ */
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+const MUTABLE_API_NAMESPACES = [
+  "/api/admin/", "/api/client/", "/api/team/", "/api/payments/",
+  "/api/olaclick/", "/api/meta/", "/api/billing/", "/api/ai/",
+];
+
+// Endpoints estritamente excluídos, com justificativa documentada:
+//  - /api/admin/workspaces/preview: é o próprio ponto de entrada/saída do
+//    preview (POST inicia, DELETE encerra) — bloqueá-lo tornaria impossível
+//    sair de um preview uma vez dentro dele.
+//  - /api/billing/coupons/validate: nunca faz insert/update/upsert/delete
+//    (ver docs/workspace-mutation-inventory.md) — validação somente leitura
+//    usada pela página pública /planos.
+const MUTATION_GUARD_EXEMPT_PATHS = new Set([
+  "/api/admin/workspaces/preview",
+  "/api/billing/coupons/validate",
+]);
+
+function isMutableNamespace(pathname: string): boolean {
+  return MUTABLE_API_NAMESPACES.some((ns) => pathname.startsWith(ns));
+}
 
 // Always public — no auth required
 const PUBLIC_PATH_PREFIXES = [
@@ -38,6 +78,22 @@ export async function proxy(request: NextRequest) {
         pathname.includes(".")
       ) {
         return NextResponse.next();
+  }
+
+  // Defesa em profundidade (Fase 6, hotfix 1.0.2) — ver comentário acima.
+  if (
+    MUTATING_METHODS.has(request.method) &&
+    isMutableNamespace(pathname) &&
+    !MUTATION_GUARD_EXEMPT_PATHS.has(pathname)
+  ) {
+    const previewToken = request.cookies.get(WORKSPACE_PREVIEW_COOKIE)?.value;
+    const verified = verifyPreviewSessionToken(previewToken);
+    if (verified.ok) {
+      return NextResponse.json(
+        { error: "Esta ação está indisponível no modo de visualização.", code: WORKSPACE_PREVIEW_READ_ONLY_CODE },
+        { status: 403 }
+      );
+    }
   }
 
   // Build Supabase client with session refresh
