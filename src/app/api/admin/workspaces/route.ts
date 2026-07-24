@@ -39,18 +39,21 @@ export async function GET(req: NextRequest) {
   }
 
   if (surface === "direct_business") {
-    const { data } = await adminDb.from("clients").select("id, company_name").is("deleted_at", null).is("archived_at", null).limit(500);
-    const directRows: WorkspaceOption[] = [];
-    for (const c of data ?? []) {
-      try {
-        const { data: link } = await adminDb.from("agency_clients").select("id").eq("client_id", c.id).maybeSingle();
-        if (!link) directRows.push({ id: c.id as string, name: c.company_name as string, isBlueprint: false });
-      } catch {
-        // agency_clients unavailable: treat every client as direct (no linkage table to say otherwise)
-        directRows.push({ id: c.id as string, name: c.company_name as string, isBlueprint: false });
-      }
-    }
-    if (directRows.length > 0) return NextResponse.json({ ok: true, options: directRows });
+    // Fase 1/2 do hotfix 1.0.4 — este ramo ANTES listava toda linha de
+    // `clients` sem vínculo em `agency_clients` como "empresa direta". Isso
+    // é uma inferência, não uma classificação: um cliente real pode não ter
+    // vínculo simplesmente porque agency_clients ainda não foi populada (é
+    // exatamente o caso hoje), não porque ele É uma empresa direta de
+    // verdade. Resultado real em QA: Duh Lanches e O Pedreirão (clientes
+    // reais de produção) apareceram no seletor demonstrativo, e o blueprint
+    // nunca era alcançado porque `directRows.length > 0` sempre vencia.
+    //
+    // Não existe hoje nenhum campo confiável de classificação "isto é uma
+    // empresa direta" (profiles.account_type, quando aplicado, classifica o
+    // dono da conta, não a linha de clients, e sua aplicação real no banco
+    // não está confirmada — ver docs/workspace-provisioning-plan.md). Sem
+    // essa classificação, e sem poder rodar SQL nesta sprint, a única opção
+    // segura é nunca listar clients reais aqui — somente o blueprint.
     return NextResponse.json({ ok: true, options: [{ id: BLUEPRINT_DIRECT_BUSINESS.id, name: BLUEPRINT_DIRECT_BUSINESS.name, isBlueprint: true }] });
   }
 
