@@ -9,6 +9,12 @@
 --
 -- Numeração deixada em aberto (DRAFT-*, não 9X) para o time confirmar a
 -- próxima sequência livre antes de aplicar.
+--
+-- Atualização 1.0.1: campo renomeado created_by -> granted_by_user_id e
+-- coluna updated_at adicionada, alinhando ao vocabulário usado em
+-- src/lib/workspaces/context.ts e ao contrato de audit log em
+-- docs/workspace-preview-security.md. Segue não aplicado — nenhum SQL
+-- rodado nesta sprint.
 
 create table if not exists public.support_access_grants (
   id uuid primary key default gen_random_uuid(),
@@ -19,10 +25,11 @@ create table if not exists public.support_access_grants (
   access_level text not null default 'read_only' check (access_level in ('read_only')),
   reason text not null,
   expires_at timestamptz not null,
-  created_by uuid not null references auth.users(id),
+  granted_by_user_id uuid not null references auth.users(id), -- renamed from created_by (1.0.1) for symmetry with granted_to_user_id
   revoked_at timestamptz,
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now() -- added in 1.0.1; app must set this on every revoke/renew write, no trigger proposed
 );
 
 create index if not exists support_access_grants_target_idx on public.support_access_grants (target_workspace_id);
@@ -31,7 +38,7 @@ create index if not exists support_access_grants_granted_to_idx on public.suppor
 alter table public.support_access_grants enable row level security;
 
 -- Proposed policies (NOT applied) — only a super_admin can read/write grants,
--- and only for themselves as granted_to_user_id or created_by.
+-- and only for themselves as granted_to_user_id or granted_by_user_id.
 -- create policy support_access_grants_super_admin_all on public.support_access_grants
 --   for all using (current_user_role() = 'super_admin') with check (current_user_role() = 'super_admin');
 

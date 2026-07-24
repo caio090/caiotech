@@ -14,9 +14,13 @@ sprint.** Nenhum SQL foi rodado, nenhum usuário ou cliente foi criado.
 2. Se não aplicada: aplicar `69-account-types-agency-workspaces.sql` (já
    existe, não foi alterado nesta sprint) antes de prosseguir.
 3. Se for necessário controle de acesso de suporte temporário: aplicar
-   `docs/supabase/DRAFT-support-access-grants.sql` (criado nesta sprint,
-   ainda em rascunho — revisar nome final da tabela/numeração antes de
-   aplicar).
+   `docs/supabase/DRAFT-support-access-grants.sql` (criado na Sprint 1.0,
+   campos alinhados no hotfix 1.0.1 — `granted_by_user_id`, `updated_at` —
+   ainda em rascunho, revisar nome final da tabela/numeração antes de
+   aplicar). **Bloqueio explícito**: nenhum `support_access_grants` real pode
+   ser criado enquanto a área `workspace_preview_mutation_enforcement` (ver
+   `src/config/project-status.ts` e `docs/workspace-preview-security.md`) não
+   estiver `validated` — hoje ela é `qa_pending` e cobre só 12 rotas reais.
 
 ## Sequência de provisionamento
 
@@ -46,8 +50,10 @@ sprint.** Nenhum SQL foi rodado, nenhum usuário ou cliente foi criado.
     esta sprint não criou uma tabela de memberships própria porque nenhuma
     lacuna real foi confirmada além do que `profiles.role` já resolve.
 11. Criar um `support_access_grants` de teste para a Duh Lanches, se e
-    somente se `DRAFT-support-access-grants.sql` tiver sido aplicado —
-    `access_level = 'read_only'`, `reason` preenchido, `expires_at` definido.
+    somente se `DRAFT-support-access-grants.sql` tiver sido aplicado **e**
+    `workspace_preview_mutation_enforcement` estiver `validated` —
+    `access_level = 'read_only'`, `reason` preenchido, `expires_at` definido,
+    `granted_by_user_id` preenchido.
 12. Marcar toda integração (OlaClick, etc.) desses registros de teste como
     `demo` ou `disconnected` explicitamente — nunca `connected` sem uma
     integração real por trás.

@@ -3,6 +3,11 @@
 Gerada na Sprint Workspaces 1.0. Reflete `src/config/workspace-capabilities.ts`
 (fonte de verdade — esta tabela é documentação, não o código).
 
+> Esta matriz cobre **visibilidade** (o que cada superfície pode ver). Para
+> **enforcement de escrita** durante um preview do Super Admin (o que pode ser
+> mutado), ver `docs/workspace-preview-security.md`, adicionado no hotfix
+> 1.0.1.
+
 | Superfície | Vê a própria estrutura | Vê outras agências | Vê empresas diretas da plataforma | Vê clientes de agência | Status técnico global |
 |---|---|---|---|---|---|
 | **Super Admin** | Sim (plataforma inteira) | Sim | Sim | Somente com preview/grant | Sim |
