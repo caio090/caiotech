@@ -40,7 +40,13 @@ export function VisualizarShell({ context, isBlueprint }: { context: WorkspaceCo
         <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">{SURFACE_LABELS[context.surface]}</p>
         <h1 className="text-xl font-black text-gray-900">{context.workspaceName}</h1>
         {context.surface === "agency_client" && (
-          <p className="text-xs text-gray-400 mt-1">Atendido por: {context.parentWorkspaceName ?? "—"}</p>
+          // Fase 4 do hotfix 1.0.4 — não deve mais cair no "—" silencioso:
+          // context.ts (blueprint) e preview.ts (real) agora sempre resolvem
+          // parentWorkspaceName ou falham fechado antes de chegar aqui. O
+          // fallback abaixo é só uma rede de segurança, nunca o caminho normal.
+          <p className="text-xs text-gray-400 mt-1">
+            Atendido por: {context.parentWorkspaceName ?? "Relação não confirmada"}
+          </p>
         )}
         {isBlueprint && (
           <span className="inline-block mt-2 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">

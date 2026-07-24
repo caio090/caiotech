@@ -70,6 +70,15 @@ export interface WorkspaceContext {
   workspaceName: string | null;
   parentWorkspaceId: string | null;
   parentWorkspaceName: string | null;
+  /**
+   * How workspaceId relates to parentWorkspaceId — null when there is no
+   * parent (surface "agency" and "direct_business" today). Added in the
+   * hotfix 1.0.4 (Fase 4) alongside the fix for the banner always showing
+   * "Atendido por: —" for a blueprint agency_client: the context carried
+   * parentWorkspaceId but context.ts never resolved parentWorkspaceName
+   * from it, and there was no field describing the relationship itself.
+   */
+  relationshipType: WorkspaceRelationshipType | null;
   /** true whenever this context came from a Super Admin preview — never true for a real session. */
   isPreview: boolean;
   /** Always true when isPreview is true. Enforced server-side (see preview.ts), never trusted from the client alone. */
