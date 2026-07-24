@@ -19,9 +19,11 @@ const GENERIC_ENTER_ERROR = "Não foi possível abrir esta visualização.";
 const KNOWN_ENTER_ERROR_MESSAGES: Record<string, string> = {
   agency_not_found_or_inactive: "Esta agência não foi encontrada ou está inativa.",
   business_not_found: "Esta empresa não foi encontrada.",
-  business_is_agency_managed_not_direct: "Este cliente já é gerenciado por uma agência — abra-o como Cliente da agência.",
+  business_is_agency_managed_not_direct: "Esta empresa não pertence à superfície selecionada.",
+  direct_business_real_not_yet_classified: "Esta empresa não pertence à superfície selecionada.",
   client_not_found: "Este cliente não foi encontrado.",
-  no_active_agency_relationship: "Este cliente não tem um vínculo ativo com uma agência.",
+  no_active_agency_relationship: "Não foi possível confirmar a relação entre agência e cliente.",
+  parent_relationship_unresolved: "Não foi possível confirmar a relação entre agência e cliente.",
   unknown_blueprint: "Esta estrutura demonstrativa não é mais válida.",
   forbidden_not_super_admin: "Sua sessão não tem mais permissão de Super Admin.",
   unauthenticated: "Sua sessão expirou. Entre novamente.",

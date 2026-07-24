@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { getWorkspacePreviewContext } from "@/lib/workspaces/context";
-import { WorkspacePreviewBanner } from "@/components/workspaces/workspace-preview-banner";
 import { ClearInvalidPreviewCookie } from "@/components/workspaces/clear-invalid-preview-cookie";
 import { VisualizarShell } from "./_visualizar-shell";
 
@@ -16,7 +15,13 @@ const STATUS_MESSAGES: Record<string, string> = {
  * Fase 7 do hotfix 1.0.1 — este page.tsx não lê mais ?preview_surface=/
  * ?workspace_id= da URL. Todo o estado vem de getWorkspacePreviewContext(),
  * que lê o cookie assinado e revalida tudo no servidor a cada request —
- * uma URL adulterada não tem mais nenhum campo de autorização para adulterar.
+ * uma URL adulterada não tem nenhum campo de autorização para adulterar.
+ *
+ * Fase 7 do hotfix 1.0.4 — o banner (WorkspacePreviewBanner) não é mais
+ * renderizado aqui: layout.tsx agora resolve o contexto uma vez e o repassa
+ * para AdminLayoutShell, que o renderiza para toda página admin durante um
+ * preview ativo — não só esta. Renderizá-lo aqui de novo duplicaria o banner
+ * nesta rota específica.
  */
 export default async function VisualizarPage() {
   const resolved = await getWorkspacePreviewContext();
@@ -38,9 +43,6 @@ export default async function VisualizarPage() {
   }
 
   return (
-    <div>
-      <WorkspacePreviewBanner context={resolved.context} />
-      <VisualizarShell context={resolved.context} isBlueprint={resolved.context.workspaceId?.startsWith("blueprint-") ?? false} />
-    </div>
+    <VisualizarShell context={resolved.context} isBlueprint={resolved.context.workspaceId?.startsWith("blueprint-") ?? false} />
   );
 }

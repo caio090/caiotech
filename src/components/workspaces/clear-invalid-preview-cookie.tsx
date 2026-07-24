@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * Fase 17 do hotfix 1.0.2 — "cookie inválido é limpo". Server Components não
@@ -13,6 +14,8 @@ import { useEffect } from "react";
  * que a Fase 17 do hotfix 1.0.1 corrigiu no switcher.
  */
 export function ClearInvalidPreviewCookie() {
+  const router = useRouter();
+
   useEffect(() => {
     fetch("/api/admin/workspaces/preview", { method: "DELETE" }).catch(() => {
       // Best-effort — o cookie já é tratado como inativo em toda leitura
@@ -20,6 +23,19 @@ export function ClearInvalidPreviewCookie() {
       // usuário fazer aqui.
     });
   }, []);
+
+  // Fase 6 do hotfix 1.0.4 — mesmo raciocínio do banner (ver
+  // workspace-preview-banner.tsx): se esta página "sem preview ativo" for
+  // restaurada do cache de back/forward do navegador, um preview novo pode
+  // ter começado nesse meio tempo em outra aba/navegação. Força reconferir
+  // o cookie real em vez de manter a mensagem de erro desatualizada.
+  useEffect(() => {
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) router.refresh();
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [router]);
 
   return null;
 }
