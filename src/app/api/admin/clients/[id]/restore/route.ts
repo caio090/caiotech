@@ -4,6 +4,7 @@ import {
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -13,7 +14,7 @@ const ADMIN_ROLES = new Set(["admin", "super_admin"]);
 
 // POST /api/admin/clients/[id]/restore
 // Restaura cliente arquivado/deletado para status onboarding
-export async function POST(_req: NextRequest, { params }: RouteContext) {
+export const POST = withMutationProtection(async function POST(_req: NextRequest, { params }: RouteContext) {
   try {
     const { id: clientId } = await params;
 
@@ -55,4 +56,4 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

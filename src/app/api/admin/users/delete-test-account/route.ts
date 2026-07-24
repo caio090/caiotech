@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const MAIN_ADMIN_EMAIL = process.env.MAIN_ADMIN_EMAIL ?? "";
 
@@ -11,7 +12,12 @@ function createAdminSupabase() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-export async function DELETE(request: NextRequest) {
+// Reachable from src/app/admin/equipe/_client-content.tsx, which IS linked
+// from the Agency preview surface's "Equipe" nav card — protected even
+// though the role check below already restricts callers to role==="admin"
+// exactly (a super_admin preview session would 403 there anyway); this is
+// defense-in-depth, not the only guard.
+export const DELETE = withMutationProtection(async function DELETE(request: NextRequest) {
   try {
     const { userId } = (await request.json()) as { userId?: string };
     if (!userId) {
@@ -83,4 +89,4 @@ export async function DELETE(request: NextRequest) {
     console.error("[delete-test-account]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+});

@@ -10,6 +10,8 @@ import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { LokatVoicePanel } from "@/components/lokat-voice-panel";
+import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
+import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
@@ -437,6 +439,13 @@ export function AdminLayoutShell({ children }: Props) {
                 </span>
               )}
             </Link>
+
+            {userRole === "super_admin" && (
+              <>
+                <WorkspaceExitButton />
+                <WorkspaceViewSwitcher />
+              </>
+            )}
 
             {userRole === "super_admin" && (
               <Link

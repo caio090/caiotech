@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getActiveDigitalMenuConnection } from "@/lib/digital-menu/server";
 import { resolveOlaClickBaseUrl } from "@/lib/olaclick";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ENDPOINT = "/v1/orders";
 
@@ -28,7 +29,7 @@ function isValidHeaderValue(value: string): boolean {
 // POST /api/olaclick/test
 // Testa conexão OlaClick para um client_id usando o endpoint correto da API.
 // Auth: x-api-key (OlaClick Public API). Nunca retorna access_token.
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -170,4 +171,4 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});

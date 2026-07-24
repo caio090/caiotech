@@ -4,6 +4,7 @@ import {
   createRequiredSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -11,7 +12,7 @@ interface RouteContext {
 
 // DELETE /api/admin/clients/[id]/hard-delete
 // Apaga definitivamente um cliente. Apenas super_admin.
-export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+export const DELETE = withMutationProtection(async function DELETE(_req: NextRequest, { params }: RouteContext) {
   try {
     const { id: clientId } = await params;
 
@@ -53,4 +54,4 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   } catch {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface LinkPayload {
   client_id:          string;
@@ -38,7 +39,7 @@ function isRpcUnavailable(err: { code?: string; message?: string } | null) {
 //   - Se não vier, procura a conexão Meta ativa mais recente via adminDb/session.
 //
 // Nunca retorna access_token, refresh_token ou outros secrets.
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   let userId: string | null = null;
   let userRole: string | null = null;
   let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
@@ -256,10 +257,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, id: data?.id, via: "direct" });
-}
+});
 
 // DELETE /api/meta/assets/link?id=<asset_record_id> — remove vínculo
-export async function DELETE(request: NextRequest) {
+export const DELETE = withMutationProtection(async function DELETE(request: NextRequest) {
   let userId: string | null = null;
   let userRole: string | null = null;
   let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
@@ -304,4 +305,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
-}
+});

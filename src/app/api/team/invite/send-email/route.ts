@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // POST /api/team/invite/send-email
 // Prepara envio de e-mail de convite.
 // Se RESEND_API_KEY ou SMTP não estiver configurado, retorna fallback manual.
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Body inválido." }, { status: 400 }); }
@@ -89,4 +90,4 @@ export async function POST(req: NextRequest) {
     console.error("[invite/send-email]", e);
     return NextResponse.json({ sent: false, fallback: true, message: "Erro inesperado. Copie o link manualmente.", invite_url });
   }
-}
+});

@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-profile";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -346,7 +347,7 @@ export async function GET() {
 }
 
 // POST /api/admin/clients — cria novo cliente
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   try {
     const profile = await getCurrentProfile();
     if (!profile) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -544,4 +545,4 @@ export async function POST(req: NextRequest) {
       supabaseError: message ? { message } : null,
     });
   }
-}
+});

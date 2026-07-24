@@ -4,6 +4,7 @@ import {
   createSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_ROLES = new Set(["admin", "super_admin", "agency"]);
 
@@ -12,7 +13,7 @@ const ALLOWED_ROLES = new Set(["admin", "super_admin", "agency"]);
 // Se o token vier vazio, preserva o token atual.
 // Se o token vier preenchido, atualiza access_token e token_last_four.
 // Nunca retorna access_token.
-export async function PATCH(
+export const PATCH = withMutationProtection(async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -133,4 +134,4 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});
