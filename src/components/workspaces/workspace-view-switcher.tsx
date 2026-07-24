@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, ChevronRight, X } from "lucide-react";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
@@ -13,10 +13,13 @@ const PREVIEWABLE_SURFACES: Exclude<WorkspaceSurface, "super_admin">[] = ["agenc
 
 /**
  * "Visualizar como" — the second header control next to the bell (the
- * first, "Painel ADM", is just a Link back to /admin/dashboard, rendered by
- * the caller). Opens as a dropdown on desktop; the same markup works as a
- * bottom sheet on mobile via the parent's responsive classes — no separate
- * mobile-only implementation, matching Fase "Mobile" (não depender de hover).
+ * first, "Painel ADM", exits any active preview — see workspace-exit-button.tsx).
+ *
+ * Fase 17 do hotfix 1.0.1: o erro novo de ESLint (setState síncrono dentro
+ * de useEffect) foi corrigido movendo a busca de opções para dentro dos
+ * próprios manipuladores de clique (pickSurface/pickAgency) — a sugestão do
+ * próprio lint ("chame setState num callback, não no corpo do efeito").
+ * Nenhum useEffect de busca de dados existe mais neste arquivo.
  */
 export function WorkspaceViewSwitcher() {
   const router = useRouter();
@@ -25,56 +28,54 @@ export function WorkspaceViewSwitcher() {
   const [options, setOptions] = useState<WorkspaceOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAgency, setSelectedAgency] = useState<WorkspaceOption | null>(null);
+  const [entering, setEntering] = useState(false);
 
-  useEffect(() => {
-    if (step === "entity" && pendingSurface) {
-      setLoading(true);
-      fetch(`/api/admin/workspaces?surface=${pendingSurface}`)
-        .then((r) => r.json())
-        .then((b: { ok: boolean; options?: WorkspaceOption[] }) => setOptions(b.ok ? b.options ?? [] : []))
-        .catch(() => setOptions([]))
-        .finally(() => setLoading(false));
+  async function fetchOptions(url: string) {
+    setLoading(true);
+    try {
+      const r = await fetch(url);
+      const b = (await r.json()) as { ok: boolean; options?: WorkspaceOption[] };
+      setOptions(b.ok ? b.options ?? [] : []);
+    } catch {
+      setOptions([]);
+    } finally {
+      setLoading(false);
     }
-    if (step === "agency_for_client") {
-      setLoading(true);
-      fetch(`/api/admin/workspaces?surface=agency`)
-        .then((r) => r.json())
-        .then((b: { ok: boolean; options?: WorkspaceOption[] }) => setOptions(b.ok ? b.options ?? [] : []))
-        .catch(() => setOptions([]))
-        .finally(() => setLoading(false));
-    }
-    if (step === "client_under_agency" && selectedAgency) {
-      setLoading(true);
-      fetch(`/api/admin/workspaces?surface=agency_client&agency_id=${selectedAgency.id}`)
-        .then((r) => r.json())
-        .then((b: { ok: boolean; options?: WorkspaceOption[] }) => setOptions(b.ok ? b.options ?? [] : []))
-        .catch(() => setOptions([]))
-        .finally(() => setLoading(false));
-    }
-  }, [step, pendingSurface, selectedAgency]);
+  }
 
   function pickSurface(surface: WorkspaceSurface) {
-    if (surface === "agency_client") { setStep("agency_for_client"); return; }
+    if (surface === "agency_client") {
+      setStep("agency_for_client");
+      fetchOptions("/api/admin/workspaces?surface=agency");
+      return;
+    }
     setPendingSurface(surface);
     setStep("entity");
+    fetchOptions(`/api/admin/workspaces?surface=${surface}`);
   }
 
   function pickAgency(agency: WorkspaceOption) {
     setSelectedAgency(agency);
     setStep("client_under_agency");
+    fetchOptions(`/api/admin/workspaces?surface=agency_client&agency_id=${agency.id}`);
   }
 
-  function enterPreview(opt: WorkspaceOption) {
+  async function enterPreview(opt: WorkspaceOption) {
     const surface = selectedAgency ? "agency_client" : pendingSurface;
-    // Blueprints are fictional — there is no real row to validate server-side,
-    // so they route to the read-only blueprint view instead of the real
-    // preview resolver (resolveWorkspacePreview only ever validates real rows).
-    if (opt.isBlueprint) {
-      router.push(`/admin/visualizar?blueprint_surface=${surface}`);
-    } else {
-      router.push(`/admin/visualizar?preview_surface=${surface}&workspace_id=${opt.id}`);
+    if (!surface) return;
+    setEntering(true);
+    try {
+      const res = await fetch("/api/admin/workspaces/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ surface, workspaceId: opt.id, isBlueprint: opt.isBlueprint }),
+      });
+      const body = (await res.json()) as { ok: boolean; destination?: string };
+      close();
+      if (body.ok && body.destination) router.push(body.destination);
+    } finally {
+      setEntering(false);
     }
-    close();
   }
 
   function close() {
@@ -119,11 +120,11 @@ export function WorkspaceViewSwitcher() {
 
           {(step === "entity" || step === "agency_for_client" || step === "client_under_agency") && (
             <div className="max-h-64 overflow-y-auto p-2">
-              {loading && <p className="text-xs text-gray-400 text-center py-4">Carregando…</p>}
-              {!loading && options.length === 0 && (
+              {(loading || entering) && <p className="text-xs text-gray-400 text-center py-4">{entering ? "Entrando…" : "Carregando…"}</p>}
+              {!loading && !entering && options.length === 0 && (
                 <p className="text-xs text-gray-400 text-center py-4">Nenhum registro encontrado.</p>
               )}
-              {!loading && options.map((opt) => (
+              {!loading && !entering && options.map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => (step === "agency_for_client" ? pickAgency(opt) : enterPreview(opt))}
