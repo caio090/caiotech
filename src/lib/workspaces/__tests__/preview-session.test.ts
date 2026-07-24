@@ -1,5 +1,7 @@
 /**
- * Ad-hoc test for the preview session token (Fase 18 do hotfix 1.0.1).
+ * Ad-hoc test for the preview session token (Fase 18 do hotfix 1.0.1,
+ * expandido na Fase 19 do hotfix 1.0.2 para cobrir a chave dedicada e a
+ * derivação HKDF).
  *
  * No test framework is installed in this project (no jest/vitest in
  * package.json) — this file follows the same pattern used for the Sprint
@@ -25,10 +27,18 @@
 // itself rejects without `allowImportingTsExtensions`. `require` keeps the
 // file readable by both tsc (as a plain relative specifier) and by Node's
 // native TS-stripping runtime (as CommonJS, package.json's default).
+//
+// Wrapped in an IIFE (not a top-level `export {}`, which would trip the
+// same ESM-sniffing problem as `import`): without any import/export, tsc
+// treats this file as a global script rather than a module, so top-level
+// `const`/`function` names would otherwise collide with the sibling
+// proxy-guard.e2e.test.ts file when both are type-checked together.
+(function () {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createHmac } = require("crypto") as typeof import("crypto");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createPreviewSessionToken, verifyPreviewSessionToken } = require("../preview-session.ts") as typeof import("../preview-session");
+const workspacePreviewSession = require("../preview-session.ts") as typeof import("../preview-session");
+const { createPreviewSessionToken, verifyPreviewSessionToken, getWorkspacePreviewSigningKey, WorkspacePreviewSigningKeyUnavailableError } = workspacePreviewSession;
 
 // Structural copy of PreviewSessionPayload for forging test tokens — kept
 // local (not imported) for the same CJS/ESM-sniffing reason as above.
@@ -59,9 +69,12 @@ function assert(condition: boolean, label: string) {
   }
 }
 
-function forgeToken(payload: TestPayload, secret: string): string {
+// Signs with whatever key the module would actually use right now (dedicated
+// WORKSPACE_PREVIEW_SECRET if set, otherwise the HKDF-derived subkey) — never
+// a raw secret directly, matching the real signing path since the 1.0.2 fix.
+function forgeToken(payload: TestPayload): string {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = createHmac("sha256", secret).update(data).digest("hex");
+  const sig = createHmac("sha256", getWorkspacePreviewSigningKey()).update(data).digest("hex");
   return `${data}.${sig}`;
 }
 
@@ -138,7 +151,6 @@ console.log("[test] preview-session.ts — malformed token never throws, never g
 
 console.log("[test] preview-session.ts — expired token is rejected but readable for audit logging");
 {
-  const secret = process.env.META_APP_SECRET!;
   const expiredPayload: TestPayload = {
     uid: "user-2",
     surface: "direct_business",
@@ -150,7 +162,7 @@ console.log("[test] preview-session.ts — expired token is rejected but readabl
     exp: Date.now() - 60 * 1000, // expired 1 minute ago
     v: 1,
   };
-  const expiredToken = forgeToken(expiredPayload, secret);
+  const expiredToken = forgeToken(expiredPayload);
   const result = verifyPreviewSessionToken(expiredToken);
   assert(result.ok === false, "expired token is rejected (ok: false)");
   assert(!result.ok && result.reason === "expired", "expired token reports reason: expired");
@@ -173,5 +185,83 @@ console.log("[test] preview-session.ts — blueprint tokens carry isBlueprint th
   assert(result.ok === true && result.payload.isBlueprint === true, "blueprint flag survives sign/verify round-trip");
 }
 
+console.log("[test] preview-session.ts — dedicated WORKSPACE_PREVIEW_SECRET takes priority over derived key");
+{
+  const before = getWorkspacePreviewSigningKey().toString("hex");
+  process.env.WORKSPACE_PREVIEW_SECRET = "dedicated-secret-for-this-test-only";
+  const after = getWorkspacePreviewSigningKey().toString("hex");
+  delete process.env.WORKSPACE_PREVIEW_SECRET;
+  const restored = getWorkspacePreviewSigningKey().toString("hex");
+  assert(before !== after, "signing key changes once WORKSPACE_PREVIEW_SECRET is set");
+  assert(after === Buffer.from("dedicated-secret-for-this-test-only", "utf8").toString("hex"), "dedicated secret is used verbatim, not re-derived");
+  assert(restored === before, "removing WORKSPACE_PREVIEW_SECRET falls back to the derived key again");
+}
+
+console.log("[test] preview-session.ts — HKDF derivation never equals the raw base secret");
+{
+  const derived = getWorkspacePreviewSigningKey().toString("hex");
+  const rawSecretHex = Buffer.from(process.env.META_APP_SECRET!, "utf8").toString("hex");
+  assert(derived !== rawSecretHex, "derived key is not the raw META_APP_SECRET bytes — a leak of one does not leak the other");
+  assert(getWorkspacePreviewSigningKey().toString("hex") === derived, "derivation is deterministic across repeated calls with the same secret");
+}
+
+console.log("[test] preview-session.ts — a token signed under a different base secret is rejected");
+{
+  const originalSecret = process.env.META_APP_SECRET;
+  process.env.META_APP_SECRET = "a-completely-different-secret";
+  const tokenSignedElsewhere = createPreviewSessionToken({
+    uid: "user-4", surface: "agency", workspaceId: "agency-9", parentWorkspaceId: null, isBlueprint: false,
+  });
+  process.env.META_APP_SECRET = originalSecret;
+  const result = verifyPreviewSessionToken(tokenSignedElsewhere);
+  assert(result.ok === false, "token signed with a different derived key fails verification under the real key");
+}
+
+console.log("[test] preview-session.ts — schema version is enforced (token for another version is rejected)");
+{
+  const wrongVersionPayload = {
+    uid: "user-5", surface: "agency", workspaceId: "agency-1", parentWorkspaceId: null,
+    isBlueprint: false, n: "aaaaaaaaaaaaaaaaaaaaaaaa",
+    iat: Date.now(), exp: Date.now() + 60_000, v: 2 as unknown as 1,
+  };
+  const token = forgeToken(wrongVersionPayload);
+  const result = verifyPreviewSessionToken(token);
+  assert(result.ok === false, "a correctly-signed but v:2 payload is rejected, not silently accepted as v1");
+}
+
+console.log("[test] preview-session.ts — missing secrets never grant access, and Production without WORKSPACE_PREVIEW_SECRET fails closed");
+{
+  const originalMeta = process.env.META_APP_SECRET;
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  // No secrets at all, outside Production: falls back to the hardcoded dev
+  // key (not secure, but never throws — local dev must keep working).
+  delete process.env.META_APP_SECRET;
+  delete process.env.VERCEL_ENV;
+  let threwOutsideProd = false;
+  try { getWorkspacePreviewSigningKey(); } catch { threwOutsideProd = true; }
+  assert(!threwOutsideProd, "missing META_APP_SECRET outside Production does not throw (dev fallback key)");
+
+  // Real Production, no dedicated secret: must fail closed.
+  process.env.VERCEL_ENV = "production";
+  let threwInProd = false;
+  try { getWorkspacePreviewSigningKey(); } catch (e) {
+    threwInProd = e instanceof WorkspacePreviewSigningKeyUnavailableError;
+  }
+  assert(threwInProd, "Production without WORKSPACE_PREVIEW_SECRET throws WorkspacePreviewSigningKeyUnavailableError");
+
+  // verifyPreviewSessionToken must never let that exception escape uncaught,
+  // since getWorkspacePreviewContext() calls it on every single request.
+  let verifyThrew = false;
+  let verifyResult: ReturnType<typeof verifyPreviewSessionToken> | null = null;
+  try { verifyResult = verifyPreviewSessionToken("anything.deadbeef"); } catch { verifyThrew = true; }
+  assert(!verifyThrew, "verifyPreviewSessionToken never throws even when the signing key is unavailable");
+  assert(!!verifyResult && verifyResult.ok === false && verifyResult.reason === "key_unavailable", "verifyPreviewSessionToken reports key_unavailable instead of crashing");
+
+  if (originalMeta === undefined) delete process.env.META_APP_SECRET; else process.env.META_APP_SECRET = originalMeta;
+  if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = originalVercelEnv;
+}
+
 console.log(`\n[test] preview-session.ts — ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+})();

@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:workspace-mutations": "node scripts/check-workspace-mutation-coverage.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
