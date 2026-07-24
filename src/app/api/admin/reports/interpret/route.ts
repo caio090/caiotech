@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_ROLES = new Set(["admin", "super_admin", "agency"]);
 
@@ -7,7 +8,7 @@ const ALLOWED_ROLES = new Set(["admin", "super_admin", "agency"]);
 // Dispara interpretação de um relatório por IA.
 // Por enquanto retorna status claro quando IA não está configurada.
 // Nunca inventa dados. Nunca marca como processed sem interpretação real.
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -95,4 +96,4 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});

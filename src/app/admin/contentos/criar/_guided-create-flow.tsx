@@ -177,11 +177,18 @@ export function GuidedCreateFlow({
   }), [activeStep, brief, content, visualFileName]);
 
   const persistDraft = useCallback(async (gc: GuidedCreateDraft, targetId: string | null): Promise<string | null> => {
-    function mapHttpError(status: number): string {
-      if (status === 401) return "Sua sessão expirou. Entre novamente.";
-      if (status === 403) return "Seu usuário não possui permissão para salvar este conteúdo.";
-      if (status === 404) return "O cliente ou rascunho não foi encontrado.";
-      if (status === 503) return "O serviço de salvamento está temporariamente indisponível.";
+    async function mapHttpError(res: Response): Promise<string> {
+      // Fase 15 do hotfix 1.0.2 — o guard de preview retorna um code
+      // dedicado (WORKSPACE_PREVIEW_READ_ONLY); esse caso precisa da
+      // mensagem exata do ticket, não a genérica de "sem permissão".
+      const body = await res.json().catch(() => null) as { code?: string } | null;
+      if (body?.code === "WORKSPACE_PREVIEW_READ_ONLY") {
+        return "Esta ação está indisponível no modo de visualização.";
+      }
+      if (res.status === 401) return "Sua sessão expirou. Entre novamente.";
+      if (res.status === 403) return "Seu usuário não possui permissão para salvar este conteúdo.";
+      if (res.status === 404) return "O cliente ou rascunho não foi encontrado.";
+      if (res.status === 503) return "O serviço de salvamento está temporariamente indisponível.";
       return "Não foi possível salvar. Seus dados continuam nesta tela.";
     }
 
@@ -191,7 +198,7 @@ export function GuidedCreateFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_id: clientId, guided_create: gc }),
       });
-      if (!res.ok) throw new Error(mapHttpError(res.status));
+      if (!res.ok) throw new Error(await mapHttpError(res));
       const data = await res.json() as { id: string };
       return data.id;
     } else {
@@ -200,7 +207,7 @@ export function GuidedCreateFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_id: clientId, guided_create: gc }),
       });
-      if (!res.ok) throw new Error(mapHttpError(res.status));
+      if (!res.ok) throw new Error(await mapHttpError(res));
       return targetId;
     }
   }, [clientId]);

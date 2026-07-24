@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // ── POST /api/ai/diagnostico ─────────────────────────────────
 // Gera um diagnóstico de marca com IA.
 // Chave OPENAI_API_KEY nunca é exposta ao cliente.
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "IA não configurada." }, { status: 503 });
@@ -69,4 +70,4 @@ Responda em português brasileiro, de forma direta e profissional.
     console.error("[ai/diagnostico]", e);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // ── POST /api/ai/legenda ─────────────────────────────────────
 // Gera legendas/copies para redes sociais com IA.
-export async function POST(req: NextRequest) {
+export const POST = withMutationProtection(async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "IA não configurada." }, { status: 503 });
@@ -62,4 +63,4 @@ Responda em português brasileiro.
     console.error("[ai/legenda]", e);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
-}
+});

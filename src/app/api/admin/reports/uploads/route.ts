@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_ROLES = new Set(["admin", "super_admin", "agency"]);
 
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/reports/uploads
 // Registra metadados de um relatório manual. O arquivo deve ser enviado
 // diretamente ao Supabase Storage pelo frontend antes de chamar este endpoint.
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -136,4 +137,4 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, reason: "internal_error" }, { status: 500 });
   }
-}
+});

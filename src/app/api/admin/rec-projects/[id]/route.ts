@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // DELETE /api/admin/rec-projects/[id]
-export async function DELETE(
+export const DELETE = withMutationProtection(async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -32,4 +33,4 @@ export async function DELETE(
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
-}
+});

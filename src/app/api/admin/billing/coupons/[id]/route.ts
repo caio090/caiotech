@@ -7,6 +7,7 @@ import {
   createSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_ROLES = new Set(["super_admin", "admin"]);
 
@@ -17,7 +18,7 @@ async function getAdminDb() {
   return await createServerSupabaseClient();
 }
 
-export async function PATCH(
+export const PATCH = withMutationProtection(async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -53,9 +54,9 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, coupon: data });
-}
+});
 
-export async function DELETE(
+export const DELETE = withMutationProtection(async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -79,4 +80,4 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
-}
+});

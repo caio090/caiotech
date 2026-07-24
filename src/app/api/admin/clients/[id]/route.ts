@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn } from "@/lib/client-visibility";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -63,7 +64,7 @@ export async function GET(
 }
 
 // PATCH /api/admin/clients/[id]
-export async function PATCH(
+export const PATCH = withMutationProtection(async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -116,10 +117,10 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
-}
+});
 
 // DELETE /api/admin/clients/[id]
-export async function DELETE(
+export const DELETE = withMutationProtection(async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -239,4 +240,4 @@ export async function DELETE(
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
-}
+});

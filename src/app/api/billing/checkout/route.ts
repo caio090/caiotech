@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getActiveProvider, getProviderStatus } from "@/lib/billing/providers";
 import { PLANS } from "@/lib/billing/plans";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 interface CheckoutBody {
   plan_slug: string;
@@ -14,7 +15,7 @@ interface CheckoutBody {
   return_url?: string;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -80,4 +81,4 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, reason: "checkout_error", message }, { status: 500 });
   }
-}
+});

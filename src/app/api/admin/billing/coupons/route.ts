@@ -10,6 +10,7 @@ import {
   createSupabaseAdminClient,
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ALLOWED_ROLES = new Set(["super_admin", "admin"]);
 
@@ -32,7 +33,7 @@ async function getAdminDb() {
   return await createServerSupabaseClient();
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, coupon: data }, { status: 201 });
-}
+});
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();

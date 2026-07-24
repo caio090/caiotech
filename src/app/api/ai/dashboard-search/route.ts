@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ async function openaiSearch(query: string): Promise<SearchResult | null> {
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -359,4 +360,4 @@ export async function POST(request: NextRequest) {
     query,
     ...result,
   });
-}
+});

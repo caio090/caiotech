@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-profile";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 const ARCHIVE_ROLES = new Set(["admin", "super_admin"]);
 
@@ -19,7 +20,7 @@ function safeDbError(error: { code?: string; message?: string; details?: string;
   };
 }
 
-export async function POST(req: Request) {
+export const POST = withMutationProtection(async function POST(req: Request) {
   try {
     const profile = await getCurrentProfile();
     if (!profile) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -74,4 +75,4 @@ export async function POST(req: Request) {
     console.error("[api/admin/clients/bulk-delete] erro inesperado", { message });
     return NextResponse.json({ error: "Erro interno ao processar clientes.", code: "SERVER_ERROR" }, { status: 500 });
   }
-}
+});
