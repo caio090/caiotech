@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveWorkspacePreview } from "@/lib/workspaces/preview";
-import { createPreviewSessionToken, verifyPreviewSessionToken, WORKSPACE_PREVIEW_COOKIE, WORKSPACE_PREVIEW_COOKIE_MAX_AGE_SECONDS } from "@/lib/workspaces/preview-session";
+import {
+  createPreviewSessionToken,
+  verifyPreviewSessionToken,
+  WorkspacePreviewSigningKeyUnavailableError,
+  WORKSPACE_PREVIEW_COOKIE,
+  WORKSPACE_PREVIEW_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/workspaces/preview-session";
 import { BLUEPRINT_AGENCY, BLUEPRINT_AGENCY_CLIENTS, BLUEPRINT_DIRECT_BUSINESS } from "@/lib/workspaces/blueprint-fixtures";
 import { recordWorkspaceAuditEvent } from "@/lib/workspaces/audit-log";
 import type { WorkspaceSurface } from "@/lib/workspaces/types";
@@ -34,7 +40,15 @@ export async function POST(req: NextRequest) {
   if (isBlueprintRequested) {
     if (!BLUEPRINT_IDS.has(workspaceId)) return NextResponse.json({ ok: false, reason: "unknown_blueprint" }, { status: 400 });
     const parentWorkspaceId = BLUEPRINT_AGENCY_CLIENTS.some((c) => c.id === workspaceId) ? BLUEPRINT_AGENCY.id : null;
-    const token = createPreviewSessionToken({ uid: user.id, surface, workspaceId, parentWorkspaceId, isBlueprint: true });
+    let token: string;
+    try {
+      token = createPreviewSessionToken({ uid: user.id, surface, workspaceId, parentWorkspaceId, isBlueprint: true });
+    } catch (e) {
+      if (e instanceof WorkspacePreviewSigningKeyUnavailableError) {
+        return NextResponse.json({ ok: false, reason: "signing_key_unavailable" }, { status: 503 });
+      }
+      throw e;
+    }
     const res = NextResponse.json({ ok: true, destination: "/admin/visualizar" });
     res.cookies.set(WORKSPACE_PREVIEW_COOKIE, token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
@@ -48,10 +62,18 @@ export async function POST(req: NextRequest) {
   const resolution = await resolveWorkspacePreview({ previewSurface: surface, workspaceId });
   if (!resolution.ok) return NextResponse.json({ ok: false, reason: resolution.reason }, { status: 400 });
 
-  const token = createPreviewSessionToken({
-    uid: user.id, surface, workspaceId,
-    parentWorkspaceId: resolution.context.parentWorkspaceId, isBlueprint: false,
-  });
+  let token: string;
+  try {
+    token = createPreviewSessionToken({
+      uid: user.id, surface, workspaceId,
+      parentWorkspaceId: resolution.context.parentWorkspaceId, isBlueprint: false,
+    });
+  } catch (e) {
+    if (e instanceof WorkspacePreviewSigningKeyUnavailableError) {
+      return NextResponse.json({ ok: false, reason: "signing_key_unavailable" }, { status: 503 });
+    }
+    throw e;
+  }
   const res = NextResponse.json({ ok: true, destination: "/admin/visualizar" });
   res.cookies.set(WORKSPACE_PREVIEW_COOKIE, token, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
