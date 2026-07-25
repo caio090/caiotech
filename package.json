@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:workspace-mutations": "node scripts/check-workspace-mutation-coverage.ts"
+    "check:workspace-mutations": "node scripts/check-workspace-mutation-coverage.ts",
+    "test:meta": "tsc --project tsconfig.meta-tests.json && node .tmp/meta-tests-build/lib/meta/__tests__/publish-eligibility.test.js && node .tmp/meta-tests-build/lib/meta/__tests__/publishing.test.js && node src/app/api/meta/publish/__tests__/guard.structural.test.ts && node src/lib/meta/__tests__/connection-strategy.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

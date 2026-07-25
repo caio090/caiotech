@@ -1,0 +1,21 @@
+{
+  "//": "Isolated tsc config for src/lib/meta's ad-hoc tests. Does NOT extend or affect tsconfig.json / the Next.js build — this project has no jest/vitest, and adding one is out of scope for this fix. Compiles the pure-logic Meta modules + their tests to plain CommonJS in .tmp/meta-tests-build so `node` can run them directly, using only the TypeScript compiler already in devDependencies.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": ".tmp/meta-tests-build",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/lib/meta/publishing.ts",
+    "src/lib/meta/publish-eligibility.ts",
+    "src/lib/meta/__tests__/publishing.test.ts",
+    "src/lib/meta/__tests__/publish-eligibility.test.ts",
+    "src/lib/supabase/types.ts"
+  ]
+}
