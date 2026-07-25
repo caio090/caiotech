@@ -318,7 +318,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
   // ── Integrações ────────────────────────────────────────────
   {
     id: "meta", name: "Meta / Instagram", category: "integracao",
-    description: "OAuth multiconexão, signed state HMAC-SHA256, wizard por cliente, Hub via client_meta_assets.",
+    description: "OAuth multiconexão, signed state HMAC-SHA256, wizard por cliente, Hub via client_meta_assets. Publicação de Feed (imagem) via dry-run + confirmação humana, na branch feat/meta-content-publishing-v1 — guard de mutação Workspaces explícito, contrato único de elegibilidade (status/formato/conexão) compartilhado entre rota e frontend, validação de mídia contra SSRF, reconexão sem duplicar linhas em meta_connections, idempotência por meta_publication_id. Ainda não mesclado, sem QA real, sem publicação real executada.",
     phase: "v1", readiness: "qa_pending",
     commit: "f141e05",
     qa: {
@@ -344,10 +344,18 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
       "Testar nova conexão + retorno contextual",
       "Validar Hub persistido após OAuth",
       "Confirmar isolamento por connection_id e asset_id",
+      "meta_content_publish: QA manual do fluxo dry-run → confirmação → publish com conta Instagram Business real (nenhuma publicação real foi feita nesta auditoria/implementação)",
+      "meta_publish_reconciliation: hoje published_but_not_recorded apenas retorna o media_id sem republicar; ainda falta uma tela/rota de reconciliação manual para o operador",
+      "Ambiguidade cross-client (mesmo ativo Meta vinculado a mais de um client_id em client_meta_assets) agora falha fechado em tempo de execução (asset_link_ambiguous); nenhum SQL foi necessário. Uma constraint de banco ou auditoria de duplicidade formal permanece planned, fora desta etapa.",
+      "Mesclar feat/meta-content-publishing-v1 (ou uma versão revisada dela) após QA formal, sem pular a etapa de review",
+    ],
+    blockers: [
+      "Dependência de ordem entre branches: feat/meta-content-publishing-v1 tem base origin/main@20f2204; hotfix/workspaces-isolation-mobile-v1 já tem commits locais posteriores a esse mesmo ponto. A branch Meta NÃO deve ser integrada antes do release da Workspaces.",
+      "Depois que a Workspaces for lançada, atualizar a branch Meta por merge controlado da origin/main (não rebase) — resolvendo o conflito esperado em src/config/project-status.ts (ambas as branches editam este arquivo) — e repetindo TypeScript + build + npm run check:workspace-mutations + QA antes de qualquer commit final.",
     ],
     risk: "medium",
     estimate: { hoursMin: 4, hoursLikely: 6, hoursMax: 10 },
-    last_updated: "2026-07-13",
+    last_updated: "2026-07-24",
   },
   {
     id: "cardapio", name: "Cardápio Digital", category: "integracao",
@@ -361,6 +369,27 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     phase: "v1", readiness: "blocked",
     blockers: ["Homologação Meta Business API pendente"],
     qa: { status: "not_required" }, risk: "low", last_updated: "2026-07-12",
+  },
+
+  // ── Precificação ────────────────────────────────────────────
+  // Registrado nesta branch (feat/meta-content-publishing-v1) por exigência
+  // de contexto global — nenhuma implementação de precificação acontece
+  // aqui. financial-engine.ts / pricing-engine.ts (ver entrada
+  // "product-engineering-preview" mais abaixo) já calculam parte disso como
+  // funções puras; esta entrada é o guarded-workspace para uma futura área
+  // dedicada de precificação guiada.
+  {
+    id: "precificacao", name: "Precificação", category: "operacional",
+    description: "Precificação guiada, conectada explicitamente à cadeia: custos → insumos → ficha técnica → custo unitário → CMV/CSV → margem → markup → preço atual → preço sugerido → produtos afetados → decisão de preço. Hoje existe parcialmente como funções puras em pricing-engine.ts (ver product-engineering-preview); uma superfície dedicada de precificação guiada ainda não foi construída.",
+    phase: "v2", readiness: "planned",
+    qa: { status: "not_started" },
+    next_actions: [
+      "Definir a superfície de UI de precificação guiada (fora do escopo desta branch Meta)",
+      "Conectar cada etapa da cadeia custos→decisão de preço a uma fonte de dado real, com origem e confiança visíveis (mesmo padrão de financial-engine.ts)",
+    ],
+    risk: "low",
+    notes: "O dado de R$ 518K citado em contexto de faturamento permanece com origem pendente — não deve ser tratado como faturamento validado até a fonte ser confirmada.",
+    last_updated: "2026-07-24",
   },
 
   // ── Relatórios e diagnósticos ──────────────────────────────
