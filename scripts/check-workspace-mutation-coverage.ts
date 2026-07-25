@@ -61,6 +61,7 @@ const ALLOWLIST: Record<string, { classification: Classification; note: string }
   "olaclick/connections/[id]/route.ts": { classification: "protected", note: "Integrações" },
   "olaclick/test/route.ts": { classification: "protected", note: "Integrações" },
   "meta/assets/link/route.ts": { classification: "protected", note: "Integrações" },
+  "meta/publish/route.ts": { classification: "protected", note: "Integrações — publica conteúdo aprovado no Instagram Feed" },
   "payments/manual-confirm/route.ts": { classification: "protected", note: "Financeiro" },
   "payments/create-charge/route.ts": { classification: "protected", note: "Financeiro" },
   "payments/asaas/create-charge/route.ts": { classification: "protected", note: "Financeiro" },

@@ -62,6 +62,7 @@ funcional no shell de demonstração hoje. Duas consequências práticas:
 | `api/admin/reports/interpret/route.ts` | POST | Relatórios | Linkado de `/admin/relatorios` (não é a "Relatórios adaptativos" pausada — feature pré-existente na main) |
 | `api/admin/reports/uploads/route.ts` | POST | Relatórios | Idem — grava upload + insere metadado |
 | `api/meta/assets/link/route.ts` | POST, DELETE | Integrações | Vincula/desvincula ativo Meta real |
+| `api/meta/publish/route.ts` | POST | Integrações | Adicionado na branch `feat/meta-content-publishing-v1` (base `origin/main` 20f2204, ainda não mesclada) — publica conteúdo aprovado no Instagram Feed via Graph API |
 | `api/olaclick/test/route.ts` | POST | Integrações | Atualiza status/last_sync da conexão + chamada externa |
 | `api/admin/billing/coupons/route.ts` | POST | Financeiro | Linkado de "Abrir Billing →" no card Financeiro |
 | `api/admin/billing/coupons/[id]/route.ts` | PATCH, DELETE | Financeiro | Idem |
@@ -152,3 +153,12 @@ do proxy.
 - `demo_memory_only`: todo o módulo Meu Negócio (10 arquivos de aba).
 - `pending_protection`: **nenhum item permanece sem classificação** — toda
   linha desta tabela tem uma classificação e uma razão.
+
+### Atualização — branch `feat/meta-content-publishing-v1`
+
+`api/meta/publish/route.ts` (nova rota, POST) foi adicionada ao ALLOWLIST
+como `protected` — `withMutationProtection` confirmado no arquivo e por
+`npm run check:workspace-mutations` (40 rotas mutáveis antes → 41 depois,
+0 falhas). Esta branch ainda não foi mesclada; nenhum commit dela existe em
+`origin/main` ou em `hotfix/workspaces-isolation-mobile-v1` no momento
+desta nota.
