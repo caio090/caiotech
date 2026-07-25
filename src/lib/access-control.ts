@@ -92,6 +92,39 @@ export function getRoleHome(role: string | null | undefined): string {
   return ROLE_HOME[role ?? ""] ?? ROLE_HOME_FALLBACK;
 }
 
+// ── Canonical role resolution ──────────────────────────────────
+
+/** Every role the system recognizes — derived from ROLE_HOME so there is
+ * one place that defines "what a valid role is". */
+export const VALID_ROLES = new Set(Object.keys(ROLE_HOME));
+
+export interface EffectiveRoleSources {
+  profileRole?: string | null;
+  userMetadataRole?: string | null;
+  appMetadataRole?: string | null;
+}
+
+/**
+ * Sprint Workspaces 1.0.7 — the one canonical, pure role resolver, shared
+ * by src/proxy.ts, the login redirect, and src/app/admin/layout.tsx. Same
+ * precedence all three already needed independently: a real account's
+ * profiles.role row can be null or stale while Supabase Auth's own
+ * user_metadata/app_metadata is correct, so profile.role alone is not
+ * trustworthy on its own — but it's still checked first because it's the
+ * value an admin can actually edit after the fact.
+ *
+ * Deliberately dependency-free (no Node/Supabase/React import) so it is
+ * safe to call from any runtime, including Edge.
+ */
+export function resolveEffectiveUserRole(sources: EffectiveRoleSources): string | null {
+  const candidates = [sources.profileRole, sources.userMetadataRole, sources.appMetadataRole];
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (trimmed && VALID_ROLES.has(trimmed)) return trimmed;
+  }
+  return null;
+}
+
 // ── Route permission helpers ──────────────────────────────────
 
 export function canAccessAdmin(role: string)           { return role === "admin" || role === "super_admin"; }
