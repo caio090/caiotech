@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
@@ -19,9 +19,11 @@ const GENERIC_ENTER_ERROR = "Não foi possível abrir esta visualização.";
 const KNOWN_ENTER_ERROR_MESSAGES: Record<string, string> = {
   agency_not_found_or_inactive: "Esta agência não foi encontrada ou está inativa.",
   business_not_found: "Esta empresa não foi encontrada.",
-  business_is_agency_managed_not_direct: "Este cliente já é gerenciado por uma agência — abra-o como Cliente da agência.",
+  business_is_agency_managed_not_direct: "Esta empresa não pertence à superfície selecionada.",
+  direct_business_real_not_yet_classified: "Esta empresa não pertence à superfície selecionada.",
   client_not_found: "Este cliente não foi encontrado.",
-  no_active_agency_relationship: "Este cliente não tem um vínculo ativo com uma agência.",
+  no_active_agency_relationship: "Não foi possível confirmar a relação entre agência e cliente.",
+  parent_relationship_unresolved: "Não foi possível confirmar a relação entre agência e cliente.",
   unknown_blueprint: "Esta estrutura demonstrativa não é mais válida.",
   forbidden_not_super_admin: "Sua sessão não tem mais permissão de Super Admin.",
   unauthenticated: "Sua sessão expirou. Entre novamente.",
@@ -45,26 +47,51 @@ const KNOWN_ENTER_ERROR_MESSAGES: Record<string, string> = {
  * preserva a seleção e permite tentar novamente — nunca navega e nunca
  * expõe detalhe técnico.
  */
+// Fase 8/9 do hotfix 1.0.5 — antes, qualquer resposta ok:false (403, 503,
+// erro de rede) virava options:[] silenciosamente, indistinguível de uma
+// lista genuinamente vazia — exatamente a causa do P1 "Nenhum registro
+// encontrado" nos três blueprints (a rota retornava 503 sem
+// SUPABASE_SERVICE_ROLE_KEY, ver src/app/api/admin/workspaces/route.ts).
+// optionsState agora distingue os 5 estados exigidos pelo ticket.
+type OptionsState = "idle" | "loading" | "ready" | "empty" | "error";
+
+const EMPTY_BLUEPRINT_MESSAGE = "Nenhuma estrutura demonstrativa está disponível.";
+const EMPTY_REAL_MESSAGE = "Nenhum workspace real está disponível para esta superfície.";
+const LOAD_ERROR_MESSAGE = "Não foi possível carregar as opções de visualização.";
+
 export function WorkspaceViewSwitcher() {
   const router = useRouter();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [step, setStep] = useState<Step>("closed");
   const [pendingSurface, setPendingSurface] = useState<WorkspaceSurface | null>(null);
   const [options, setOptions] = useState<WorkspaceOption[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [optionsState, setOptionsState] = useState<OptionsState>("idle");
+  const [optionsSource, setOptionsSource] = useState<"blueprint" | "real">("blueprint");
+  const [lastOptionsUrl, setLastOptionsUrl] = useState<string | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<WorkspaceOption | null>(null);
   const [entering, setEntering] = useState(false);
   const [enterError, setEnterError] = useState<string | null>(null);
 
   async function fetchOptions(url: string) {
-    setLoading(true);
+    // Limpa a lista anterior IMEDIATAMENTE — nunca mostra a lista da
+    // superfície/agência anterior enquanto a nova carrega (Fase 8).
+    setOptions([]);
+    setOptionsState("loading");
+    setLastOptionsUrl(url);
     try {
       const r = await fetch(url);
-      const b = (await r.json()) as { ok: boolean; options?: WorkspaceOption[] };
-      setOptions(b.ok ? b.options ?? [] : []);
+      const b = (await r.json().catch(() => null)) as { ok: boolean; source?: "blueprint" | "real"; options?: WorkspaceOption[] } | null;
+      if (!b || !b.ok) {
+        // Erro HTTP (403/503/500/JSON inválido) NUNCA vira lista vazia.
+        setOptionsState("error");
+        return;
+      }
+      const rows = b.options ?? [];
+      setOptions(rows);
+      setOptionsSource(b.source ?? "blueprint");
+      setOptionsState(rows.length === 0 ? "empty" : "ready");
     } catch {
-      setOptions([]);
-    } finally {
-      setLoading(false);
+      setOptionsState("error");
     }
   }
 
@@ -72,19 +99,23 @@ export function WorkspaceViewSwitcher() {
     setEnterError(null);
     if (surface === "agency_client") {
       setStep("agency_for_client");
-      fetchOptions("/api/admin/workspaces?surface=agency");
+      fetchOptions("/api/admin/workspaces?surface=agency&source=blueprint");
       return;
     }
     setPendingSurface(surface);
     setStep("entity");
-    fetchOptions(`/api/admin/workspaces?surface=${surface}`);
+    fetchOptions(`/api/admin/workspaces?surface=${surface}&source=blueprint`);
   }
 
   function pickAgency(agency: WorkspaceOption) {
     setEnterError(null);
     setSelectedAgency(agency);
     setStep("client_under_agency");
-    fetchOptions(`/api/admin/workspaces?surface=agency_client&agency_id=${agency.id}`);
+    fetchOptions(`/api/admin/workspaces?surface=agency_client&agency_id=${agency.id}&source=blueprint`);
+  }
+
+  function retryFetchOptions() {
+    if (lastOptionsUrl) void fetchOptions(lastOptionsUrl);
   }
 
   async function enterPreview(opt: WorkspaceOption) {
@@ -114,16 +145,33 @@ export function WorkspaceViewSwitcher() {
     }
   }
 
-  function close() {
-    setStep("closed"); setOptions([]); setSelectedAgency(null); setPendingSurface(null); setEnterError(null);
+  function close(returnFocus = false) {
+    setStep("closed"); setOptions([]); setOptionsState("idle"); setLastOptionsUrl(null);
+    setSelectedAgency(null); setPendingSurface(null); setEnterError(null);
+    if (returnFocus) triggerRef.current?.focus();
   }
+
+  // Fase 12 do hotfix 1.0.5 — Escape fecha o modal e devolve o foco ao
+  // botão que o abriu, em vez de deixá-lo perdido no documento.
+  useEffect(() => {
+    if (step === "closed") return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") close(true);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [step]);
 
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setStep(step === "closed" ? "surface" : "closed")}
         className="p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-600"
         title="Visualizar como outro painel"
+        aria-label="Visualizar como outro painel"
+        aria-haspopup="menu"
+        aria-expanded={step !== "closed"}
       >
         <Eye className="w-4 h-4" />
         <span className="hidden md:inline text-xs font-bold">Visualizar como</span>
@@ -137,7 +185,7 @@ export function WorkspaceViewSwitcher() {
               {(step === "entity" || step === "agency_for_client") && "Selecione a entidade"}
               {step === "client_under_agency" && `Cliente de ${selectedAgency?.name}`}
             </p>
-            <button onClick={close} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            <button onClick={() => close(true)} aria-label="Fechar" className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
           </div>
 
           {step === "surface" && (
@@ -163,11 +211,27 @@ export function WorkspaceViewSwitcher() {
                 </div>
               )}
               <div className="max-h-64 overflow-y-auto">
-                {(loading || entering) && <p className="text-xs text-gray-400 text-center py-4">{entering ? "Entrando…" : "Carregando…"}</p>}
-                {!loading && !entering && options.length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-4">Nenhum registro encontrado.</p>
+                {entering && <p className="text-xs text-gray-400 text-center py-4">Entrando…</p>}
+                {!entering && optionsState === "loading" && (
+                  <p className="text-xs text-gray-400 text-center py-4">Carregando…</p>
                 )}
-                {!loading && !entering && options.map((opt) => (
+                {!entering && optionsState === "empty" && (
+                  <p className="text-xs text-gray-400 text-center py-4">
+                    {optionsSource === "real" ? EMPTY_REAL_MESSAGE : EMPTY_BLUEPRINT_MESSAGE}
+                  </p>
+                )}
+                {!entering && optionsState === "error" && (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-red-600 mb-2">{LOAD_ERROR_MESSAGE}</p>
+                    <button
+                      onClick={retryFetchOptions}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 underline"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                )}
+                {!entering && optionsState === "ready" && options.map((opt) => (
                   <button
                     key={opt.id}
                     onClick={() => (step === "agency_for_client" ? pickAgency(opt) : enterPreview(opt))}

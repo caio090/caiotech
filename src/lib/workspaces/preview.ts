@@ -54,7 +54,8 @@ export async function resolveWorkspacePreview(request: PreviewRequest): Promise<
         ok: true,
         context: {
           surface: "agency", workspaceId: agency.id, workspaceName: agency.name,
-          parentWorkspaceId: null, parentWorkspaceName: null, isPreview: true, readOnly: true,
+          parentWorkspaceId: null, parentWorkspaceName: null, relationshipType: null,
+          isPreview: true, readOnly: true,
         },
       };
     } catch {
@@ -63,20 +64,16 @@ export async function resolveWorkspacePreview(request: PreviewRequest): Promise<
   }
 
   if (surface === "direct_business") {
-    const { data: client } = await adminDb.from("clients").select("id, company_name, deleted_at, archived_at").eq("id", workspaceId).maybeSingle();
-    if (!client || client.deleted_at || client.archived_at) return { ok: false, reason: "business_not_found" };
-    // "Direct" means no agency_clients link exists for this client.
-    try {
-      const { data: link } = await adminDb.from("agency_clients").select("id").eq("client_id", workspaceId).maybeSingle();
-      if (link) return { ok: false, reason: "business_is_agency_managed_not_direct" };
-    } catch { /* agency_clients pode não existir — tratado como ausência de vínculo, não como erro */ }
-    return {
-      ok: true,
-      context: {
-        surface: "direct_business", workspaceId: client.id, workspaceName: client.company_name,
-        parentWorkspaceId: null, parentWorkspaceName: null, isPreview: true, readOnly: true,
-      },
-    };
+    // Fase 1/2 do hotfix 1.0.4 — "ausência de vínculo em agency_clients" NÃO
+    // é uma classificação confiável de "empresa direta": hoje ela é
+    // indistinguível de "vínculo ainda não registrado". A rota
+    // /api/admin/workspaces (picker) já parou de listar clients reais para
+    // esta superfície; este resolver espelha a mesma regra para que nenhuma
+    // chamada direta à API de preview consiga contornar o picker e validar
+    // um client_id real como "empresa direta". Sem um campo de classificação
+    // real aplicado ao banco (fora de escopo — não roda SQL nesta sprint),
+    // a única opção segura é recusar todo workspace real aqui.
+    return { ok: false, reason: "direct_business_real_not_yet_classified" };
   }
 
   // surface === "agency_client"
@@ -86,11 +83,18 @@ export async function resolveWorkspacePreview(request: PreviewRequest): Promise<
     const { data: link } = await adminDb.from("agency_clients").select("agency_id").eq("client_id", workspaceId).eq("status", "active").maybeSingle();
     if (!link) return { ok: false, reason: "no_active_agency_relationship" };
     const { data: agency } = await adminDb.from("agency_workspaces").select("id, name").eq("id", link.agency_id).maybeSingle();
+    // Fase 4 do hotfix 1.0.4 — antes, um `agency` ausente (linha órfã: o
+    // vínculo aponta para uma agência que não existe mais) caía
+    // silenciosamente em parentWorkspaceId/Name = null, e o banner mostrava
+    // "Atendido por: —" sem nenhum aviso. Uma relação confirmada em
+    // agency_clients mas que não resolve a um agency_workspaces real não é
+    // "sem pai" — é uma relação quebrada, e não deve iniciar preview.
+    if (!agency) return { ok: false, reason: "parent_relationship_unresolved" };
     return {
       ok: true,
       context: {
         surface: "agency_client", workspaceId: client.id, workspaceName: client.company_name,
-        parentWorkspaceId: agency?.id ?? null, parentWorkspaceName: agency?.name ?? null,
+        parentWorkspaceId: agency.id, parentWorkspaceName: agency.name, relationshipType: "managed_client",
         isPreview: true, readOnly: true,
       },
     };
@@ -103,6 +107,7 @@ export async function resolveWorkspacePreview(request: PreviewRequest): Promise<
 export function realSuperAdminContext(): WorkspaceContext {
   return {
     surface: "super_admin", workspaceId: null, workspaceName: null,
-    parentWorkspaceId: null, parentWorkspaceName: null, isPreview: false, readOnly: false,
+    parentWorkspaceId: null, parentWorkspaceName: null, relationshipType: null,
+    isPreview: false, readOnly: false,
   };
 }

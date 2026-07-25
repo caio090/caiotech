@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
-import { getRoleHome } from "@/lib/access-control";
+import { getRoleHome, resolveEffectiveUserRole } from "@/lib/access-control";
 import { Eye, EyeOff, Loader2, ShieldCheck, User, Sparkles, TrendingUp, Wallet, GraduationCap, KeyRound, Link2, ArrowRight } from "lucide-react";
 
 const DEMO_ROLES = [
@@ -62,7 +62,11 @@ export default function LoginPage() {
         .eq("id", data.user.id)
         .maybeSingle();
 
-      const role = profileRow?.role ?? (data.user.user_metadata?.role as string | undefined) ?? "cliente";
+      const role = resolveEffectiveUserRole({
+        profileRole: profileRow?.role as string | undefined,
+        userMetadataRole: data.user.user_metadata?.role as string | undefined,
+        appMetadataRole: data.user.app_metadata?.role as string | undefined,
+      }) ?? "cliente";
       router.push(getRoleHome(role));
     } catch {
       setError("Erro de conexão. Verifique sua internet e tente novamente.");

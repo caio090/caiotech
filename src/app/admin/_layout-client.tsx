@@ -12,6 +12,8 @@ import { MobileBottomNav } from "@/components/mobile-nav";
 import { LokatVoicePanel } from "@/components/lokat-voice-panel";
 import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
 import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
+import { WorkspacePreviewBanner } from "@/components/workspaces/workspace-preview-banner";
+import type { WorkspaceContext } from "@/lib/workspaces/types";
 import { isSupabaseConfigured, createClient } from "@/lib/supabase/client";
 import { performSignOut } from "@/lib/sign-out";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
@@ -53,12 +55,36 @@ interface AdminNotif {
 
 interface Props {
   children: React.ReactNode;
+  /**
+   * Fase 7 do hotfix 1.0.4 — antes, WorkspacePreviewBanner só era renderizado
+   * dentro de /admin/visualizar/page.tsx. Os cards do shell de demonstração
+   * linkam para páginas REAIS fora dessa rota (/admin/contentos,
+   * /admin/relatorios, /admin/financeiro, /admin/conexoes, /admin/meu-negocio)
+   * — nelas, o banner simplesmente não existia, e o Super Admin perdia todo
+   * indício visual de estar em preview. Resolvido no servidor (layout.tsx,
+   * via getWorkspacePreviewContext()) e passado como prop para que TODA
+   * página admin renderize o mesmo banner, uma única vez, no mesmo lugar.
+   */
+  previewContext: WorkspaceContext | null;
+  /**
+   * Sprint Workspaces 1.0.7 — resolved server-side in src/app/admin/layout.tsx
+   * via resolveEffectiveUserRole() (the same canonical precedence src/proxy.ts
+   * and the login redirect use), and used to initialize userRole below so the
+   * FIRST render already knows whether to show "Painel ADM" / "Visualizar
+   * como" — a client-side fetch is never the gate for that decision anymore.
+   * Only the resolved role string is passed — never a token, cookie, or the
+   * full user/profile object.
+   */
+  initialUserRole: string | null;
 }
 
-export function AdminLayoutShell({ children }: Props) {
+export function AdminLayoutShell({ children, previewContext, initialUserRole }: Props) {
   const [userName,         setUserName]         = useState("Admin");
   const [initials,         setInitials]         = useState("A");
-  const [userRole,         setUserRole]         = useState<string | null>(null);
+  // No setter: role comes exclusively from the server-resolved prop and
+  // never changes during this component's lifetime (a session/role change
+  // means a fresh server render, which passes a fresh initialUserRole).
+  const userRole = initialUserRole;
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const pathname = usePathname();
 
@@ -112,7 +138,20 @@ export function AdminLayoutShell({ children }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  // Fetch user name
+  // Fetch display name/initials only.
+  //
+  // Sprint Workspaces 1.0.6 found the root cause of "Painel ADM" /
+  // "Visualizar como" never appearing for a genuine Super Admin: this used
+  // to be the only place in the app that resolved role from profiles.role
+  // alone, with no fallback, and it returned early when `profile` was null
+  // — so userRole stayed null forever even though src/proxy.ts had already
+  // let the same user reach /admin/dashboard via a more permissive check.
+  // 1.0.7 removes the class of bug entirely rather than patching this
+  // fallback further: role now comes exclusively from the initialUserRole
+  // prop (server-resolved in src/app/admin/layout.tsx, before first render)
+  // and is never touched here. This effect only fills in name/initials —
+  // authorization and identity display are deliberately separate, so a
+  // failure here can never hide an administrative control.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
@@ -122,12 +161,18 @@ export function AdminLayoutShell({ children }: Props) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
         const { data: profile } = await supabase
-          .from("profiles").select("name, role").eq("id", user.id).maybeSingle();
-        if (!profile || cancelled) return;
-        const name = profile.name ?? user.email ?? "Admin";
+          .from("profiles").select("name").eq("id", user.id).maybeSingle();
+        if (cancelled) return;
+        const name = profile?.name ?? user.email ?? "Admin";
         const ini  = name.split(/\s+/).slice(0, 2).map((w: string) => w[0] ?? "").join("").toUpperCase() || "A";
-        if (!cancelled) { setUserName(name); setInitials(ini); setUserRole(profile.role ?? null); }
-      } catch {}
+        setUserName(name); setInitials(ini);
+      } catch {
+        // Non-blocking: initialUserRole (and therefore every
+        // super_admin-gated control) is unaffected by this failing — only
+        // the display name falls back to its "Admin" default. No email,
+        // user id, token, or Supabase payload is logged.
+        console.warn("[AdminLayoutShell] falha ao carregar nome de exibição (não afeta permissões)");
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -320,7 +365,7 @@ export function AdminLayoutShell({ children }: Props) {
             : "bg-white border-b border-gray-100"
         )}>
           <div className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 w-48 md:w-72 transition-colors",
+            "flex items-center gap-2 rounded-xl px-3 py-2 w-32 md:w-72 transition-colors",
             isInicioPage ? "bg-white/10 border border-white/15" : "bg-gray-50 border border-gray-200"
           )}>
             <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -440,11 +485,25 @@ export function AdminLayoutShell({ children }: Props) {
               )}
             </Link>
 
+            {/* Fase 10/11 do hotfix 1.0.5 — a 1.0.4 tentou caber Painel ADM
+                e Visualizar como na MESMA linha do header ao lado de busca,
+                sino, CRM, Status V1 e avatar, contando com margem de
+                pixels calculada mas nunca confirmada num navegador real —
+                o QA em 390x844 continuou reprovando os dois. Solução mais
+                robusta (Opção C do ticket): em mobile, estes dois controles
+                saem inteiramente da linha do header (que volta a ter
+                exatamente a mesma composição de antes da 1.0.4: busca,
+                sino, CRM, Status V1, avatar — sem "Mais", sem disputa de
+                espaço) e ganham uma barra dedicada, só deles, logo abaixo
+                do header. Nenhum handler é duplicado: são os MESMOS
+                componentes WorkspaceExitButton/WorkspaceViewSwitcher,
+                renderizados aqui (hidden md:flex, some no desktop) e de
+                novo mais abaixo (md:hidden, some no mobile). */}
             {userRole === "super_admin" && (
-              <>
+              <div className="hidden md:flex items-center gap-2">
                 <WorkspaceExitButton />
                 <WorkspaceViewSwitcher />
-              </>
+              </div>
             )}
 
             {userRole === "super_admin" && (
@@ -470,6 +529,21 @@ export function AdminLayoutShell({ children }: Props) {
             </button>
           </div>
         </header>
+
+        {userRole === "super_admin" && (
+          // justify-end (não center): WorkspaceViewSwitcher posiciona seu
+          // próprio dropdown com `absolute right-0 w-72` relativo ao botão —
+          // centralizado nesta barra, o dropdown de 288px estouraria a
+          // borda esquerda da viewport em 390px. Alinhado à direita, ele
+          // replica a mesma posição (perto da borda direita) que já tinha
+          // dentro do header no desktop, onde o dropdown sempre coube.
+          <div className="md:hidden flex items-center justify-end gap-2 px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+            <WorkspaceExitButton />
+            <WorkspaceViewSwitcher />
+          </div>
+        )}
+
+        {previewContext?.isPreview && <WorkspacePreviewBanner context={previewContext} />}
 
         {isOnContentosPage && (
           <div className="bg-purple-700 border-b border-purple-600 flex items-center justify-between px-4 md:px-6 py-2 flex-shrink-0">

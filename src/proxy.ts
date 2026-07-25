@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getRoleHome, OPERACIONAL_ALLOWED } from "@/lib/access-control";
+import { getRoleHome, OPERACIONAL_ALLOWED, resolveEffectiveUserRole } from "@/lib/access-control";
 import { verifyPreviewSessionToken, WORKSPACE_PREVIEW_COOKIE } from "@/lib/workspaces/preview-session";
 import { WORKSPACE_PREVIEW_READ_ONLY_CODE } from "@/lib/workspaces/assert-not-preview";
 
@@ -125,17 +125,20 @@ export async function proxy(request: NextRequest) {
 
   // Read role from profiles (authoritative).
   // Falls back to JWT metadata so auth never silently downgrades a real user.
+  // resolveEffectiveUserRole() is the single canonical resolver — shared
+  // with the login redirect and src/app/admin/layout.tsx (Sprint
+  // Workspaces 1.0.7) — so this precedence is defined in exactly one place.
   const { data: profileRow } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
 
-  const role: string =
-        profileRow?.role ??
-        (user.user_metadata?.role as string | undefined) ??
-        (user.app_metadata?.role as string | undefined) ??
-        "cliente";
+  const role: string = resolveEffectiveUserRole({
+    profileRole: profileRow?.role as string | undefined,
+    userMetadataRole: user.user_metadata?.role as string | undefined,
+    appMetadataRole: user.app_metadata?.role as string | undefined,
+  }) ?? "cliente";
 
   // ── Admin / Super Admin: can access everything ───────────────
   if (role === "admin" || role === "super_admin") {

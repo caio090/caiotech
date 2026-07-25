@@ -58,11 +58,18 @@ export async function getWorkspacePreviewContext(): Promise<ResolvedPreviewConte
   if (payload.isBlueprint) {
     const name = blueprintName(payload.workspaceId);
     if (!name) return { status: "invalid", context: null };
+    // Fase 4 do hotfix 1.0.4 — parentWorkspaceName nunca era resolvido aqui
+    // (sempre null), mesmo quando payload.parentWorkspaceId apontava para o
+    // blueprint da agência — daí o banner sempre mostrar "Atendido por: —"
+    // para o Cliente de Teste 02. blueprintName() já resolve qualquer id de
+    // fixture, incluindo o da agência-pai.
+    const parentName = payload.parentWorkspaceId ? blueprintName(payload.parentWorkspaceId) : null;
     return {
       status: "active_read_only",
       context: {
         surface: payload.surface, workspaceId: payload.workspaceId, workspaceName: name,
-        parentWorkspaceId: payload.parentWorkspaceId, parentWorkspaceName: null,
+        parentWorkspaceId: payload.parentWorkspaceId, parentWorkspaceName: parentName,
+        relationshipType: payload.parentWorkspaceId ? "managed_client" : null,
         isPreview: true, readOnly: true,
       },
     };
