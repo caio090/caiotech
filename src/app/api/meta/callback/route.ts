@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/app-url";
 import { verifyOAuthState } from "@/lib/meta/state";
+import { META_OAUTH_SCOPES } from "@/lib/meta/publishing";
 
 // GET /api/meta/callback
 // Recebe o retorno OAuth do Meta, valida state assinado, troca code por token
@@ -93,11 +94,23 @@ export async function GET(request: NextRequest) {
   // ── 4. Busca metadados da conta Meta (não-crítico) ────────────────────
   let metaUserId:   string | null = null;
   let metaUserName: string | null = null;
+  let grantedScopes = "";
   try {
-    const meRes  = await fetch(`https://graph.facebook.com/me?fields=id,name&access_token=${accessToken}`);
+    const [meRes, permissionsRes] = await Promise.all([
+      fetch(`https://graph.facebook.com/me?fields=id,name&access_token=${accessToken}`),
+      fetch(`https://graph.facebook.com/me/permissions?access_token=${accessToken}`),
+    ]);
     const meData = await meRes.json() as { id?: string; name?: string };
+    const permissionsData = await permissionsRes.json() as {
+      data?: Array<{ permission?: string; status?: string }>;
+    };
     metaUserId   = meData.id   ?? null;
     metaUserName = meData.name ?? null;
+    grantedScopes = (permissionsData.data ?? [])
+      .filter((permission) => permission.status === "granted" && permission.permission)
+      .map((permission) => permission.permission!)
+      .filter((permission) => META_OAUTH_SCOPES.includes(permission as typeof META_OAUTH_SCOPES[number]))
+      .join(",");
   } catch { /* não crítico */ }
 
   // ── 5. Persiste em meta_connections via admin client (bypassa RLS) ────
@@ -115,23 +128,40 @@ export async function GET(request: NextRequest) {
   const adminDb = createSupabaseAdminClient();
   let newConnectionId: string | null = null;
 
+  // No unique constraint exists on (connected_by, meta_user_id) in
+  // meta_connections (see docs/supabase/35-meta-connections.sql) — adding
+  // one is a schema change out of scope for this fix. Instead, look up the
+  // existing row for this exact user+Meta-account combination and update it
+  // in place; only insert when it's genuinely a new connection. This closes
+  // the insert-only gap that produced a fresh duplicate row on every
+  // reconnection, without inventing a constraint the table doesn't have.
   try {
-    const { data: inserted, error: insertError } = await adminDb
+    const existingQuery = adminDb
       .from("meta_connections")
-      .insert({
-        connected_by: userId,
-        provider:     "meta",
-        meta_app_id:  appId,
-        meta_user_id: metaUserId,
-        access_token: accessToken, // armazenado server-side, nunca enviado ao front
-        status:       "active",
-        is_active:    true,
-      })
       .select("id")
-      .single();
+      .eq("connected_by", userId)
+      .eq("provider", "meta");
+    const { data: existing } = metaUserId
+      ? await existingQuery.eq("meta_user_id", metaUserId).maybeSingle()
+      : await existingQuery.is("meta_user_id", null).maybeSingle();
 
-    if (insertError) {
-      if (insertError.code === "42P01") {
+    const connectionFields = {
+      connected_by: userId,
+      provider:     "meta",
+      meta_app_id:  appId,
+      meta_user_id: metaUserId,
+      access_token: accessToken, // armazenado server-side, nunca enviado ao front
+      scopes:       grantedScopes,
+      status:       "active",
+      is_active:    true,
+    };
+
+    const { data: saved, error: saveError } = existing?.id
+      ? await adminDb.from("meta_connections").update(connectionFields).eq("id", existing.id).select("id").single()
+      : await adminDb.from("meta_connections").insert(connectionFields).select("id").single();
+
+    if (saveError) {
+      if (saveError.code === "42P01") {
         return NextResponse.redirect(
           `${appUrl}/admin/conexoes?meta_warn=${encodeURIComponent(
             "OAuth autorizado com sucesso, mas a tabela meta_connections ainda não existe. Rode o SQL 35 no Supabase."
@@ -139,9 +169,9 @@ export async function GET(request: NextRequest) {
         );
       }
       // Erro real de DB — não redireciona como sucesso
-      console.error("[meta/callback] falha ao inserir conexão", {
-        code:    insertError.code,
-        message: insertError.message,
+      console.error("[meta/callback] falha ao salvar conexão", {
+        code:    saveError.code,
+        message: saveError.message,
         // Nunca loga token
       });
       return NextResponse.redirect(
@@ -151,7 +181,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    newConnectionId = inserted?.id ?? null;
+    newConnectionId = saved?.id ?? existing?.id ?? null;
   } catch {
     return NextResponse.redirect(
       `${appUrl}/admin/conexoes?meta_error=${encodeURIComponent("Erro inesperado ao salvar a conexão Meta.")}`

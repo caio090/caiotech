@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAppUrl, isProductionEnv, hasLocalhostMetaRedirect } from "@/lib/app-url";
 import { createOAuthState } from "@/lib/meta/state";
+import { META_OAUTH_SCOPES } from "@/lib/meta/publishing";
 
 const VALID_RETURN_PATHS = new Set([
   "/admin/clientes",
@@ -48,13 +49,7 @@ export async function GET(request: NextRequest) {
 
   const state = createOAuthState({ uid: user.id, cid: clientId, rt: returnTo });
 
-  const scopes = [
-    "pages_show_list",
-    "pages_read_engagement",
-    "instagram_basic",
-    "instagram_manage_insights",
-    "business_management",
-  ].join(",");
+  const scopes = META_OAUTH_SCOPES.join(",");
 
   const authUrl = new URL(`https://www.facebook.com/${apiVersion}/dialog/oauth`);
   authUrl.searchParams.set("client_id",     appId);
