@@ -66,12 +66,25 @@ interface Props {
    * página admin renderize o mesmo banner, uma única vez, no mesmo lugar.
    */
   previewContext: WorkspaceContext | null;
+  /**
+   * Sprint Workspaces 1.0.7 — resolved server-side in src/app/admin/layout.tsx
+   * via resolveEffectiveUserRole() (the same canonical precedence src/proxy.ts
+   * and the login redirect use), and used to initialize userRole below so the
+   * FIRST render already knows whether to show "Painel ADM" / "Visualizar
+   * como" — a client-side fetch is never the gate for that decision anymore.
+   * Only the resolved role string is passed — never a token, cookie, or the
+   * full user/profile object.
+   */
+  initialUserRole: string | null;
 }
 
-export function AdminLayoutShell({ children, previewContext }: Props) {
+export function AdminLayoutShell({ children, previewContext, initialUserRole }: Props) {
   const [userName,         setUserName]         = useState("Admin");
   const [initials,         setInitials]         = useState("A");
-  const [userRole,         setUserRole]         = useState<string | null>(null);
+  // No setter: role comes exclusively from the server-resolved prop and
+  // never changes during this component's lifetime (a session/role change
+  // means a fresh server render, which passes a fresh initialUserRole).
+  const userRole = initialUserRole;
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const pathname = usePathname();
 
@@ -125,21 +138,20 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  // Fetch user name + role.
+  // Fetch display name/initials only.
   //
-  // Sprint Workspaces 1.0.6 — root cause of "Painel ADM" / "Visualizar como"
-  // never appearing for a genuine Super Admin: this was the only place in
-  // the app that resolved role from profiles.role alone, with no fallback.
-  // src/proxy.ts (the actual route gate that let this same user reach
-  // /admin/dashboard) and the login redirect (src/app/(public)/login/page.tsx)
-  // both already fall back to user_metadata/app_metadata specifically
-  // because a real account's profiles.role row can be null or stale while
-  // the Auth-level metadata is correct ("so auth never silently downgrades
-  // a real user" — proxy.ts's own comment). This component skipped that
-  // fallback and, worse, returned early when `profile` itself was null —
-  // so userRole stayed null forever and every super_admin-gated control
-  // silently vanished, even though the very same user had already passed
-  // the server's more permissive role check to get here.
+  // Sprint Workspaces 1.0.6 found the root cause of "Painel ADM" /
+  // "Visualizar como" never appearing for a genuine Super Admin: this used
+  // to be the only place in the app that resolved role from profiles.role
+  // alone, with no fallback, and it returned early when `profile` was null
+  // — so userRole stayed null forever even though src/proxy.ts had already
+  // let the same user reach /admin/dashboard via a more permissive check.
+  // 1.0.7 removes the class of bug entirely rather than patching this
+  // fallback further: role now comes exclusively from the initialUserRole
+  // prop (server-resolved in src/app/admin/layout.tsx, before first render)
+  // and is never touched here. This effect only fills in name/initials —
+  // authorization and identity display are deliberately separate, so a
+  // failure here can never hide an administrative control.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
@@ -149,16 +161,18 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
         const { data: profile } = await supabase
-          .from("profiles").select("name, role").eq("id", user.id).maybeSingle();
+          .from("profiles").select("name").eq("id", user.id).maybeSingle();
         if (cancelled) return;
-        const role = profile?.role
-          ?? (user.user_metadata?.role as string | undefined)
-          ?? (user.app_metadata?.role as string | undefined)
-          ?? null;
         const name = profile?.name ?? user.email ?? "Admin";
         const ini  = name.split(/\s+/).slice(0, 2).map((w: string) => w[0] ?? "").join("").toUpperCase() || "A";
-        setUserName(name); setInitials(ini); setUserRole(role);
-      } catch {}
+        setUserName(name); setInitials(ini);
+      } catch {
+        // Non-blocking: initialUserRole (and therefore every
+        // super_admin-gated control) is unaffected by this failing — only
+        // the display name falls back to its "Admin" default. No email,
+        // user id, token, or Supabase payload is logged.
+        console.warn("[AdminLayoutShell] falha ao carregar nome de exibição (não afeta permissões)");
+      }
     })();
     return () => { cancelled = true; };
   }, []);
