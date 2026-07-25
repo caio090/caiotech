@@ -125,7 +125,21 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  // Fetch user name
+  // Fetch user name + role.
+  //
+  // Sprint Workspaces 1.0.6 — root cause of "Painel ADM" / "Visualizar como"
+  // never appearing for a genuine Super Admin: this was the only place in
+  // the app that resolved role from profiles.role alone, with no fallback.
+  // src/proxy.ts (the actual route gate that let this same user reach
+  // /admin/dashboard) and the login redirect (src/app/(public)/login/page.tsx)
+  // both already fall back to user_metadata/app_metadata specifically
+  // because a real account's profiles.role row can be null or stale while
+  // the Auth-level metadata is correct ("so auth never silently downgrades
+  // a real user" — proxy.ts's own comment). This component skipped that
+  // fallback and, worse, returned early when `profile` itself was null —
+  // so userRole stayed null forever and every super_admin-gated control
+  // silently vanished, even though the very same user had already passed
+  // the server's more permissive role check to get here.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
@@ -136,10 +150,14 @@ export function AdminLayoutShell({ children, previewContext }: Props) {
         if (!user || cancelled) return;
         const { data: profile } = await supabase
           .from("profiles").select("name, role").eq("id", user.id).maybeSingle();
-        if (!profile || cancelled) return;
-        const name = profile.name ?? user.email ?? "Admin";
+        if (cancelled) return;
+        const role = profile?.role
+          ?? (user.user_metadata?.role as string | undefined)
+          ?? (user.app_metadata?.role as string | undefined)
+          ?? null;
+        const name = profile?.name ?? user.email ?? "Admin";
         const ini  = name.split(/\s+/).slice(0, 2).map((w: string) => w[0] ?? "").join("").toUpperCase() || "A";
-        if (!cancelled) { setUserName(name); setInitials(ini); setUserRole(profile.role ?? null); }
+        setUserName(name); setInitials(ini); setUserRole(role);
       } catch {}
     })();
     return () => { cancelled = true; };
