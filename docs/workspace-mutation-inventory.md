@@ -125,6 +125,31 @@ card ir ao ar.**
 | `api/admin/workspaces/preview/route.ts` (POST, DELETE) | É o próprio ponto de entrada/saída do preview — exceção estrita exigida pelo ticket |
 | `api/admin/workspaces/preview/exit/route.ts` (POST) | Hotfix 1.0.10 — saída atômica dedicada (cookie deletion + HTTP 303 na mesma resposta); mesma natureza da exceção acima, não é uma mutação de dado de negócio |
 
+## Mutações de controle de sessão de preview explicitamente permitidas no runtime (proxy) — Fase 8 do hotfix 1.0.11
+
+Esta tabela é a única fonte de verdade sobre o que o **guard em tempo de execução**
+(`src/proxy.ts`, via `shouldBlockMutationInPreview()` em
+`src/lib/workspaces/mutation-guard-runtime.ts`) efetivamente deixa passar durante
+um preview ativo. A tabela `excluded_with_reason` acima é só a classificação do
+script `check-workspace-mutation-coverage.ts` (análise estática de arquivo, sem
+efeito em runtime) — **hotfix 1.0.11 encontrou exatamente essa lacuna**: a rota
+`api/admin/workspaces/preview/exit/route.ts` foi classificada ali no hotfix 1.0.10,
+mas nunca foi adicionada à allowlist real do proxy, que a bloqueava com 403
+`WORKSPACE_PREVIEW_READ_ONLY` antes mesmo de o handler ser alcançado.
+
+| Pathname | Método | Motivo | Matcher runtime | Teste associado |
+|---|---|---|---|---|
+| `/api/admin/workspaces/preview` | POST, DELETE | Entrada/saída original do preview (ativação e limpeza best-effort) | `MUTATION_GUARD_EXEMPT_PATHS` (Set, exceção por path, qualquer método mutante) | `mutation-guard-runtime.test.ts` — "a rota antiga ... continua exempta para POST/DELETE" |
+| `/api/admin/workspaces/preview/exit` | **POST somente** | Hotfix 1.0.10/1.0.11 — saída atômica (Set-Cookie + HTTP 303 na mesma resposta); DELETE/PUT/PATCH permanecem bloqueados nesse mesmo path, pois a rota só implementa POST | `isWorkspacePreviewControlMutation()` (exceção exata método+path, não um Set de path) | `mutation-guard-runtime.test.ts` — Cenário A + matriz exaustiva de allow/deny |
+
+Qualquer rota nova adicionada sob os namespaces mutáveis do proxy
+(`/api/admin/`, `/api/client/`, `/api/team/`, `/api/payments/`,
+`/api/olaclick/`, `/api/meta/`, `/api/billing/`, `/api/ai/`) que precise ser
+alcançável durante um preview ativo **deve** ganhar uma linha nesta tabela E uma
+asserção correspondente em `mutation-guard-runtime.test.ts` — nunca apenas uma
+entrada em `check-workspace-mutation-coverage.ts`, que não tem nenhum efeito
+sobre o que o proxy realmente bloqueia.
+
 ## Server Actions (Fase 7)
 
 `grep -rl '"use server"' src` não retornou nenhum resultado. **Não existe
