@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       throw e;
     }
     const res = NextResponse.json({ ok: true, destination: "/admin/visualizar" });
+    res.headers.set("Cache-Control", "no-store");
     res.cookies.set(WORKSPACE_PREVIEW_COOKIE, token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
       path: "/", maxAge: WORKSPACE_PREVIEW_COOKIE_MAX_AGE_SECONDS,
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
     throw e;
   }
   const res = NextResponse.json({ ok: true, destination: "/admin/visualizar" });
+  res.headers.set("Cache-Control", "no-store");
   res.cookies.set(WORKSPACE_PREVIEW_COOKIE, token, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
     path: "/", maxAge: WORKSPACE_PREVIEW_COOKIE_MAX_AGE_SECONDS,
@@ -90,6 +92,7 @@ export async function DELETE(req: NextRequest) {
   const payload = verified.ok ? verified.payload : verified.reason === "expired" ? verified.payload : null;
 
   const res = NextResponse.json({ ok: true });
+  res.headers.set("Cache-Control", "no-store");
   res.cookies.set(WORKSPACE_PREVIEW_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
   if (payload) {
     recordWorkspaceAuditEvent({

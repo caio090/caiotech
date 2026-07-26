@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Eye, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
 import type { WorkspaceSurface } from "@/lib/workspaces/types";
@@ -12,6 +11,23 @@ type Step = "closed" | "surface" | "entity" | "agency_for_client" | "client_unde
 const PREVIEWABLE_SURFACES: Exclude<WorkspaceSurface, "super_admin">[] = ["agency", "agency_client", "direct_business"];
 
 const GENERIC_ENTER_ERROR = "Não foi possível abrir esta visualização.";
+
+// Hotfix 1.0.9 — the only pathname POST /api/admin/workspaces/preview is
+// ever allowed to send back. Validated explicitly before navigating
+// instead of trusting any string the response happens to contain.
+const PREVIEW_DESTINATION = "/admin/visualizar";
+
+// Sanitized local timing only (a single duration number, never a
+// cookie/token/payload) — module-scope, not nested inside the component,
+// so react-hooks/purity doesn't (rightly, for actual render code) flag the
+// impure performance.now() call; these only ever run from an async click
+// handler, never during render.
+function startPreviewTimer(): number {
+  return performance.now();
+}
+function logPreviewDuration(label: string, startedAt: number) {
+  console.info(`[workspace-preview] ${label}: ${Math.round(performance.now() - startedAt)}ms`);
+}
 
 // Fase 16 do hotfix 1.0.2 — mapeia razões conhecidas e seguras (nunca stack
 // trace, nunca detalhe de banco) para uma orientação específica; qualquer
@@ -60,7 +76,6 @@ const EMPTY_REAL_MESSAGE = "Nenhum workspace real está disponível para esta su
 const LOAD_ERROR_MESSAGE = "Não foi possível carregar as opções de visualização.";
 
 export function WorkspaceViewSwitcher() {
-  const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [step, setStep] = useState<Step>("closed");
   const [pendingSurface, setPendingSurface] = useState<WorkspaceSurface | null>(null);
@@ -118,42 +133,62 @@ export function WorkspaceViewSwitcher() {
     if (lastOptionsUrl) void fetchOptions(lastOptionsUrl);
   }
 
+  // Hotfix 1.0.9 — 1.0.8's router.push()+router.refresh() fix worked, but
+  // Production QA measured 4-7s to switch blueprints and found a full
+  // repaint gap before the new context appeared. Both symptoms trace to
+  // the same design flaw: push() and refresh() are two SEPARATE App
+  // Router round-trips (a soft navigation, then an independent RSC
+  // re-fetch of the same tree) layered on top of this component's own
+  // still-mounted effects (name/notification fetches in
+  // _layout-client.tsx) re-running again on top of that — three phases
+  // of async work the user sees as one long stall with no visual
+  // feedback in between.
+  //
+  // A workspace switch is a privileged-context boundary, not an ordinary
+  // in-app navigation — it deserves the same treatment as a tenant
+  // switch: exactly one server round trip (this POST) to mutate the
+  // session, then exactly one real browser navigation
+  // (window.location.assign) that discards the Router Cache, every React
+  // effect, and every stale closure at once, and shows the browser's own
+  // native loading indicator instead of a silent async gap.
   async function enterPreview(opt: WorkspaceOption) {
+    if (entering) return; // one activation in flight at a time
     const surface = selectedAgency ? "agency_client" : pendingSurface;
     if (!surface) return;
     setEntering(true);
     setEnterError(null);
+    // Fase 6 — lets the next Production QA pass confirm this POST itself
+    // isn't what caused the 4-7s observed in 1.0.8 (the suspected cause is
+    // the removed push()+refresh() double round-trip, not this request).
+    const requestStartedAt = startPreviewTimer();
     try {
       const res = await fetch("/api/admin/workspaces/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ surface, workspaceId: opt.id, isBlueprint: opt.isBlueprint }),
       });
-      const body = (await res.json().catch(() => null)) as { ok: boolean; destination?: string; reason?: string } | null;
-      if (body?.ok && body.destination) {
-        close();
-        // Hotfix 1.0.8 — POST /api/admin/workspaces/preview always resolves
-        // destination to the same "/admin/visualizar" pathname, so pushing
-        // it while already there (switching Agência → Cliente → Empresa,
-        // for example) is a same-URL no-op in the App Router: nothing
-        // re-renders, even though the preview cookie just changed
-        // server-side. router.push() alone also isn't enough on the FIRST
-        // activation (dashboard → /admin/visualizar) because the shared
-        // src/app/admin/layout.tsx segment can still be served from the
-        // client Router Cache, which has no way to know a cookie changed.
-        // router.refresh() re-runs the current route's server components
-        // (this layout included) against the fresh cookie, in both cases —
-        // that's what makes the switch show up without a manual reload.
-        router.push(body.destination);
-        router.refresh();
+      const body = (await res.json().catch(() => null)) as { ok?: boolean; destination?: string; reason?: string } | null;
+      logPreviewDuration("ativação", requestStartedAt);
+
+      if (res.ok && body?.ok === true && body.destination === PREVIEW_DESTINATION) {
+        // Success: do NOT reset `entering` — the "Trocando ambiente..."
+        // state (and the disabled options list) stays exactly as it is
+        // until the browser actually unloads this document for the new
+        // one. There is nothing left to keep in sync locally: the current
+        // panel intentionally stays on screen, unchanged, until the real
+        // navigation replaces it wholesale.
+        window.location.assign(body.destination);
         return;
       }
-      // Falha: mantém o menu aberto, a seleção intacta, e mostra uma
-      // mensagem segura — nunca fecha o menu nem navega em caso de erro.
+
+      // Any other outcome (network error, non-2xx, malformed body, or a
+      // destination that doesn't match the one allowed value) is treated
+      // as failure — never navigate on an ambiguous response. Menu stays
+      // open, selection intact, current context untouched.
       setEnterError((body?.reason && KNOWN_ENTER_ERROR_MESSAGES[body.reason]) || GENERIC_ENTER_ERROR);
+      setEntering(false);
     } catch {
       setEnterError(GENERIC_ENTER_ERROR);
-    } finally {
       setEntering(false);
     }
   }
@@ -224,7 +259,7 @@ export function WorkspaceViewSwitcher() {
                 </div>
               )}
               <div className="max-h-64 overflow-y-auto">
-                {entering && <p className="text-xs text-gray-400 text-center py-4">Entrando…</p>}
+                {entering && <p className="text-xs text-gray-400 text-center py-4">Trocando ambiente…</p>}
                 {!entering && optionsState === "loading" && (
                   <p className="text-xs text-gray-400 text-center py-4">Carregando…</p>
                 )}
