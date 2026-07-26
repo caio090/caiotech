@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, X } from "lucide-react";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
 import type { WorkspaceContext, WorkspaceRelationshipType } from "@/lib/workspaces/types";
+
+const EXIT_ACTION = "/api/admin/workspaces/preview/exit";
 
 // Fase 4/7 do hotfix 1.0.4 — o banner agora recebe e exibe relationshipType,
 // não só o nome do pai (que sozinho não distinguia "gerenciado pela agência"
@@ -22,12 +24,19 @@ const RELATIONSHIP_LABELS: Record<WorkspaceRelationshipType, string> = {
  * page under /admin/visualizar renders this by wrapping its content, so
  * there's no route that can lose it.
  *
- * "Sair da visualização" now calls DELETE /api/admin/workspaces/preview to
- * clear the signed cookie before navigating — previously a plain <Link>
- * that only changed pathname while leaving the preview cookie active.
+ * Hotfix 1.0.10 — Production QA of 1.0.9 found the real P1: THIS button
+ * ("Sair da visualização", inside the banner shown throughout an active
+ * preview) still ran DELETE via fetch() inside a `finally`-guarded
+ * router.push() — the exact class of bug 1.0.9 believed it had eliminated,
+ * just left unfixed here because 1.0.9 only touched the separate "Painel
+ * ADM" button (workspace-exit-button.tsx). The two controls had drifted
+ * into duplicate, independently-maintained exit logic; this is the one
+ * that actually matched what QA clicked. Now a real <form method="post">
+ * to the atomic exit endpoint — see src/lib/workspaces/atomic-exit.ts.
  */
 export function WorkspacePreviewBanner({ context }: { context: WorkspaceContext }) {
   const router = useRouter();
+  const [exiting, setExiting] = useState(false);
 
   // Fase 6 do hotfix 1.0.4 — "browser back não restaura estado inválido".
   // Next.js mantém um cache de back/forward independente de staleTimes
@@ -48,14 +57,6 @@ export function WorkspacePreviewBanner({ context }: { context: WorkspaceContext 
 
   if (!context.isPreview) return null;
 
-  async function exit() {
-    try {
-      await fetch("/api/admin/workspaces/preview", { method: "DELETE" });
-    } finally {
-      router.push("/admin/dashboard");
-    }
-  }
-
   return (
     <div className="sticky top-0 z-40 bg-amber-500 text-white px-4 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-xs font-bold shadow-md">
       <div className="flex items-start sm:items-center gap-2 min-w-0">
@@ -67,12 +68,20 @@ export function WorkspacePreviewBanner({ context }: { context: WorkspaceContext 
           {context.readOnly ? " · Somente leitura" : ""}
         </span>
       </div>
-      <button
-        onClick={exit}
-        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap self-start sm:self-auto shrink-0"
+      <form
+        method="post"
+        action={EXIT_ACTION}
+        onSubmit={() => setExiting(true)}
+        className="self-start sm:self-auto shrink-0"
       >
-        <X className="w-3 h-3" /> Sair da visualização
-      </button>
+        <button
+          type="submit"
+          disabled={exiting}
+          className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap disabled:opacity-60"
+        >
+          <X className="w-3 h-3" /> {exiting ? "Saindo…" : "Sair da visualização"}
+        </button>
+      </form>
     </div>
   );
 }
