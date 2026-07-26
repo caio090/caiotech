@@ -132,7 +132,20 @@ export function WorkspaceViewSwitcher() {
       const body = (await res.json().catch(() => null)) as { ok: boolean; destination?: string; reason?: string } | null;
       if (body?.ok && body.destination) {
         close();
+        // Hotfix 1.0.8 — POST /api/admin/workspaces/preview always resolves
+        // destination to the same "/admin/visualizar" pathname, so pushing
+        // it while already there (switching Agência → Cliente → Empresa,
+        // for example) is a same-URL no-op in the App Router: nothing
+        // re-renders, even though the preview cookie just changed
+        // server-side. router.push() alone also isn't enough on the FIRST
+        // activation (dashboard → /admin/visualizar) because the shared
+        // src/app/admin/layout.tsx segment can still be served from the
+        // client Router Cache, which has no way to know a cookie changed.
+        // router.refresh() re-runs the current route's server components
+        // (this layout included) against the fresh cookie, in both cases —
+        // that's what makes the switch show up without a manual reload.
         router.push(body.destination);
+        router.refresh();
         return;
       }
       // Falha: mantém o menu aberto, a seleção intacta, e mostra uma
