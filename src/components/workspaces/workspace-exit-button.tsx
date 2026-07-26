@@ -17,7 +17,16 @@ export function WorkspaceExitButton() {
     try {
       await fetch("/api/admin/workspaces/preview", { method: "DELETE" });
     } finally {
+      // Hotfix 1.0.8 — same Router Cache gap as workspace-view-switcher.tsx:
+      // the DELETE clears the signed cookie server-side, but a bare
+      // router.push() can leave the shared admin layout rendering from a
+      // cached RSC payload that still reflects the (now cleared) preview.
+      // router.refresh() forces that shared layout to re-resolve
+      // getWorkspacePreviewContext() against the current, cookie-less
+      // request, so the exit is reflected immediately, not just on the
+      // next manual reload.
       router.push("/admin/dashboard");
+      router.refresh();
     }
   }
 
