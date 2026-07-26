@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getRoleHome, OPERACIONAL_ALLOWED, resolveEffectiveUserRole } from "@/lib/access-control";
 import { verifyPreviewSessionToken, WORKSPACE_PREVIEW_COOKIE } from "@/lib/workspaces/preview-session";
 import { WORKSPACE_PREVIEW_READ_ONLY_CODE } from "@/lib/workspaces/assert-not-preview";
+import {
+  MUTATING_METHODS,
+  isMutableNamespace,
+  shouldBlockMutationInPreview,
+} from "@/lib/workspaces/mutation-guard-runtime";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -21,29 +26,13 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
  * rede de segurança rápida contra qualquer rota mutável dentro dos
  * namespaces conhecidos que não tenha (ou ainda não tenha) o guard
  * explícito, não a fonte de verdade.
+ *
+ * Hotfix 1.0.11 — a decisão real (quais métodos/caminhos são bloqueados,
+ * quais são exceções de controle de preview) mora inteiramente em
+ * src/lib/workspaces/mutation-guard-runtime.ts, um módulo puro sem
+ * dependência de "next/server" — para que a exata lógica de produção seja
+ * executável por um teste real, e não apenas inspecionada por string.
  */
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-const MUTABLE_API_NAMESPACES = [
-  "/api/admin/", "/api/client/", "/api/team/", "/api/payments/",
-  "/api/olaclick/", "/api/meta/", "/api/billing/", "/api/ai/",
-];
-
-// Endpoints estritamente excluídos, com justificativa documentada:
-//  - /api/admin/workspaces/preview: é o próprio ponto de entrada/saída do
-//    preview (POST inicia, DELETE encerra) — bloqueá-lo tornaria impossível
-//    sair de um preview uma vez dentro dele.
-//  - /api/billing/coupons/validate: nunca faz insert/update/upsert/delete
-//    (ver docs/workspace-mutation-inventory.md) — validação somente leitura
-//    usada pela página pública /planos.
-const MUTATION_GUARD_EXEMPT_PATHS = new Set([
-  "/api/admin/workspaces/preview",
-  "/api/billing/coupons/validate",
-]);
-
-function isMutableNamespace(pathname: string): boolean {
-  return MUTABLE_API_NAMESPACES.some((ns) => pathname.startsWith(ns));
-}
 
 // Always public — no auth required
 const PUBLIC_PATH_PREFIXES = [
@@ -81,14 +70,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Defesa em profundidade (Fase 6, hotfix 1.0.2) — ver comentário acima.
-  if (
-    MUTATING_METHODS.has(request.method) &&
-    isMutableNamespace(pathname) &&
-    !MUTATION_GUARD_EXEMPT_PATHS.has(pathname)
-  ) {
+  if (MUTATING_METHODS.has(request.method) && isMutableNamespace(pathname)) {
     const previewToken = request.cookies.get(WORKSPACE_PREVIEW_COOKIE)?.value;
-    const verified = verifyPreviewSessionToken(previewToken);
-    if (verified.ok) {
+    const hasValidPreviewToken = verifyPreviewSessionToken(previewToken).ok;
+    if (shouldBlockMutationInPreview({ method: request.method, pathname, hasValidPreviewToken })) {
       return NextResponse.json(
         { error: "Esta ação está indisponível no modo de visualização.", code: WORKSPACE_PREVIEW_READ_ONLY_CODE },
         { status: 403 }
