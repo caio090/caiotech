@@ -123,6 +123,7 @@ card ir ao ar.**
 | `api/webhooks/payments/asaas/route.ts` | Webhook inbound do Asaas |
 | `api/webhooks/payments/route.ts` | Webhook inbound genérico de pagamentos |
 | `api/admin/workspaces/preview/route.ts` (POST, DELETE) | É o próprio ponto de entrada/saída do preview — exceção estrita exigida pelo ticket |
+| `api/admin/workspaces/preview/exit/route.ts` (POST) | Hotfix 1.0.10 — saída atômica dedicada (cookie deletion + HTTP 303 na mesma resposta); mesma natureza da exceção acima, não é uma mutação de dado de negócio |
 
 ## Server Actions (Fase 7)
 
