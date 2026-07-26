@@ -1,44 +1,33 @@
 /**
- * Structural regression test for Sprint Workspaces 1.0.8.
+ * Structural regression test for Sprint Workspaces preview navigation —
+ * history: 1.0.8 introduced router.push()+router.refresh() to fix a P1
+ * (blueprint switches needed a manual reload). Production QA of 1.0.8
+ * confirmed the switch worked, but found two more problems: (a) 4-7s of
+ * latency and a visible stale-panel gap, and (b) exiting a preview
+ * navigated even when the DELETE request itself failed, because the
+ * navigation lived inside a `finally` block — the URL could show
+ * /admin/dashboard while the preview cookie was still active server-side.
  *
- * Bug confirmed by Production QA: switching between blueprints (Agência →
- * Cliente → Empresa → Agência) only showed the new context after a manual
- * browser reload; exiting a preview could visually linger too.
- *
- * Root cause (traced through the real request flow, not guessed):
- * POST /api/admin/workspaces/preview always resolves `destination` to the
- * SAME fixed pathname, "/admin/visualizar" (confirmed by reading
- * src/app/api/admin/workspaces/preview/route.ts directly — both success
- * branches return `{ ok: true, destination: "/admin/visualizar" }"`).
- * Since a user switching blueprints is already ON /admin/visualizar,
- * `router.push(body.destination)` was pushing to the CURRENT pathname —
- * a same-URL no-op in the Next.js App Router: no navigation event fires,
- * and nothing tells the client Router Cache that src/app/admin/layout.tsx
- * (the shared server component that resolves previewContext from the
- * just-changed cookie) needs to re-run. Even on the FIRST activation
- * (dashboard -> /admin/visualizar, a real pathname change), the same
- * shared layout segment can still be served from the Router Cache, which
- * has no visibility into a cookie having changed server-side. Exiting the
- * preview (workspace-exit-button.tsx) had the identical gap: the DELETE
- * request clears the cookie server-side, but a bare `router.push()` gave
- * the client no reason to re-resolve that same shared layout.
- *
- * Fix: call `router.refresh()` immediately after `router.push()` in both
- * places. `router.refresh()` re-runs the current route's server
- * components (this shared layout included) against the current, fresh
- * cookie — it's the one App Router primitive that actually invalidates
- * the Router Cache, independent of whether the pathname changed.
+ * 1.0.9 replaces router.push()+router.refresh() entirely, in both the
+ * switcher and the exit button, with a single full-document navigation
+ * (window.location.assign / window.location.replace) gated on a validated
+ * 2xx response — never inside a finally block. A privileged-context
+ * switch (this is effectively a tenant switch) gets exactly one server
+ * round trip (the POST/DELETE) and exactly one real browser navigation,
+ * which discards the Router Cache, every React effect, and every stale
+ * closure at once — the two separate round-trips 1.0.8 needed (push then
+ * an independent refresh) are gone by construction, which is also the
+ * leading explanation for the observed latency (see the sprint's
+ * project-status.ts notes for the full reasoning; this file can only
+ * confirm the code shape, not re-measure Production timing).
  *
  * No jest/vitest in this project, and no DOM/browser testing framework
- * (React Testing Library, Playwright) is installed — adding one is out of
- * scope for this fix. A true rendered-DOM test of router behavior would
- * need one of those; this file follows the same disclosed-limitation,
- * source-level convention already established across this sprint
+ * is installed — this follows the same disclosed-limitation, source-level
+ * convention as the rest of this sprint
  * (src/app/admin/__tests__/layout-shell.structural.test.ts,
- * src/app/api/meta/publish/__tests__/guard.structural.test.ts on the Meta
- * branch): it proves the actual call sites, their order, and that nothing
- * gates or loops them — not just that a string appears somewhere in the
- * file.
+ * src/lib/__tests__/access-control-role.test.ts): it proves the actual
+ * call sites, their order, and that nothing gates or loops them — not
+ * just that a string appears somewhere in the file.
  *
  *   node src/lib/workspaces/__tests__/preview-navigation-sync.structural.test.ts
  */
@@ -60,73 +49,109 @@ const switcherSource = readFileSync(join(componentsDir, "workspace-view-switcher
 const exitButtonSource = readFileSync(join(componentsDir, "workspace-exit-button.tsx"), "utf8");
 const previewRouteSource = readFileSync(join(__dirname, "..", "..", "..", "app", "api", "admin", "workspaces", "preview", "route.ts"), "utf8");
 
+function extractFunctionBody(source: string, signature: RegExp): string {
+  const startMatch = source.match(signature);
+  if (!startMatch || startMatch.index === undefined) return "";
+  // Balance braces from the function's opening "{" to find its true end —
+  // robust against nested blocks with their own closing braces at the
+  // same indentation, unlike a naive "first \n  }" regex.
+  const openBraceIdx = source.indexOf("{", startMatch.index);
+  let depth = 0;
+  for (let i = openBraceIdx; i < source.length; i++) {
+    if (source[i] === "{") depth++;
+    else if (source[i] === "}") {
+      depth--;
+      if (depth === 0) return source.slice(startMatch.index, i + 1);
+    }
+  }
+  return source.slice(startMatch.index);
+}
+
+const enterPreviewBody = extractFunctionBody(switcherSource, /async function enterPreview\(/);
+const handleClickBody = extractFunctionBody(exitButtonSource, /async function handleClick\(\)/);
+
 console.log("[test] confirmed root cause: destination is always the same fixed pathname");
 {
   const destinationMatches = [...previewRouteSource.matchAll(/destination:\s*"([^"]+)"/g)].map((m) => m[1]);
   assert(destinationMatches.length >= 2, "the preview route has at least the two success-path destinations expected");
-  assert(destinationMatches.every((d) => d === "/admin/visualizar"), "every destination the preview route can return is the SAME fixed pathname — confirms router.push() alone would no-op when already there");
+  assert(destinationMatches.every((d) => d === "/admin/visualizar"), "every destination the preview route can return is the SAME fixed pathname");
 }
 
-console.log("\n[test] 1/2/3/4. entering/switching a preview pushes AND refreshes, unconditionally");
+console.log("\n[test] 6/7. router.push/router.refresh are gone from both navigation flows");
 {
-  // All three surface transitions (Agência, Cliente de agência, Empresa
-  // direta) funnel through this same enterPreview() function — there is
-  // only one call site to check, and it covers all three by construction.
-  const enterPreviewMatch = switcherSource.match(/async function enterPreview\([\s\S]*?\n  \}/);
-  assert(!!enterPreviewMatch, "enterPreview() is present");
-  const body = enterPreviewMatch?.[0] ?? "";
-
-  const pushIdx = body.indexOf("router.push(body.destination)");
-  const refreshIdx = body.indexOf("router.refresh();"); // trailing ";" avoids matching the explanatory comment above the real call
-  assert(pushIdx > -1 && refreshIdx > -1, "both router.push(body.destination) and router.refresh() are present in enterPreview()");
-  assert(pushIdx < refreshIdx, "push happens before refresh — refresh is not a leftover from some earlier, unrelated code path");
-
-  // 5. Not gated behind a pathname comparison — fires even when the
-  // destination equals the current route (the actual switching scenario).
-  assert(!/if\s*\(\s*(pathname|window\.location)/.test(body), "5. refresh is unconditional — not gated behind any current-pathname check, so it still fires when switching between blueprints on the same /admin/visualizar route");
-
-  // 9. Local switcher state (options, selectedAgency, errors) is reset via
-  // close() BEFORE the navigation — no stale blueprint list/selection can
-  // linger into the next render.
-  const closeIdx = body.indexOf("close();");
-  assert(closeIdx > -1 && closeIdx < pushIdx, "9. close() resets local switcher state before push/refresh — no stale selection or option list survives into the new context");
-
-  // 10. Exactly one POST is issued per activation attempt — enterPreview()
-  // is not retried/duplicated on its own.
-  const postCalls = [...body.matchAll(/method:\s*"POST"/g)];
-  assert(postCalls.length === 1, "10. exactly one POST call exists in enterPreview() — no duplicate/retry request");
-
-  // 11. refresh() is called directly inside the click-triggered async
-  // handler, not inside a useEffect/interval that could re-fire on its own.
-  assert(!/setInterval|setTimeout/.test(body), "11. no setInterval/setTimeout wraps the refresh — it cannot loop on its own");
+  // Absence of the useRouter import/hook is the definitive proof: with no
+  // `router` variable in scope at all, a `router.push(...)` call would be
+  // a reference to an undefined identifier — this project's own
+  // `npx tsc --noEmit` (0 errors, checked as part of this sprint's
+  // validations) would fail to compile if either file still called it.
+  // (Both files' comments legitimately still mention "router.push()" and
+  // "router.refresh()" in prose, explaining what the *previous* hotfix
+  // did and why it wasn't enough — a plain string search for those
+  // substrings would incorrectly flag that prose as leftover code.)
+  assert(!/import\s*\{[^}]*useRouter[^}]*\}\s*from\s*"next\/navigation"/.test(switcherSource), "6. workspace-view-switcher.tsx no longer imports useRouter — no router.push/router.refresh call can exist without it");
+  assert(!/import\s*\{[^}]*useRouter[^}]*\}\s*from\s*"next\/navigation"/.test(exitButtonSource), "7. workspace-exit-button.tsx no longer imports useRouter — no router.push/router.refresh call can exist without it");
 }
 
-console.log("\n[test] 6/7/8. why the banner, the preview shell, and the agency-parent name update without a manual reload");
+console.log("\n[test] 1/4/5/6/15. activation: one POST, disabled while in flight, location.assign exactly once on success");
 {
-  // These all come from the SAME server-resolved source (previewContext,
-  // rebuilt by src/app/admin/layout.tsx and src/app/admin/visualizar/page.tsx
-  // — both server components) — router.refresh() forcing those to re-run
-  // is what makes all three update together, not three separate fixes.
-  const layoutSource = readFileSync(join(__dirname, "..", "..", "..", "app", "admin", "layout.tsx"), "utf8");
-  assert(layoutSource.includes("getWorkspacePreviewContext()"), "6. the shared admin layout resolves previewContext fresh on every server render — refresh() is what triggers that server render again");
-  assert(layoutSource.includes("previewContext?.isPreview && <WorkspacePreviewBanner") || readFileSync(join(__dirname, "..", "..", "..", "app", "admin", "_layout-client.tsx"), "utf8").includes("previewContext?.isPreview && <WorkspacePreviewBanner"), "6b. WorkspacePreviewBanner renders directly from that same previewContext prop, not from independent client state");
+  assert(enterPreviewBody.length > 0, "enterPreview() is present");
+  assert(/if\s*\(entering\)\s*return;/.test(enterPreviewBody), "15. enterPreview() returns immediately if already entering — a second click cannot fire a second POST");
+  const postCalls = [...enterPreviewBody.matchAll(/method:\s*"POST"/g)];
+  assert(postCalls.length === 1, "exactly one POST call exists in enterPreview()");
 
-  const visualizarPageSource = readFileSync(join(__dirname, "..", "..", "..", "app", "admin", "visualizar", "page.tsx"), "utf8");
-  assert(visualizarPageSource.includes("getWorkspacePreviewContext()"), "7. /admin/visualizar's own page.tsx (a server component) also re-resolves the context fresh on every render — this is what updates the preview's own shell (VisualizarShell), not the persistent AppSidebar");
-  assert(/<VisualizarShell context=\{resolved\.context\}/.test(visualizarPageSource), "8. VisualizarShell (which renders parentWorkspaceName / \"Atendido por\") receives context directly from that fresh server resolution — no memoized/stale copy");
+  const assignCalls = [...enterPreviewBody.matchAll(/window\.location\.assign\(/g)];
+  assert(assignCalls.length === 1, "1. exactly one window.location.assign(...) call exists in enterPreview()");
+
+  // The assign call must be inside the success branch (gated on res.ok +
+  // body.ok + the validated destination), not unconditional.
+  const successBranchMatch = enterPreviewBody.match(/if \(res\.ok && body\?\.ok === true && body\.destination === PREVIEW_DESTINATION\) \{[\s\S]*?window\.location\.assign\(body\.destination\);/);
+  assert(!!successBranchMatch, "1b. window.location.assign is gated behind res.ok, body.ok === true, AND a destination equality check — not called unconditionally");
+
+  // 2/3. Error paths (bad response, thrown exception) must never reach assign.
+  const catchBlock = enterPreviewBody.match(/\} catch \{[\s\S]*?\n  \}$/)?.[0] ?? enterPreviewBody.slice(enterPreviewBody.indexOf("} catch"));
+  assert(!catchBlock.includes("window.location.assign"), "2. the catch block (network/thrown errors) never calls window.location.assign");
+  const afterSuccessBranch = enterPreviewBody.slice((successBranchMatch ? enterPreviewBody.indexOf(successBranchMatch[0]) + successBranchMatch[0].length : 0));
+  assert(!afterSuccessBranch.includes("window.location.assign"), "3. no other window.location.assign call exists outside the validated success branch — an invalid/malformed response cannot navigate");
+
+  // 4. Button/options are disabled while entering — the render only shows
+  // selectable options when NOT entering (existing !entering gate).
+  assert(switcherSource.includes("!entering && optionsState"), "4. option buttons are only rendered when not currently entering — no new click can fire mid-request");
+
+  // 5. The overlay copy required by the ticket.
+  assert(switcherSource.includes("Trocando ambiente"), "5. the \"Trocando ambiente...\" overlay text is present");
 }
 
-console.log("\n[test] 12/13. exit navigates to /admin/dashboard and clears the session, with the same refresh fix");
+console.log("\n[test] 8/9/10/11/12/14/16. exit: one DELETE, location.replace exactly once on success, never inside finally");
 {
-  assert(exitButtonSource.includes('await fetch("/api/admin/workspaces/preview", { method: "DELETE" })'), "13. exit calls DELETE on the preview session before navigating");
-  const handleClickMatch = exitButtonSource.match(/async function handleClick\(\)[\s\S]*?\n  \}/);
-  assert(!!handleClickMatch, "handleClick() is present");
-  const exitBody = handleClickMatch?.[0] ?? "";
-  const exitPushIdx = exitBody.indexOf('router.push("/admin/dashboard")');
-  const exitRefreshIdx = exitBody.indexOf("router.refresh();"); // trailing ";" avoids matching the explanatory comment above the real call
-  assert(exitPushIdx > -1, "12. exit pushes to /admin/dashboard, the canonical admin route — never stays on /admin/visualizar");
-  assert(exitRefreshIdx > -1 && exitPushIdx < exitRefreshIdx, "exit also refreshes after pushing, for the same Router Cache reason as entering a preview");
-  assert(exitBody.includes("finally"), "the push+refresh run in a finally block — they happen whether or not the DELETE request succeeds, so a network hiccup can't strand the user mid-exit");
+  assert(handleClickBody.length > 0, "handleClick() is present");
+  assert(handleClickBody.includes('await fetch("/api/admin/workspaces/preview", { method: "DELETE" })'), "handleClick() calls DELETE on the preview session");
+  assert(/if\s*\(exiting\)\s*return;/.test(handleClickBody), "16. handleClick() returns immediately if already exiting — a second click cannot fire a second DELETE");
+
+  const replaceCalls = [...handleClickBody.matchAll(/window\.location\.replace\(/g)];
+  assert(replaceCalls.length === 1, "8. exactly one window.location.replace(...) call exists in handleClick()");
+  assert(!handleClickBody.includes("window.location.assign"), "14. exit uses .replace, never .assign — the ended preview document is never a browser-back target");
+
+  const successBranchMatch = handleClickBody.match(/if \(res\.ok && body\?\.ok === true\) \{[\s\S]*?window\.location\.replace\("\/admin\/dashboard"\);/);
+  assert(!!successBranchMatch, "8b. window.location.replace is gated behind res.ok AND body.ok === true");
+
+  // 12. Critically: no `finally` block wraps the navigation at all anymore
+  // — this is the exact bug Production QA flagged (navigation used to run
+  // unconditionally in `finally`, even when the DELETE failed).
+  assert(!handleClickBody.includes("finally"), "12. no finally block exists in handleClick() — navigation cannot run when the DELETE failed");
+
+  // 9/10/11. The failure paths set an error and reset `exiting` (re-enabling the button — the retry affordance) without navigating.
+  const catchBlock = handleClickBody.slice(handleClickBody.indexOf("} catch"));
+  assert(!catchBlock.includes("window.location.replace"), "9. the catch block (network/thrown errors) never calls window.location.replace");
+  assert(handleClickBody.includes("setExitError(GENERIC_EXIT_ERROR);\n      setExiting(false);"), "10/11. on failure, exitError is set and exiting is reset to false — the preview stays visible and the same button can be clicked again to retry");
+  assert(exitButtonSource.includes("Saindo da visualização"), "13. the \"Saindo da visualização...\" state text is present");
+}
+
+console.log("\n[test] 17/18/19. Cache-Control: no-store on both POST and DELETE; cookie stays HttpOnly");
+{
+  const noStoreCount = [...previewRouteSource.matchAll(/res\.headers\.set\("Cache-Control",\s*"no-store"\)/g)].length;
+  assert(noStoreCount === 3, `17/18. Cache-Control: no-store is set on all 3 success responses (blueprint POST, real-workspace POST, DELETE) — found ${noStoreCount}`);
+  const httpOnlyCount = [...previewRouteSource.matchAll(/httpOnly:\s*true/g)].length;
+  assert(httpOnlyCount === 3, "19. the cookie is still set/cleared with httpOnly: true in all 3 places — Cache-Control is additive, the cookie's own security attributes are untouched");
 }
 
 console.log(`\n[test] preview-navigation-sync — ${passed} passed, ${failed} failed`);
