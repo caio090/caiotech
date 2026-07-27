@@ -1184,6 +1184,25 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     notes: "Somente na branch feat/workspace-panels-v1. Deliberadamente NÃO persiste em tabela — hoje só um console.info(JSON) por evento. Sem SQL criado ou executado nesta sprint; persistência real é trabalho futuro, dependente de aprovação de schema. Hotfix 1.0.2 (Fase 23): reconfirmado que nenhum dado sensível (token, cookie, payload completo, e-mail, nome de cliente) é logado — só uid, surface, workspaceId, isBlueprint e timestamp. Nenhum logger estruturado existe hoje no projeto (grep confirmou), então console.info seguiu sendo a escolha honesta.",
   },
 
+  // ── Contas, painéis e roteamento (branch feat/accounts-panel-routing-v1) ──
+  {
+    id: "accounts_panel_routing_audit",
+    name: "Contas — Auditoria de painéis, memberships e roteamento",
+    category: "admin",
+    description: "Auditoria prévia (somente leitura) do modelo real de contas/workspaces após a validação de Workspaces 1.0.11 em Production: docs/accounts-panel-routing-audit.md mapeia profiles/clients/agency_workspaces/agency_clients/client_user_access ao vivo (Supabase MCP, projeto lokat-os), a resolução de papel/cliente atual, a matriz de rotas por superfície, e desenha (sem implementar) o plano idempotente de criação de contas e os testes de isolamento entre Focus/Duh Lanches/Açaí do Gordo.",
+    phase: "v2",
+    readiness: "in_progress",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-26",
+    notes: "Nenhuma mutação executada — 100% leitura (código + consultas SELECT ao Supabase real). Achados principais: (1) o modelo de Workspaces (agency_workspaces/agency_clients) construído nos hotfixes 1.0–1.0.11 tem 0 linhas reais em produção — nunca foi inserido por nenhum código da aplicação, só é exercitado pelo preview do Super Admin com dados de blueprint; não existe hoje nenhum 'Gerenciar empresa' real, só o preview somente-leitura. (2) Existem quatro vocabulários de account_type/plano desalinhados entre si (docs/supabase/69, src/lib/account-permissions.ts, src/lib/account-types.ts, e o valor real observado em clients.account_type = 'lokat_client', que não existe em nenhum dos três) — já parcialmente reconhecido no próprio comentário de src/config/workspace-capabilities.ts de uma sprint anterior, mas nunca unificado. (3) O único limite de clientes por plano implementado em código (canCreateClient/getClientLimitByPlan) usa slugs de plano que nunca correspondem aos slugs reais do banco (billing_plans/plan_limits: comunidade/start/pro/agencia) — na prática sempre cai no fallback, nunca aplica o limite contratado; não há nenhuma validação server-side do limite hoje, e não existe nenhum fluxo de criação de agency_clients no código para a validação se aplicar. (4) Das entidades citadas pelo ticket, só Duh Lanches e O Pedreirão existem de fato (2 clientes reais no banco, ambos sem owner_id, sem agência vinculada, status 'onboarding'); Agência Lokat, Focus, Cliente Teste Focus 01 e Açaí do Gordo NÃO existem em nenhuma tabela — confirmado por consulta direta, não suposição. (5) Nenhum risco P0 encontrado — o modelo multi-tenant real ainda não está em uso por nenhum usuário de verdade, então não há vetor de vazamento entre empresas hoje. P1/P2 detalhados na seção 12 do documento. Meu Negócio/Precificação/Produtos são 100% demo em memória (zero Supabase) — sem risco de isolamento porque não há dado real. QA formal não se aplica (auditoria, não feature).",
+    next_actions: [
+      "Decidir com o usuário qual vocabulário de account_type/plano é o canônico antes de qualquer implementação nova",
+      "Implementar assertAgencyCanAddClient() server-side antes de qualquer UI de criação de cliente por agência",
+      "Construir findOrCreateWorkspace/findOrCreateAgencyClient em modo dry-run, validado manualmente antes de qualquer execução real",
+      "Só criar Focus/Cliente Teste Focus 01/Açaí do Gordo com dados reais fornecidos explicitamente pelo usuário (nunca inventados) — nenhum dos três existe hoje",
+    ],
+  },
+
   // ── Workspaces 1.0.2 (mesma branch feat/workspace-panels-v1) ──────────────
   {
     id: "workspace_mutation_inventory",
