@@ -1222,6 +1222,31 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
   },
 
+  // -- Meu Negocio - Fluxo de Caixa, Reserva e importacao local de planilhas --
+  {
+    id: "meu_negocio_finance_cashflow_spreadsheet_v1",
+    name: "Meu Negocio - Fluxo de Caixa, Reserva e planilhas V1",
+    category: "operacional",
+    description: "Experiencia financeira demonstrativa em /admin/meu-negocio com visao simples e Modo Gestor, dashboard de fluxo de caixa, capital de giro, reserva financeira, graficos, importacao local revisavel de XLSX/CSV e exportacao do modelo oficial de planilha.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    risk: "medium",
+    last_updated: "2026-07-27",
+    notes: "Implementacao local concluida e coberta por 209 assercoes automatizadas, TypeScript, ESLint e build de producao. Os dados financeiros exibidos continuam simulados e identificados; nao existe persistencia, consulta ao Supabase, envio de planilha ou integracao com Google Sheets nesta fase. A importacao acontece somente no navegador e exige revisao antes de aplicar. A conexao OlaClick continua separada deste fluxo. QA visual autenticado permanece pendente porque o ambiente local nao possui as variaveis Supabase necessarias para abrir /admin/meu-negocio. Dependencia xlsx 0.18.5 possui advisories conhecidos sem correcao no registro npm e deve ser substituida antes de aceitar arquivos nao confiaveis em producao.",
+    blockers: [
+      "Persistencia financeira por workspace/cliente ainda nao implementada",
+      "QA visual autenticado pendente",
+      "Substituir ou isolar xlsx antes de liberar importacao de arquivos nao confiaveis",
+    ],
+    next_actions: [
+      "Executar QA visual autenticado em desktop, tablet e mobile",
+      "Definir persistencia por workspace/cliente sem misturar dados entre empresas",
+      "Avaliar biblioteca mantida para XLSX e impor limites de tamanho/complexidade",
+      "Planejar Google Sheets como integracao futura com OAuth proprio, sem simular conexao",
+    ],
+  },
+
   // ── Workspaces 1.0.2 (mesma branch feat/workspace-panels-v1) ──────────────
   {
     id: "workspace_mutation_inventory",
