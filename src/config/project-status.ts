@@ -706,8 +706,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Branch fix/rec-os-global-navigation, mergeada em main em 2026-07-23 (release canônica 1.0). tsc, build e ESLint passam limpos. Isolamento entre clientes verificado apenas em nível de código — sem QA em navegador real com os dois clientes reais (Duh Lanches, O Pedreirão) ainda. Hotfix canônico 1.0.1 (sprint local): corrigido o mismatch de hidratação (React #418) em formatDate() deste arquivo, causado por toLocaleDateString sem timeZone explícito — ver production_hydration_stability.",
-    next_actions: ["QA local (Codex Web): reload repetido em /admin/contentos com e sem client, confirmar ausência de React #418 no console"],
+    notes: "Branch fix/rec-os-global-navigation, mergeada em main em 2026-07-23 (release canônica 1.0). tsc, build e ESLint passam limpos. Isolamento entre clientes verificado apenas em nível de código — sem QA em navegador real com os dois clientes reais (Duh Lanches, O Pedreirão) ainda. Hotfix canônico 1.0.1 (sprint local): corrigido o mismatch de hidratação (React #418) em formatDate() deste arquivo, causado por toLocaleDateString sem timeZone explícito — ver production_hydration_stability. Pendência registrada na sprint feat/meu-negocio-stock-restaurant-v1 (nenhum código REC OS tocado, apenas observação durante a auditoria visual do dashboard): (1) dois nomes 'REC OS' aparecem no dashboard, um deles deveria representar outro módulo; (2) o calendário interno da REC OS navega para o calendário global em vez de permanecer dentro da própria REC OS — os dados podem refletir no calendário global sem reutilizar a mesma rota visual. Branch futura recomendada: fix/rec-os-dashboard-calendar-routing-v1.",
+    next_actions: ["QA local (Codex Web): reload repetido em /admin/contentos com e sem client, confirmar ausência de React #418 no console", "Futuro: abrir fix/rec-os-dashboard-calendar-routing-v1 para corrigir a duplicidade de nomes REC OS no dashboard e o roteamento do calendário interno"],
   },
   {
     id: "rec_os_clickable_dashboard",
@@ -1200,6 +1200,25 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
       "Implementar assertAgencyCanAddClient() server-side antes de qualquer UI de criação de cliente por agência",
       "Construir findOrCreateWorkspace/findOrCreateAgencyClient em modo dry-run, validado manualmente antes de qualquer execução real",
       "Só criar Focus/Cliente Teste Focus 01/Açaí do Gordo com dados reais fornecidos explicitamente pelo usuário (nunca inventados) — nenhum dos três existe hoje",
+    ],
+  },
+
+  // ── Meu Negócio — Vertical slice Restaurante (branch feat/meu-negocio-stock-restaurant-v1) ──
+  {
+    id: "meu_negocio_restaurant_vertical_slice",
+    name: "Meu Negócio — Vertical slice Restaurante (estoque, fichas técnicas, CMV)",
+    category: "operacional",
+    description: "Protótipo navegável e matematicamente coerente para o arquétipo food_service dentro de /admin/meu-negocio: seleção de empresa, estoque central e cozinha com transferências e inventário, compras com ponto de reposição e cobertura, fichas técnicas (fator de correção, rendimento de cocção, CMV do produto), CMV real vs. teórico com lacuna explicada, relatórios, glossário contextual e fluxo 'Analisar e preencher'. Arquitetura adaptativa por arquétipo de negócio (BusinessArchetypeConfig) — só food_service tem a experiência completa; os demais (retail, services, agency, clinic, law_firm, generic) existem como contratos tipados.",
+    phase: "v2",
+    readiness: "in_progress",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-26",
+    notes: "100% em memória, sem persistência e sem nenhuma consulta/mutação ao Supabase — confirmado por teste estrutural (nenhum arquivo novo referencia Supabase ou fetch()). A auditoria anterior (feat/accounts-panel-routing-v1) confirmou que agency_workspaces/agency_clients têm 0 linhas reais e que não existe 'Gerenciar empresa' real — esta sprint respeita esse limite: a tela de seleção de empresa usa fixtures locais (Duh Lanches como 'active'/food_service, O Pedreirão como 'available_for_activation'/retail, sem experiência retail construída), nunca uma consulta real a clients/agency_clients. Todos os números de exemplo (Smash de Exemplo, relatório de CMV) estão marcados como simulação e batem exatamente com os valores do ticket, verificados por teste real (não apenas exibidos): custo dos ingredientes R$ 8,62, CMV do produto 34,48%, consumo real R$ 37.000/CMV real 37%, consumo teórico R$ 33.000/CMV teórico 33%, lacuna R$ 4.000/4 pontos percentuais. Fator de correção e rendimento de cocção são funções puras separadas (perda de limpeza ≠ perda de cocção), nunca misturadas. Transferência central→cozinha nunca permite saldo negativo (rejeitada, não clampada) e preserva o total consolidado entre as duas localizações. Contagem de inventário trata explicitamente saldo zero, contado zero, valores negativos e unidade incompatível — nunca divide por zero. 111 asserções reais passando (25 em stock/calculations, 21 em costing/calculations incluindo os números exatos do ticket, 65 estruturais). Um bug real de import foi encontrado e corrigido durante a validação no servidor local (buildPurchaseDrafts estava sendo importado do módulo errado) — só foi pego rodando o servidor de fato, não pelos testes ad-hoc isolados, reforçando por que o Fase de 'servidor local' do ticket não é dispensável. ESLint limpo nos arquivos alterados (incluindo a correção de um react-hooks/purity de Date.now() reutilizando o generateId() já existente em _shared.tsx). tsc --noEmit e next build continuam bloqueados pelo mesmo teto de memória (~700-750MB) dos hotfixes 1.0.10/1.0.11/exit-guard — mas, diferente dessas sprints, `next dev` funcionou desta vez (compilação sob demanda, não o programa inteiro de uma vez) e serviu /login (200) e /admin/meu-negocio (307, redirect correto sem sessão) em http://localhost:3002 — sem validação visual autenticada (sem navegador/sessão de Super Admin disponível neste ambiente, mesma lacuna disclosed desde os primeiros hotfixes de Workspaces). Pendência de REC OS (dois nomes 'REC OS' no dashboard, calendário interno navegando para o calendário global) registrada em rec_os_global_hub — nenhum código REC OS foi tocado.",
+    next_actions: [
+      "QA visual autenticado (Codex Web/Claude Web) em http://localhost:3002/admin/meu-negocio com sessão real de Super Admin",
+      "Conectar o módulo a um workspace/cliente real assim que o modelo de contas (accounts_panel_routing_audit) for unificado — hoje a seleção de empresa é só fixture local",
+      "Implementar a experiência completa do arquétipo retail (O Pedreirão) em uma sprint futura",
+      "Abrir fix/rec-os-dashboard-calendar-routing-v1 para a pendência de REC OS registrada nesta sprint",
     ],
   },
 
