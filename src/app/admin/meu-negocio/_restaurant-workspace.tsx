@@ -15,6 +15,7 @@ import { RestaurantTechnicalSheets } from "./_restaurant-technical-sheets";
 import { RestaurantReports } from "./_restaurant-reports";
 import { RestaurantAnalyzeFill } from "./_restaurant-analyze-fill";
 import { ComingSoonPanel } from "./_coming-soon-panel";
+import { FinanceTab } from "./_finance-tab";
 
 const SECTION_ORDER: BusinessModuleKey[] = [
   "overview", "reports", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings",
@@ -109,7 +110,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
       {activeSection === "purchasing" && <RestaurantPurchasing items={items} balances={balances} />}
       {activeSection === "technical_sheets" && <RestaurantTechnicalSheets sheets={sheets} />}
       {activeSection === "products_pricing" && <RestaurantTechnicalSheets sheets={sheets} pricingFocus />}
-      {activeSection === "finance" && <ComingSoonPanel title="Financeiro" description="Fluxo de caixa e DRE simplificado por empresa — planejado para uma sprint futura." />}
+      {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateTo} />}
       {activeSection === "settings" && <ComingSoonPanel title="Configurações" description="Preferências do módulo (unidades, fornecedores padrão, alertas) — planejado para uma sprint futura." />}
 
       <RestaurantAnalyzeFill />
