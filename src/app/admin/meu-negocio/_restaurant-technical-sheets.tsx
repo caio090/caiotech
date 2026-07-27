@@ -103,7 +103,11 @@ const STATUS_LABEL: Record<TechnicalSheet["status"], string> = {
   draft: "Rascunho", active: "Ativa", outdated: "Desatualizada", archived: "Arquivada",
 };
 
-function Metric({ label, value, highlight, ...rest }: { label: string; value: string; highlight?: boolean } & Record<string, string | undefined>) {
+function Metric({ label, value, highlight, ...rest }: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+} & Omit<React.HTMLAttributes<HTMLDivElement>, "children">) {
   return (
     <div {...rest} className={cn("rounded-xl px-3 py-2", highlight ? "bg-amber-50" : "bg-gray-50")}>
       <p className="text-[10px] text-gray-400">{label}</p>
