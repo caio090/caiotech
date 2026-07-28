@@ -45,5 +45,13 @@ public/rec/*.mp4
 dev-out*.txt
 dev-err*.txt
 dev-server.log
+.tmp/
+
+# Project-scoped agent skills installed from audited external repositories
+.agents/skills/gsap-*/
+.agents/skills/threejs-*/
+.claude/skills/gsap-*/
+.claude/skills/threejs-*/
+skills-lock.json
 
 .vercel
