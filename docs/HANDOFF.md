@@ -1001,3 +1001,12 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
 - Autenticar manualmente em `http://127.0.0.1:3002/login` e executar o roteiro visual do Centro de Comando.
 - Depois do QA, revisar o diff e decidir sobre commits/push apenas na branch de correcao.
+# Meu Negócio Motion V1 - release candidate
+
+- Branch: `feat/meu-negocio-motion-3d-refinement-v1`.
+- A rota existente `/admin/meu-negocio` recebeu um motion system compartilhado com GSAP para entrada do Centro de Comando e transições entre área, subárea e modo.
+- O Assistente Lokat recebeu um único orb Three.js lazy, sem Fiber/Drei, com fallback estático, DPR 1.5, bloqueio em mobile/pointer coarse/reduced motion e cleanup completo.
+- Nenhuma fórmula, fixture, integração, dado real, Supabase, Auth ou RLS foi alterado.
+- Dependências: `gsap`, `@gsap/react`, `three` e `@types/three`; `framer-motion` foi preservado.
+- Validações: TypeScript, ESLint, 246 testes estruturais/funcionais e build Webpack aprovados.
+- QA visual autenticado permanece pendente; próximo passo é merge e deploy controlado após revisão.
