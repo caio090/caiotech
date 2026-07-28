@@ -1247,6 +1247,30 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
   },
 
+  {
+    id: "meu_negocio_cmv_menu_engineering_v1",
+    name: "Meu Negócio — Central de CMV e Engenharia de Cardápio V1",
+    category: "operacional",
+    description: "Central demonstrativa que separa Visão simples/Modo Gestor de CMV teórico/real, calcula lacuna, cobertura explicável, margem de contribuição, popularidade e quadrantes de engenharia de cardápio, com hipóteses e verificações sem acusação automática.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    risk: "medium",
+    last_updated: "2026-07-27",
+    notes: "Somente na branch feat/meu-negocio-cmv-menu-engineering-v1. Duh Lanches é contexto visual e todos os valores são EXEMPLOS SIMULADOS derivados de uma fixture central; nenhum dado real, Supabase, Auth, workspace ou integração OlaClick foi alterado. CMV_FINAL_REFERENCE_PENDING permanece ativo. Persistência, histórico real, dados reais OlaClick e QA visual autenticado continuam pendentes. xlsx 0.18.5 foi substituído pela distribuição oficial fixa 0.20.3 e o importador local ganhou limites de arquivo, abas, linhas, colunas, células e texto, além de rejeição de prototype keys e desativação de fórmula/HTML.",
+    blockers: [
+      "Referência visual final do MVP de CMV ainda não fornecida",
+      "Persistência por workspace/cliente não implementada",
+      "Dados reais OlaClick ainda não conectados à Central de CMV",
+      "QA visual autenticado em 390/768/1024/desktop pendente",
+    ],
+    next_actions: [
+      "Executar QA visual autenticado da Central de CMV",
+      "Recalibrar o layout quando CMV_FINAL_REFERENCE_PENDING for resolvido",
+      "Projetar persistência e integração OlaClick em sprint separada",
+    ],
+  },
+
   // ── Workspaces 1.0.2 (mesma branch feat/workspace-panels-v1) ──────────────
   {
     id: "workspace_mutation_inventory",
