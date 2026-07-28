@@ -17,6 +17,7 @@ import { RestaurantAnalyzeFill } from "./_restaurant-analyze-fill";
 import { ComingSoonPanel } from "./_coming-soon-panel";
 import { FinanceTab } from "./_finance-tab";
 import { CmvCenter } from "./_cmv-center";
+import { ProductCommandCenter } from "./_product-command-center";
 
 const SECTION_ORDER: BusinessModuleKey[] = [
   "overview", "reports", "cmv_menu", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings",
@@ -52,7 +53,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
   }
 
   return (
-    <div>
+    <div className="pt-1 sm:pt-2">
       <div className="flex items-center justify-between gap-3 mb-4">
         <button onClick={onBack} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
           <ArrowLeft className="w-3.5 h-3.5" /> Trocar empresa
@@ -112,7 +113,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
       )}
       {activeSection === "purchasing" && <RestaurantPurchasing items={items} balances={balances} />}
       {activeSection === "technical_sheets" && <RestaurantTechnicalSheets sheets={sheets} />}
-      {activeSection === "products_pricing" && <RestaurantTechnicalSheets sheets={sheets} pricingFocus />}
+      {activeSection === "products_pricing" && <ProductCommandCenter />}
       {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateTo} />}
       {activeSection === "settings" && <ComingSoonPanel title="Configurações" description="Preferências do módulo (unidades, fornecedores padrão, alertas) — planejado para uma sprint futura." />}
 
