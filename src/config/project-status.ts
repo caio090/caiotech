@@ -1052,6 +1052,20 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     last_updated: "2026-07-27",
     notes: "Somente demonstração em memória nesta branch. IA não calcula nem altera dados; store=false, sem web search. OlaClick auditada sem inventar conexão ou prova runtime. Sem SQL, Supabase, Auth, dado real ou deploy. V1_PROGRESS=81 e V2_PROGRESS=12 preservados.",
   },
+  {
+    id: "meu_negocio_dashboard_design_system_v1",
+    name: "Meu Negócio — Navegação e design profissional do Centro de Comando V1",
+    category: "admin",
+    description: "Oito áreas principais, subnavegação contextual, Produtos e Fichas unificados, Estoque e Compras unificados, design tokens locais, Centro de Comando executivo e cascata de resultado gerencial.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["QA visual autenticado em 390, 768, 1024 e 1440 px pendente"],
+    next_actions: ["Executar QA visual autenticado local", "Validar navegação por teclado, gráficos e drawers em navegador real"],
+    risk: "low",
+    last_updated: "2026-07-28",
+    notes: "Somente reorganização e apresentação local. Fórmulas, integrações, OpenAI, Supabase, Auth e persistência não foram alterados. OlaClick permanece não testada. Nenhuma nova dependência. V1_PROGRESS=81, V2_PROGRESS=12 e global_calendar=qa_pending preservados.",
+  },
   // ── Workspaces 1.0 (branch feat/workspace-panels-v1) ──────────────────────
   // Nenhum usuário, cliente ou registro real foi criado nesta sprint.
   {

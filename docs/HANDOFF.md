@@ -919,3 +919,46 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - Configurar `OPENAI_API_KEY` e `OPENAI_MODEL_MEUNEGOCIO` somente no servidor para QA real do assistente.
 - Corrigir ou padronizar o runner antigo de CMV para Node 24.
 - Branch publicada: `feat/meu-negocio-command-center-ai-v1`; nao houve merge, deploy ou alteracao da main.
+
+## 2026-07-28 - Meu Negócio Navegação e Design Profissional V1
+
+### O que foi feito
+
+- Criada worktree isolada `lokat-os-meu-negocio-dashboard-design` na branch `feat/meu-negocio-dashboard-design-system-v1`.
+- Reorganizada a navegação em oito áreas principais, com seletor mobile e subnavegação contextual preservada por área.
+- Unificados Produtos e Fichas, e Estoque e Compras, sem apagar os componentes anteriores.
+- Criado Centro de Comando executivo com seis KPIs principais, indicadores complementares, cascata de resultado gerencial, CMV, caixa, reserva, produtos, estoque, alertas, qualidade e ações rápidas.
+- Criados tokens locais de dashboard, foco visível, reduced motion e estados de fonte.
+- Fontes e Integrações passaram a mostrar atualidade, confiabilidade e estado honesto; OlaClick permanece `Não testado`.
+- Documentadas cinco referências open source e suas licenças, sem cópia integral ou dependência nova.
+
+### Arquivos principais
+
+- `src/app/admin/meu-negocio/_restaurant-workspace.tsx`
+- `src/app/admin/meu-negocio/_command-center-dashboard.tsx`
+- `src/app/admin/meu-negocio/_business-result-waterfall.tsx`
+- `src/app/admin/meu-negocio/_dashboard-design-tokens.ts`
+- `src/app/admin/meu-negocio/_sources-tab.tsx`
+- `src/lib/business-command-center/__tests__/dashboard-navigation.structural.test.ts`
+- `docs/meu-negocio-dashboard-open-source-references.md`
+- `src/config/project-status.ts`
+
+### Validações
+
+- TypeScript aprovado.
+- ESLint dos arquivos alterados aprovado.
+- 46 asserções novas de navegação/dashboard aprovadas.
+- 29 asserções anteriores de UI/IA e 63 do Centro de Comando aprovadas.
+- 65 asserções do vertical slice Restaurante e 28 de UI Financeiro aprovadas.
+- Suítes puras de estoque (25), custos (21), financeiro (44), mercado UI (12) e CMV UI (20) aprovadas.
+- Build Webpack aprovado com `NODE_OPTIONS=--max-old-space-size=4096`; primeira tentativa falhou somente por limite local de heap.
+
+### Pendências
+
+- Executar QA visual autenticado em 390, 768, 1024 e 1440 px.
+- Não marcar a área como validada antes do QA visual.
+- Validar OlaClick em runtime em sprint própria antes de alterar seu estado.
+
+### Próximo passo recomendado
+
+- Abrir o servidor local desta worktree, autenticar como Super Admin e executar o roteiro visual do Centro de Comando.
