@@ -10,6 +10,7 @@ const dashboard = read("src/app/admin/meu-negocio/_command-center-dashboard.tsx"
 const waterfall = read("src/app/admin/meu-negocio/_business-result-waterfall.tsx");
 const sources = read("src/app/admin/meu-negocio/_sources-tab.tsx");
 const tokens = read("src/app/admin/meu-negocio/_dashboard-design-tokens.ts");
+const globals = read("src/app/globals.css");
 const packageJson = read("package.json");
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
@@ -29,6 +30,14 @@ assert(dashboard.includes("PRIMARY.includes") && dashboard.includes("2xl:grid-co
 assert(dashboard.includes("aria-labelledby") && dashboard.includes("aria-label"), "estrutura acessível");
 assert(dashboard.includes("dashboardTokens.focus") && tokens.includes("focus-visible:ring-2"), "foco visível");
 assert(dashboard.includes("motion-reduce") || tokens.includes("motion-reduce"), "reduced motion");
+assert(tokens.includes("mn-dashboard-theme") && tokens.includes("bg-[#090b10]") && tokens.includes("text-[#f6f7fb]"), "canvas escuro e foreground principal locais");
+assert(tokens.includes("bg-[#11141c]") && tokens.includes("bg-[#171b26]"), "hierarquia de superficies locais");
+assert(globals.includes(".mn-dashboard-theme .text-slate-950") && globals.includes(".mn-dashboard-theme .text-gray-900"), "foregrounds claros substituem classes herdadas");
+assert(globals.includes(".mn-dashboard-theme button:disabled") && globals.includes("cursor: not-allowed"), "estado disabled permanece legivel");
+assert(globals.includes(".recharts-default-tooltip") && globals.includes(".recharts-cartesian-axis-tick-value"), "graficos e tooltips usam tema escuro");
+for (const forbidden of ["text-black", "text-slate-950", "text-zinc-950", "text-gray-950"]) {
+  assert(!dashboard.includes(forbidden) && !waterfall.includes(forbidden), `dashboard principal sem ${forbidden}`);
+}
 assert(waterfall.includes("Resultado gerencial, não substitui a contabilidade."), "cascata não chama resultado de lucro líquido");
 for (const label of ["Vendas realizadas", "Descontos", "Custo dos produtos", "Taxas variáveis", "Despesas operacionais", "Resultado gerencial"]) assert(waterfall.includes(label), `cascata contém ${label}`);
 for (const source of ["Cardápio digital", "Planilhas", "Preenchimento manual", "Diagnóstico", "Estoque", "Fichas técnicas", "Cálculos Lokat", "OpenAI", "Google Planilhas"]) assert(sources.includes(source), `fontes contém ${source}`);
