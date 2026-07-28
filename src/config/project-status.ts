@@ -1024,6 +1024,20 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     notes: "Somente na branch feat/product-engineering-preview-v1. Bloqueado por decisão — não deve ser contornado.",
   },
 
+  {
+    id: "meu_negocio_market_benchmark_pricing_v1",
+    name: "Mercado, Preço e Mix de Vendas V1",
+    category: "admin",
+    description: "Pesquisa manual/importada revisável, benchmark configurável, comparabilidade, estratégias de preço, canais, preço realizado e efeito do mix integrados à Central de CMV.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["Dados reais pendentes", "Persistência pendente", "QA visual autenticado pendente"],
+    next_actions: ["Executar QA visual em 390 px, tablet e desktop", "Validar fluxo local de inclusão e revisão de amostras"],
+    risk: "low",
+    last_updated: "2026-07-27",
+    notes: "Demonstração Duh Lanches somente com dados simulados e Concorrente A/B/C. Mercado é referência, nunca ordem automática. Sem SQL, Supabase, Auth, scraping ou persistência.",
+  },
   // ── Workspaces 1.0 (branch feat/workspace-panels-v1) ──────────────────────
   // Nenhum usuário, cliente ou registro real foi criado nesta sprint.
   {
