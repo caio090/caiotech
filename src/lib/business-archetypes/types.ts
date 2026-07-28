@@ -23,6 +23,7 @@ export type BusinessModuleKey =
   | "purchasing"
   | "technical_sheets"
   | "products_pricing"
+  | "cmv_menu"
   | "finance"
   | "settings";
 
@@ -59,7 +60,7 @@ export const BUSINESS_ARCHETYPES: Record<BusinessArchetypeId, BusinessArchetypeC
       costMetricLabel: "CMV",
       costMetricLabelPlural: "CMV (Custo da Mercadoria Vendida)",
     },
-    modules: ["overview", "reports", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings"],
+    modules: ["overview", "reports", "cmv_menu", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings"],
     futureNote: "Vertical slice completo desta sprint.",
   },
   retail: {

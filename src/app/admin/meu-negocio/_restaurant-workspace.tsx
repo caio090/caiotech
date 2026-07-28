@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, LayoutGrid, FileBarChart, Package, ShoppingCart, ClipboardList, Tags, Wallet, Settings } from "lucide-react";
+import { ArrowLeft, LayoutGrid, FileBarChart, Package, ShoppingCart, ClipboardList, Tags, Wallet, Settings, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
 import { getArchetypeConfig } from "@/lib/business-archetypes/types";
@@ -16,14 +16,16 @@ import { RestaurantReports } from "./_restaurant-reports";
 import { RestaurantAnalyzeFill } from "./_restaurant-analyze-fill";
 import { ComingSoonPanel } from "./_coming-soon-panel";
 import { FinanceTab } from "./_finance-tab";
+import { CmvCenter } from "./_cmv-center";
 
 const SECTION_ORDER: BusinessModuleKey[] = [
-  "overview", "reports", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings",
+  "overview", "reports", "cmv_menu", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings",
 ];
 
 const SECTION_META: Record<BusinessModuleKey, { label: string; icon: React.ElementType }> = {
   overview: { label: "Visão geral", icon: LayoutGrid },
   reports: { label: "Relatórios", icon: FileBarChart },
+  cmv_menu: { label: "CMV e Cardápio", icon: UtensilsCrossed },
   stock: { label: "Estoque", icon: Package },
   purchasing: { label: "Compras", icon: ShoppingCart },
   technical_sheets: { label: "Fichas técnicas", icon: ClipboardList },
@@ -104,6 +106,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
         />
       )}
       {activeSection === "reports" && <RestaurantReports items={items} balances={balances} movements={movements} />}
+      {activeSection === "cmv_menu" && <CmvCenter companyName={companyName} />}
       {activeSection === "stock" && (
         <RestaurantStock items={items} balances={balances} movements={movements} onBalancesChange={setBalances} onRecordMovement={recordMovement} />
       )}
