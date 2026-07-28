@@ -741,3 +741,12 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Nenhuma fórmula, integração, API OpenAI, SQL, Supabase, Auth, workspace ou dado real foi alterado.
 - Testes estruturais novos e regressões anteriores aprovados; build Webpack aprovado com heap local de 4 GB.
 - QA visual autenticado permanece pendente; área mantida como `qa_pending`.
+## 2026-07-28 - Correcao visual Meu Negocio
+
+- Branch: `fix/meu-negocio-dashboard-visual-contrast-v1`.
+- Base: `299a010293e9c7d2d3228cd1790cf0299453f2a4`.
+- Causa: componentes claros (`text-slate-950`, `bg-white` e equivalentes) renderizados dentro de paineis escuros.
+- Solucao: tokens locais escuros e overrides estritamente escopados por `.mn-dashboard-theme`.
+- Funcoes, calculos, fixtures, dados, integracoes, Supabase e Auth nao foram alterados.
+- TypeScript, ESLint, testes relevantes e build Webpack passaram.
+- Runtime local: `http://127.0.0.1:3002`; QA autenticado pendente.
