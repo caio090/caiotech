@@ -37,7 +37,7 @@ const read = (name: string) => readFileSync(join(dir, name), "utf8");
 const entrySource = read("_entry.tsx");
 const selectorSource = read("_company-selector.tsx");
 const workspaceSource = read("_restaurant-workspace.tsx");
-const overviewSource = read("_restaurant-overview.tsx");
+const overviewSource = read("_command-center-dashboard.tsx") + read("_dashboard-design-tokens.ts");
 const stockSource = read("_restaurant-stock.tsx");
 const transferSource = read("_stock-transfer-panel.tsx");
 const countSource = read("_stock-count-panel.tsx");
@@ -127,7 +127,7 @@ console.log("\n[test] Compras — ponto de reposição, cobertura, WhatsApp futu
 
 console.log("\n[test] Visão geral — cards navegam para o setor correspondente");
 {
-  assert(overviewSource.includes("onNavigate(c.section)"), "cada card da Visão geral chama onNavigate com a seção correspondente");
+  assert(overviewSource.includes("onNavigate(metric.destination)"), "cada card da Visão geral chama onNavigate com a seção correspondente");
   assert(overviewSource.includes("motion-reduce:"), "cards respeitam prefers-reduced-motion (motion-reduce:)");
 }
 

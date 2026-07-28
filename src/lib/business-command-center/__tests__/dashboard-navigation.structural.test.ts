@@ -1,0 +1,38 @@
+(function () {
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require("node:fs") as typeof import("node:fs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const path = require("node:path") as typeof import("node:path");
+const root = process.cwd();
+const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
+const workspace = read("src/app/admin/meu-negocio/_restaurant-workspace.tsx");
+const dashboard = read("src/app/admin/meu-negocio/_command-center-dashboard.tsx");
+const waterfall = read("src/app/admin/meu-negocio/_business-result-waterfall.tsx");
+const sources = read("src/app/admin/meu-negocio/_sources-tab.tsx");
+const tokens = read("src/app/admin/meu-negocio/_dashboard-design-tokens.ts");
+const packageJson = read("package.json");
+let passed = 0; let failed = 0;
+const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
+
+const navigation = ["Visão geral", "Financeiro", "CMV e Cardápio", "Produtos e Fichas", "Estoque e Compras", "Relatórios", "Fontes e Integrações", "Configurações"];
+let cursor = -1;
+for (const label of navigation) { const next = workspace.indexOf(`label: "${label}"`, cursor + 1); assert(next > cursor, `ordem de navegação: ${label}`); cursor = next; }
+assert((workspace.match(/label: "/g) ?? []).length === 8, "oito áreas principais");
+assert(workspace.includes("Fichas técnicas") && workspace.includes("Vínculos do cardápio"), "Produtos e Fichas unificados com subáreas");
+assert(workspace.includes("Estoque central") && workspace.includes("Lista de compras"), "Estoque e Compras unificados com subáreas");
+assert(workspace.includes("setSubsections((current)"), "subárea preservada por área");
+assert(workspace.includes("<select value={activeSection}"), "mobile usa seletor controlado");
+assert(!workspace.includes("overflow-x-auto pb-1 scrollbar-none\" role=\"tablist"), "mobile não usa oito tabs espremidas");
+
+for (const token of ["Indicadores principais", "Vendas e pedidos", "CMV real, teórico e meta", "Saldo de caixa projetado", "O que precisa da sua atenção", "Qualidade dos dados", "Ações rápidas"]) assert(dashboard.includes(token), `dashboard contém ${token}`);
+assert(dashboard.includes("PRIMARY.includes") && dashboard.includes("2xl:grid-cols-6"), "seis KPIs principais");
+assert(dashboard.includes("aria-labelledby") && dashboard.includes("aria-label"), "estrutura acessível");
+assert(dashboard.includes("dashboardTokens.focus") && tokens.includes("focus-visible:ring-2"), "foco visível");
+assert(dashboard.includes("motion-reduce") || tokens.includes("motion-reduce"), "reduced motion");
+assert(waterfall.includes("Resultado gerencial, não substitui a contabilidade."), "cascata não chama resultado de lucro líquido");
+for (const label of ["Vendas realizadas", "Descontos", "Custo dos produtos", "Taxas variáveis", "Despesas operacionais", "Resultado gerencial"]) assert(waterfall.includes(label), `cascata contém ${label}`);
+for (const source of ["Cardápio digital", "Planilhas", "Preenchimento manual", "Diagnóstico", "Estoque", "Fichas técnicas", "Cálculos Lokat", "OpenAI", "Google Planilhas"]) assert(sources.includes(source), `fontes contém ${source}`);
+assert(sources.includes("Runtime não validado") && !sources.includes('name: "Cardápio digital · OlaClick", state: "connected"'), "OlaClick não é conectada sem runtime");
+for (const dependency of ["@tremor", "antd", "apexcharts", "@clerk"]) assert(!packageJson.includes(`\"${dependency}`), `sem nova dependência ${dependency}`);
+console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
+})();

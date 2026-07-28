@@ -39,7 +39,7 @@ assert(viewMode.includes("sessionStorage"), "modo visual usa sessionStorage");
 assert(!/createSupabase|auth\.uid|canWrite|isAuthorized|permission|capability/i.test(stripComments(viewMode)), "modo visual não implementa autorização");
 
 console.log("\n[test] integracao da experiencia financeira");
-assert(workspace.includes('finance: { label: "Financeiro"') && workspace.includes("<FinanceTab"), "Financeiro está ligado ao workspace");
+assert(workspace.includes('{ id: "finance", label: "Financeiro"') && workspace.includes("<FinanceTab"), "Financeiro está ligado ao workspace");
 assert(financeTab.includes("DataSourceBadge"), "DataSourceBadge existe na aba Financeiro");
 assert(financeTab.includes("Exemplo simulado") || financeTab.includes("DEMO_DATA_LABEL"), "dados simulados são identificados");
 assert(charts.includes("title: string") && charts.includes("period: string") && charts.includes("source: string"), "gráficos exigem título, período e fonte");
