@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import { Upload, Download, Cloud, AlertTriangle, CheckCircle2, Clock, XCircle, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateId } from "./_shared";
 import { downloadLokatTemplate } from "@/lib/finance/spreadsheet-template";
 import { analyzeSheet } from "@/lib/finance/spreadsheet-classification";
+import { readSpreadsheetSafely, SpreadsheetSecurityError, validateSpreadsheetFile } from "@/lib/finance/spreadsheet-security";
 import type {
   BusinessViewMode, SpreadsheetImportBatch, SpreadsheetImportFile, SpreadsheetImportStatus, SpreadsheetSheet, GoogleSheetConnection,
 } from "@/lib/finance/types";
@@ -40,13 +40,13 @@ const STATUS_META: Record<SpreadsheetImportStatus, { label: string; icon: React.
 };
 
 async function parseWorkbookToImportFile(file: File): Promise<SpreadsheetImportFile> {
+  validateSpreadsheetFile(file);
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const { workbook, rowsBySheet } = readSpreadsheetSafely(buffer);
   const format: SpreadsheetImportFile["format"] = file.name.toLowerCase().endsWith(".csv") ? "csv" : file.name.toLowerCase().endsWith(".xls") ? "xls" : "xlsx";
 
   const sheets: SpreadsheetSheet[] = workbook.SheetNames.map((name) => {
-    const rows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[name], { header: 1, defval: "", blankrows: false })
-      .map((row) => row.map((cell) => String(cell ?? "")));
+    const rows = rowsBySheet.get(name) ?? [];
     return analyzeSheet(name, rows);
   });
 
@@ -82,8 +82,8 @@ export function FinanceImportPanel({
       const parsed = await parseWorkbookToImportFile(file);
       setPending(parsed);
       setMappingOverrides({});
-    } catch {
-      setParseError("Não foi possível ler este arquivo. Confirme que é um .xlsx, .xls ou .csv válido.");
+    } catch (error) {
+      setParseError(error instanceof SpreadsheetSecurityError ? error.message : "Não foi possível ler este arquivo. Confirme que é um .xlsx, .xls ou .csv válido.");
     }
   }
 
