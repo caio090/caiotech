@@ -879,3 +879,43 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - SQL 90: `failed` — tentado e falhou. Nao re-executar. Ver `docs/supabase/90-reconcile-partial-foundations.sql` para contexto.
 - Nao renomear rotas tecnicas `/contentos`; apenas manter nome publico visivel como REC OS.
 - Assets locais nao rastreados continuam fora do escopo e nao devem ser apagados.
+
+## 2026-07-28 - Meu Negocio Centro de Comando e IA V1
+
+### O que foi feito
+
+- Criado Centro de Comando demonstrativo com cards clicaveis, graficos, alertas e fontes visiveis.
+- Criado `MetricCalculationTrace` e drawer "Como calculamos" com formula, inputs, fontes, periodo, cobertura e exclusoes.
+- Criado catalogo em memoria de Produtos e Fichas Tecnicas, com busca, filtros, vinculos revisaveis e anexos de sessao.
+- Adicionada evolucao e decomposicao explicavel do CMV, sem afirmar causas quando faltam dados.
+- Auditada a integracao OlaClick existente, sem chamada runtime e sem inventar estado conectado.
+- Criado Assistente Lokat server-side com SDK oficial OpenAI, Responses API, JSON Schema estrito, `store: false`, limite, timeout e fallback sem chave.
+- Corrigidos pontos visuais de role Super Admin, selo individual da Duh, linguagem dos quadrantes, profundidade da Visao simples e tooltip/legenda.
+
+### Arquivos principais
+
+- `src/lib/business-command-center/*`
+- `src/app/admin/meu-negocio/_restaurant-overview.tsx`
+- `src/app/admin/meu-negocio/_product-command-center.tsx`
+- `src/app/admin/meu-negocio/_ask-lokat-panel.tsx`
+- `src/app/api/meu-negocio/ai/analyze/route.ts`
+- `docs/olaclick-command-center-audit.md`
+- `src/config/project-status.ts`
+
+### Validacoes
+
+- `npx tsc --noEmit --skipLibCheck`: aprovado.
+- ESLint somente nos arquivos alterados: aprovado.
+- `npx next build --webpack`: aprovado.
+- Testes novos: 92 assercoes aprovadas.
+- Estoque, custos e financas anteriores: aprovados.
+- Suite antiga de CMV: bloqueada antes das assercoes pela incompatibilidade existente de `require` em escopo ESM no Node 24.
+- Servidor: `http://127.0.0.1:3005`, landing/login 200 e rota autenticada redirecionando corretamente ao login.
+
+### Pendencias e proximo passo
+
+- Executar QA visual autenticado em 390, 768, 1024 e 1440 px; navegador interno sem sessao local nesta execucao.
+- Validar OlaClick em runtime antes de mudar qualquer capacidade para conectado.
+- Configurar `OPENAI_API_KEY` e `OPENAI_MODEL_MEUNEGOCIO` somente no servidor para QA real do assistente.
+- Corrigir ou padronizar o runner antigo de CMV para Node 24.
+- Branch publicada: `feat/meu-negocio-command-center-ai-v1`; nao houve merge, deploy ou alteracao da main.
