@@ -197,6 +197,7 @@ export type SpreadsheetSheetType =
   | "products"
   | "technical_sheets"
   | "pricing"
+  | "market_benchmark"
   | "unknown";
 
 export type SpreadsheetDataClassification = "actual" | "planned" | "theoretical" | "projected" | "estimated" | "unknown";

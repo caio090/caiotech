@@ -13,17 +13,23 @@ import type {
 
 const FIELD_OPTIONS = [
   "description", "amount", "dueDate", "effectiveDate", "competenceDate", "category", "status", "paymentMethod", "quantity", "unit", "unitCost",
+  "competitor", "product", "channel", "regularPrice", "promotionalPrice", "portionWeight", "composition", "includesSides", "neighborhood", "observedAt", "sourceReference", "notes",
 ];
 const FIELD_LABEL: Record<string, string> = {
   description: "Descrição", amount: "Valor", dueDate: "Data de vencimento", effectiveDate: "Data efetiva",
   competenceDate: "Competência", category: "Categoria", status: "Status", paymentMethod: "Forma de pagamento",
   quantity: "Quantidade", unit: "Unidade", unitCost: "Custo unitário",
+  competitor: "Concorrente", product: "Produto", channel: "Canal", regularPrice: "Preço regular",
+  promotionalPrice: "Preço promocional", portionWeight: "Gramagem", composition: "Composição",
+  includesSides: "Acompanhamento", neighborhood: "Bairro", observedAt: "Data da observação",
+  sourceReference: "Origem", notes: "Observação",
 };
 
 const SHEET_TYPE_LABEL: Record<string, string> = {
   cash_flow: "Fluxo de caixa", fixed_costs: "Custos fixos", variable_costs: "Custos variáveis", revenues: "Receitas",
   accounts_receivable: "Contas a receber", accounts_payable: "Contas a pagar", inventory: "Estoque", ingredients: "Insumos",
   products: "Produtos", technical_sheets: "Fichas técnicas", pricing: "Precificação", unknown: "Não identificado",
+  market_benchmark: "Pesquisa de mercado",
 };
 const CLASSIFICATION_LABEL: Record<string, string> = {
   actual: "Real", planned: "Planejado", theoretical: "Teórico", projected: "Projetado", estimated: "Estimado", unknown: "Não identificado",

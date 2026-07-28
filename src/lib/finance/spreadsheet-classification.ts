@@ -19,6 +19,7 @@ const SHEET_TYPE_KEYWORDS: Record<Exclude<SpreadsheetSheetType, "unknown">, stri
   products: ["produto", "produtos"],
   technical_sheets: ["ficha tecnica", "ficha técnica", "fichas tecnicas"],
   pricing: ["precificacao", "precificação", "preco", "preço"],
+  market_benchmark: ["pesquisa de mercado", "benchmark", "concorrente", "concorrencia", "concorrência"],
 };
 
 const COLUMN_FIELD_KEYWORDS: Record<string, string[]> = {
