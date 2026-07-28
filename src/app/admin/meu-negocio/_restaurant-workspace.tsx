@@ -1,123 +1,102 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, LayoutGrid, FileBarChart, Package, ShoppingCart, ClipboardList, Tags, Wallet, Settings, UtensilsCrossed } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, Database, FileBarChart, LayoutGrid, Package, Settings, Tags, UtensilsCrossed, Wallet } from "lucide-react";
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
 import { getArchetypeConfig } from "@/lib/business-archetypes/types";
-import { STOCK_ITEM_FIXTURES, STOCK_BALANCE_FIXTURES, STOCK_MOVEMENT_FIXTURES } from "@/lib/stock/fixtures";
 import { TECHNICAL_SHEET_FIXTURES } from "@/lib/costing/fixtures";
+import { STOCK_BALANCE_FIXTURES, STOCK_ITEM_FIXTURES, STOCK_MOVEMENT_FIXTURES } from "@/lib/stock/fixtures";
 import type { StockBalance, StockMovement } from "@/lib/stock/types";
-import { RestaurantOverview } from "./_restaurant-overview";
-import { RestaurantStock } from "./_restaurant-stock";
-import { RestaurantPurchasing } from "./_restaurant-purchasing";
-import { RestaurantTechnicalSheets } from "./_restaurant-technical-sheets";
-import { RestaurantReports } from "./_restaurant-reports";
-import { RestaurantAnalyzeFill } from "./_restaurant-analyze-fill";
-import { ComingSoonPanel } from "./_coming-soon-panel";
-import { FinanceTab } from "./_finance-tab";
+import { cn } from "@/lib/utils";
 import { CmvCenter } from "./_cmv-center";
+import { CommandCenterDashboard } from "./_command-center-dashboard";
+import { ComingSoonPanel } from "./_coming-soon-panel";
+import { dashboardTokens } from "./_dashboard-design-tokens";
+import { FinanceTab } from "./_finance-tab";
 import { ProductCommandCenter } from "./_product-command-center";
+import { RestaurantAnalyzeFill } from "./_restaurant-analyze-fill";
+import { RestaurantPurchasing } from "./_restaurant-purchasing";
+import { RestaurantReports } from "./_restaurant-reports";
+import { RestaurantStock } from "./_restaurant-stock";
+import { RestaurantTechnicalSheets } from "./_restaurant-technical-sheets";
+import { SourcesTab } from "./_sources-tab";
 
-const SECTION_ORDER: BusinessModuleKey[] = [
-  "overview", "reports", "cmv_menu", "stock", "purchasing", "technical_sheets", "products_pricing", "finance", "settings",
+type DashboardSection = "overview" | "finance" | "cmv" | "products" | "inventory" | "reports" | "sources" | "settings";
+type ViewMode = "simple" | "manager";
+
+const SECTIONS: Array<{ id: DashboardSection; label: string; icon: React.ElementType }> = [
+  { id: "overview", label: "Visão geral", icon: LayoutGrid },
+  { id: "finance", label: "Financeiro", icon: Wallet },
+  { id: "cmv", label: "CMV e Cardápio", icon: UtensilsCrossed },
+  { id: "products", label: "Produtos e Fichas", icon: Tags },
+  { id: "inventory", label: "Estoque e Compras", icon: Package },
+  { id: "reports", label: "Relatórios", icon: FileBarChart },
+  { id: "sources", label: "Fontes e Integrações", icon: Database },
+  { id: "settings", label: "Configurações", icon: Settings },
 ];
 
-const SECTION_META: Record<BusinessModuleKey, { label: string; icon: React.ElementType }> = {
-  overview: { label: "Visão geral", icon: LayoutGrid },
-  reports: { label: "Relatórios", icon: FileBarChart },
-  cmv_menu: { label: "CMV e Cardápio", icon: UtensilsCrossed },
-  stock: { label: "Estoque", icon: Package },
-  purchasing: { label: "Compras", icon: ShoppingCart },
-  technical_sheets: { label: "Fichas técnicas", icon: ClipboardList },
-  products_pricing: { label: "Produtos e preços", icon: Tags },
-  finance: { label: "Financeiro", icon: Wallet },
-  settings: { label: "Configurações", icon: Settings },
+const SUBSECTIONS: Record<DashboardSection, string[]> = {
+  overview: [],
+  finance: ["Resumo", "Fluxo de caixa", "Planejado versus realizado", "Reserva", "Contas a pagar", "Contas a receber", "Projeções", "Dados e planilhas"],
+  cmv: ["Resumo", "CMV teórico", "CMV real", "Evolução", "Diferença e investigação", "Engenharia de cardápio", "Mercado e concorrência", "Simulador de preço", "Cobertura"],
+  products: ["Catálogo", "Fichas técnicas", "Custos", "Preços e margens", "Vínculos do cardápio", "Anexos", "Histórico"],
+  inventory: ["Visão geral", "Estoque central", "Cozinha", "Movimentações", "Inventários", "Perdas", "Lista de compras", "Pedidos", "Fornecedores"],
+  reports: ["Executivo", "Financeiro", "CMV", "Produtos", "Estoque", "Compras", "Mercado", "Dados e qualidade", "Exportações"],
+  sources: ["Visão geral", "Cardápio digital", "Planilhas", "Diagnóstico", "Estoque", "Fichas", "OpenAI", "Google Planilhas futuro", "Histórico de sincronização"],
+  settings: [],
 };
 
 export function RestaurantWorkspace({ companyName, onBack }: { companyName: string; onBack: () => void }) {
   const archetype = getArchetypeConfig("food_service");
-  const [activeSection, setActiveSection] = useState<BusinessModuleKey>("overview");
-
+  const [activeSection, setActiveSection] = useState<DashboardSection>("overview");
+  const [subsections, setSubsections] = useState<Record<DashboardSection, string>>(() => Object.fromEntries(SECTIONS.map(({ id }) => [id, SUBSECTIONS[id][0] ?? ""])) as Record<DashboardSection, string>);
+  const [viewMode, setViewMode] = useState<ViewMode>("simple");
   const [balances, setBalances] = useState<StockBalance[]>(STOCK_BALANCE_FIXTURES);
   const [movements, setMovements] = useState<StockMovement[]>(STOCK_MOVEMENT_FIXTURES);
   const items = useMemo(() => STOCK_ITEM_FIXTURES, []);
   const sheets = useMemo(() => TECHNICAL_SHEET_FIXTURES, []);
+  const activeMeta = SECTIONS.find((section) => section.id === activeSection) ?? SECTIONS[0];
+  const activeSubsection = subsections[activeSection];
 
-  function recordMovement(movement: StockMovement) {
-    setMovements((prev) => [movement, ...prev]);
-  }
-
-  function navigateTo(section: BusinessModuleKey) {
-    setActiveSection(section);
+  function setSubsection(value: string) { setSubsections((current) => ({ ...current, [activeSection]: value })); }
+  function recordMovement(movement: StockMovement) { setMovements((previous) => [movement, ...previous]); }
+  function navigateFromLegacy(section: BusinessModuleKey) {
+    const destination: Record<BusinessModuleKey, DashboardSection> = { overview: "overview", finance: "finance", cmv_menu: "cmv", products_pricing: "products", technical_sheets: "products", stock: "inventory", purchasing: "inventory", reports: "reports", settings: "sources" };
+    setActiveSection(destination[section]);
+    if (section === "technical_sheets") setSubsections((current) => ({ ...current, products: "Fichas técnicas" }));
+    if (section === "purchasing") setSubsections((current) => ({ ...current, inventory: "Lista de compras" }));
   }
 
   return (
-    <div className="pt-1 sm:pt-2">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <button onClick={onBack} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
-          <ArrowLeft className="w-3.5 h-3.5" /> Trocar empresa
-        </button>
-        <div className="text-right">
-          <p className="text-sm font-bold text-gray-900">{companyName}</p>
-          <p className="text-[10px] text-gray-400">{archetype.label}</p>
-        </div>
+    <div className={`${dashboardTokens.page} min-h-screen rounded-lg p-2 sm:p-4`}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <button onClick={onBack} className={`${dashboardTokens.focus} inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900`}><ArrowLeft className="h-3.5 w-3.5" />Trocar empresa</button>
+        <div className="min-w-0 text-right"><p className="truncate text-sm font-extrabold text-slate-950">{companyName}</p><p className="text-[10px] text-slate-500">{archetype.label}</p></div>
       </div>
 
-      <div className="mb-5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
-        <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5">Modo demonstração</p>
-        <p className="text-xs text-amber-700 leading-relaxed">
-          Estoque, compras, fichas técnicas e relatórios desta tela usam dados de exemplo em memória — nada é salvo
-          e nada representa a situação real de nenhum cliente.
-        </p>
-      </div>
+      <div className="mb-4 rounded-md border border-violet-200 bg-violet-50 px-4 py-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wide text-violet-700">Exemplo simulado</p><p className="mt-0.5 text-xs leading-relaxed text-violet-800">Os dados desta experiência ficam em memória e não representam a situação real de nenhum cliente.</p></div><div className="inline-flex rounded-md border border-violet-200 bg-white p-1" role="group" aria-label="Nível de detalhe"><button onClick={() => setViewMode("simple")} aria-pressed={viewMode === "simple"} className={modeClass(viewMode === "simple")}>Visão simples</button><button onClick={() => setViewMode("manager")} aria-pressed={viewMode === "manager"} className={modeClass(viewMode === "manager")}>Modo Gestor</button></div></div></div>
 
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-none" role="tablist">
-        {SECTION_ORDER.map((key) => {
-          const meta = SECTION_META[key];
-          const Icon = meta.icon;
-          const available = archetype.modules.includes(key);
-          return (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={activeSection === key}
-              disabled={!available}
-              onClick={() => navigateTo(key)}
-              data-testid={`restaurant-nav-${key}`}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border whitespace-nowrap transition-colors",
-                !available && "opacity-40 cursor-not-allowed",
-                activeSection === key
-                  ? "bg-purple-600 text-white border-purple-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {meta.label}
-            </button>
-          );
-        })}
-      </div>
+      <nav aria-label="Áreas de Meu Negócio" className={`${dashboardTokens.panel} ${dashboardTokens.radius} mb-3 hidden grid-cols-4 gap-1 p-1 lg:grid xl:grid-cols-8`}>
+        {SECTIONS.map(({ id, label, icon: Icon }) => <button key={id} data-testid={`business-nav-${id}`} aria-current={activeSection === id ? "page" : undefined} onClick={() => setActiveSection(id)} className={cn(dashboardTokens.focus, dashboardTokens.motion, "flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[11px] font-bold", activeSection === id ? "bg-violet-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950")}><Icon className="h-3.5 w-3.5 shrink-0" /><span>{label}</span></button>)}
+      </nav>
 
-      {activeSection === "overview" && (
-        <RestaurantOverview
-          items={items} balances={balances} movements={movements} sheets={sheets}
-          onNavigate={navigateTo}
-        />
-      )}
+      <label className="mb-3 block lg:hidden"><span className="mb-1 block text-[10px] font-bold uppercase text-slate-500">Área atual</span><select value={activeSection} onChange={(event) => setActiveSection(event.target.value as DashboardSection)} className={`${dashboardTokens.focus} w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900`}>{SECTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
+
+      {SUBSECTIONS[activeSection].length > 0 && <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1" aria-label={`Subáreas de ${activeMeta.label}`}><span className="sticky left-0 shrink-0 bg-[#f4f5f8] pr-1 text-[10px] font-black uppercase text-slate-400">{activeMeta.label}</span>{SUBSECTIONS[activeSection].map((label) => <button key={label} onClick={() => setSubsection(label)} aria-pressed={activeSubsection === label} className={cn(dashboardTokens.focus, "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold", activeSubsection === label ? "border-violet-300 bg-violet-50 text-violet-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300")}>{label}</button>)}</div>}
+
+      {activeSection === "overview" && <CommandCenterDashboard companyName={companyName} managerMode={viewMode === "manager"} onNavigate={navigateFromLegacy} />}
+      {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} />}
+      {activeSection === "cmv" && <CmvCenter companyName={companyName} />}
+      {activeSection === "products" && activeSubsection === "Fichas técnicas" && <RestaurantTechnicalSheets sheets={sheets} />}
+      {activeSection === "products" && activeSubsection !== "Fichas técnicas" && <ProductCommandCenter />}
+      {activeSection === "inventory" && ["Lista de compras", "Pedidos", "Fornecedores"].includes(activeSubsection) && <RestaurantPurchasing items={items} balances={balances} />}
+      {activeSection === "inventory" && !["Lista de compras", "Pedidos", "Fornecedores"].includes(activeSubsection) && <RestaurantStock items={items} balances={balances} movements={movements} onBalancesChange={setBalances} onRecordMovement={recordMovement} />}
       {activeSection === "reports" && <RestaurantReports items={items} balances={balances} movements={movements} />}
-      {activeSection === "cmv_menu" && <CmvCenter companyName={companyName} />}
-      {activeSection === "stock" && (
-        <RestaurantStock items={items} balances={balances} movements={movements} onBalancesChange={setBalances} onRecordMovement={recordMovement} />
-      )}
-      {activeSection === "purchasing" && <RestaurantPurchasing items={items} balances={balances} />}
-      {activeSection === "technical_sheets" && <RestaurantTechnicalSheets sheets={sheets} />}
-      {activeSection === "products_pricing" && <ProductCommandCenter />}
-      {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateTo} />}
-      {activeSection === "settings" && <ComingSoonPanel title="Configurações" description="Preferências do módulo (unidades, fornecedores padrão, alertas) — planejado para uma sprint futura." />}
-
+      {activeSection === "sources" && <SourcesTab />}
+      {activeSection === "settings" && <ComingSoonPanel title="Configurações" description="Preferências do módulo, alertas e unidades. Esta sprint reorganiza a interface sem criar persistência." />}
       <RestaurantAnalyzeFill />
     </div>
   );
 }
+
+function modeClass(active: boolean) { return cn("rounded px-3 py-1.5 text-[10px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500", active ? "bg-violet-600 text-white" : "text-slate-600 hover:bg-slate-50"); }

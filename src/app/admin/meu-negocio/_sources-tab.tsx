@@ -1,65 +1,36 @@
 "use client";
 
-import { Database, Info } from "lucide-react";
+import { Database, Info, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { dashboardTokens } from "./_dashboard-design-tokens";
 
-type SourceState = "conectado" | "importacao_manual" | "planejado" | "bloqueado_api" | "nao_configurado";
-
-const STATE_LABEL: Record<SourceState, string> = {
-  conectado: "Conectado",
-  importacao_manual: "Importação manual",
-  planejado: "Planejado",
-  bloqueado_api: "Bloqueado por API",
-  nao_configurado: "Não configurado",
+type SourceState = "connected" | "not_tested" | "simulated" | "stale" | "needs_setup" | "unavailable";
+const STATE: Record<SourceState, { label: string; style: string }> = {
+  connected: { label: "Conectado", style: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  not_tested: { label: "Não testado", style: "border-amber-200 bg-amber-50 text-amber-800" },
+  simulated: { label: "Simulado", style: "border-violet-200 bg-violet-50 text-violet-700" },
+  stale: { label: "Desatualizado", style: "border-orange-200 bg-orange-50 text-orange-700" },
+  needs_setup: { label: "Precisa configurar", style: "border-blue-200 bg-blue-50 text-blue-700" },
+  unavailable: { label: "Indisponível", style: "border-slate-200 bg-slate-50 text-slate-500" },
 };
-const STATE_STYLE: Record<SourceState, string> = {
-  conectado: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  importacao_manual: "bg-blue-50 text-blue-700 border-blue-100",
-  planejado: "bg-gray-50 text-gray-500 border-gray-200",
-  bloqueado_api: "bg-red-50 text-red-700 border-red-100",
-  nao_configurado: "bg-gray-50 text-gray-500 border-gray-200",
-};
-
-const SOURCES: Array<{ id: string; name: string; state: SourceState; note?: string }> = [
-  { id: "manual", name: "Entrada manual", state: "importacao_manual", note: "Funcional nesta versão — todos os campos das abas são editáveis." },
-  { id: "aipede", name: "AiPede", state: "planejado", note: "Importação manual planejada para uma próxima fatia — nenhuma integração real nesta versão." },
-  { id: "ifood", name: "iFood", state: "nao_configurado" },
-  { id: "olaclick", name: "OlaClick", state: "nao_configurado" },
-  { id: "cardapio_proprio", name: "Cardápio próprio", state: "nao_configurado" },
-  { id: "whatsapp", name: "WhatsApp", state: "nao_configurado" },
-  { id: "csv", name: "CSV/Excel", state: "planejado", note: "Marcado como próximo vertical slice — ainda não implementado." },
+const SOURCES: Array<{ name: string; state: SourceState; updated: string; reliability: string; note: string }> = [
+  { name: "Cardápio digital · OlaClick", state: "not_tested", updated: "Runtime não validado", reliability: "A confirmar", note: "Rotas server-side encontradas; nenhuma leitura real foi feita nesta sprint." },
+  { name: "Planilhas", state: "simulated", updated: "01/07/2026 09:00", reliability: "Média", note: "Exemplo importado apenas para demonstração visual." },
+  { name: "Preenchimento manual", state: "connected", updated: "Disponível nesta sessão", reliability: "Depende da revisão", note: "Alterações permanecem locais e não são persistidas nesta sprint." },
+  { name: "Diagnóstico", state: "needs_setup", updated: "Sem atualização", reliability: "Não avaliada", note: "A fonte ainda precisa ser associada ao contexto do negócio." },
+  { name: "Estoque", state: "simulated", updated: "30/06/2026", reliability: "Média", note: "Fixtures determinísticos de central e cozinha." },
+  { name: "Fichas técnicas", state: "simulated", updated: "30/06/2026", reliability: "82% de cobertura", note: "Há uma ficha incompleta no exemplo." },
+  { name: "Cálculos Lokat", state: "connected", updated: "01/07/2026 09:00", reliability: "Alta sobre a base disponível", note: "Fórmulas locais com rastreabilidade." },
+  { name: "OpenAI", state: "needs_setup", updated: "Não inspecionado", reliability: "Não avaliada", note: "O assistente apresenta fallback seguro quando não configurado." },
+  { name: "Google Planilhas", state: "unavailable", updated: "Planejado", reliability: "Não avaliada", note: "Integração futura; nenhuma conexão existe nesta versão." },
 ];
 
 export function SourcesTab() {
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <div className="flex items-center gap-1.5 mb-3">
-          <Database className="w-3.5 h-3.5 text-indigo-600" />
-          <p className="text-xs font-bold text-gray-700">Fontes de dados</p>
-        </div>
-        <div className="space-y-2">
-          {SOURCES.map((s) => (
-            <div key={s.id} className="flex items-start justify-between gap-3 bg-gray-50 rounded-xl border border-gray-100 px-3 py-2.5">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-gray-800">{s.name}</p>
-                {s.note && <p className="text-[10px] text-gray-400 mt-0.5">{s.note}</p>}
-              </div>
-              <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0", STATE_STYLE[s.state])}>
-                {STATE_LABEL[s.state]}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 flex items-start gap-2">
-        <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-800 leading-relaxed">
-          &ldquo;Ganhos&rdquo; reportados por uma plataforma de delivery não significa automaticamente lucro do estabelecimento —
-          taxas, subsídios e repasses precisam ser conferidos separadamente antes de qualquer conclusão financeira.
-        </p>
-      </div>
-    </div>
-  );
+  return <div className="space-y-4" data-testid="sources-and-integrations">
+    <section className={`${dashboardTokens.panel} ${dashboardTokens.radius} ${dashboardTokens.cardPadding}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Database className="h-4 w-4 text-violet-600" /><h2 className="text-base font-black text-slate-950">Fontes e Integrações</h2></div><p className="mt-1 text-xs text-slate-500">Origem, atualidade e confiabilidade dos dados usados no Centro de Comando.</p></div><button className={`${dashboardTokens.focus} inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700`} title="Ação demonstrativa"><RefreshCw className="h-3.5 w-3.5" />Revisar estados</button></div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">{SOURCES.map((source) => <article key={source.name} className="rounded-md border border-slate-200 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-extrabold text-slate-900">{source.name}</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-600">{source.note}</p></div><span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold", STATE[source.state].style)}>{STATE[source.state].label}</span></div><dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-[10px]"><div><dt className="text-slate-400">Atualização</dt><dd className="mt-0.5 font-bold text-slate-700">{source.updated}</dd></div><div><dt className="text-slate-400">Confiabilidade</dt><dd className="mt-0.5 font-bold text-slate-700">{source.reliability}</dd></div></dl></article>)}</div>
+    </section>
+    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3"><Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" /><p className="text-xs leading-relaxed text-amber-900">OlaClick não está marcada como conectada: a implementação foi encontrada, mas o runtime não foi comprovado nesta sprint. Nenhuma chave ou token é exibido.</p></div>
+  </div>;
 }
