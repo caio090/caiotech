@@ -8,6 +8,7 @@ import { TECHNICAL_SHEET_FIXTURES } from "@/lib/costing/fixtures";
 import { STOCK_BALANCE_FIXTURES, STOCK_ITEM_FIXTURES, STOCK_MOVEMENT_FIXTURES } from "@/lib/stock/fixtures";
 import type { StockBalance, StockMovement } from "@/lib/stock/types";
 import { cn } from "@/lib/utils";
+import { MotionSection } from "@/components/motion/motion-section";
 import { CmvCenter } from "./_cmv-center";
 import { CommandCenterDashboard } from "./_command-center-dashboard";
 import { ComingSoonPanel } from "./_coming-soon-panel";
@@ -84,6 +85,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
 
       {SUBSECTIONS[activeSection].length > 0 && <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1" aria-label={`Subáreas de ${activeMeta.label}`}><span className="sticky left-0 shrink-0 bg-[#090b10] pr-1 text-[10px] font-black uppercase text-[#697386]">{activeMeta.label}</span>{SUBSECTIONS[activeSection].map((label) => <button key={label} onClick={() => setSubsection(label)} aria-pressed={activeSubsection === label} className={cn(dashboardTokens.focus, "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold", activeSubsection === label ? "border-violet-400/50 bg-violet-400/15 text-violet-200" : "border-[#272d3a] bg-[#11141c] text-[#bcc4d4] hover:border-[#3a4354] hover:bg-[#1d2230]")}>{label}</button>)}</div>}
 
+      <MotionSection motionKey={`${activeSection}:${activeSubsection}:${viewMode}`}>
       {activeSection === "overview" && <CommandCenterDashboard companyName={companyName} managerMode={viewMode === "manager"} onNavigate={navigateFromLegacy} />}
       {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} />}
       {activeSection === "cmv" && <CmvCenter companyName={companyName} />}
@@ -94,6 +96,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
       {activeSection === "reports" && <RestaurantReports items={items} balances={balances} movements={movements} />}
       {activeSection === "sources" && <SourcesTab />}
       {activeSection === "settings" && <ComingSoonPanel title="Configurações" description="Preferências do módulo, alertas e unidades. Esta sprint reorganiza a interface sem criar persistência." />}
+      </MotionSection>
       <RestaurantAnalyzeFill />
     </div>
   );

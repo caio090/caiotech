@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, Calculator, Database, RefreshCw, Settings2, Sparkles, X } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
+import { MotionStagger } from "@/components/motion/motion-stagger";
 import { COMMAND_CENTER_ALERTS, COMMAND_CENTER_METRICS, CMV_EVOLUTION } from "@/lib/business-command-center/fixtures";
 import type { CommandCenterMetric, MetricCalculationTrace } from "@/lib/business-command-center/types";
 import { AskLokatPanel } from "./_ask-lokat-panel";
@@ -23,7 +24,7 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
   const primary = COMMAND_CENTER_METRICS.filter((metric) => PRIMARY.includes(metric.id));
   const secondary = COMMAND_CENTER_METRICS.filter((metric) => !PRIMARY.includes(metric.id));
   return (
-    <div className="space-y-4" data-testid="command-center-v2">
+    <MotionStagger className="space-y-4" data-testid="command-center-v2">
       <header className={`${dashboardTokens.elevated} ${dashboardTokens.radius} ${dashboardTokens.cardPadding}`}>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
@@ -71,7 +72,7 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
       <section className={`${dashboardTokens.panel} ${dashboardTokens.radius} p-3`} aria-label="Ações rápidas"><div className="flex flex-wrap items-center gap-2"><span className="mr-1 text-[10px] font-black uppercase text-slate-500">Ações rápidas</span>{["Cadastrar produto", "Criar ficha técnica", "Registrar inventário", "Adicionar compra", "Importar planilha", "Configurar fonte"].map((label) => <button key={label} className={buttonClass} title="Ação demonstrativa; nenhuma informação será salva"><Sparkles className="h-3 w-3" />{label}</button>)}<button onClick={() => setAssistantOpen(true)} className={buttonClass}><Bot className="h-3 w-3" />Perguntar à Lokat</button></div></section>
       {trace && <TraceDrawer trace={trace} onClose={() => setTrace(null)} onNavigate={onNavigate} />}
       <AskLokatPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} onNavigate={onNavigate} />
-    </div>
+    </MotionStagger>
   );
 }
 
