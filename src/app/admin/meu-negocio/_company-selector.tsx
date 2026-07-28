@@ -52,6 +52,8 @@ function CompanyCard({ card, onOpen }: { card: CompanySelectionCard; onOpen: (id
         </span>
       </div>
 
+      {card.id === "duh-lanches" && <span className="w-fit bg-purple-50 px-2 py-1 text-[9px] font-black uppercase text-purple-700">Exemplo simulado</span>}
+
       <div>
         <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
           <span>Diagnóstico</span>
