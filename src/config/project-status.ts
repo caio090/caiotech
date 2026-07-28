@@ -1038,6 +1038,20 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     last_updated: "2026-07-27",
     notes: "Demonstração Duh Lanches somente com dados simulados e Concorrente A/B/C. Mercado é referência, nunca ordem automática. Sem SQL, Supabase, Auth, scraping ou persistência.",
   },
+  {
+    id: "meu_negocio_command_center_ai_v1",
+    name: "Meu Negócio — Centro de Comando e Assistente V1",
+    category: "admin",
+    description: "Dashboard executivo, cards clicáveis, rastreabilidade por fonte/período/fórmula, catálogo de produtos e fichas, evolução do CMV, auditoria OlaClick e Assistente Lokat server-side com saída estruturada.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["Dados reais e persistência pendentes", "QA visual autenticado pendente", "OpenAI depende de variáveis server-side"],
+    next_actions: ["Executar QA visual em 390, 768, 1024 e 1440 px", "Validar Assistente sem e com configuração server-side"],
+    risk: "low",
+    last_updated: "2026-07-27",
+    notes: "Somente demonstração em memória nesta branch. IA não calcula nem altera dados; store=false, sem web search. OlaClick auditada sem inventar conexão ou prova runtime. Sem SQL, Supabase, Auth, dado real ou deploy. V1_PROGRESS=81 e V2_PROGRESS=12 preservados.",
+  },
   // ── Workspaces 1.0 (branch feat/workspace-panels-v1) ──────────────────────
   // Nenhum usuário, cliente ou registro real foi criado nesta sprint.
   {
