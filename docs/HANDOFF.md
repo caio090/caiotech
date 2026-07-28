@@ -962,3 +962,42 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 ### Próximo passo recomendado
 
 - Abrir o servidor local desta worktree, autenticar como Super Admin e executar o roteiro visual do Centro de Comando.
+## 2026-07-28 - Meu Negocio contraste visual V1
+
+### O que foi feito
+
+- Criada worktree isolada `lokat-os-meu-negocio-visual-contrast` na branch `fix/meu-negocio-dashboard-visual-contrast-v1`.
+- Corrigida a mistura entre tokens claros e paineis escuros no Centro de Comando.
+- Criado tema escuro local e escopado por `.mn-dashboard-theme`, sem alterar o tema global do produto.
+- Consolidada hierarquia de canvas, painel, superficie elevada e elemento interativo.
+- Corrigidos foregrounds, badges semanticos, inputs, estados disabled, eixos, legendas e tooltips dos graficos.
+- Adicionados testes estruturais e verificacao matematica de contraste WCAG AA.
+
+### Arquivos alterados
+
+- `src/app/globals.css`
+- `src/app/admin/meu-negocio/_dashboard-design-tokens.ts`
+- `src/app/admin/meu-negocio/_restaurant-workspace.tsx`
+- `src/app/admin/meu-negocio/_command-center-dashboard.tsx`
+- `src/app/admin/meu-negocio/_business-result-waterfall.tsx`
+- `src/app/admin/meu-negocio/_sources-tab.tsx`
+- `src/lib/business-command-center/__tests__/dashboard-navigation.structural.test.ts`
+- `src/lib/business-command-center/__tests__/dashboard-contrast.test.ts`
+
+### Validacoes
+
+- TypeScript, ESLint focado e build Webpack aprovados.
+- Testes novos: 9 assercoes de contraste e 55 estruturais aprovadas.
+- Regressoes de Centro de Comando, UI/IA, Restaurante, Financeiro, CMV, estoque, custos e mercado aprovadas.
+- Servidor local mantido em `http://127.0.0.1:3002`.
+
+### Pendencias
+
+- QA visual autenticado em 390, 768, 1024 e 1440 px continua pendente por falta de sessao local controlavel no navegador.
+- Nao marcar a correcao como `validated` antes desse QA.
+- `V1_PROGRESS=81`, `V2_PROGRESS=12` e `global_calendar=qa_pending` permanecem inalterados.
+
+### Proximo passo recomendado
+
+- Autenticar manualmente em `http://127.0.0.1:3002/login` e executar o roteiro visual do Centro de Comando.
+- Depois do QA, revisar o diff e decidir sobre commits/push apenas na branch de correcao.

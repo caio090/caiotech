@@ -456,6 +456,93 @@ body {
 .lk-dark .divide-gray-100 > * + * { border-color: var(--lk-border) !important; }
 .lk-dark .divide-y > * + * { border-color: var(--lk-border) !important; }
 
+/* Meu Negocio command center: scoped dark design system. */
+.mn-dashboard-theme {
+  --mn-canvas: #090b10;
+  --mn-panel: #11141c;
+  --mn-elevated: #171b26;
+  --mn-interactive: #1d2230;
+  --mn-border: #272d3a;
+  --mn-border-strong: #3a4354;
+  --mn-text: #f6f7fb;
+  --mn-text-secondary: #bcc4d4;
+  --mn-text-muted: #8993a8;
+  --mn-text-subtle: #697386;
+  color: var(--mn-text);
+  color-scheme: dark;
+}
+.mn-dashboard-theme .bg-white { background-color: var(--mn-panel) !important; }
+.mn-dashboard-theme .bg-slate-50,
+.mn-dashboard-theme .bg-gray-50 { background-color: var(--mn-elevated) !important; }
+.mn-dashboard-theme .bg-slate-100,
+.mn-dashboard-theme .bg-gray-100 { background-color: var(--mn-interactive) !important; }
+.mn-dashboard-theme .bg-emerald-50 { background-color: rgba(34, 197, 94, 0.1) !important; }
+.mn-dashboard-theme .bg-amber-50,
+.mn-dashboard-theme .bg-orange-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
+.mn-dashboard-theme .bg-rose-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
+.mn-dashboard-theme .bg-sky-50,
+.mn-dashboard-theme .bg-blue-50 { background-color: rgba(56, 189, 248, 0.1) !important; }
+.mn-dashboard-theme .bg-violet-50,
+.mn-dashboard-theme .bg-purple-50 { background-color: rgba(139, 92, 246, 0.12) !important; }
+.mn-dashboard-theme .text-black,
+.mn-dashboard-theme .text-slate-950,
+.mn-dashboard-theme .text-slate-900,
+.mn-dashboard-theme .text-gray-950,
+.mn-dashboard-theme .text-gray-900,
+.mn-dashboard-theme .text-zinc-950,
+.mn-dashboard-theme .text-neutral-950 { color: var(--mn-text) !important; }
+.mn-dashboard-theme .text-slate-700,
+.mn-dashboard-theme .text-slate-600,
+.mn-dashboard-theme .text-gray-700,
+.mn-dashboard-theme .text-gray-600 { color: var(--mn-text-secondary) !important; }
+.mn-dashboard-theme .text-slate-500,
+.mn-dashboard-theme .text-gray-500 { color: var(--mn-text-muted) !important; }
+.mn-dashboard-theme .text-slate-400,
+.mn-dashboard-theme .text-gray-400 { color: var(--mn-text-subtle) !important; }
+.mn-dashboard-theme .text-violet-700,
+.mn-dashboard-theme .text-purple-700 { color: #c4b5fd !important; }
+.mn-dashboard-theme .text-emerald-700 { color: #86efac !important; }
+.mn-dashboard-theme .text-amber-700,
+.mn-dashboard-theme .text-amber-800,
+.mn-dashboard-theme .text-amber-900,
+.mn-dashboard-theme .text-orange-700 { color: #fcd34d !important; }
+.mn-dashboard-theme .text-rose-700 { color: #fca5a5 !important; }
+.mn-dashboard-theme .text-sky-700,
+.mn-dashboard-theme .text-blue-700 { color: #7dd3fc !important; }
+.mn-dashboard-theme .border-slate-100,
+.mn-dashboard-theme .border-slate-200,
+.mn-dashboard-theme .border-gray-100,
+.mn-dashboard-theme .border-gray-200,
+.mn-dashboard-theme .divide-slate-100 > * + * { border-color: var(--mn-border) !important; }
+.mn-dashboard-theme input,
+.mn-dashboard-theme textarea,
+.mn-dashboard-theme select {
+  border-color: var(--mn-border-strong) !important;
+  background: var(--mn-elevated) !important;
+  color: var(--mn-text) !important;
+}
+.mn-dashboard-theme input::placeholder,
+.mn-dashboard-theme textarea::placeholder { color: var(--mn-text-subtle) !important; }
+.mn-dashboard-theme button:disabled {
+  border-color: var(--mn-border) !important;
+  background: var(--mn-panel) !important;
+  color: var(--mn-text-subtle) !important;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+.mn-dashboard-theme .recharts-cartesian-axis-tick-value,
+.mn-dashboard-theme .recharts-legend-item-text { fill: var(--mn-text-muted) !important; color: var(--mn-text-muted) !important; }
+.mn-dashboard-theme .recharts-cartesian-grid line { stroke: var(--mn-border) !important; }
+.mn-dashboard-theme .recharts-default-tooltip {
+  border: 1px solid var(--mn-border-strong) !important;
+  border-radius: 6px !important;
+  background: var(--mn-elevated) !important;
+  color: var(--mn-text) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+.mn-dashboard-theme .recharts-tooltip-label,
+.mn-dashboard-theme .recharts-tooltip-item { color: var(--mn-text) !important; }
+
 /* ── Public page base ───────────────────────────────────────── */
 .lk-public {
   background: var(--lk-bg);

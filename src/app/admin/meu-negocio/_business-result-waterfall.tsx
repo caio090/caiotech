@@ -32,7 +32,7 @@ export function BusinessResultWaterfall({ managerMode }: { managerMode: boolean 
               <div className={step.positive ? "w-full rounded-t bg-violet-500" : "w-full rounded-t bg-slate-300"} style={{ height: `${Math.max(16, Math.abs(step.value) / max * 100)}%` }} />
             </div>
             <p className="text-[10px] leading-tight text-slate-500">{step.label}</p>
-            <p className={step.value < 0 ? "mt-1 text-xs font-extrabold text-rose-700" : "mt-1 text-xs font-extrabold text-slate-950"}>{step.value < 0 ? "− " : ""}{money(step.value)}</p>
+            <p className={step.value < 0 ? "mt-1 text-xs font-extrabold text-rose-300" : "mt-1 text-xs font-extrabold text-[#f6f7fb]"}>{step.value < 0 ? "− " : ""}{money(step.value)}</p>
             {index < STEPS.length - 1 && <ArrowDown className="absolute -right-2 top-7 hidden h-3 w-3 -rotate-90 text-slate-300 xl:block" />}
           </div>
         ))}
