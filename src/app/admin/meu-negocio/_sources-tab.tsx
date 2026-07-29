@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Database, Info, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dashboardTokens } from "./_dashboard-design-tokens";
@@ -13,8 +14,61 @@ const STATE: Record<SourceState, { label: string; style: string }> = {
   needs_setup: { label: "Precisa configurar", style: "border-blue-200 bg-blue-50 text-blue-700" },
   unavailable: { label: "Indisponível", style: "border-slate-200 bg-slate-50 text-slate-500" },
 };
+
+interface OlaClickEnvStatus { ok: boolean; hasAnyConnection?: boolean; connectionCount?: number }
+type OlaClickCheckState = "loading" | "checked" | "unauthenticated" | "error";
+
+/**
+ * Fase 20/3: só faz uma checagem read-only real (GET /api/olaclick/env-status,
+ * nenhum segredo retornado) — nunca mostra "Conectada" apenas porque existe
+ * uma linha em olaclick_connections; o runtime de leitura de pedidos segue
+ * não comprovado independentemente do resultado desta checagem.
+ */
+function OlaClickStatusCard() {
+  const [state, setState] = useState<OlaClickCheckState>("loading");
+  const [data, setData] = useState<OlaClickEnvStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/olaclick/env-status")
+      .then(async (response) => {
+        if (cancelled) return;
+        if (response.status === 401) { setState("unauthenticated"); return; }
+        if (!response.ok) { setState("error"); return; }
+        const json = (await response.json()) as OlaClickEnvStatus;
+        setData(json);
+        setState(json.ok ? "checked" : "error");
+      })
+      .catch(() => { if (!cancelled) setState("error"); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const connectionFound = state === "checked" && (data?.connectionCount ?? 0) > 0;
+  const badge = state === "checked" ? (connectionFound ? STATE.not_tested : STATE.needs_setup) : STATE.unavailable;
+  const note = state === "loading" ? "Verificando configuração..."
+    : state === "unauthenticated" ? "Não foi possível verificar (sessão não encontrada)."
+    : state === "error" ? "Não foi possível verificar agora. Rotas server-side encontradas; nenhuma leitura foi confirmada."
+    : connectionFound ? `${data?.connectionCount} conexão(ões) configurada(s) para este ambiente, mas a leitura de pedidos em runtime não foi comprovada nesta sprint.`
+    : "Nenhuma conexão configurada para este ambiente nesta sprint.";
+
+  return (
+    <article className="rounded-md border border-slate-200 bg-slate-50/60 p-4" data-testid="olaclick-status-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-extrabold text-slate-900">Cardápio digital · OlaClick</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{note}</p>
+        </div>
+        <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold", badge.style)}>{badge.label}</span>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-[10px]">
+        <div><dt className="text-slate-400">Atualização</dt><dd className="mt-0.5 font-bold text-slate-700">Runtime não validado</dd></div>
+        <div><dt className="text-slate-400">Confiabilidade</dt><dd className="mt-0.5 font-bold text-slate-700">A confirmar</dd></div>
+      </dl>
+    </article>
+  );
+}
+
 const SOURCES: Array<{ name: string; state: SourceState; updated: string; reliability: string; note: string }> = [
-  { name: "Cardápio digital · OlaClick", state: "not_tested", updated: "Runtime não validado", reliability: "A confirmar", note: "Rotas server-side encontradas; nenhuma leitura real foi feita nesta sprint." },
   { name: "Planilhas", state: "simulated", updated: "01/07/2026 09:00", reliability: "Média", note: "Exemplo importado apenas para demonstração visual." },
   { name: "Preenchimento manual", state: "connected", updated: "Disponível nesta sessão", reliability: "Depende da revisão", note: "Alterações permanecem locais e não são persistidas nesta sprint." },
   { name: "Diagnóstico", state: "needs_setup", updated: "Sem atualização", reliability: "Não avaliada", note: "A fonte ainda precisa ser associada ao contexto do negócio." },
@@ -29,7 +83,10 @@ export function SourcesTab() {
   return <div className="space-y-4" data-testid="sources-and-integrations">
     <section className={`${dashboardTokens.panel} ${dashboardTokens.radius} ${dashboardTokens.cardPadding}`}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Database className="h-4 w-4 text-violet-400" /><h2 className="text-base font-black text-[#f6f7fb]">Fontes e Integrações</h2></div><p className="mt-1 text-xs text-[#8993a8]">Origem, atualidade e confiabilidade dos dados usados no Centro de Comando.</p></div><button className={`${dashboardTokens.focus} inline-flex items-center gap-1.5 rounded-md border border-[#3a4354] bg-[#1d2230] px-3 py-2 text-xs font-bold text-[#bcc4d4] hover:text-white`} title="Ação demonstrativa"><RefreshCw className="h-3.5 w-3.5" />Revisar estados</button></div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">{SOURCES.map((source) => <article key={source.name} className="rounded-md border border-slate-200 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-extrabold text-slate-900">{source.name}</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-600">{source.note}</p></div><span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold", STATE[source.state].style)}>{STATE[source.state].label}</span></div><dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-[10px]"><div><dt className="text-slate-400">Atualização</dt><dd className="mt-0.5 font-bold text-slate-700">{source.updated}</dd></div><div><dt className="text-slate-400">Confiabilidade</dt><dd className="mt-0.5 font-bold text-slate-700">{source.reliability}</dd></div></dl></article>)}</div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <OlaClickStatusCard />
+        {SOURCES.map((source) => <article key={source.name} className="rounded-md border border-slate-200 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-extrabold text-slate-900">{source.name}</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-600">{source.note}</p></div><span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold", STATE[source.state].style)}>{STATE[source.state].label}</span></div><dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-[10px]"><div><dt className="text-slate-400">Atualização</dt><dd className="mt-0.5 font-bold text-slate-700">{source.updated}</dd></div><div><dt className="text-slate-400">Confiabilidade</dt><dd className="mt-0.5 font-bold text-slate-700">{source.reliability}</dd></div></dl></article>)}
+      </div>
     </section>
     <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3"><Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" /><p className="text-xs leading-relaxed text-amber-900">OlaClick não está marcada como conectada: a implementação foi encontrada, mas o runtime não foi comprovado nesta sprint. Nenhuma chave ou token é exibido.</p></div>
   </div>;
