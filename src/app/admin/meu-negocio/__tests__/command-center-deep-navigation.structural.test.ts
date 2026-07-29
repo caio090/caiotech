@@ -46,5 +46,21 @@ console.log("\n[test] nenhuma regressão nos destinos sem subárea explícita");
   assert(workspace.includes(`legacyDetail = section === "technical_sheets" ? "Fichas técnicas" : section === "purchasing" ? "Lista de compras" : undefined`), "compatibilidade retroativa preservada para chamadores que só passam a área (ex.: cross-links do Financeiro)");
 }
 
+console.log("\n[test] card \"Produtos sem ficha\" (KPI complementar) navega de verdade (regressão do 2o QA visual)");
+{
+  // Este card é um CompactKpi renderizado em "Ver indicadores complementares" -- um
+  // elemento de UI totalmente diferente do alerta "missing-sheet" testado acima.
+  // O bug anterior só foi pego pelo QA visual porque o teste de config (acima)
+  // passava sem garantir que ESTE card específico estivesse conectado a algo.
+  const compactKpiCall = dashboard.match(/<CompactKpi label="Produtos sem ficha"[^/]*\/>/)?.[0] ?? "";
+  assert(compactKpiCall.length > 0, "card \"Produtos sem ficha\" (CompactKpi) encontrado no dashboard");
+  assert(compactKpiCall.includes('onClick={() => onNavigate("products_pricing", "Fichas técnicas")}'), "card \"Produtos sem ficha\" navega para Produtos e Fichas / Fichas técnicas, usando os IDs canônicos existentes");
+  const compactKpiComponent = dashboard.split("function CompactKpi")[1] ?? "";
+  assert(compactKpiComponent.includes("<button") && compactKpiComponent.includes("onClick"), "CompactKpi renderiza <button> real (semântica de botão) quando recebe destino");
+  assert(compactKpiComponent.includes("aria-label={`${label}: ${value}, ${detail}`}"), "card tem aria-label compreensível");
+  assert(compactKpiComponent.includes("dashboardTokens.focus"), "card tem foco visível");
+  assert(!compactKpiComponent.includes("<article") || compactKpiComponent.includes("!onClick"), "cards sem destino continuam como <article> não-interativo (sem regressão nos outros complementares)");
+}
+
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();
