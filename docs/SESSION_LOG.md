@@ -766,3 +766,12 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Definido o contrato de tipos `NormalizedOrder`/`NormalizedOrderItem` (apenas tipos, engine de extração existente não foi reescrita).
 - Renomeado "Dados e planilhas" para "Dados e relatórios" em toda a UI.
 - TypeScript, ESLint, 772 asserções (32 suítes) e build Webpack aprovados; escopo reduzido deliberadamente frente às 34 fases pedidas (ver `docs/HANDOFF.md`).
+
+## 2026-07-29 - Meu Negócio: cardápios digitais, período central e modos globais V2
+
+- OlaClick reenquadrada como provedor (`DigitalMenuProvider`), não módulo: card "Cardápio digital" com "Provedor: OlaClick" como campo interno, nunca "Conectada" sem `runtimeValidated`.
+- Criado `BusinessPeriodSelection` (`src/lib/business-period/`) com 9 presets, dia operacional configurável por empresa e cálculo timezone-aware correto em madrugada/virada de mês/ano. Um único `PeriodSelector` no shell.
+- Financeiro/Resumo recalcula de verdade a partir do período central; Faturamento propaga rótulo/comparação reais mas avisa explicitamente que a fixture não recalcula por período.
+- Corrigido bug real: Visão simples/Modo Gestor tinha três estados desconectados (workspace, FinanceTab, CmvCenter) — consolidado num único hook com persistência de sessão.
+- Visão simples agora esconde estruturalmente os indicadores complementares (não só recolhe); 8 KPIs principais ganharam o badge real de classificação de dados.
+- TypeScript, ESLint, 922 asserções (39 suítes) e build Webpack aprovados; dia operacional/período central ainda não chegou a CMV/Estoque/Compras/Relatórios (fora do escopo desta sessão).
