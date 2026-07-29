@@ -86,6 +86,38 @@ console.log("\n[test] comparação -- período anterior de mesma duração, mês
   assert(custom.comparisonStartDate === "2026-06-30" && custom.comparisonEndDateExclusive === "2026-07-10", "CUSTOM (10 dias) compara com os 10 dias imediatamente anteriores");
 }
 
+console.log("\n[test] rótulos mostram datas reais em pt-BR, não descrições genéricas (Fase 6/7 -- achado do QA visual)");
+{
+  const now = new Date("2026-07-29T18:00:00.000Z");
+  const custom = calc.buildPeriodSelection("CUSTOM", TZ, OP_START, now, { startDate: "2026-07-01", endDateExclusive: "2026-07-16" });
+  assert(custom.label === "01/07/2026 a 15/07/2026", "label do período personalizado mostra as datas reais (fim inclusivo na UI), não a palavra genérica \"Personalizado\"");
+  assert(custom.comparisonLabel === "16/06/2026 até 30/06/2026", "comparação de um CUSTOM de 15 dias mostra as datas reais (exemplo exato do brief), não \"15 dias imediatamente anteriores\"");
+
+  const singleDay = calc.buildPeriodSelection("CUSTOM", TZ, OP_START, now, { startDate: "2026-07-01", endDateExclusive: "2026-07-02" });
+  assert(singleDay.comparisonLabel === "30/06/2026", "comparação de 1 dia mostra a data única, não \"Dia anterior\" genérico");
+
+  const yearBoundary = calc.buildPeriodSelection("CUSTOM", TZ, OP_START, now, { startDate: "2025-12-29", endDateExclusive: "2026-01-06" });
+  assert(yearBoundary.label === "29/12/2025 a 05/01/2026", "label do personalizado atravessando o ano formata as duas datas corretamente");
+  assert(yearBoundary.comparisonStartDate === "2025-12-21" && yearBoundary.comparisonEndDateExclusive === "2025-12-29", "comparação de personalizado atravessando o ano calcula corretamente (28/12 a 05/01 do brief)");
+
+  const march = calc.buildPeriodSelection("CUSTOM", TZ, OP_START, now, { startDate: "2026-03-01", endDateExclusive: "2026-04-01" });
+  assert(march.comparisonStartDate === "2026-02-01" && march.comparisonEndDateExclusive === "2026-03-01", "personalizado que corresponde a um mês cheio (março) compara com fevereiro inteiro (28 dias em 2026), tratado como mês cheio mesmo vindo de CUSTOM");
+}
+
+console.log("\n[test] toExclusiveEndDate / toInclusiveEndDate -- único ponto de conversão (Fase 5)");
+{
+  assert(calc.toExclusiveEndDate("2026-07-15") === "2026-07-16", "data final inclusiva da UI -> fim exclusivo do domínio (+1 dia)");
+  assert(calc.toInclusiveEndDate("2026-07-16") === "2026-07-15", "fim exclusivo do domínio -> data final inclusiva da UI (-1 dia)");
+  assert(calc.toExclusiveEndDate("2026-12-31") === "2027-01-01", "conversão atravessa a virada do ano corretamente");
+  assert(calc.toInclusiveEndDate("2026-01-01") === "2025-12-31", "conversão inversa atravessa a virada do ano corretamente");
+}
+
+console.log("\n[test] formatDateBR -- formato brasileiro dd/mm/aaaa (Fase 6)");
+{
+  assert(calc.formatDateBR("2026-07-01") === "01/07/2026", "formata data ISO em dd/mm/aaaa");
+  assert(calc.formatDateBR("2026-01-05") === "05/01/2026", "preenche zero à esquerda em dia e mês");
+}
+
 console.log("\n[test] virada de ano na composição de presets (Fase 21)");
 {
   const now = new Date("2026-01-03T18:00:00.000Z"); // 15:00 Fortaleza, 3 jan 2026
