@@ -101,6 +101,40 @@ function resolveComparisonRange(startDate: string, endDateExclusive: string): { 
   return { comparisonStartDate, comparisonEndDateExclusive, comparisonLabel };
 }
 
+export interface CustomPeriodDraft { startDate: string; endDateInclusive: string }
+export interface CustomPeriodValidation {
+  valid: boolean;
+  fieldErrors: { startDate?: string; endDateInclusive?: string };
+  formError: string | null;
+}
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Fase 3: única função de validação do rascunho do período personalizado --
+ * usada tanto pelo `disabled` do botão Aplicar quanto pelo handler (defesa
+ * contra Enter/submit programático). Datas são comparadas como strings civis
+ * "YYYY-MM-DD" (ordenação lexicográfica == ordenação cronológica nesse
+ * formato), nunca convertidas para Date/UTC, para não introduzir deslocamento
+ * de fuso horário acidental.
+ */
+export function validateCustomPeriodDraft(draft: CustomPeriodDraft): CustomPeriodValidation {
+  const fieldErrors: CustomPeriodValidation["fieldErrors"] = {};
+  if (!draft.startDate) fieldErrors.startDate = "Informe a data inicial.";
+  else if (!ISO_DATE_PATTERN.test(draft.startDate)) fieldErrors.startDate = "Data inicial inválida.";
+  if (!draft.endDateInclusive) fieldErrors.endDateInclusive = "Informe a data final.";
+  else if (!ISO_DATE_PATTERN.test(draft.endDateInclusive)) fieldErrors.endDateInclusive = "Data final inválida.";
+
+  if (fieldErrors.startDate || fieldErrors.endDateInclusive) {
+    const formError = [fieldErrors.startDate, fieldErrors.endDateInclusive].filter((message): message is string => Boolean(message)).join(" ");
+    return { valid: false, fieldErrors, formError };
+  }
+  if (draft.startDate > draft.endDateInclusive) {
+    return { valid: false, fieldErrors: {}, formError: "A data inicial não pode ser posterior à data final." };
+  }
+  return { valid: true, fieldErrors: {}, formError: null };
+}
+
 export interface CustomPeriodInput { startDate: string; endDateExclusive: string }
 
 export function buildPeriodSelection(preset: BusinessPeriodPreset, timezone: string, operationalDayStart: string, now: Date, custom?: CustomPeriodInput): BusinessPeriodSelection {
