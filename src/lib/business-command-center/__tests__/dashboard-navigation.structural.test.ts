@@ -41,7 +41,7 @@ for (const forbidden of ["text-black", "text-slate-950", "text-zinc-950", "text-
 assert(waterfall.includes("Resultado gerencial, não substitui a contabilidade."), "cascata não chama resultado de lucro líquido");
 for (const label of ["Vendas realizadas", "Descontos", "Custo dos produtos", "Taxas variáveis", "Despesas operacionais", "Resultado gerencial"]) assert(waterfall.includes(label), `cascata contém ${label}`);
 for (const source of ["Cardápio digital", "Planilhas", "Preenchimento manual", "Diagnóstico", "Estoque", "Fichas técnicas", "Cálculos Lokat", "OpenAI", "Google Planilhas"]) assert(sources.includes(source), `fontes contém ${source}`);
-assert(sources.includes("Runtime não validado") && !sources.includes('name: "Cardápio digital · OlaClick", state: "connected"'), "OlaClick não é conectada sem runtime");
+assert(sources.includes("runtimeValidated: false") && !sources.includes('name: "Cardápio digital · OlaClick", state: "connected"'), "OlaClick não é conectada sem runtime (resolveConnectionStatus sempre recebe runtimeValidated: false nesta sprint)");
 for (const dependency of ["@tremor", "antd", "apexcharts", "@clerk"]) assert(!packageJson.includes(`\"${dependency}`), `sem nova dependência ${dependency}`);
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();
