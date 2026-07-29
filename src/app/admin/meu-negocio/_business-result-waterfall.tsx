@@ -22,10 +22,11 @@ export function BusinessResultWaterfall({ managerMode }: { managerMode: boolean 
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 id="business-result-title" className="text-sm font-extrabold">Formação do resultado</h3>
-          <p className="mt-1 text-xs text-slate-500">Junho de 2026 · valores demonstrativos</p>
+          <p className="mt-1 text-xs text-slate-500">Base simulada: Junho de 2026 · valores demonstrativos</p>
         </div>
         <DataClassificationBadge classification="SIMULATED" testId="waterfall-badge" />
       </div>
+      <p className="mt-1 text-[10px] text-amber-600">Valor demonstrativo de referência; não recalcula para o período selecionado.</p>
       <div className="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {STEPS.map((step, index) => (
           <div key={step.label} className="relative min-w-0">

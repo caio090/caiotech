@@ -58,6 +58,7 @@ export function RevenueHeroCard({ managerMode, onNavigate, period }: { managerMo
           <p className="mt-1 text-3xl font-black text-[#f6f7fb]">{summary.realizedRevenue.formattedValue}</p>
           <ComparisonLine comparison={comparison} />
           <p className="mt-1 text-[10px] text-[#8993a8]">{summary.period.label} · {summary.validOrders.formattedValue} pedidos válidos · ticket médio {summary.averageTicket.formattedValue}</p>
+          {summary.realizedRevenue.dataClassification === "SIMULATED" && <p className="mt-0.5 text-[9px] text-amber-300/80">Valor demonstrativo de referência; não recalcula para o período selecionado.</p>}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <button onClick={() => onNavigate("finance", "Faturamento")} className={`${dashboardTokens.focus} inline-flex items-center gap-1 text-xs font-bold text-violet-300 hover:text-violet-200`}>Abrir Faturamento<ArrowRight className="h-3.5 w-3.5" /></button>
