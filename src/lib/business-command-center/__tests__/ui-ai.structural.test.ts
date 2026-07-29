@@ -15,4 +15,3 @@ assert(ai.includes("client.responses.create"), "Responses API"); assert(ai.inclu
 assert(route.includes("getCurrentUser"), "rota autentica server-side"); assert(route.includes("MAX_INPUT = 500"), "input limitado"); assert(route.includes("MAX_REQUESTS = 8"), "rate limit"); assert(route.includes("TIMEOUT_MS = 15_000"), "timeout"); assert(route.includes("Assistente IA ainda não configurado"), "fallback sem chave"); assert(!route.includes("console.log"), "sem log de payload");
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();
-

@@ -62,4 +62,3 @@ export interface BusinessInsightResponse {
 }
 
 export interface BusinessInsightAIProvider { analyze(snapshot: BusinessInsightSnapshot, signal?: AbortSignal): Promise<BusinessInsightResponse>; }
-

@@ -25,4 +25,3 @@ export function productMatches(item: typeof PRODUCT_CATALOG_FIXTURES[number], qu
   if (filter === "attention") return item.alerts.length > 0;
   return true;
 }
-

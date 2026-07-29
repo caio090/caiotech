@@ -22,4 +22,3 @@ export async function POST(request: NextRequest) {
   catch (error) { const timedOut = error instanceof Error && error.name === "AbortError"; console.warn("[meu-negocio/ai] análise indisponível", { timedOut }); return NextResponse.json({ ok: false, error: timedOut ? "A análise excedeu o tempo limite." : "Assistente indisponível no momento.", fallback: localDeterministicExplanation() }, { status: timedOut ? 504 : 502 }); }
   finally { clearTimeout(timer); }
 }
-

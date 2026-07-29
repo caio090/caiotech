@@ -63,4 +63,3 @@ export const OLACLICK_CAPABILITIES: CommerceDataProviderCapability[] = [
   { resource: "refunds", state: "not_implemented", source: "Adapter OlaClick", lastTest: null, note: "Não implementado." },
   { resource: "reports", state: "available", source: "Relatório de faturamento", lastTest: null, note: "Relatório interno implementado." },
 ];
-

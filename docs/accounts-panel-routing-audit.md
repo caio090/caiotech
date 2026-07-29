@@ -144,7 +144,7 @@ contra `VALID_ROLES` (derivado de `ROLE_HOME`). Compartilhada por
 `src/proxy.ts`, o redirect de login e `src/app/admin/layout.tsx` — **uma
 única fonte**, sem duplicação nem drift, confirmado por leitura direta.
 
-### 3.2 Papéis reais aceitos (fonte única): 
+### 3.2 Papéis reais aceitos (fonte única):
 `super_admin, admin, cliente, aluno, operacional, comercial, sdr, closer,
 social_media, designer, editor, videomaker, gestor_trafego, financeiro`.
 Idêntico ao CHECK constraint ao vivo do banco (seção 2). **Nenhum papel
@@ -329,7 +329,7 @@ sessão real de um usuário `agencia`/`empresa`.
   (seção 3.4), então na prática nunca aplica o limite correto.
 - Race condition: impossível avaliar hoje — não existe o INSERT a
   proteger.
-- Regra final proposta (não implementada): 
+- Regra final proposta (não implementada):
   ```
   active_agency_clients (status='active' in agency_clients)
   + pending_accepted_client_invites (status IN ('pending','accepted') com client vinculável)
