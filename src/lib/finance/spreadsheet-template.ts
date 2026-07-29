@@ -9,7 +9,7 @@ import * as XLSX from "xlsx";
 const README_ROWS: string[][] = [
   ["Modelo de planilha Lokat — Meu Negócio"],
   [""],
-  ["Este arquivo é um modelo. Preencha as abas com os dados do seu negócio e importe de volta em Meu Negócio → Financeiro → Dados e planilhas."],
+  ["Este arquivo é um modelo. Preencha as abas com os dados do seu negócio e importe de volta em Meu Negócio → Financeiro → Dados e relatórios."],
   [""],
   ["Campos a preencher"],
   ["Preencha manualmente: descrição, valor, categoria, datas, quantidade, unidade e custo unitário nas abas correspondentes."],
@@ -36,7 +36,7 @@ const README_ROWS: string[][] = [
   ["Descrição, valor e data são obrigatórios em todas as abas de movimentação. Linhas sem esses três campos são rejeitadas na importação."],
   [""],
   ["Como importar de volta"],
-  ["Vá em Meu Negócio → Financeiro → Dados e planilhas → Importar planilha, selecione este arquivo preenchido e revise a proposta de importação antes de confirmar. Nada é aplicado automaticamente."],
+  ["Vá em Meu Negócio → Financeiro → Dados e relatórios → Importar planilha, selecione este arquivo preenchido e revise a proposta de importação antes de confirmar. Nada é aplicado automaticamente."],
 ];
 
 const CASH_FLOW_ROWS: string[][] = [

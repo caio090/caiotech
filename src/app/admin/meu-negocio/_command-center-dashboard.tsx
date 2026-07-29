@@ -10,6 +10,7 @@ import type { CommandCenterMetric, MetricCalculationTrace } from "@/lib/business
 import { AskLokatPanel } from "./_ask-lokat-panel";
 import { BusinessResultWaterfall } from "./_business-result-waterfall";
 import { dashboardStatus, dashboardTokens } from "./_dashboard-design-tokens";
+import { RevenueHeroCard } from "./_revenue-panels";
 
 type NavigateFn = (section: BusinessModuleKey, detail?: string) => void;
 type Props = { companyName: string; managerMode: boolean; onNavigate: NavigateFn };
@@ -42,6 +43,8 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
       </header>
 
       <SourceStrip onNavigate={onNavigate} />
+
+      <RevenueHeroCard managerMode={managerMode} onNavigate={onNavigate} />
 
       <section aria-labelledby="kpi-title">
         <div className="mb-2 flex items-end justify-between"><div><h3 id="kpi-title" className="text-sm font-extrabold text-[#f6f7fb]">Indicadores principais</h3><p className="text-[11px] text-[#8993a8]">Seis números para entender a situação agora.</p></div></div>

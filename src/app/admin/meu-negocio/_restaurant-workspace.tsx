@@ -38,7 +38,7 @@ const SECTIONS: Array<{ id: DashboardSection; label: string; icon: React.Element
 
 const SUBSECTIONS: Record<DashboardSection, string[]> = {
   overview: [],
-  finance: ["Resumo", "Fluxo de caixa", "Planejado versus realizado", "Reserva", "Contas a pagar", "Contas a receber", "Projeções", "Dados e planilhas"],
+  finance: ["Resumo", "Faturamento", "Fluxo de caixa", "Planejado versus realizado", "Reserva", "Contas a pagar", "Contas a receber", "Projeções", "Dados e relatórios"],
   cmv: ["Resumo", "CMV teórico", "CMV real", "Evolução", "Diferença e investigação", "Engenharia de cardápio", "Mercado e concorrência", "Simulador de preço", "Cobertura"],
   products: ["Catálogo", "Fichas técnicas", "Custos", "Preços e margens", "Vínculos do cardápio", "Anexos", "Histórico"],
   inventory: ["Visão geral", "Estoque central", "Cozinha", "Movimentações", "Inventários", "Perdas", "Lista de compras", "Pedidos", "Fornecedores"],
@@ -92,7 +92,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
 
       <MotionSection motionKey={`${activeSection}:${activeSubsection}:${viewMode}`}>
       {activeSection === "overview" && <CommandCenterDashboard companyName={companyName} managerMode={viewMode === "manager"} onNavigate={navigateFromLegacy} />}
-      {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} />}
+      {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} activeSubsection={activeSubsection} />}
       {activeSection === "cmv" && <CmvCenter companyName={companyName} />}
       {activeSection === "products" && activeSubsection === "Fichas técnicas" && <RestaurantTechnicalSheets sheets={sheets} />}
       {activeSection === "products" && activeSubsection !== "Fichas técnicas" && <ProductCommandCenter />}

@@ -135,7 +135,7 @@ export function FinanceImportPanel({
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Dados e planilhas</p>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Dados e relatórios</p>
         <div className="flex flex-wrap gap-2.5">
           <button
             onClick={() => inputRef.current?.click()}

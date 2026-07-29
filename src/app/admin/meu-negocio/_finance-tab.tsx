@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LayoutGrid, ShieldCheck, CalendarRange, FileSpreadsheet } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useBusinessViewMode, ViewModeToggle } from "./_view-mode";
 import { DataSourceBadge } from "./_data-source-badge";
 import { FinanceDashboard } from "./_finance-dashboard";
 import { FinanceReservePanel } from "./_finance-reserve";
 import { FinanceWorkingCapitalPanel } from "./_finance-working-capital";
 import { FinanceImportPanel } from "./_finance-import";
+import { RevenueFullPanel } from "./_revenue-panels";
+import { ComingSoonPanel } from "./_coming-soon-panel";
 import { buildFinanceDashboardData, calculateWorkingCapitalCalendar, essentialCategoryLabels, excludedCategoryLabels } from "@/lib/finance/dashboard-builder";
 import { calculateEssentialMonthlyOutflow } from "@/lib/finance/calculations";
 import { buildSimulatedProvenance } from "@/lib/finance/data-source";
@@ -24,18 +24,11 @@ const PERIOD_START = "2026-07-01";
 const PERIOD_END = "2026-07-31";
 const PERIOD_LABEL = "Julho/2026 (mês corrente)";
 
-type FinanceSubTab = "dashboard" | "reserve" | "working_capital" | "import";
+/** Subáreas do Financeiro ainda sem painel próprio nesta sprint (Fase 9/22 -- honesto em vez de fingir). */
+const COMING_SOON_SUBSECTIONS = ["Planejado versus realizado", "Contas a pagar", "Contas a receber", "Projeções"];
 
-const SUB_TABS: Array<{ key: FinanceSubTab; label: string; icon: React.ElementType }> = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutGrid },
-  { key: "reserve", label: "Reserva e fôlego", icon: ShieldCheck },
-  { key: "working_capital", label: "Capital de giro", icon: CalendarRange },
-  { key: "import", label: "Dados e planilhas", icon: FileSpreadsheet },
-];
-
-export function FinanceTab({ companyName, onNavigate }: { companyName: string; onNavigate: (section: BusinessModuleKey) => void }) {
+export function FinanceTab({ companyName, onNavigate, activeSubsection }: { companyName: string; onNavigate: (section: BusinessModuleKey, detail?: string) => void; activeSubsection: string }) {
   const [viewMode, setViewMode] = useBusinessViewMode();
-  const [subTab, setSubTab] = useState<FinanceSubTab>("dashboard");
 
   // Estado central único desta demonstração (Fase 16) — todo o resto deste
   // arquivo apenas deriva dele via funções puras, nunca duplica valores.
@@ -62,34 +55,17 @@ export function FinanceTab({ companyName, onNavigate }: { companyName: string; o
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div role="tablist" className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {SUB_TABS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                role="tab"
-                aria-selected={subTab === key}
-                onClick={() => setSubTab(key)}
-                data-testid={`finance-subtab-${key}`}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border whitespace-nowrap transition-colors",
-                  subTab === key ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                )}
-              >
-                <Icon className="w-3.5 h-3.5" /> {label}
-              </button>
-            ))}
-          </div>
-          <DataSourceBadge provenance={provenance} testId="finance-tab-data-source-badge" />
-        </div>
+        <DataSourceBadge provenance={provenance} testId="finance-tab-data-source-badge" />
         <ViewModeToggle mode={viewMode} onChange={setViewMode} />
       </div>
 
-      {subTab === "dashboard" && (
+      {activeSubsection === "Resumo" && (
         <FinanceDashboard data={dashboardData} viewMode={viewMode} onNavigate={onNavigate} />
       )}
 
-      {subTab === "reserve" && (
+      {activeSubsection === "Faturamento" && <RevenueFullPanel managerMode={viewMode === "manager"} />}
+
+      {activeSubsection === "Reserva" && (
         <FinanceReservePanel
           summary={dashboardData.reserve}
           config={reserveConfig}
@@ -102,9 +78,9 @@ export function FinanceTab({ companyName, onNavigate }: { companyName: string; o
         />
       )}
 
-      {subTab === "working_capital" && <FinanceWorkingCapitalPanel summary={workingCapital} />}
+      {activeSubsection === "Fluxo de caixa" && <FinanceWorkingCapitalPanel summary={workingCapital} />}
 
-      {subTab === "import" && (
+      {activeSubsection === "Dados e relatórios" && (
         <FinanceImportPanel
           companyName={companyName}
           viewMode={viewMode}
@@ -112,6 +88,10 @@ export function FinanceTab({ companyName, onNavigate }: { companyName: string; o
           onHistoryChange={setImportHistory}
           googleConnection={GOOGLE_SHEET_CONNECTION_FIXTURE}
         />
+      )}
+
+      {COMING_SOON_SUBSECTIONS.includes(activeSubsection) && (
+        <ComingSoonPanel title={activeSubsection} description="Esta subárea do Financeiro ainda não tem um painel próprio nesta sprint. Preferimos deixar isso claro a fingir uma tela pronta." />
       )}
     </div>
   );
