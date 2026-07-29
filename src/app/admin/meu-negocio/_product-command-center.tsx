@@ -4,6 +4,7 @@ import { AlertTriangle, FilePlus2, Link2, PackagePlus, Paperclip, Search, X } fr
 import { PRODUCT_CATALOG_FIXTURES } from "@/lib/business-command-center/fixtures";
 import { productMatches } from "@/lib/business-command-center/calculations";
 import type { ProductAttachment, ProductCatalogItem } from "@/lib/business-command-center/types";
+import { useFocusTrap } from "@/lib/a11y/use-focus-trap";
 
 const brl = (cents: number | null) => cents === null ? "Indisponível" : (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const MAPPING = { linked: "Vinculado", suggested: "Sugestão de vínculo", unlinked: "Não vinculado", conflict: "Conflito", archived: "Produto externo arquivado" } as const;
@@ -19,6 +20,8 @@ export function ProductCommandCenter() {
 
 function ProductDetailDrawer({ product, onClose }: { product: ProductCatalogItem; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  useFocusTrap(panel, true);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -30,7 +33,7 @@ function ProductDetailDrawer({ product, onClose }: { product: ProductCatalogItem
 
   const margin = product.priceCents !== null && product.portionCostCents !== null ? product.priceCents - product.portionCostCents : null;
   return <div className="fixed inset-0 z-[90] bg-black/50" role="dialog" aria-modal="true" aria-labelledby="product-detail-title">
-    <aside className="ml-auto flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white p-5 shadow-2xl">
+    <aside ref={panel} tabIndex={-1} className="ml-auto flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white p-5 shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500">
       <div className="flex items-start justify-between"><div><p className="text-[10px] font-black uppercase text-purple-700">Ficha do produto · demonstrativo</p><h2 id="product-detail-title" className="text-lg font-black">{product.name}</h2></div><button ref={closeButton} onClick={onClose} aria-label="Fechar" className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"><X className="h-5 w-5" /></button></div>
       <dl className="mt-5 grid grid-cols-2 gap-4 text-xs">
         <div><dt className="text-gray-500">Categoria</dt><dd className="font-bold">{product.category}</dd></div>

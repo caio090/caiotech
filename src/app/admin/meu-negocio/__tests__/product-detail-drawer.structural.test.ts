@@ -46,5 +46,14 @@ console.log("\n[test] conteúdo mínimo do drawer");
   assert(drawer.includes("Exemplo simulado"), "drawer deixa claro que os valores são demonstrativos");
 }
 
+console.log("\n[test] focus trap conectado ao drawer (bug relatado no 2o QA visual: Tab escapava para elementos externos)");
+{
+  const drawer = source.split("function ProductDetailDrawer")[1] ?? "";
+  assert(source.includes('import { useFocusTrap } from "@/lib/a11y/use-focus-trap"'), "drawer importa o hook reutilizável useFocusTrap");
+  assert(drawer.includes("useFocusTrap(panel, true)"), "focus trap é ativado enquanto o drawer está montado (sempre true, pois só monta quando aberto)");
+  assert(drawer.includes('<aside ref={panel} tabIndex={-1}'), "container do drawer tem ref e tabIndex={-1} (alvo de foco de fallback)");
+  assert(!/useFocusTrap[\s\S]*useFocusTrap/.test(drawer), "useFocusTrap é chamado uma única vez (sem listener duplicado)");
+}
+
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();
