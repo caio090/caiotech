@@ -61,11 +61,16 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
 
   function setSubsection(value: string) { setSubsections((current) => ({ ...current, [activeSection]: value })); }
   function recordMovement(movement: StockMovement) { setMovements((previous) => [movement, ...previous]); }
-  function navigateFromLegacy(section: BusinessModuleKey) {
+  function navigateFromLegacy(section: BusinessModuleKey, detail?: string) {
     const destination: Record<BusinessModuleKey, DashboardSection> = { overview: "overview", finance: "finance", cmv_menu: "cmv", products_pricing: "products", technical_sheets: "products", stock: "inventory", purchasing: "inventory", reports: "reports", settings: "sources" };
-    setActiveSection(destination[section]);
-    if (section === "technical_sheets") setSubsections((current) => ({ ...current, products: "Fichas técnicas" }));
-    if (section === "purchasing") setSubsections((current) => ({ ...current, inventory: "Lista de compras" }));
+    const targetArea = destination[section];
+    // legacy keys that always implied a fixed subarea before `detail` existed; kept as a fallback
+    // so call sites that still pass only `section` (e.g. cross-links in Financeiro) keep working.
+    const legacyDetail = section === "technical_sheets" ? "Fichas técnicas" : section === "purchasing" ? "Lista de compras" : undefined;
+    const options = SUBSECTIONS[targetArea];
+    const resolvedDetail = (detail && options.includes(detail) ? detail : undefined) ?? legacyDetail ?? options[0] ?? "";
+    setActiveSection(targetArea);
+    setSubsections((current) => ({ ...current, [targetArea]: resolvedDetail }));
   }
 
   return (

@@ -10,18 +10,18 @@ export interface MetricCalculationTrace {
   inputs: Array<{ label: string; value: number; unit: string; source: string }>;
   includedRecords: number; excludedRecords: number; coverage: number; warnings: string[];
   calculationVersion: string; calculatedAt: string; target: number | null; result: number; unit: string;
-  linksToFixData: Array<{ label: string; destination: BusinessModuleKey }>;
+  linksToFixData: Array<{ label: string; destination: BusinessModuleKey; destinationDetail?: string }>;
 }
 
 export interface CommandCenterMetric {
   id: string; label: string; value: number; formattedValue: string; comparison: string;
   period: string; source: string; updatedAt: string; nature: DataNature; confidence: Confidence;
-  state: DataState; tooltip: string; destination: BusinessModuleKey; alert?: string; trace: MetricCalculationTrace;
+  state: DataState; tooltip: string; destination: BusinessModuleKey; destinationDetail?: string; alert?: string; trace: MetricCalculationTrace;
 }
 
 export interface BusinessAlert {
   id: string; priority: "high" | "medium" | "low"; title: string; explanation: string; impact: string;
-  origin: string; sector: string; action: string; destination: BusinessModuleKey; suggestedOwner: string; status: "open" | "monitoring";
+  origin: string; sector: string; action: string; destination: BusinessModuleKey; destinationDetail?: string; suggestedOwner: string; status: "open" | "monitoring";
 }
 
 export type CommerceCapability = "orders" | "order_items" | "products" | "categories" | "modifiers" | "customers_summary" | "payments" | "discounts" | "fees" | "service_types" | "order_sources" | "cancellations" | "refunds" | "reports";

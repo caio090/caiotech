@@ -127,7 +127,7 @@ console.log("\n[test] Compras — ponto de reposição, cobertura, WhatsApp futu
 
 console.log("\n[test] Visão geral — cards navegam para o setor correspondente");
 {
-  assert(overviewSource.includes("onNavigate(metric.destination)"), "cada card da Visão geral chama onNavigate com a seção correspondente");
+  assert(overviewSource.includes("onNavigate(metric.destination, metric.destinationDetail)"), "cada card da Visão geral chama onNavigate com a seção e a subárea correspondentes");
   assert(overviewSource.includes("motion-reduce:"), "cards respeitam prefers-reduced-motion (motion-reduce:)");
 }
 
