@@ -2,6 +2,7 @@
 
 import { ArrowDown } from "lucide-react";
 import { dashboardTokens } from "./_dashboard-design-tokens";
+import { DataClassificationBadge } from "./_data-classification-badge";
 
 const STEPS = [
   { label: "Vendas realizadas", value: 10000000, positive: true, source: "Cardápio digital simulado" },
@@ -23,7 +24,7 @@ export function BusinessResultWaterfall({ managerMode }: { managerMode: boolean 
           <h3 id="business-result-title" className="text-sm font-extrabold">Formação do resultado</h3>
           <p className="mt-1 text-xs text-slate-500">Junho de 2026 · valores demonstrativos</p>
         </div>
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">Exemplo simulado</span>
+        <DataClassificationBadge classification="SIMULATED" testId="waterfall-badge" />
       </div>
       <div className="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {STEPS.map((step, index) => (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useBusinessViewMode, ViewModeToggle } from "./_view-mode";
+import { ViewModeToggle } from "./_view-mode";
+import type { BusinessViewMode } from "@/lib/finance/types";
 import { DataSourceBadge } from "./_data-source-badge";
 import { FinanceDashboard } from "./_finance-dashboard";
 import { FinanceReservePanel } from "./_finance-reserve";
@@ -12,6 +13,8 @@ import { ComingSoonPanel } from "./_coming-soon-panel";
 import { buildFinanceDashboardData, calculateWorkingCapitalCalendar, essentialCategoryLabels, excludedCategoryLabels } from "@/lib/finance/dashboard-builder";
 import { calculateEssentialMonthlyOutflow } from "@/lib/finance/calculations";
 import { buildSimulatedProvenance } from "@/lib/finance/data-source";
+import { toMetricPeriod } from "@/lib/business-period/calculations";
+import type { BusinessPeriodSelection } from "@/lib/business-period/types";
 import {
   CASH_FLOW_ENTRIES_FIXTURES, CASH_FLOW_OPENING_BALANCE, CASH_RESERVE_CONFIG_FIXTURE,
   DEMO_DATA_LABEL, DEMO_TODAY_ISO, GOOGLE_SHEET_CONNECTION_FIXTURE, IMPORT_HISTORY_FIXTURES,
@@ -20,15 +23,14 @@ import type { CashFlowEntry, CashReserveConfig, SpreadsheetImportBatch } from "@
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
 
 const OPENING_BALANCE_DATE = "2026-06-01";
-const PERIOD_START = "2026-07-01";
-const PERIOD_END = "2026-07-31";
-const PERIOD_LABEL = "Julho/2026 (mês corrente)";
 
 /** Subáreas do Financeiro ainda sem painel próprio nesta sprint (Fase 9/22 -- honesto em vez de fingir). */
 const COMING_SOON_SUBSECTIONS = ["Planejado versus realizado", "Contas a pagar", "Contas a receber", "Projeções"];
 
-export function FinanceTab({ companyName, onNavigate, activeSubsection }: { companyName: string; onNavigate: (section: BusinessModuleKey, detail?: string) => void; activeSubsection: string }) {
-  const [viewMode, setViewMode] = useBusinessViewMode();
+export function FinanceTab({ companyName, onNavigate, activeSubsection, period, viewMode, onViewModeChange }: { companyName: string; onNavigate: (section: BusinessModuleKey, detail?: string) => void; activeSubsection: string; period: BusinessPeriodSelection; viewMode: BusinessViewMode; onViewModeChange: (mode: BusinessViewMode) => void }) {
+  // Fase 13: viewMode vem de RestaurantWorkspace (estado central único, não
+  // mais um useBusinessViewMode() local desconectado do resto da rota).
+  const metricPeriod = useMemo(() => toMetricPeriod(period), [period]);
 
   // Estado central único desta demonstração (Fase 16) — todo o resto deste
   // arquivo apenas deriva dele via funções puras, nunca duplica valores.
@@ -37,12 +39,12 @@ export function FinanceTab({ companyName, onNavigate, activeSubsection }: { comp
   const [importHistory, setImportHistory] = useState<SpreadsheetImportBatch[]>(IMPORT_HISTORY_FIXTURES);
 
   const dashboardData = useMemo(
-    () => buildFinanceDashboardData(entries, reserveConfig, CASH_FLOW_OPENING_BALANCE, OPENING_BALANCE_DATE, DEMO_TODAY_ISO, PERIOD_START, PERIOD_END, PERIOD_LABEL),
-    [entries, reserveConfig]
+    () => buildFinanceDashboardData(entries, reserveConfig, CASH_FLOW_OPENING_BALANCE, OPENING_BALANCE_DATE, DEMO_TODAY_ISO, metricPeriod.start, metricPeriod.end, metricPeriod.label),
+    [entries, reserveConfig, metricPeriod]
   );
-  const essentialMonthlyOutflow = useMemo(() => calculateEssentialMonthlyOutflow(entries, PERIOD_START, PERIOD_END), [entries]);
+  const essentialMonthlyOutflow = useMemo(() => calculateEssentialMonthlyOutflow(entries, metricPeriod.start, metricPeriod.end), [entries, metricPeriod]);
   const workingCapital = useMemo(() => calculateWorkingCapitalCalendar(dashboardData.currentBalance, entries, DEMO_TODAY_ISO, 60), [dashboardData.currentBalance, entries]);
-  const provenance = useMemo(() => buildSimulatedProvenance({ periodStart: PERIOD_START, periodEnd: PERIOD_END, lastUpdatedAt: DEMO_TODAY_ISO }), []);
+  const provenance = useMemo(() => buildSimulatedProvenance({ periodStart: metricPeriod.start, periodEnd: metricPeriod.end, lastUpdatedAt: DEMO_TODAY_ISO }), [metricPeriod]);
 
   return (
     <div className="space-y-5">
@@ -56,14 +58,14 @@ export function FinanceTab({ companyName, onNavigate, activeSubsection }: { comp
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <DataSourceBadge provenance={provenance} testId="finance-tab-data-source-badge" />
-        <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        <ViewModeToggle mode={viewMode} onChange={onViewModeChange} />
       </div>
 
       {activeSubsection === "Resumo" && (
         <FinanceDashboard data={dashboardData} viewMode={viewMode} onNavigate={onNavigate} />
       )}
 
-      {activeSubsection === "Faturamento" && <RevenueFullPanel managerMode={viewMode === "manager"} />}
+      {activeSubsection === "Faturamento" && <RevenueFullPanel managerMode={viewMode === "manager"} period={period} />}
 
       {activeSubsection === "Reserva" && (
         <FinanceReservePanel

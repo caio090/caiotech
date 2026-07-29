@@ -6,21 +6,24 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
 import { MotionStagger } from "@/components/motion/motion-stagger";
 import { COMMAND_CENTER_ALERTS, COMMAND_CENTER_METRICS, CMV_EVOLUTION } from "@/lib/business-command-center/fixtures";
+import { classifyLegacyMetric } from "@/lib/business-command-center/calculations";
 import type { CommandCenterMetric, MetricCalculationTrace } from "@/lib/business-command-center/types";
 import { AskLokatPanel } from "./_ask-lokat-panel";
 import { BusinessResultWaterfall } from "./_business-result-waterfall";
 import { dashboardStatus, dashboardTokens } from "./_dashboard-design-tokens";
 import { RevenueHeroCard } from "./_revenue-panels";
+import { DataClassificationBadge } from "./_data-classification-badge";
+import type { BusinessPeriodSelection } from "@/lib/business-period/types";
 
 type NavigateFn = (section: BusinessModuleKey, detail?: string) => void;
-type Props = { companyName: string; managerMode: boolean; onNavigate: NavigateFn };
+type Props = { companyName: string; managerMode: boolean; onNavigate: NavigateFn; period: BusinessPeriodSelection; onRequestManagerMode: () => void };
 const money = (cents: number) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const sales = [{ period: "Abr.", vendas: 82000, pedidos: 211 }, { period: "Mai.", vendas: 92200, pedidos: 236 }, { period: "Jun.", vendas: 100000, pedidos: 248 }];
 const cash = [{ period: "Hoje", value: 18450 }, { period: "+7d", value: 16900 }, { period: "+15d", value: 19700 }, { period: "+30d", value: 22500 }];
 const stock = [{ name: "Central", value: 6800 }, { name: "Cozinha", value: 3200 }];
 const PRIMARY = ["sales", "orders", "ticket_average", "cmv_actual", "cmv_gap", "cash_balance"];
 
-export function CommandCenterDashboard({ companyName, managerMode, onNavigate }: Props) {
+export function CommandCenterDashboard({ companyName, managerMode, onNavigate, period, onRequestManagerMode }: Props) {
   const [trace, setTrace] = useState<MetricCalculationTrace | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const primary = COMMAND_CENTER_METRICS.filter((metric) => PRIMARY.includes(metric.id));
@@ -32,7 +35,7 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase text-violet-700">Centro de comando</p><span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Operação acompanhada</span></div>
             <h2 className="mt-1 text-xl font-black tracking-tight text-[#f6f7fb] sm:text-2xl">{companyName}</h2>
-            <p className="mt-1 text-xs text-slate-500">Alimentação · Junho de 2026 · comparação com maio · atualizado em 01/07/2026 às 09:00</p>
+            <p className="mt-1 text-xs text-slate-500">Alimentação · {period.label} · comparando com {period.comparisonLabel}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button className={buttonClass}><RefreshCw className="h-3.5 w-3.5" />Atualizar dados</button>
@@ -44,12 +47,16 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
 
       <SourceStrip onNavigate={onNavigate} />
 
-      <RevenueHeroCard managerMode={managerMode} onNavigate={onNavigate} />
+      <RevenueHeroCard managerMode={managerMode} onNavigate={onNavigate} period={period} />
 
       <section aria-labelledby="kpi-title">
         <div className="mb-2 flex items-end justify-between"><div><h3 id="kpi-title" className="text-sm font-extrabold text-[#f6f7fb]">Indicadores principais</h3><p className="text-[11px] text-[#8993a8]">Seis números para entender a situação agora.</p></div></div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">{primary.map((metric) => <ExecutiveMetric key={metric.id} metric={metric} onNavigate={onNavigate} onTrace={setTrace} />)}</div>
-        <details className="mt-3"><summary className={`${dashboardTokens.focus} cursor-pointer text-xs font-bold text-violet-700`}>Ver indicadores complementares</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{secondary.map((metric) => <ExecutiveMetric key={metric.id} metric={metric} onNavigate={onNavigate} onTrace={setTrace} />)}<CompactKpi label="Reserva atual" value="R$ 12.400" detail="67% da recomendação" /><CompactKpi label="Produtos sem ficha" value="1" detail="de 3 produtos" onClick={() => onNavigate("products_pricing", "Fichas técnicas")} /><CompactKpi label="Margem de contribuição" value="22,0%" detail="Estimativa gerencial" /></div></details>
+        {managerMode ? (
+          <details className="mt-3" open><summary className={`${dashboardTokens.focus} cursor-pointer text-xs font-bold text-violet-700`}>Indicadores complementares</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{secondary.map((metric) => <ExecutiveMetric key={metric.id} metric={metric} onNavigate={onNavigate} onTrace={setTrace} />)}<CompactKpi label="Reserva atual" value="R$ 12.400" detail="67% da recomendação" /><CompactKpi label="Produtos sem ficha" value="1" detail="de 3 produtos" onClick={() => onNavigate("products_pricing", "Fichas técnicas")} /><CompactKpi label="Margem de contribuição" value="22,0%" detail="Estimativa gerencial" /></div></details>
+        ) : (
+          <button onClick={onRequestManagerMode} className={`${dashboardTokens.focus} mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-600`} data-testid="request-manager-mode">Ver mais indicadores no Modo Gestor</button>
+        )}
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -82,9 +89,9 @@ export function CommandCenterDashboard({ companyName, managerMode, onNavigate }:
 
 const buttonClass = `${dashboardTokens.focus} ${dashboardTokens.motion} inline-flex min-h-9 items-center gap-1.5 rounded-md border border-[#3a4354] bg-[#1d2230] px-3 py-2 text-xs font-bold text-[#bcc4d4] hover:border-violet-400/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-70`;
 function SourceStrip({ onNavigate }: { onNavigate: (section: BusinessModuleKey) => void }) { const sources = [{ name: "Cardápio digital", state: "Não testado", style: dashboardStatus.warning }, { name: "Planilha", state: "Exemplo importado", style: dashboardStatus.informative }, { name: "Diagnóstico", state: "Precisa configurar", style: dashboardStatus.manual }, { name: "Estoque", state: "Simulado", style: dashboardStatus.simulated }, { name: "Fichas", state: "Simulado", style: dashboardStatus.simulated }, { name: "Cálculos Lokat", state: "Disponível", style: dashboardStatus.positive }]; return <section className={`${dashboardTokens.panel} ${dashboardTokens.radius} grid overflow-hidden sm:grid-cols-2 xl:grid-cols-6`} aria-label="Fontes e integrações">{sources.map((source) => <button key={source.name} onClick={() => onNavigate("settings")} className={`${dashboardTokens.focus} border-b border-slate-100 px-3 py-2.5 text-left last:border-0 sm:border-r xl:border-b-0`}><span className="block text-[10px] text-slate-500">{source.name}</span><span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold ${source.style}`}>{source.state}</span></button>)}</section>; }
-function ExecutiveMetric({ metric, onNavigate, onTrace }: { metric: CommandCenterMetric; onNavigate: NavigateFn; onTrace: (trace: MetricCalculationTrace) => void }) { return <article className={`${dashboardTokens.panel} ${dashboardTokens.radius} p-4 transition-colors hover:border-[#3a4354] hover:bg-[#171b26]`}><button onClick={() => onNavigate(metric.destination, metric.destinationDetail)} className={`${dashboardTokens.focus} w-full text-left`} title={metric.tooltip}><div className="flex items-start justify-between gap-2"><p className="text-[11px] font-bold text-[#bcc4d4]">{metric.label}</p>{metric.alert && <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />}</div><p className="mt-1 text-xl font-black text-[#f6f7fb]">{metric.formattedValue}</p><p className="text-[10px] font-bold text-emerald-300">{metric.comparison}</p><svg aria-hidden="true" viewBox="0 0 80 16" className="mt-3 h-4 w-full text-violet-400"><polyline points="0,13 16,10 32,11 48,5 64,7 80,2" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button><div className="mt-2 border-t border-[#272d3a] pt-2 text-[10px] text-[#8993a8]"><p>{metric.period} · {metric.source}</p><p>Atualizado em 01/07 · {metric.state === "simulated" ? "Simulado" : "Calculado"}</p></div><button onClick={() => onTrace(metric.trace)} className={`${dashboardTokens.focus} mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-violet-300 hover:text-violet-200`}><Calculator className="h-3 w-3" />Como calculamos</button></article>; }
+function ExecutiveMetric({ metric, onNavigate, onTrace }: { metric: CommandCenterMetric; onNavigate: NavigateFn; onTrace: (trace: MetricCalculationTrace) => void }) { return <article className={`${dashboardTokens.panel} ${dashboardTokens.radius} p-4 transition-colors hover:border-[#3a4354] hover:bg-[#171b26]`}><button onClick={() => onNavigate(metric.destination, metric.destinationDetail)} className={`${dashboardTokens.focus} w-full text-left`} title={metric.tooltip}><div className="flex items-start justify-between gap-2"><p className="text-[11px] font-bold text-[#bcc4d4]">{metric.label}</p>{metric.alert && <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />}</div><p className="mt-1 text-xl font-black text-[#f6f7fb]">{metric.formattedValue}</p><p className="text-[10px] font-bold text-emerald-300">{metric.comparison}</p><svg aria-hidden="true" viewBox="0 0 80 16" className="mt-3 h-4 w-full text-violet-400"><polyline points="0,13 16,10 32,11 48,5 64,7 80,2" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button><div className="mt-2 flex items-center justify-between gap-2 border-t border-[#272d3a] pt-2 text-[10px] text-[#8993a8]"><p>{metric.period} · {metric.source}</p><DataClassificationBadge classification={classifyLegacyMetric(metric)} /></div><button onClick={() => onTrace(metric.trace)} className={`${dashboardTokens.focus} mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-violet-300 hover:text-violet-200`}><Calculator className="h-3 w-3" />Como calculamos</button></article>; }
 function CompactKpi({ label, value, detail, onClick }: { label: string; value: string; detail: string; onClick?: () => void }) {
-  const body = <><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black">{value}</p><p className="mt-1 text-[10px] text-slate-500">{detail} · Exemplo simulado</p></>;
+  const body = <><div className="flex items-start justify-between gap-2"><p className="text-[11px] font-bold text-slate-500">{label}</p><DataClassificationBadge classification="SIMULATED" /></div><p className="mt-1 text-xl font-black">{value}</p><p className="mt-1 text-[10px] text-slate-500">{detail}</p></>;
   if (!onClick) return <article className={`${dashboardTokens.panel} ${dashboardTokens.radius} p-4`}>{body}</article>;
   return <button onClick={onClick} aria-label={`${label}: ${value}, ${detail}`} className={`${dashboardTokens.panel} ${dashboardTokens.radius} ${dashboardTokens.focus} w-full p-4 text-left transition-colors hover:border-[#3a4354] hover:bg-[#171b26]`}>{body}</button>;
 }

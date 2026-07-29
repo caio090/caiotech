@@ -2,23 +2,32 @@
 
 import { useMemo, useState } from "react";
 import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
-import { calculateRevenueSummary, comparePeriods, resolvePreviousPeriod } from "@/lib/revenue/calculations";
-import { REVENUE_CALCULATED_AT_FIXTURE, REVENUE_PERIOD_FIXTURE, REVENUE_PREVIOUS_RAW_INPUTS_FIXTURE, REVENUE_RAW_INPUTS_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE } from "@/lib/revenue/fixtures";
+import { calculateRevenueSummary, comparePeriods } from "@/lib/revenue/calculations";
+import { REVENUE_CALCULATED_AT_FIXTURE, REVENUE_PREVIOUS_RAW_INPUTS_FIXTURE, REVENUE_RAW_INPUTS_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE } from "@/lib/revenue/fixtures";
 import type { PeriodComparison } from "@/lib/revenue/types";
 import type { BusinessMetricValue } from "@/lib/data-quality/types";
 import { formatPercent } from "@/lib/motor-lokat/money";
+import { toComparisonMetricPeriod, toMetricPeriod } from "@/lib/business-period/calculations";
+import type { BusinessPeriodSelection } from "@/lib/business-period/types";
 import { DataClassificationBadge, DataClassificationDetails } from "./_data-classification-badge";
 import { dashboardTokens } from "./_dashboard-design-tokens";
 
-function useRevenueSummary() {
+/**
+ * Fase 11/19: os valores em si são uma fixture estática (REVENUE_RAW_INPUTS_FIXTURE)
+ * -- selecionar um período diferente atualiza o RÓTULO e a COMPARAÇÃO de verdade
+ * (via toMetricPeriod/toComparisonMetricPeriod), mas os números simulados não
+ * recalculam por período nesta sprint. Isso é mostrado explicitamente, nunca
+ * escondido, para não fingir uma reação que não existe.
+ */
+function useRevenueSummary(period: BusinessPeriodSelection) {
   return useMemo(() => {
-    const period = REVENUE_PERIOD_FIXTURE;
-    const summary = calculateRevenueSummary(REVENUE_RAW_INPUTS_FIXTURE, period, "SIMULATED", REVENUE_CALCULATED_AT_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE);
-    const previousPeriod = resolvePreviousPeriod(period);
-    const previousSummary = calculateRevenueSummary(REVENUE_PREVIOUS_RAW_INPUTS_FIXTURE, previousPeriod, "SIMULATED", REVENUE_CALCULATED_AT_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE);
-    const comparison = comparePeriods(summary.realizedRevenue.value, previousSummary.realizedRevenue.value, previousPeriod);
+    const metricPeriod = toMetricPeriod(period);
+    const comparisonPeriod = toComparisonMetricPeriod(period);
+    const summary = calculateRevenueSummary(REVENUE_RAW_INPUTS_FIXTURE, metricPeriod, "SIMULATED", REVENUE_CALCULATED_AT_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE);
+    const previousSummary = calculateRevenueSummary(REVENUE_PREVIOUS_RAW_INPUTS_FIXTURE, comparisonPeriod, "SIMULATED", REVENUE_CALCULATED_AT_FIXTURE, REVENUE_SOURCE_LABEL_FIXTURE);
+    const comparison = comparePeriods(summary.realizedRevenue.value, previousSummary.realizedRevenue.value, comparisonPeriod);
     return { summary, comparison };
-  }, []);
+  }, [period]);
 }
 
 function ComparisonLine({ comparison }: { comparison: PeriodComparison }) {
@@ -35,8 +44,8 @@ function ComparisonLine({ comparison }: { comparison: PeriodComparison }) {
 }
 
 /** Primeiro KPI da Visão geral (Fase 8) -- nunca escondido dentro do grid de indicadores secundários. */
-export function RevenueHeroCard({ managerMode, onNavigate }: { managerMode: boolean; onNavigate: (section: "finance", detail?: string) => void }) {
-  const { summary, comparison } = useRevenueSummary();
+export function RevenueHeroCard({ managerMode, onNavigate, period }: { managerMode: boolean; onNavigate: (section: "finance", detail?: string) => void; period: BusinessPeriodSelection }) {
+  const { summary, comparison } = useRevenueSummary(period);
   const [showFormula, setShowFormula] = useState(false);
   return (
     <section data-testid="revenue-hero-card" aria-labelledby="revenue-hero-title" className={`${dashboardTokens.elevated} ${dashboardTokens.radius} ${dashboardTokens.cardPadding}`}>
@@ -59,6 +68,7 @@ export function RevenueHeroCard({ managerMode, onNavigate }: { managerMode: bool
         <div className="mt-3 border-t border-[#272d3a] pt-3 text-[11px] text-[#8993a8]">
           <p className="rounded bg-[#171b26] p-3 font-mono text-[11px]">{summary.realizedRevenue.formulaTrace.expression}</p>
           {summary.realizedRevenue.formulaTrace.isPartial && <p className="mt-1 text-amber-300">Fórmula parcial: um ou mais componentes não estão disponíveis.</p>}
+          {summary.realizedRevenue.dataClassification === "SIMULATED" && <p className="mt-1 text-amber-300">Estes valores de exemplo não recalculam por período nesta sprint; apenas o rótulo e a comparação refletem o período selecionado.</p>}
           {managerMode && <DataClassificationDetails metric={summary.realizedRevenue} />}
         </div>
       )}
@@ -76,8 +86,8 @@ function BreakdownRow({ metric }: { metric: BusinessMetricValue }) {
 }
 
 /** Subárea Financeiro / Faturamento (Fase 9). */
-export function RevenueFullPanel({ managerMode }: { managerMode: boolean }) {
-  const { summary, comparison } = useRevenueSummary();
+export function RevenueFullPanel({ managerMode, period }: { managerMode: boolean; period: BusinessPeriodSelection }) {
+  const { summary, comparison } = useRevenueSummary(period);
   return (
     <div className="space-y-4" data-testid="revenue-full-panel">
       <section className={`${dashboardTokens.panel} ${dashboardTokens.radius} ${dashboardTokens.cardPadding}`}>
@@ -90,6 +100,7 @@ export function RevenueFullPanel({ managerMode }: { managerMode: boolean }) {
         </div>
         <p className="mt-2 text-3xl font-black text-[#f6f7fb]">{summary.realizedRevenue.formattedValue}</p>
         <ComparisonLine comparison={comparison} />
+        {summary.realizedRevenue.dataClassification === "SIMULATED" && <p className="mt-2 text-[10px] text-amber-600">Estes valores de exemplo não recalculam por período nesta sprint; apenas o rótulo e a comparação refletem o período selecionado.</p>}
         {managerMode && <DataClassificationDetails metric={summary.realizedRevenue} />}
       </section>
 

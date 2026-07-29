@@ -39,7 +39,7 @@ console.log("\n[test] bug corrigido: FinanceTab tinha estado interno próprio de
   assert(!financeTab.includes("useState<FinanceSubTab>"), "FinanceTab não mantém mais um subTab local duplicado");
   assert(!financeTab.includes('role="tablist"'), "FinanceTab não renderiza mais uma segunda barra de abas paralela à navegação externa de subáreas");
   assert(financeTab.includes("activeSubsection: string"), "FinanceTab agora é controlado pela subárea central (RestaurantWorkspace), não por estado próprio");
-  assert(workspace.includes("<FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} activeSubsection={activeSubsection} />"), "RestaurantWorkspace repassa a subárea central para o FinanceTab");
+  assert(workspace.includes("<FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} activeSubsection={activeSubsection}") && workspace.includes("period={periodSelection}"), "RestaurantWorkspace repassa a subárea central e o período central para o FinanceTab");
 }
 
 console.log("\n[test] \"Abrir Faturamento\" no card da Visão geral realmente chega no painel (não só destaca um botão)");
