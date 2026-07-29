@@ -1,3 +1,22 @@
+/**
+ * Fase 10 (correção definitiva): LACUNA ENCONTRADA -- todas as asserções
+ * deste arquivo leem _period-selector.tsx como TEXTO (fs.readFileSync +
+ * string/regex) e nunca montam o componente nem disparam um evento real.
+ * Isso prova que certos PADRÕES DE CÓDIGO existem (imports corretos, nomes de
+ * função, presença de atributos JSX), mas NUNCA prova que um clique real
+ * aciona o handler real, nem que o callback real recebe os argumentos
+ * certos, nem que o CSS realmente evita overflow em 390px -- por isso é
+ * estruturalmente incapaz de detectar uma regressão puramente de
+ * comportamento renderizado (por isso o nome do arquivo é ".structural.").
+ *
+ * A prova comportamental real (montagem via @testing-library/react + jsdom,
+ * eventos de verdade, argumentos de callback verificados) está em
+ * period-selector-rendered.dom.test.tsx, que substitui este arquivo como
+ * fonte de verdade para "o fluxo funciona". Este arquivo é mantido como
+ * guarda-corpo estrutural leve (evita reintroduzir padrões já eliminados,
+ * como o +1/-1 dia local ou o useEffect síncrono), não como prova de
+ * comportamento.
+ */
 (function () {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require("node:fs") as typeof import("node:fs");
@@ -22,19 +41,20 @@ console.log("\n[test] causa raiz corrigida: rascunho ressincroniza com o períod
 
 console.log("\n[test] helpers compartilhados de conversão (Fase 5) -- nada de +1/-1 dia local");
 {
-  assert(source.includes('import { buildPeriodSelection, formatDateBR, toExclusiveEndDate, toInclusiveEndDate } from "@/lib/business-period/calculations"'), "seletor importa os helpers do módulo central em vez de reimplementar localmente");
+  assert(source.includes('import { buildPeriodSelection, formatDateBR, toExclusiveEndDate, toInclusiveEndDate, validateCustomPeriodDraft } from "@/lib/business-period/calculations"'), "seletor importa os helpers do módulo central em vez de reimplementar localmente");
   assert(!/function addOneDayInclusive/.test(source), "reimplementação local antiga de +1/-1 dia foi removida");
   assert(source.includes("toExclusiveEndDate(customEndInclusive)"), "aplicar o personalizado converte via o helper compartilhado (fim inclusivo da UI -> exclusivo do domínio)");
 }
 
-console.log("\n[test] validação real do intervalo (Fase 4)");
+console.log("\n[test] validação delega à função central validateCustomPeriodDraft (Fase 3, correção definitiva)");
 {
-  assert(source.includes('!customStart || !customEndInclusive') && source.includes("Informe a data inicial e a data final."), "campos ausentes são bloqueados com mensagem específica");
-  assert(source.includes("customStart > customEndInclusive") && source.includes("A data inicial não pode ser posterior à data final."), "início posterior ao fim é bloqueado com mensagem específica");
-  assert(source.includes("aria-invalid={validationError !== null}"), "campos marcam aria-invalid quando o rascunho é inválido");
-  assert(source.includes('aria-describedby={validationError ? "period-custom-error" : undefined}') && source.includes('id="period-custom-error"') && source.includes('role="alert"'), "mensagem de erro é associada aos campos via aria-describedby e anunciável via role=alert");
-  assert(source.includes("disabled={validationError !== null}") && source.includes("aria-disabled={validationError !== null}"), "botão Aplicar fica desabilitado (disabled real, não só visual) quando inválido");
-  assert(source.includes("if (validationError) return;"), "handler de aplicar também valida defensivamente, não confia só no disabled do botão");
+  assert(source.includes("validateCustomPeriodDraft") && source.includes('from "@/lib/business-period/calculations"'), "seletor importa validateCustomPeriodDraft do módulo central, não reimplementa a checagem localmente com ternários ad-hoc");
+  assert(source.includes("const validation = validateCustomPeriodDraft({ startDate: customStart, endDateInclusive: customEndInclusive });"), "componente delega toda a decisão de válido/inválido a essa única função (mesma usada pelos testes de unidade em business-period/__tests__/calculations.test.ts)");
+  assert(source.includes("aria-invalid={startInvalid}") && source.includes("aria-invalid={endInvalid}"), "cada campo marca aria-invalid de forma independente -- campo vazio/malformado marca só o próprio campo, erro de ordem (início > fim) marca os dois");
+  assert(source.includes('aria-describedby={validation.formError ? "period-custom-error" : undefined}') && source.includes('id="period-custom-error"') && source.includes('role="alert"'), "mensagem de erro é associada aos campos via aria-describedby e anunciável via role=alert");
+  assert(source.includes("disabled={!validation.valid}") && source.includes("aria-disabled={!validation.valid}"), "botão Aplicar fica desabilitado (disabled real, não só visual) quando inválido");
+  assert(source.includes("if (!validation.valid) return;"), "handler de aplicar também valida defensivamente, não confia só no disabled do botão");
+  assert(source.includes("<form") && source.includes("onSubmit={applyCustom}") && source.includes("event?.preventDefault()"), "campos ficam dentro de um <form> real com onSubmit -- Enter também é bloqueado quando inválido, não só o clique no botão (achado do rastreamento do fluxo real desta rodada)");
   assert(!source.includes("alert("), "nenhuma validação usa alert() nativo do navegador");
 }
 
@@ -71,6 +91,17 @@ console.log("\n[test] timezone e dia operacional expandidos no Modo Gestor (Fase
   assert(managerBlock.includes("Início operacional:") && managerBlock.includes("Fim operacional:"), "início e fim operacionais do período atual são mostrados (Fase 11)");
   assert(managerBlock.includes("inclusiva") && managerBlock.includes("exclusivo"), "regra inclusivo/exclusivo explicada em linguagem simples no Modo Gestor");
   assert(source.includes("managerMode && (") , "todo o bloco só existe quando managerMode é verdadeiro (não aparece na Visão simples)");
+}
+
+console.log("\n[test] painel responsivo em mobile 390px (Fase 8 -- P2 do QA visual, verificado com Chromium real via Playwright fora do repositório)");
+{
+  assert(source.includes("fixed inset-x-3 top-20"), "abaixo de sm: o painel é posicionado relativo à VIEWPORT (fixed + inset-x-3), não mais relativo ao botão que abre o seletor -- esse era o causador real do corte: `absolute right-0` ficava perto da borda ESQUERDA quando o botão quebrava linha em telas estreitas (flex-wrap do banner), então o painel de 320px subtraía para a esquerda da tela");
+  assert(source.includes("max-w-[calc(100vw-1.5rem)]"), "largura máxima nunca excede a viewport menos margem (24px), mesmo com o painel fixo à viewport");
+  assert(source.includes("sm:absolute sm:inset-x-auto sm:top-auto sm:right-0"), "a partir de sm: (640px) volta ao posicionamento absoluto original ancorado no botão -- layout desktop aprovado não muda");
+  assert(source.includes("flex-col gap-1.5 sm:flex-row"), "campos de data empilham em uma coluna abaixo de sm:, lado a lado a partir de sm: (conforme aprovado no desktop)");
+  assert(source.includes("min-w-0"), "inputs de data podem encolher (min-w-0) em vez de forçar overflow horizontal dentro do painel");
+  assert(source.includes("break-words"), "mensagem de erro quebra linha em vez de vazar horizontalmente em telas estreitas");
+  assert(source.includes("max-h-[calc(100vh-6rem)] overflow-y-auto"), "scroll interno do painel só quando necessário (conteúdo mais alto que a viewport), nunca por padrão");
 }
 
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;

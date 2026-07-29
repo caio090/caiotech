@@ -146,5 +146,30 @@ console.log("\n[test] rótulos dos presets em pt-BR (Fase 7)");
   for (const [key, label] of Object.entries(expected)) assert(calc.BUSINESS_PERIOD_PRESET_LABEL[key as keyof typeof calc.BUSINESS_PERIOD_PRESET_LABEL] === label, `${key} -> "${label}"`);
 }
 
+console.log("\n[test] validateCustomPeriodDraft -- única função de validação do personalizado (Fase 3, correção definitiva)");
+{
+  const emptyStart = calc.validateCustomPeriodDraft({ startDate: "", endDateInclusive: "2026-07-15" });
+  assert(emptyStart.valid === false && emptyStart.fieldErrors.startDate === "Informe a data inicial.", "início vazio: inválido com mensagem específica em fieldErrors.startDate");
+  assert(emptyStart.formError === "Informe a data inicial.", "início vazio: formError reflete a mensagem exata");
+
+  const emptyEnd = calc.validateCustomPeriodDraft({ startDate: "2026-07-01", endDateInclusive: "" });
+  assert(emptyEnd.valid === false && emptyEnd.fieldErrors.endDateInclusive === "Informe a data final.", "fim vazio: inválido com mensagem específica em fieldErrors.endDateInclusive");
+
+  const bothEmpty = calc.validateCustomPeriodDraft({ startDate: "", endDateInclusive: "" });
+  assert(bothEmpty.valid === false && Boolean(bothEmpty.fieldErrors.startDate) && Boolean(bothEmpty.fieldErrors.endDateInclusive), "ambos vazios: os dois fieldErrors são preenchidos");
+
+  const inverted = calc.validateCustomPeriodDraft({ startDate: "2026-07-20", endDateInclusive: "2026-07-10" });
+  assert(inverted.valid === false && inverted.formError === "A data inicial não pode ser posterior à data final.", "20/07 -> 10/07 (invertido): bloqueado com a mensagem exata do brief, nunca aceito silenciosamente");
+
+  const invalidShape = calc.validateCustomPeriodDraft({ startDate: "20/07/2026", endDateInclusive: "2026-07-15" });
+  assert(invalidShape.valid === false && invalidShape.fieldErrors.startDate === "Data inicial inválida.", "formato fora de YYYY-MM-DD é rejeitado (nunca interpretado via Date/UTC)");
+
+  const singleDay = calc.validateCustomPeriodDraft({ startDate: "2026-07-15", endDateInclusive: "2026-07-15" });
+  assert(singleDay.valid === true && singleDay.formError === null, "início == fim (um único dia) é um intervalo válido no rascunho da UI");
+
+  const valid = calc.validateCustomPeriodDraft({ startDate: "2026-07-01", endDateInclusive: "2026-07-15" });
+  assert(valid.valid === true && valid.formError === null && Object.keys(valid.fieldErrors).length === 0, "01/07 -> 15/07: válido, sem erros de campo nem de formulário");
+}
+
 console.log(`[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();

@@ -45,7 +45,7 @@ console.log("\n[test] seletor de período -- presets, personalizado, validação
     assert(periodSelector.includes(preset), `seletor lista o preset ${preset}`);
   }
   assert(periodSelector.includes('type="date"'), "seletor tem campos de data para o intervalo personalizado");
-  assert(periodSelector.includes("customStart > customEndInclusive") || periodSelector.includes("customStart >"), "seletor valida que a data inicial não é posterior à final antes de aplicar");
+  assert(periodSelector.includes("validateCustomPeriodDraft"), "seletor valida a data inicial contra a final via a função central validateCustomPeriodDraft (correção definitiva: checagem deixou de ser um ternário local e passou a viver em business-period/calculations.ts, testada isoladamente lá)");
   assert(periodSelector.includes("Restaurar padrão") && periodSelector.includes("Cancelar") && periodSelector.includes("Aplicar"), "seletor personalizado tem aplicar/cancelar/restaurar padrão");
   assert(periodSelector.includes("Comparando com"), "seletor mostra a comparação ativa");
   assert(periodSelector.includes("managerMode &&") && periodSelector.includes("Timezone"), "timezone e dia operacional só aparecem no Modo Gestor");
