@@ -756,3 +756,13 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
 - Integrado piloto Three.js somente no painel Pergunte à Lokat, carregado dinamicamente.
 - Adicionada cobertura estrutural para dependências, lifecycle WebGL, acessibilidade e ausência de páginas paralelas.
 - Build de produção aprovado; publicação limitada à branch de feature.
+
+## 2026-07-29 - Meu Negócio: camada de dados reais, Faturamento e taxonomia
+
+- Auditada a integração OlaClick (engine madura, ~2300 linhas, nunca exercitada contra uma conta real); mantido `OLACLICK_RUNTIME: NAO COMPROVADO`.
+- Criada taxonomia canônica `DataClassification`/`BusinessMetricValue` (`src/lib/data-quality/`) para nunca deixar uma métrica derivada parecer mais confiável que sua pior entrada.
+- "Faturamento realizado" agora é o primeiro KPI da Visão geral e ganhou subárea própria em Financeiro (`src/lib/revenue/`), com comparação de período e classificação honesta (`SIMULATED`).
+- Corrigido bug pré-existente: `FinanceTab` tinha um estado de aba interno desconectado da subárea central do `RestaurantWorkspace` — navegação para "Reserva"/"Faturamento" não trocava o conteúdo real.
+- Definido o contrato de tipos `NormalizedOrder`/`NormalizedOrderItem` (apenas tipos, engine de extração existente não foi reescrita).
+- Renomeado "Dados e planilhas" para "Dados e relatórios" em toda a UI.
+- TypeScript, ESLint, 772 asserções (32 suítes) e build Webpack aprovados; escopo reduzido deliberadamente frente às 34 fases pedidas (ver `docs/HANDOFF.md`).
