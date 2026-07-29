@@ -25,6 +25,19 @@ function addDaysToISO(iso: string, deltaDays: number): string {
   return formatISODate(shifted.year, shifted.month, shifted.day);
 }
 
+/**
+ * Fase 5: the ONLY place that converts between the UI's inclusive end date
+ * and the domain's exclusive end date -- never scatter +1/-1 day arithmetic
+ * across components again.
+ */
+export function toExclusiveEndDate(inclusiveEndISO: string): string { return addDaysToISO(inclusiveEndISO, 1); }
+export function toInclusiveEndDate(exclusiveEndISO: string): string { return addDaysToISO(exclusiveEndISO, -1); }
+
+export function formatDateBR(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 /** Shifts (year, month) by any number of months, positive or negative, with correct year rollover. */
 function shiftMonth(year: number, month: number, deltaMonths: number): { year: number; month: number } {
   const totalMonths = year * 12 + (month - 1) + deltaMonths;
@@ -82,7 +95,10 @@ function resolveComparisonRange(startDate: string, endDateExclusive: string): { 
   const durationDays = daysBetweenExclusive(startDate, endDateExclusive);
   const comparisonEndDateExclusive = startDate;
   const comparisonStartDate = addDaysToISO(startDate, -durationDays);
-  return { comparisonStartDate, comparisonEndDateExclusive, comparisonLabel: durationDays === 1 ? "Dia anterior" : `${durationDays} dias imediatamente anteriores` };
+  const comparisonLabel = durationDays === 1
+    ? formatDateBR(comparisonStartDate)
+    : `${formatDateBR(comparisonStartDate)} até ${formatDateBR(toInclusiveEndDate(comparisonEndDateExclusive))}`;
+  return { comparisonStartDate, comparisonEndDateExclusive, comparisonLabel };
 }
 
 export interface CustomPeriodInput { startDate: string; endDateExclusive: string }
@@ -137,7 +153,8 @@ export function buildPeriodSelection(preset: BusinessPeriodPreset, timezone: str
     case "CUSTOM":
       if (!custom) throw new Error("CUSTOM preset requires a custom range");
       if (custom.startDate >= custom.endDateExclusive) throw new Error("startDate must be before endDateExclusive");
-      startDate = custom.startDate; endDateExclusive = custom.endDateExclusive; label = "Personalizado";
+      startDate = custom.startDate; endDateExclusive = custom.endDateExclusive;
+      label = `${formatDateBR(startDate)} a ${formatDateBR(toInclusiveEndDate(endDateExclusive))}`;
       break;
     default: {
       const exhaustive: never = preset;
