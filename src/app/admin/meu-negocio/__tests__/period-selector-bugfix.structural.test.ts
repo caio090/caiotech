@@ -43,7 +43,7 @@ console.log("\n[test] helpers compartilhados de conversão (Fase 5) -- nada de +
 {
   assert(source.includes('import { buildPeriodSelection, formatDateBR, toExclusiveEndDate, toInclusiveEndDate, validateCustomPeriodDraft } from "@/lib/business-period/calculations"'), "seletor importa os helpers do módulo central em vez de reimplementar localmente");
   assert(!/function addOneDayInclusive/.test(source), "reimplementação local antiga de +1/-1 dia foi removida");
-  assert(source.includes("toExclusiveEndDate(customEndInclusive)"), "aplicar o personalizado converte via o helper compartilhado (fim inclusivo da UI -> exclusivo do domínio)");
+  assert(source.includes("toExclusiveEndDate(formEndInclusive)"), "aplicar o personalizado converte via o helper compartilhado (fim inclusivo da UI -> exclusivo do domínio) usando o valor lido do FormData, não mais do estado React direto (hotfix de Production)");
 }
 
 console.log("\n[test] validação delega à função central validateCustomPeriodDraft (Fase 3, correção definitiva)");
@@ -53,8 +53,11 @@ console.log("\n[test] validação delega à função central validateCustomPerio
   assert(source.includes("aria-invalid={startInvalid}") && source.includes("aria-invalid={endInvalid}"), "cada campo marca aria-invalid de forma independente -- campo vazio/malformado marca só o próprio campo, erro de ordem (início > fim) marca os dois");
   assert(source.includes('aria-describedby={validation.formError ? "period-custom-error" : undefined}') && source.includes('id="period-custom-error"') && source.includes('role="alert"'), "mensagem de erro é associada aos campos via aria-describedby e anunciável via role=alert");
   assert(source.includes("disabled={!validation.valid}") && source.includes("aria-disabled={!validation.valid}"), "botão Aplicar fica desabilitado (disabled real, não só visual) quando inválido");
-  assert(source.includes("if (!validation.valid) return;"), "handler de aplicar também valida defensivamente, não confia só no disabled do botão");
-  assert(source.includes("<form") && source.includes("onSubmit={applyCustom}") && source.includes("event?.preventDefault()"), "campos ficam dentro de um <form> real com onSubmit -- Enter também é bloqueado quando inválido, não só o clique no botão (achado do rastreamento do fluxo real desta rodada)");
+  assert(source.includes("if (!formValidation.valid) return;"), "handler de aplicar valida defensivamente contra o FormData (hotfix de Production) -- não contra o estado React, que pode estar desatualizado em relação ao DOM real do input");
+  assert(source.includes("<form") && source.includes("onSubmit={applyCustom}") && source.includes("event.preventDefault()"), "campos ficam dentro de um <form> real com onSubmit -- Enter também é bloqueado quando inválido, não só o clique no botão (achado do rastreamento do fluxo real desta rodada)");
+  assert(source.includes("new FormData(event.currentTarget)"), "hotfix de Production: submit relê o FormData do próprio formulário -- não confia apenas no estado React, que um input nativo type=\"date\" pode alterar sem disparar onChange/onInput em certos cenários de navegador/automação");
+  assert(source.includes('name="customStartDate"') && source.includes('name="customEndDate"'), "inputs têm name estável para que o FormData consiga lê-los pelo nome exato");
+  assert(source.includes("onInput={handleCustomStartInput}") && source.includes("onInput={handleCustomEndInput}"), "inputs escutam onInput além de onChange -- cobre navegadores/automação que disparam só um dos dois eventos");
   assert(!source.includes("alert("), "nenhuma validação usa alert() nativo do navegador");
 }
 
