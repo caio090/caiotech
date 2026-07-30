@@ -2,6 +2,29 @@
 
 Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 
+## Última sessão — 2026-07-29 — Meu Negócio: cardápios digitais, período central e modos globais V2 (branch `feat/meu-negocio-motion-3d-refinement-v1`, NÃO mergeada)
+
+- **OlaClick reenquadrada como provedor, não módulo**: novo modelo genérico `DigitalMenuProvider`/`DigitalMenuCapability`/`DigitalMenuConnectionStatus` (`src/lib/digital-menu/provider-status.ts`) que nunca menciona um provedor específico no código (só em comentários de exemplo). O card em Fontes e Integrações virou "Cardápio digital" com "Provedor: OlaClick" como campo interno, agrupado numa nova subseção "Cardápios digitais". `resolveConnectionStatus` só permite estados tipo "conectado" quando `runtimeValidated=true` — nesta sprint isso nunca acontece, então o card continua honesto.
+- **Período central de verdade** (`src/lib/business-period/`): `BusinessPeriodSelection` com 9 presets, dia operacional configurável por empresa (`operationalDayStart`, ex. "04:00"), cálculo timezone-aware que resolve corretamente madrugada e viradas de mês/ano via `Intl.DateTimeFormat`. Comparação usa o intervalo imediatamente anterior de mesma duração, exceto meses cheios (comparam com o mês anterior completo). Um único `PeriodSelector` no shell do `RestaurantWorkspace`, nunca duplicado por setor.
+- **Financeiro/Resumo recalcula de verdade** a partir do período central (`buildFinanceDashboardData` já filtrava por `periodStart/periodEnd` — só faltava não estar hardcoded). A Visão geral e o Faturamento propagam rótulo e comparação reais, mas a fixture de faturamento continua estática nesta sprint — isso é mostrado explicitamente ("não recalcula por período"), nunca escondido.
+- **Bug real corrigido**: Visão simples/Modo Gestor tinha **três** estados desconectados — `RestaurantWorkspace` tinha o seu próprio, e `FinanceTab` e `CmvCenter` chamavam `useBusinessViewMode()` cada um com sua própria instância. Alternar o modo numa área não afetava as outras. Consolidado num único hook na raiz do workspace (que agora ganha também persistência em `sessionStorage` para a rota inteira, reaproveitando o hook em vez de descartá-lo).
+- **Diferença estrutural real entre os modos**: em Visão simples, os indicadores complementares da Visão geral somem do DOM (não só ficam recolhidos) e dão lugar a um link "Ver mais no Modo Gestor" que realmente troca o modo.
+- **Classificação aplicada aos KPIs principais**: `classifyLegacyMetric()` (`src/lib/business-command-center/calculations.ts`) faz a ponte entre os campos antigos `nature`/`state` e a taxonomia canônica; Pedidos, Ticket médio, CMV real/teórico, Lacuna, Saldo, Reserva, Estoque e Produtos sem ficha mostram o badge `DataClassificationBadge` real em vez do texto fixo "Simulado"/"Calculado".
+- **Fora do escopo desta sessão**: dia operacional/período central ainda não chegou a CMV/Estoque/Compras/Relatórios (só Visão geral, Faturamento e Financeiro/Resumo, como pedido); engenharia de cardápio real, fila de vinculação, conciliação completa, documentos por período e Google Planilhas seguem não implementados.
+- Validações: TypeScript, ESLint, 922 asserções (39 suítes) e build Webpack aprovados.
+
+## Última sessão — 2026-07-29 — Meu Negócio: camada de dados reais, Faturamento e taxonomia (branch `feat/meu-negocio-motion-3d-refinement-v1`, NÃO mergeada)
+
+- **Auditoria OlaClick**: engine de pedidos (`src/app/api/olaclick/orders/route.ts`, ~2300 linhas) já é madura — auth probe, windowing/paginação com fallback, timezone Fortaleza, normalização de pagamentos — mas **nenhuma conta real foi exercitada nesta ou em sessões anteriores**. Menu (`menu/route.ts:29`) segue TODO no código. Sem `SUPABASE_SERVICE_ROLE_KEY`/sessão autenticada disponível nesta execução para provar runtime; `OLACLICK_RUNTIME: NAO COMPROVADO` permanece o estado honesto, confirmado contra `docs/olaclick-command-center-audit.md` (2026-07-28).
+- **Nova taxonomia canônica** (`src/lib/data-quality/`): `DataClassification` (REAL_SYNCED/REAL_IMPORTED/REAL_MANUAL/CALCULATED/ESTIMATED/SIMULATED/UNAVAILABLE) + `BusinessMetricValue`, com `deriveDerivedClassification` garantindo que uma métrica derivada nunca pareça mais confiável que sua pior entrada (ex.: faturamento real + mix simulado → estimado). Supersede o modelo mais estreito `DataProvenance` de `src/lib/finance/data-source.ts` para métricas novas; migrar as existentes fica para uma sessão futura.
+- **Faturamento explícito** (`src/lib/revenue/`, `_revenue-panels.tsx`): "Faturamento realizado" agora é o primeiro elemento da Visão geral (antes do grid de KPIs), com vendas brutas, descontos, cancelamentos, taxas, receita após taxas (nunca chamada de lucro) e comparação com período equivalente anterior (`resolvePreviousPeriod`/`comparePeriods`, nunca divide por zero). Nova subárea Financeiro → Faturamento. Dados classificados honestamente como `SIMULATED` (mesmos números da fixture "Vendas realizadas" existente, agora decompostos, não inventados).
+- **Bug real corrigido en passant**: `FinanceTab` mantinha um `subTab` local totalmente desconectado da subárea externa (`activeSubsection` do `RestaurantWorkspace`) — clicar em "Reserva"/"Faturamento" nos cards da Visão geral só destacava o botão externo sem trocar o conteúdo real. Removida a barra de abas interna duplicada; `FinanceTab` agora é controlado pela subárea central. Subáreas do Financeiro ainda sem painel próprio (Planejado vs. realizado, Contas a pagar/receber, Projeções) mostram `ComingSoonPanel` em vez de ficarem mudas.
+- **OlaClick honesta na UI**: card em Fontes e Integrações faz uma checagem real e read-only (`GET /api/olaclick/env-status`), nunca exibe "Conectada", degrada graciosamente em 401/erro de rede.
+- **Contrato `NormalizedOrder`/`NormalizedOrderItem`** definido em `src/lib/digital-menu/analytics-types.ts` — apenas tipos; a engine de extração ad-hoc existente NÃO foi reescrita para consumi-los (zero cobertura de teste pré-existente na engine, risco maior que benefício sem uma conta real para validar).
+- Renomeado "Dados e planilhas" → "Dados e relatórios" em toda a UI e nos textos do modelo de planilha exportável.
+- **Fora do escopo desta sessão** (34 fases pedidas, escopo reduzido deliberadamente): dia operacional configurável por empresa, período central realmente governando CMV/estoque/compras/relatórios, engenharia de cardápio com itens reais, fila de vinculação de produtos externos, importação com conciliação completa OlaClick×relatório, documentos por período, diferenciação completa Visão simples/Modo Gestor em todos os módulos (só a área de Faturamento nova diferencia hoje). Ver relatório da sessão para a lista completa.
+- Validações: TypeScript, ESLint, 772 asserções (32 suítes) e build Webpack aprovados.
+
 ## Última sessão — 2026-07-23 — Hotfix canônico LOKAT OS 1.0.1, rotas do REC OS, entrada do EditorOS, hydration e Status de produção (branch local `hotfix/canonical-routes-hydration-v1`, NÃO mergeada nem publicada)
 
 - QA autenticado em Production (commit `1c92be3`, deployment `dpl_3q5h6ZyxBSy6P5TQj1VFU7cZWg4w`) reportou P1: React #418 (hydration mismatch), subrotas do REC OS redirecionando ao seletor sem `?client=`, EditorOS sem landing sem parâmetros.
@@ -879,3 +902,134 @@ Memoria oficial de continuidade entre agentes no projeto Lokat OS.
 - SQL 90: `failed` — tentado e falhou. Nao re-executar. Ver `docs/supabase/90-reconcile-partial-foundations.sql` para contexto.
 - Nao renomear rotas tecnicas `/contentos`; apenas manter nome publico visivel como REC OS.
 - Assets locais nao rastreados continuam fora do escopo e nao devem ser apagados.
+
+## 2026-07-28 - Meu Negocio Centro de Comando e IA V1
+
+### O que foi feito
+
+- Criado Centro de Comando demonstrativo com cards clicaveis, graficos, alertas e fontes visiveis.
+- Criado `MetricCalculationTrace` e drawer "Como calculamos" com formula, inputs, fontes, periodo, cobertura e exclusoes.
+- Criado catalogo em memoria de Produtos e Fichas Tecnicas, com busca, filtros, vinculos revisaveis e anexos de sessao.
+- Adicionada evolucao e decomposicao explicavel do CMV, sem afirmar causas quando faltam dados.
+- Auditada a integracao OlaClick existente, sem chamada runtime e sem inventar estado conectado.
+- Criado Assistente Lokat server-side com SDK oficial OpenAI, Responses API, JSON Schema estrito, `store: false`, limite, timeout e fallback sem chave.
+- Corrigidos pontos visuais de role Super Admin, selo individual da Duh, linguagem dos quadrantes, profundidade da Visao simples e tooltip/legenda.
+
+### Arquivos principais
+
+- `src/lib/business-command-center/*`
+- `src/app/admin/meu-negocio/_restaurant-overview.tsx`
+- `src/app/admin/meu-negocio/_product-command-center.tsx`
+- `src/app/admin/meu-negocio/_ask-lokat-panel.tsx`
+- `src/app/api/meu-negocio/ai/analyze/route.ts`
+- `docs/olaclick-command-center-audit.md`
+- `src/config/project-status.ts`
+
+### Validacoes
+
+- `npx tsc --noEmit --skipLibCheck`: aprovado.
+- ESLint somente nos arquivos alterados: aprovado.
+- `npx next build --webpack`: aprovado.
+- Testes novos: 92 assercoes aprovadas.
+- Estoque, custos e financas anteriores: aprovados.
+- Suite antiga de CMV: bloqueada antes das assercoes pela incompatibilidade existente de `require` em escopo ESM no Node 24.
+- Servidor: `http://127.0.0.1:3005`, landing/login 200 e rota autenticada redirecionando corretamente ao login.
+
+### Pendencias e proximo passo
+
+- Executar QA visual autenticado em 390, 768, 1024 e 1440 px; navegador interno sem sessao local nesta execucao.
+- Validar OlaClick em runtime antes de mudar qualquer capacidade para conectado.
+- Configurar `OPENAI_API_KEY` e `OPENAI_MODEL_MEUNEGOCIO` somente no servidor para QA real do assistente.
+- Corrigir ou padronizar o runner antigo de CMV para Node 24.
+- Branch publicada: `feat/meu-negocio-command-center-ai-v1`; nao houve merge, deploy ou alteracao da main.
+
+## 2026-07-28 - Meu Negócio Navegação e Design Profissional V1
+
+### O que foi feito
+
+- Criada worktree isolada `lokat-os-meu-negocio-dashboard-design` na branch `feat/meu-negocio-dashboard-design-system-v1`.
+- Reorganizada a navegação em oito áreas principais, com seletor mobile e subnavegação contextual preservada por área.
+- Unificados Produtos e Fichas, e Estoque e Compras, sem apagar os componentes anteriores.
+- Criado Centro de Comando executivo com seis KPIs principais, indicadores complementares, cascata de resultado gerencial, CMV, caixa, reserva, produtos, estoque, alertas, qualidade e ações rápidas.
+- Criados tokens locais de dashboard, foco visível, reduced motion e estados de fonte.
+- Fontes e Integrações passaram a mostrar atualidade, confiabilidade e estado honesto; OlaClick permanece `Não testado`.
+- Documentadas cinco referências open source e suas licenças, sem cópia integral ou dependência nova.
+
+### Arquivos principais
+
+- `src/app/admin/meu-negocio/_restaurant-workspace.tsx`
+- `src/app/admin/meu-negocio/_command-center-dashboard.tsx`
+- `src/app/admin/meu-negocio/_business-result-waterfall.tsx`
+- `src/app/admin/meu-negocio/_dashboard-design-tokens.ts`
+- `src/app/admin/meu-negocio/_sources-tab.tsx`
+- `src/lib/business-command-center/__tests__/dashboard-navigation.structural.test.ts`
+- `docs/meu-negocio-dashboard-open-source-references.md`
+- `src/config/project-status.ts`
+
+### Validações
+
+- TypeScript aprovado.
+- ESLint dos arquivos alterados aprovado.
+- 46 asserções novas de navegação/dashboard aprovadas.
+- 29 asserções anteriores de UI/IA e 63 do Centro de Comando aprovadas.
+- 65 asserções do vertical slice Restaurante e 28 de UI Financeiro aprovadas.
+- Suítes puras de estoque (25), custos (21), financeiro (44), mercado UI (12) e CMV UI (20) aprovadas.
+- Build Webpack aprovado com `NODE_OPTIONS=--max-old-space-size=4096`; primeira tentativa falhou somente por limite local de heap.
+
+### Pendências
+
+- Executar QA visual autenticado em 390, 768, 1024 e 1440 px.
+- Não marcar a área como validada antes do QA visual.
+- Validar OlaClick em runtime em sprint própria antes de alterar seu estado.
+
+### Próximo passo recomendado
+
+- Abrir o servidor local desta worktree, autenticar como Super Admin e executar o roteiro visual do Centro de Comando.
+## 2026-07-28 - Meu Negocio contraste visual V1
+
+### O que foi feito
+
+- Criada worktree isolada `lokat-os-meu-negocio-visual-contrast` na branch `fix/meu-negocio-dashboard-visual-contrast-v1`.
+- Corrigida a mistura entre tokens claros e paineis escuros no Centro de Comando.
+- Criado tema escuro local e escopado por `.mn-dashboard-theme`, sem alterar o tema global do produto.
+- Consolidada hierarquia de canvas, painel, superficie elevada e elemento interativo.
+- Corrigidos foregrounds, badges semanticos, inputs, estados disabled, eixos, legendas e tooltips dos graficos.
+- Adicionados testes estruturais e verificacao matematica de contraste WCAG AA.
+
+### Arquivos alterados
+
+- `src/app/globals.css`
+- `src/app/admin/meu-negocio/_dashboard-design-tokens.ts`
+- `src/app/admin/meu-negocio/_restaurant-workspace.tsx`
+- `src/app/admin/meu-negocio/_command-center-dashboard.tsx`
+- `src/app/admin/meu-negocio/_business-result-waterfall.tsx`
+- `src/app/admin/meu-negocio/_sources-tab.tsx`
+- `src/lib/business-command-center/__tests__/dashboard-navigation.structural.test.ts`
+- `src/lib/business-command-center/__tests__/dashboard-contrast.test.ts`
+
+### Validacoes
+
+- TypeScript, ESLint focado e build Webpack aprovados.
+- Testes novos: 9 assercoes de contraste e 55 estruturais aprovadas.
+- Regressoes de Centro de Comando, UI/IA, Restaurante, Financeiro, CMV, estoque, custos e mercado aprovadas.
+- Servidor local mantido em `http://127.0.0.1:3002`.
+
+### Pendencias
+
+- QA visual autenticado em 390, 768, 1024 e 1440 px continua pendente por falta de sessao local controlavel no navegador.
+- Nao marcar a correcao como `validated` antes desse QA.
+- `V1_PROGRESS=81`, `V2_PROGRESS=12` e `global_calendar=qa_pending` permanecem inalterados.
+
+### Proximo passo recomendado
+
+- Autenticar manualmente em `http://127.0.0.1:3002/login` e executar o roteiro visual do Centro de Comando.
+- Depois do QA, revisar o diff e decidir sobre commits/push apenas na branch de correcao.
+# Meu Negócio Motion V1 - release candidate
+
+- Branch: `feat/meu-negocio-motion-3d-refinement-v1`.
+- A rota existente `/admin/meu-negocio` recebeu um motion system compartilhado com GSAP para entrada do Centro de Comando e transições entre área, subárea e modo.
+- O Assistente Lokat recebeu um único orb Three.js lazy, sem Fiber/Drei, com fallback estático, DPR 1.5, bloqueio em mobile/pointer coarse/reduced motion e cleanup completo.
+- Nenhuma fórmula, fixture, integração, dado real, Supabase, Auth ou RLS foi alterado.
+- Dependências: `gsap`, `@gsap/react`, `three` e `@types/three`; `framer-motion` foi preservado.
+- Validações: TypeScript, ESLint, 246 testes estruturais/funcionais e build Webpack aprovados.
+- QA visual autenticado permanece pendente; próximo passo é merge e deploy controlado após revisão.

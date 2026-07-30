@@ -731,3 +731,47 @@ Registro cronologico das sessoes de trabalho no Lokat OS.
   Web) e o proximo passo.
 - Nenhum push, nenhum Preview, nenhuma alteracao em main ou Production nesta
   sprint.
+
+## 2026-07-28 - Meu Negócio Dashboard Design System V1
+
+- Branch/worktree isoladas criadas a partir do commit `0bc1e8d` da fase anterior.
+- Navegação reduzida a oito áreas, com Produtos/Fichas e Estoque/Compras unificados por subnavegação.
+- Centro de Comando reconstruído com composição executiva, cascata financeira, gráficos Recharts e estados honestos de fonte.
+- Tokens locais consolidados para superfícies, bordas, foco, estados e movimento reduzido.
+- Nenhuma fórmula, integração, API OpenAI, SQL, Supabase, Auth, workspace ou dado real foi alterado.
+- Testes estruturais novos e regressões anteriores aprovados; build Webpack aprovado com heap local de 4 GB.
+- QA visual autenticado permanece pendente; área mantida como `qa_pending`.
+## 2026-07-28 - Correcao visual Meu Negocio
+
+- Branch: `fix/meu-negocio-dashboard-visual-contrast-v1`.
+- Base: `299a010293e9c7d2d3228cd1790cf0299453f2a4`.
+- Causa: componentes claros (`text-slate-950`, `bg-white` e equivalentes) renderizados dentro de paineis escuros.
+- Solucao: tokens locais escuros e overrides estritamente escopados por `.mn-dashboard-theme`.
+- Funcoes, calculos, fixtures, dados, integracoes, Supabase e Auth nao foram alterados.
+- TypeScript, ESLint, testes relevantes e build Webpack passaram.
+- Runtime local: `http://127.0.0.1:3002`; QA autenticado pendente.
+# Sessão - Meu Negócio Motion V1
+
+- Consolidado tema dark premium com transições GSAP escopadas e reduced motion.
+- Integrado piloto Three.js somente no painel Pergunte à Lokat, carregado dinamicamente.
+- Adicionada cobertura estrutural para dependências, lifecycle WebGL, acessibilidade e ausência de páginas paralelas.
+- Build de produção aprovado; publicação limitada à branch de feature.
+
+## 2026-07-29 - Meu Negócio: camada de dados reais, Faturamento e taxonomia
+
+- Auditada a integração OlaClick (engine madura, ~2300 linhas, nunca exercitada contra uma conta real); mantido `OLACLICK_RUNTIME: NAO COMPROVADO`.
+- Criada taxonomia canônica `DataClassification`/`BusinessMetricValue` (`src/lib/data-quality/`) para nunca deixar uma métrica derivada parecer mais confiável que sua pior entrada.
+- "Faturamento realizado" agora é o primeiro KPI da Visão geral e ganhou subárea própria em Financeiro (`src/lib/revenue/`), com comparação de período e classificação honesta (`SIMULATED`).
+- Corrigido bug pré-existente: `FinanceTab` tinha um estado de aba interno desconectado da subárea central do `RestaurantWorkspace` — navegação para "Reserva"/"Faturamento" não trocava o conteúdo real.
+- Definido o contrato de tipos `NormalizedOrder`/`NormalizedOrderItem` (apenas tipos, engine de extração existente não foi reescrita).
+- Renomeado "Dados e planilhas" para "Dados e relatórios" em toda a UI.
+- TypeScript, ESLint, 772 asserções (32 suítes) e build Webpack aprovados; escopo reduzido deliberadamente frente às 34 fases pedidas (ver `docs/HANDOFF.md`).
+
+## 2026-07-29 - Meu Negócio: cardápios digitais, período central e modos globais V2
+
+- OlaClick reenquadrada como provedor (`DigitalMenuProvider`), não módulo: card "Cardápio digital" com "Provedor: OlaClick" como campo interno, nunca "Conectada" sem `runtimeValidated`.
+- Criado `BusinessPeriodSelection` (`src/lib/business-period/`) com 9 presets, dia operacional configurável por empresa e cálculo timezone-aware correto em madrugada/virada de mês/ano. Um único `PeriodSelector` no shell.
+- Financeiro/Resumo recalcula de verdade a partir do período central; Faturamento propaga rótulo/comparação reais mas avisa explicitamente que a fixture não recalcula por período.
+- Corrigido bug real: Visão simples/Modo Gestor tinha três estados desconectados (workspace, FinanceTab, CmvCenter) — consolidado num único hook com persistência de sessão.
+- Visão simples agora esconde estruturalmente os indicadores complementares (não só recolhe); 8 KPIs principais ganharam o badge real de classificação de dados.
+- TypeScript, ESLint, 922 asserções (39 suítes) e build Webpack aprovados; dia operacional/período central ainda não chegou a CMV/Estoque/Compras/Relatórios (fora do escopo desta sessão).

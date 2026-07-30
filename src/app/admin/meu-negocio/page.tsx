@@ -1,12 +1,15 @@
-import { MeuNegocioContent } from "./_client-content";
+import { MeuNegocioEntry } from "./_entry";
 
 /**
- * Sprint Motor LOKAT 1.0 — "Meu Negócio" preview.
+ * Sprint Motor LOKAT 1.0 — "Meu Negócio" preview (original Motor LOKAT
+ * segment demo, kept at ./_client-content.tsx, unused from this entry
+ * point since the vertical slice sprint below).
  *
- * This first vertical slice runs entirely in demo mode: no Supabase reads or
- * writes, no persistence. Every value is an editable example that lives only
- * in the browser's memory for the duration of the session. See _client-content.tsx.
+ * feat/meu-negocio-stock-restaurant-v1 — vertical slice Restaurante:
+ * seleção de empresa primeiro, depois estoque/fichas técnicas/CMV/
+ * relatórios para o arquétipo food_service. Continua 100% em memória —
+ * nenhuma consulta ou mutação real ao Supabase.
  */
 export default function AdminMeuNegocioPage() {
-  return <MeuNegocioContent />;
+  return <MeuNegocioEntry />;
 }

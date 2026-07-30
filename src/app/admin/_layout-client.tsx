@@ -267,6 +267,8 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
 
   // Compute days remaining client-side only to avoid React #418 (Date.now() differs between SSR and hydration)
   useEffect(() => {
+    // Intentional hydration boundary: Date.now() cannot run during SSR without diverging.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDaysRemaining(getDaysRemainingV1());
   }, []);
 
@@ -351,7 +353,7 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
         <AppSidebar
           variant="admin"
           userName={userName}
-          userRole="Admin"
+          userRole={userRole === "super_admin" ? "Super Admin" : userRole === "admin" ? "Admin" : "Usuário"}
           onSignOut={handleSignOut}
           badges={badges}
           transparent={isInicioPage}

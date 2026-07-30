@@ -706,8 +706,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
-    notes: "Branch fix/rec-os-global-navigation, mergeada em main em 2026-07-23 (release canônica 1.0). tsc, build e ESLint passam limpos. Isolamento entre clientes verificado apenas em nível de código — sem QA em navegador real com os dois clientes reais (Duh Lanches, O Pedreirão) ainda. Hotfix canônico 1.0.1 (sprint local): corrigido o mismatch de hidratação (React #418) em formatDate() deste arquivo, causado por toLocaleDateString sem timeZone explícito — ver production_hydration_stability.",
-    next_actions: ["QA local (Codex Web): reload repetido em /admin/contentos com e sem client, confirmar ausência de React #418 no console"],
+    notes: "Branch fix/rec-os-global-navigation, mergeada em main em 2026-07-23 (release canônica 1.0). tsc, build e ESLint passam limpos. Isolamento entre clientes verificado apenas em nível de código — sem QA em navegador real com os dois clientes reais (Duh Lanches, O Pedreirão) ainda. Hotfix canônico 1.0.1 (sprint local): corrigido o mismatch de hidratação (React #418) em formatDate() deste arquivo, causado por toLocaleDateString sem timeZone explícito — ver production_hydration_stability. Pendência registrada na sprint feat/meu-negocio-stock-restaurant-v1 (nenhum código REC OS tocado, apenas observação durante a auditoria visual do dashboard): (1) dois nomes 'REC OS' aparecem no dashboard, um deles deveria representar outro módulo; (2) o calendário interno da REC OS navega para o calendário global em vez de permanecer dentro da própria REC OS — os dados podem refletir no calendário global sem reutilizar a mesma rota visual. Branch futura recomendada: fix/rec-os-dashboard-calendar-routing-v1.",
+    next_actions: ["QA local (Codex Web): reload repetido em /admin/contentos com e sem client, confirmar ausência de React #418 no console", "Futuro: abrir fix/rec-os-dashboard-calendar-routing-v1 para corrigir a duplicidade de nomes REC OS no dashboard e o roteamento do calendário interno"],
   },
   {
     id: "rec_os_clickable_dashboard",
@@ -1024,6 +1024,48 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     notes: "Somente na branch feat/product-engineering-preview-v1. Bloqueado por decisão — não deve ser contornado.",
   },
 
+  {
+    id: "meu_negocio_market_benchmark_pricing_v1",
+    name: "Mercado, Preço e Mix de Vendas V1",
+    category: "admin",
+    description: "Pesquisa manual/importada revisável, benchmark configurável, comparabilidade, estratégias de preço, canais, preço realizado e efeito do mix integrados à Central de CMV.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["Dados reais pendentes", "Persistência pendente", "QA visual autenticado pendente"],
+    next_actions: ["Executar QA visual em 390 px, tablet e desktop", "Validar fluxo local de inclusão e revisão de amostras"],
+    risk: "low",
+    last_updated: "2026-07-27",
+    notes: "Demonstração Duh Lanches somente com dados simulados e Concorrente A/B/C. Mercado é referência, nunca ordem automática. Sem SQL, Supabase, Auth, scraping ou persistência.",
+  },
+  {
+    id: "meu_negocio_command_center_ai_v1",
+    name: "Meu Negócio — Centro de Comando e Assistente V1",
+    category: "admin",
+    description: "Dashboard executivo, cards clicáveis, rastreabilidade por fonte/período/fórmula, catálogo de produtos e fichas, evolução do CMV, auditoria OlaClick e Assistente Lokat server-side com saída estruturada.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["Dados reais e persistência pendentes", "QA visual autenticado pendente", "OpenAI depende de variáveis server-side"],
+    next_actions: ["Executar QA visual em 390, 768, 1024 e 1440 px", "Validar Assistente sem e com configuração server-side"],
+    risk: "low",
+    last_updated: "2026-07-27",
+    notes: "Somente demonstração em memória nesta branch. IA não calcula nem altera dados; store=false, sem web search. OlaClick auditada sem inventar conexão ou prova runtime. Sem SQL, Supabase, Auth, dado real ou deploy. V1_PROGRESS=81 e V2_PROGRESS=12 preservados.",
+  },
+  {
+    id: "meu_negocio_dashboard_design_system_v1",
+    name: "Meu Negócio — Navegação e design profissional do Centro de Comando V1",
+    category: "admin",
+    description: "Oito áreas principais, subnavegação contextual, Produtos e Fichas unificados, Estoque e Compras unificados, design tokens locais, Centro de Comando executivo e cascata de resultado gerencial.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    blockers: ["QA visual autenticado em 390, 768, 1024 e 1440 px pendente"],
+    next_actions: ["Executar QA visual autenticado local", "Validar navegação por teclado, gráficos e drawers em navegador real"],
+    risk: "low",
+    last_updated: "2026-07-28",
+    notes: "Somente reorganização e apresentação local. Fórmulas, integrações, OpenAI, Supabase, Auth e persistência não foram alterados. OlaClick permanece não testada. Nenhuma nova dependência. V1_PROGRESS=81, V2_PROGRESS=12 e global_calendar=qa_pending preservados.",
+  },
   // ── Workspaces 1.0 (branch feat/workspace-panels-v1) ──────────────────────
   // Nenhum usuário, cliente ou registro real foi criado nesta sprint.
   {
@@ -1182,6 +1224,93 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     qa: { status: "not_started" },
     last_updated: "2026-07-23",
     notes: "Somente na branch feat/workspace-panels-v1. Deliberadamente NÃO persiste em tabela — hoje só um console.info(JSON) por evento. Sem SQL criado ou executado nesta sprint; persistência real é trabalho futuro, dependente de aprovação de schema. Hotfix 1.0.2 (Fase 23): reconfirmado que nenhum dado sensível (token, cookie, payload completo, e-mail, nome de cliente) é logado — só uid, surface, workspaceId, isBlueprint e timestamp. Nenhum logger estruturado existe hoje no projeto (grep confirmou), então console.info seguiu sendo a escolha honesta.",
+  },
+
+  // ── Contas, painéis e roteamento (branch feat/accounts-panel-routing-v1) ──
+  {
+    id: "accounts_panel_routing_audit",
+    name: "Contas — Auditoria de painéis, memberships e roteamento",
+    category: "admin",
+    description: "Auditoria prévia (somente leitura) do modelo real de contas/workspaces após a validação de Workspaces 1.0.11 em Production: docs/accounts-panel-routing-audit.md mapeia profiles/clients/agency_workspaces/agency_clients/client_user_access ao vivo (Supabase MCP, projeto lokat-os), a resolução de papel/cliente atual, a matriz de rotas por superfície, e desenha (sem implementar) o plano idempotente de criação de contas e os testes de isolamento entre Focus/Duh Lanches/Açaí do Gordo.",
+    phase: "v2",
+    readiness: "in_progress",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-26",
+    notes: "Nenhuma mutação executada — 100% leitura (código + consultas SELECT ao Supabase real). Achados principais: (1) o modelo de Workspaces (agency_workspaces/agency_clients) construído nos hotfixes 1.0–1.0.11 tem 0 linhas reais em produção — nunca foi inserido por nenhum código da aplicação, só é exercitado pelo preview do Super Admin com dados de blueprint; não existe hoje nenhum 'Gerenciar empresa' real, só o preview somente-leitura. (2) Existem quatro vocabulários de account_type/plano desalinhados entre si (docs/supabase/69, src/lib/account-permissions.ts, src/lib/account-types.ts, e o valor real observado em clients.account_type = 'lokat_client', que não existe em nenhum dos três) — já parcialmente reconhecido no próprio comentário de src/config/workspace-capabilities.ts de uma sprint anterior, mas nunca unificado. (3) O único limite de clientes por plano implementado em código (canCreateClient/getClientLimitByPlan) usa slugs de plano que nunca correspondem aos slugs reais do banco (billing_plans/plan_limits: comunidade/start/pro/agencia) — na prática sempre cai no fallback, nunca aplica o limite contratado; não há nenhuma validação server-side do limite hoje, e não existe nenhum fluxo de criação de agency_clients no código para a validação se aplicar. (4) Das entidades citadas pelo ticket, só Duh Lanches e O Pedreirão existem de fato (2 clientes reais no banco, ambos sem owner_id, sem agência vinculada, status 'onboarding'); Agência Lokat, Focus, Cliente Teste Focus 01 e Açaí do Gordo NÃO existem em nenhuma tabela — confirmado por consulta direta, não suposição. (5) Nenhum risco P0 encontrado — o modelo multi-tenant real ainda não está em uso por nenhum usuário de verdade, então não há vetor de vazamento entre empresas hoje. P1/P2 detalhados na seção 12 do documento. Meu Negócio/Precificação/Produtos são 100% demo em memória (zero Supabase) — sem risco de isolamento porque não há dado real. QA formal não se aplica (auditoria, não feature).",
+    next_actions: [
+      "Decidir com o usuário qual vocabulário de account_type/plano é o canônico antes de qualquer implementação nova",
+      "Implementar assertAgencyCanAddClient() server-side antes de qualquer UI de criação de cliente por agência",
+      "Construir findOrCreateWorkspace/findOrCreateAgencyClient em modo dry-run, validado manualmente antes de qualquer execução real",
+      "Só criar Focus/Cliente Teste Focus 01/Açaí do Gordo com dados reais fornecidos explicitamente pelo usuário (nunca inventados) — nenhum dos três existe hoje",
+    ],
+  },
+
+  // ── Meu Negócio — Vertical slice Restaurante (branch feat/meu-negocio-stock-restaurant-v1) ──
+  {
+    id: "meu_negocio_restaurant_vertical_slice",
+    name: "Meu Negócio — Vertical slice Restaurante (estoque, fichas técnicas, CMV)",
+    category: "operacional",
+    description: "Protótipo navegável e matematicamente coerente para o arquétipo food_service dentro de /admin/meu-negocio: seleção de empresa, estoque central e cozinha com transferências e inventário, compras com ponto de reposição e cobertura, fichas técnicas (fator de correção, rendimento de cocção, CMV do produto), CMV real vs. teórico com lacuna explicada, relatórios, glossário contextual e fluxo 'Analisar e preencher'. Arquitetura adaptativa por arquétipo de negócio (BusinessArchetypeConfig) — só food_service tem a experiência completa; os demais (retail, services, agency, clinic, law_firm, generic) existem como contratos tipados.",
+    phase: "v2",
+    readiness: "in_progress",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-26",
+    notes: "100% em memória, sem persistência e sem nenhuma consulta/mutação ao Supabase — confirmado por teste estrutural (nenhum arquivo novo referencia Supabase ou fetch()). A auditoria anterior (feat/accounts-panel-routing-v1) confirmou que agency_workspaces/agency_clients têm 0 linhas reais e que não existe 'Gerenciar empresa' real — esta sprint respeita esse limite: a tela de seleção de empresa usa fixtures locais (Duh Lanches como 'active'/food_service, O Pedreirão como 'available_for_activation'/retail, sem experiência retail construída), nunca uma consulta real a clients/agency_clients. Todos os números de exemplo (Smash de Exemplo, relatório de CMV) estão marcados como simulação e batem exatamente com os valores do ticket, verificados por teste real (não apenas exibidos): custo dos ingredientes R$ 8,62, CMV do produto 34,48%, consumo real R$ 37.000/CMV real 37%, consumo teórico R$ 33.000/CMV teórico 33%, lacuna R$ 4.000/4 pontos percentuais. Fator de correção e rendimento de cocção são funções puras separadas (perda de limpeza ≠ perda de cocção), nunca misturadas. Transferência central→cozinha nunca permite saldo negativo (rejeitada, não clampada) e preserva o total consolidado entre as duas localizações. Contagem de inventário trata explicitamente saldo zero, contado zero, valores negativos e unidade incompatível — nunca divide por zero. 111 asserções reais passando (25 em stock/calculations, 21 em costing/calculations incluindo os números exatos do ticket, 65 estruturais). Um bug real de import foi encontrado e corrigido durante a validação no servidor local (buildPurchaseDrafts estava sendo importado do módulo errado) — só foi pego rodando o servidor de fato, não pelos testes ad-hoc isolados, reforçando por que o Fase de 'servidor local' do ticket não é dispensável. ESLint limpo nos arquivos alterados (incluindo a correção de um react-hooks/purity de Date.now() reutilizando o generateId() já existente em _shared.tsx). tsc --noEmit e next build continuam bloqueados pelo mesmo teto de memória (~700-750MB) dos hotfixes 1.0.10/1.0.11/exit-guard — mas, diferente dessas sprints, `next dev` funcionou desta vez (compilação sob demanda, não o programa inteiro de uma vez) e serviu /login (200) e /admin/meu-negocio (307, redirect correto sem sessão) em http://localhost:3002 — sem validação visual autenticada (sem navegador/sessão de Super Admin disponível neste ambiente, mesma lacuna disclosed desde os primeiros hotfixes de Workspaces). Pendência de REC OS (dois nomes 'REC OS' no dashboard, calendário interno navegando para o calendário global) registrada em rec_os_global_hub — nenhum código REC OS foi tocado.",
+    next_actions: [
+      "QA visual autenticado (Codex Web/Claude Web) em http://localhost:3002/admin/meu-negocio com sessão real de Super Admin",
+      "Conectar o módulo a um workspace/cliente real assim que o modelo de contas (accounts_panel_routing_audit) for unificado — hoje a seleção de empresa é só fixture local",
+      "Implementar a experiência completa do arquétipo retail (O Pedreirão) em uma sprint futura",
+      "Abrir fix/rec-os-dashboard-calendar-routing-v1 para a pendência de REC OS registrada nesta sprint",
+    ],
+  },
+
+  // -- Meu Negocio - Fluxo de Caixa, Reserva e importacao local de planilhas --
+  {
+    id: "meu_negocio_finance_cashflow_spreadsheet_v1",
+    name: "Meu Negocio - Fluxo de Caixa, Reserva e planilhas V1",
+    category: "operacional",
+    description: "Experiencia financeira demonstrativa em /admin/meu-negocio com visao simples e Modo Gestor, dashboard de fluxo de caixa, capital de giro, reserva financeira, graficos, importacao local revisavel de XLSX/CSV e exportacao do modelo oficial de planilha.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    risk: "medium",
+    last_updated: "2026-07-27",
+    notes: "Implementacao local concluida e coberta por 209 assercoes automatizadas, TypeScript, ESLint e build de producao. Os dados financeiros exibidos continuam simulados e identificados; nao existe persistencia, consulta ao Supabase, envio de planilha ou integracao com Google Sheets nesta fase. A importacao acontece somente no navegador e exige revisao antes de aplicar. A conexao OlaClick continua separada deste fluxo. QA visual autenticado permanece pendente porque o ambiente local nao possui as variaveis Supabase necessarias para abrir /admin/meu-negocio. Dependencia xlsx 0.18.5 possui advisories conhecidos sem correcao no registro npm e deve ser substituida antes de aceitar arquivos nao confiaveis em producao.",
+    blockers: [
+      "Persistencia financeira por workspace/cliente ainda nao implementada",
+      "QA visual autenticado pendente",
+      "Substituir ou isolar xlsx antes de liberar importacao de arquivos nao confiaveis",
+    ],
+    next_actions: [
+      "Executar QA visual autenticado em desktop, tablet e mobile",
+      "Definir persistencia por workspace/cliente sem misturar dados entre empresas",
+      "Avaliar biblioteca mantida para XLSX e impor limites de tamanho/complexidade",
+      "Planejar Google Sheets como integracao futura com OAuth proprio, sem simular conexao",
+    ],
+  },
+
+  {
+    id: "meu_negocio_cmv_menu_engineering_v1",
+    name: "Meu Negócio — Central de CMV e Engenharia de Cardápio V1",
+    category: "operacional",
+    description: "Central demonstrativa que separa Visão simples/Modo Gestor de CMV teórico/real, calcula lacuna, cobertura explicável, margem de contribuição, popularidade e quadrantes de engenharia de cardápio, com hipóteses e verificações sem acusação automática.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    risk: "medium",
+    last_updated: "2026-07-27",
+    notes: "Somente na branch feat/meu-negocio-cmv-menu-engineering-v1. Duh Lanches é contexto visual e todos os valores são EXEMPLOS SIMULADOS derivados de uma fixture central; nenhum dado real, Supabase, Auth, workspace ou integração OlaClick foi alterado. CMV_FINAL_REFERENCE_PENDING permanece ativo. Persistência, histórico real, dados reais OlaClick e QA visual autenticado continuam pendentes. xlsx 0.18.5 foi substituído pela distribuição oficial fixa 0.20.3 e o importador local ganhou limites de arquivo, abas, linhas, colunas, células e texto, além de rejeição de prototype keys e desativação de fórmula/HTML.",
+    blockers: [
+      "Referência visual final do MVP de CMV ainda não fornecida",
+      "Persistência por workspace/cliente não implementada",
+      "Dados reais OlaClick ainda não conectados à Central de CMV",
+      "QA visual autenticado em 390/768/1024/desktop pendente",
+    ],
+    next_actions: [
+      "Executar QA visual autenticado da Central de CMV",
+      "Recalibrar o layout quando CMV_FINAL_REFERENCE_PENDING for resolvido",
+      "Projetar persistência e integração OlaClick em sprint separada",
+    ],
   },
 
   // ── Workspaces 1.0.2 (mesma branch feat/workspace-panels-v1) ──────────────

@@ -10,23 +10,32 @@
     "check:workspace-mutations": "node scripts/check-workspace-mutation-coverage.ts"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "framer-motion": "^12.42.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
     "openai": "^6.45.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "swup": "^4.9.2"
+    "recharts": "^3.10.1",
+    "swup": "^4.9.2",
+    "three": "^0.185.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.185.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "jsdom": "^25.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
