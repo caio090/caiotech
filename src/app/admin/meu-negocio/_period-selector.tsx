@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BUSINESS_PERIOD_PRESET_LABEL } from "@/lib/business-period/types";
@@ -65,13 +65,37 @@ export function PeriodSelector({ selection, onChange, timezone, operationalDaySt
     setOpen(false);
   }
 
-  function applyCustom(event?: FormEvent) {
-    event?.preventDefault(); // cobre Enter dentro do <form>, não só o clique no botão
-    if (!validation.valid) return; // defensivo -- o botão já fica desabilitado neste caso
-    const endExclusive = toExclusiveEndDate(customEndInclusive);
-    onChange(buildPeriodSelection("CUSTOM", timezone, operationalDayStart, new Date(), { startDate: customStart, endDateExclusive: endExclusive }));
+  // Fase 4 do hotfix de Production: o estado React de customStart/customEndInclusive
+  // é o que renderiza os inputs e o disabled do botão, mas NÃO é a fonte de
+  // verdade no momento do submit -- um input nativo type="date" pode ter seu
+  // valor alterado no DOM sem que o onChange do React chegue a disparar
+  // (autofill, automação de navegador que despacha só "change" no elemento
+  // sem passar pelo listener sintético de "input" que o React usa
+  // internamente, ou qualquer evento incompleto). Por isso o submit sempre
+  // relê o FormData do próprio <form> -- o valor efetivamente presente no
+  // formulário -- e valida ESSE valor, nunca confiando cegamente no estado
+  // React que pode estar atrasado.
+  function applyCustom(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); // cobre Enter dentro do <form>, não só o clique no botão
+    const formData = new FormData(event.currentTarget);
+    const formStart = String(formData.get("customStartDate") ?? "").trim();
+    const formEndInclusive = String(formData.get("customEndDate") ?? "").trim();
+    // Ressincroniza o estado React com o valor real do DOM antes de decidir --
+    // garante que a mensagem/aria-invalid exibidos reflitam exatamente o que
+    // foi validado, mesmo se o estado estivesse atrasado em relação ao DOM.
+    if (formStart !== customStart) setCustomStart(formStart);
+    if (formEndInclusive !== customEndInclusive) setCustomEndInclusive(formEndInclusive);
+    const formValidation = validateCustomPeriodDraft({ startDate: formStart, endDateInclusive: formEndInclusive });
+    if (!formValidation.valid) return; // não fecha o painel, não chama onChange
+    const endExclusive = toExclusiveEndDate(formEndInclusive);
+    onChange(buildPeriodSelection("CUSTOM", timezone, operationalDayStart, new Date(), { startDate: formStart, endDateExclusive: endExclusive }));
     setOpen(false);
   }
+
+  // Mesmo handler para onChange e onInput -- cobre navegadores/automação que
+  // disparam só um dos dois eventos ao alterar um input nativo type="date".
+  function handleCustomStartInput(event: ChangeEvent<HTMLInputElement> | FormEvent<HTMLInputElement>) { setCustomStart((event.target as HTMLInputElement).value); }
+  function handleCustomEndInput(event: ChangeEvent<HTMLInputElement> | FormEvent<HTMLInputElement>) { setCustomEndInclusive((event.target as HTMLInputElement).value); }
 
   function restoreDefault() {
     onChange(buildPeriodSelection("THIS_MONTH", timezone, operationalDayStart, new Date()));
@@ -101,10 +125,10 @@ export function PeriodSelector({ selection, onChange, timezone, operationalDaySt
             <p className="text-[10px] font-black uppercase text-[#697386]">Personalizado</p>
             <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-center">
               <label htmlFor="period-custom-start" className="sr-only">Data inicial</label>
-              <input id="period-custom-start" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} aria-invalid={startInvalid} aria-describedby={validation.formError ? "period-custom-error" : undefined} className="w-full min-w-0 rounded border border-[#3a4354] bg-[#11141c] px-2 py-1.5 text-[11px] text-[#f6f7fb]" />
+              <input id="period-custom-start" name="customStartDate" type="date" value={customStart} onChange={handleCustomStartInput} onInput={handleCustomStartInput} aria-invalid={startInvalid} aria-describedby={validation.formError ? "period-custom-error" : undefined} className="w-full min-w-0 rounded border border-[#3a4354] bg-[#11141c] px-2 py-1.5 text-[11px] text-[#f6f7fb]" />
               <span className="hidden shrink-0 text-[#697386] sm:inline">–</span>
               <label htmlFor="period-custom-end" className="sr-only">Data final</label>
-              <input id="period-custom-end" type="date" value={customEndInclusive} onChange={(event) => setCustomEndInclusive(event.target.value)} aria-invalid={endInvalid} aria-describedby={validation.formError ? "period-custom-error" : undefined} className="w-full min-w-0 rounded border border-[#3a4354] bg-[#11141c] px-2 py-1.5 text-[11px] text-[#f6f7fb]" />
+              <input id="period-custom-end" name="customEndDate" type="date" value={customEndInclusive} onChange={handleCustomEndInput} onInput={handleCustomEndInput} aria-invalid={endInvalid} aria-describedby={validation.formError ? "period-custom-error" : undefined} className="w-full min-w-0 rounded border border-[#3a4354] bg-[#11141c] px-2 py-1.5 text-[11px] text-[#f6f7fb]" />
             </div>
             {validation.formError && <p id="period-custom-error" role="alert" className="mt-1 break-words text-[10px] font-bold text-rose-400">{validation.formError}</p>}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
