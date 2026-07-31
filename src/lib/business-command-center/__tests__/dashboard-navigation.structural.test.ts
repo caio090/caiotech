@@ -15,10 +15,14 @@ const packageJson = read("package.json");
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
 
-const navigation = ["Visão geral", "Financeiro", "CMV e Cardápio", "Produtos e Fichas", "Estoque e Compras", "Relatórios", "Fontes e Integrações", "Configurações"];
+// Sprint Meu Negócio 2.1.2: "DNA & Estratégia" entrou entre Visão geral e
+// Financeiro (restauração da camada estratégica dentro do Centro de Comando
+// atual, sem remover nenhuma área existente) — nove áreas principais agora,
+// não mais oito.
+const navigation = ["Visão geral", "DNA & Estratégia", "Financeiro", "CMV e Cardápio", "Produtos e Fichas", "Estoque e Compras", "Relatórios", "Fontes e Integrações", "Configurações"];
 let cursor = -1;
 for (const label of navigation) { const next = workspace.indexOf(`label: "${label}"`, cursor + 1); assert(next > cursor, `ordem de navegação: ${label}`); cursor = next; }
-assert((workspace.match(/label: "/g) ?? []).length === 8, "oito áreas principais");
+assert((workspace.match(/label: "/g) ?? []).length === 9, "nove áreas principais (oito originais + DNA & Estratégia)");
 assert(workspace.includes("Fichas técnicas") && workspace.includes("Vínculos do cardápio"), "Produtos e Fichas unificados com subáreas");
 assert(workspace.includes("Estoque central") && workspace.includes("Lista de compras"), "Estoque e Compras unificados com subáreas");
 assert(workspace.includes("setSubsections((current)"), "subárea preservada por área");
