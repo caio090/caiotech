@@ -47,3 +47,12 @@ Ver `docs/DECISIONS.md` e `docs/architecture/REC_OS_INFORMATION_ARCHITECTURE.md`
 ## Integridade do registry
 
 `findMissingDependencies()` e `findDependencyCycles()` (ambos em `platform-modules.ts`) são a base dos testes de integridade (Fase 41, itens 1-8).
+
+## Nota — Sprint Meu Negócio 2.1.2
+
+A descrição do módulo `meu_negocio` foi atualizada para citar a nova área
+"DNA & Estratégia" (entre Visão geral e Financeiro no Centro de Comando
+real). Nenhum módulo de plataforma novo foi criado para isso — DNA e
+estratégia são parte do módulo `meu_negocio` existente, não um módulo
+"Motor LOKAT" concorrente (Motor LOKAT continua sendo um mecanismo/badge
+interno, não uma entrada própria no registry).

@@ -19,3 +19,17 @@ Nenhum pacote referencia Duh Lanches, O Pedreirão ou qualquer cliente real — 
 ## Business Profile
 
 `src/lib/business-profile/types.ts` define `BusinessProfile` como uma **interpretação normalizada** dos dados que já existem em Meu Negócio — não um cadastro paralelo. `enabledNichePack` conecta o perfil ao pacote correspondente.
+
+## Nota — Sprint Meu Negócio 2.1.2 (segmento do DNA restaurado)
+
+`src/lib/business-strategy/types.ts` tipa `BusinessDnaProfile.segment` como
+`BusinessArchetypeId` (de `src/lib/business-archetypes/types.ts`:
+`food_service | retail | services | agency | clinic | law_firm |
+generic`) — o mesmo vocabulário usado pela empresa real do Centro de
+Comando — em vez do `BusinessSegment` histórico de `motor-lokat/types.ts`
+(`delivery | varejo | clinica | servicos | agencia | saas`), que nunca
+incluiu `food_service`. Isso é diferente do `BusinessSegment` deste
+arquivo (`business-profile/types.ts`, usado pelos pacotes de nicho acima)
+— três vocabulários de segmento coexistem hoje no código
+(`motor-lokat`, `business-archetypes`, `business-profile`), nenhum deles
+unificado nesta sprint; documentado aqui para visibilidade, não corrigido.

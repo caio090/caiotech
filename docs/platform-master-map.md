@@ -42,3 +42,16 @@ Produto → Oportunidade → Campanha comercial → Brief REC OS → Conteúdo �
 ## O que esta sprint explicitamente não fez
 
 Ver `docs/mvp-priority-map.md` para trilhas e `docs/platform-module-registry.md` para maturidade por módulo. Nenhuma integração externa (OlaClick, AiPede, Google Calendar, WhatsApp), nenhuma IA real, nenhum SQL, nenhuma migration, nenhum dado real alterado.
+
+## Nota — Sprint Meu Negócio 2.1.2 (camada estratégica)
+
+`src/lib/business-strategy/` restaura e amplia a camada estratégica de
+Meu Negócio (DNA, 8Ps LOKAT, SWOT/FOFA, concorrência, posicionamento,
+metas, sazonalidade, qualidade dos dados) dentro do Centro de Comando real
+— ver `docs/meu-negocio/business-dna-restoration.md`,
+`docs/meu-negocio/lokat-8ps-framework.md`,
+`docs/meu-negocio/swot-fofa-model.md`,
+`docs/meu-negocio/competitor-analysis-model.md` e
+`docs/meu-negocio/living-business-manual.md`. Reaproveita `DataConfidence`
+do Data Hub desta mesma sprint (Core 2.1) para a escala de confiança —
+não é um segundo sistema de proveniência.
