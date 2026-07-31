@@ -62,3 +62,16 @@ aplicação real não confirmada nesta sprint), o isolamento real depende de
 todo acesso passar pelas funções server-side deste módulo
 (`resolveWorkspacePreview`, `src/app/api/admin/workspaces/route.ts`) e nunca
 de uma query direta ao Supabase a partir do cliente.
+
+## Nota — Sprint LOKAT Core 2.1 (mapa de módulos)
+
+`src/config/platform-modules.ts` introduz `ModuleSurface = WorkspaceSurface |
+"operational_user"` para a matriz de visibilidade de módulo na página
+`/admin/ecossistema`. `"operational_user"` é **conceitual, não uma nova
+WorkspaceSurface real** — não altera `src/lib/workspaces/types.ts` nem
+`workspace-capabilities.ts`, e não introduz uma nova autorização paralela.
+É só uma granularidade a mais para descrever "um usuário operacional dentro
+de agency/direct_business", já que hoje não existe esse sub-papel na
+autorização real (todo usuário autenticado herda a superfície inteira). Esta
+matriz continua sendo a fonte de verdade para o que é de fato bloqueado no
+servidor.
