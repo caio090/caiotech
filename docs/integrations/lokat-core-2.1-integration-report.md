@@ -309,3 +309,19 @@ Ambos herdados de `origin/main`, confirmados por diff vazio entre
    2026-07-28).
 2. `atomic-exit-endpoint.e2e.test.ts` desatualizado em relação ao gate
    mais amplo do `proxy.ts` atual (4 de 8 asserções).
+
+## Addendum — Sprint Meu Negócio 2.1.2 (2026-07-31)
+
+O achado (1) acima foi corrigido nesta sprint seguinte, na mesma branch
+`integration/lokat-core-platform-map-v1`: `withMutationProtection`
+aplicado à rota, classificação `protected` adicionada ao ALLOWLIST,
+`npm run check:workspace-mutations` volta a reportar 0 falhas — ver
+`docs/meu-negocio/business-dna-restoration.md` e a nota correspondente em
+`docs/intelligence-layer.md`. O achado (2) permanece registrado, sem
+alteração (fora do escopo desta sprint também).
+
+Esta mesma sprint também ajustou novamente `src/config/platform-modules.ts`
+(entrada `meu_negocio`, para citar a nova área "DNA & Estratégia") e
+`src/config/project-status.ts` (5 áreas novas + correção de 5 notas que
+diziam "somente na branch feat/product-engineering-preview-v1" quando o
+código já estava em `origin/main` desde antes desta integração).

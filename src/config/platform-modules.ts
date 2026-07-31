@@ -138,7 +138,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
   {
     id: "meu_negocio",
     name: "Meu Negócio",
-    description: "Centro de Comando para empresa direta/autônomo: Visão geral, Financeiro, CMV e Cardápio, Produtos e Fichas, Estoque e Compras, Relatórios, Fontes e Integrações, Configurações -- com período central/personalizado, Visão simples/Modo Gestor e classificação de dados por origem. Hoje 100% em memória (fixtures), sem Supabase.",
+    description: "Centro de Comando para empresa direta/autônomo: Visão geral, DNA & Estratégia, Financeiro, CMV e Cardápio, Produtos e Fichas, Estoque e Compras, Relatórios, Fontes e Integrações, Configurações -- com período central/personalizado, Visão simples/Modo Gestor e classificação de dados por origem. Sprint Meu Negócio 2.1.2 (2026-07-31) reconectou a camada estratégica (DNA, 8Ps LOKAT, SWOT/FOFA, concorrência, posicionamento, metas e sazonalidade) que existia em main mas estava desconectada da experiência real desde a migração para este Centro de Comando -- ver src/lib/business-strategy/ e docs/meu-negocio/business-dna-restoration.md. Hoje 100% em memória (fixtures), sem Supabase.",
     category: "management",
     routes: ["/admin/meu-negocio"],
     surfaces: [
