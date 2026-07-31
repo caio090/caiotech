@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, Database, FileBarChart, LayoutGrid, Package, Settings, Tags, UtensilsCrossed, Wallet } from "lucide-react";
+import { ArrowLeft, Database, FileBarChart, LayoutGrid, Package, Settings, Sparkles, Tags, UtensilsCrossed, Wallet } from "lucide-react";
 import type { BusinessModuleKey } from "@/lib/business-archetypes/types";
 import { getArchetypeConfig } from "@/lib/business-archetypes/types";
 import { TECHNICAL_SHEET_FIXTURES } from "@/lib/costing/fixtures";
@@ -25,11 +25,13 @@ import { RestaurantReports } from "./_restaurant-reports";
 import { RestaurantStock } from "./_restaurant-stock";
 import { RestaurantTechnicalSheets } from "./_restaurant-technical-sheets";
 import { SourcesTab } from "./_sources-tab";
+import { StrategyWorkspace, STRATEGY_SUBSECTIONS } from "./_strategy/_strategy-workspace";
 
-type DashboardSection = "overview" | "finance" | "cmv" | "products" | "inventory" | "reports" | "sources" | "settings";
+type DashboardSection = "overview" | "strategy" | "finance" | "cmv" | "products" | "inventory" | "reports" | "sources" | "settings";
 
 const SECTIONS: Array<{ id: DashboardSection; label: string; icon: React.ElementType }> = [
   { id: "overview", label: "Visão geral", icon: LayoutGrid },
+  { id: "strategy", label: "DNA & Estratégia", icon: Sparkles },
   { id: "finance", label: "Financeiro", icon: Wallet },
   { id: "cmv", label: "CMV e Cardápio", icon: UtensilsCrossed },
   { id: "products", label: "Produtos e Fichas", icon: Tags },
@@ -46,6 +48,7 @@ const COMPANY_OPERATIONAL_DAY_START = "04:00";
 
 const SUBSECTIONS: Record<DashboardSection, string[]> = {
   overview: [],
+  strategy: [...STRATEGY_SUBSECTIONS],
   finance: ["Resumo", "Faturamento", "Fluxo de caixa", "Planejado versus realizado", "Reserva", "Contas a pagar", "Contas a receber", "Projeções", "Dados e relatórios"],
   cmv: ["Resumo", "CMV teórico", "CMV real", "Evolução", "Diferença e investigação", "Engenharia de cardápio", "Mercado e concorrência", "Simulador de preço", "Cobertura"],
   products: ["Catálogo", "Fichas técnicas", "Custos", "Preços e margens", "Vínculos do cardápio", "Anexos", "Histórico"],
@@ -101,6 +104,7 @@ export function RestaurantWorkspace({ companyName, onBack }: { companyName: stri
 
       <MotionSection motionKey={`${activeSection}:${activeSubsection}:${viewMode}`}>
       {activeSection === "overview" && <CommandCenterDashboard companyName={companyName} managerMode={viewMode === "manager"} onNavigate={navigateFromLegacy} period={periodSelection} onRequestManagerMode={() => setViewMode("manager")} />}
+      {activeSection === "strategy" && <StrategyWorkspace companyName={companyName} segment={archetype.id} activeSubsection={activeSubsection} viewMode={viewMode} onViewModeChange={setViewMode} />}
       {activeSection === "finance" && <FinanceTab companyName={companyName} onNavigate={navigateFromLegacy} activeSubsection={activeSubsection} period={periodSelection} viewMode={viewMode} onViewModeChange={setViewMode} />}
       {activeSection === "cmv" && <CmvCenter companyName={companyName} viewMode={viewMode} onViewModeChange={setViewMode} />}
       {activeSection === "products" && activeSubsection === "Fichas técnicas" && <RestaurantTechnicalSheets sheets={sheets} />}

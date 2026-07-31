@@ -98,6 +98,20 @@ export interface SwotItem {
   confirmed: boolean;
   /** True for the segment example rows seeded on first load — never presented as fact. */
   isExample?: boolean;
+  /**
+   * Sprint Meu Negócio 2.1.2 — campos aditivos e opcionais (não quebram
+   * nenhum item existente sem eles) que ligam um item SWOT ao módulo,
+   * concorrente ou meta que o originou, e ao seu próprio ciclo de revisão.
+   * `status` é sobre o item em si; `confirmed` continua sendo a fonte da
+   * verdade sobre "isto é fato do negócio" — um item pode estar `reviewing`
+   * e ainda não `confirmed`.
+   */
+  status?: "draft" | "reviewing" | "confirmed" | "outdated" | "archived";
+  linkedModule?: string;
+  linkedCompetitorId?: string;
+  linkedGoalId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ── Metas de vendas (Fase 7) ─────────────────────────────────────────────────
