@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { buildBusinessInsightSnapshot, localDeterministicExplanation, validateInsightMetricReferences } from "@/lib/business-command-center/calculations";
 import { OpenAIBusinessInsightProvider } from "@/lib/business-command-center/ai";
+import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 
 export const dynamic = "force-dynamic";
 const buckets = new Map<string, { count: number; resetAt: number }>();
 const MAX_INPUT = 500; const WINDOW_MS = 60_000; const MAX_REQUESTS = 8; const TIMEOUT_MS = 15_000;
 
-export async function POST(request: NextRequest) {
+// Sprint Meu Negócio 2.1.2 (Fase 31): esta rota chama um provider de IA
+// externo (custo real por chamada quando configurado) — um side effect que
+// check:workspace-mutations não deve deixar passar como "read_only_operation"
+// só porque não grava no banco. Bloqueada durante o Workspace Preview antes
+// de gastar qualquer request/limite de rate/chamada ao provider.
+export const POST = withMutationProtection(async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ ok: false, error: "Sessão necessária." }, { status: 401 });
   let body: unknown; try { body = await request.json(); } catch { return NextResponse.json({ ok: false, error: "JSON inválido." }, { status: 400 }); }
@@ -21,4 +27,4 @@ export async function POST(request: NextRequest) {
   try { const snapshot = buildBusinessInsightSnapshot(question); const response = await new OpenAIBusinessInsightProvider(model, apiKey).analyze(snapshot, controller.signal); if (!validateInsightMetricReferences(response)) return NextResponse.json({ ok: false, error: "A análise referenciou um indicador inexistente e foi rejeitada com segurança.", fallback: localDeterministicExplanation() }, { status: 422 }); return NextResponse.json({ ok: true, response }); }
   catch (error) { const timedOut = error instanceof Error && error.name === "AbortError"; console.warn("[meu-negocio/ai] análise indisponível", { timedOut }); return NextResponse.json({ ok: false, error: timedOut ? "A análise excedeu o tempo limite." : "Assistente indisponível no momento.", fallback: localDeterministicExplanation() }, { status: timedOut ? 504 : 502 }); }
   finally { clearTimeout(timer); }
-}
+});

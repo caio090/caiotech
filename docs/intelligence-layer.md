@@ -24,3 +24,18 @@ Cada módulo declara quais ações permite (`src/lib/intelligence/capabilities.t
 ## Radar de Produto e IA futura
 
 `src/lib/product-research/analyzer.ts` define `ProductResearchAnalyzer` com implementação `deterministic_stub`: agrupamento e ranking por regras explícitas (contagem, correspondência literal), nunca geração de texto.
+
+## Nota — Sprint Meu Negócio 2.1.2 (rota de IA do Assistente do Meu Negócio protegida)
+
+`src/app/api/meu-negocio/ai/analyze/route.ts` (o "Pergunte à Lokat" real,
+que chama OpenAI quando configurado) não tinha `withMutationProtection`
+desde que foi criada — uma chamada externa com custo real por requisição
+não estava bloqueada durante o Workspace Preview. Corrigido nesta sprint:
+a rota agora usa o mesmo wrapper das demais rotas de IA
+(`ai/briefing`, `ai/legenda`, etc.) e foi classificada como `protected` em
+`scripts/check-workspace-mutation-coverage.ts` — ver
+`docs/workspace-mutation-inventory.md`. Também nesta sprint: o contrato de
+pesquisa automática de concorrentes (`CompetitorResearchProvider`, em
+`src/lib/business-strategy/types.ts`) segue exatamente o mesmo padrão
+"sem IA falsa" — `availability: "unavailable"` fixo, nenhuma chamada web
+ou de IA.

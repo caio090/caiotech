@@ -69,6 +69,7 @@ funcional no shell de demonstração hoje. Duas consequências práticas:
 | `api/ai/dashboard-search/route.ts` | POST | Global (header admin) | Idem |
 | `api/ai/diagnostico/route.ts` | POST | Meu Negócio | Idem |
 | `api/ai/legenda/route.ts` | POST | REC OS | Idem |
+| `api/meu-negocio/ai/analyze/route.ts` | POST | Meu Negócio | Chamada externa (OpenAI) do Assistente LOKAT — Sprint Meu Negócio 2.1.2 aplicou `withMutationProtection` (faltava desde a sprint que criou a rota); side effect e custo mesmo sem persistência, por isso "protected" e não "read_only_operation" |
 | `api/billing/checkout/route.ts` | POST | Financeiro (plataforma) | Side effect financeiro real (cria checkout session) |
 | `api/admin/users/delete-test-account/route.ts` | DELETE | Equipe | Linkado de `/admin/equipe` — alteração de autenticação (hard delete de usuário) |
 
