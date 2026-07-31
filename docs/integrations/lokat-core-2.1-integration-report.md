@@ -167,9 +167,145 @@ feature (10 inserções / 1 remoção desde `fa2fa01`), e `node_modules/jsdom`
 estava ausente no worktree de integração. `npm ci --no-audit --no-fund`
 concluído com sucesso: 478 pacotes, ~5 minutos, exit 0.
 
-## Pendências para as próximas seções deste relatório
+## Commit de merge
 
-As seções de qualidade (tsc/eslint/diff-check), build (webpack + fallback
-Turbopack), varredura final de padrões proibidos, servidor local na porta
-3100 e o commit de merge em si serão adicionadas/atualizadas nas próximas
-fases desta mesma sprint, antes do relatório final numerado.
+`eaa5d3f85d32418cce5728944bbf2951ea19b014` — `merge(core): integrate Lokat
+Core 2.1 over current main`. Dois pais: `c89c80fd` (`origin/main`) e
+`adba4413` (tip intocado de `feat/lokat-core-platform-map-v1`). A branch
+original da feature não recebeu nenhum commit novo — todo o trabalho de
+integração vive só em `integration/lokat-core-platform-map-v1`. Não foi
+aberto um commit `fix(core)` separado para o ajuste do `meu_negocio`
+porque ele já estava staged (via `git add`) antes do commit de merge ser
+criado — o diff isolado do ajuste foi auditado à parte (2 campos, exatos,
+sem nenhuma outra linha tocada) antes de decidir não separá-lo.
+
+## Qualidade (sobre o HEAD do merge)
+
+- `rm -rf .next` (cache obsoleto de builds/branches anteriores).
+- `NODE_OPTIONS="--max-old-space-size=1536 --max-semi-space-size=16" npx
+  tsc --noEmit --skipLibCheck` → **exit 0, log vazio** (0 erros).
+- ESLint sobre os 58 arquivos `.ts`/`.tsx` alterados pelo merge (`git diff
+  --name-only c89c80f eaa5d3f`) → **exit 0**, 0 erros/avisos.
+- `git diff --check c89c80f eaa5d3f` → **exit 0** (sem whitespace
+  conflitante).
+
+Memória livre no ambiente no momento da execução: ~3,35GB de ~12,45GB
+totais — mesma faixa restrita observada na sprint original. Não houve OOM
+em nenhum dos três comandos desta vez.
+
+## Build
+
+`NODE_OPTIONS="--max-old-space-size=1536 --max-semi-space-size=16" npx
+next build --webpack` → **exit 0**, sem necessidade do fallback Turbopack.
+Log completo em 255 linhas sem nenhuma ocorrência de `error`/`failed`.
+`/admin/ecossistema` presente na árvore de rotas como `ƒ` (dinâmica,
+renderizada sob demanda) — build de produção reconhece a rota nova sem
+erro. Diferente das tentativas da sprint original (OOM recorrente mesmo
+com o mesmo fix de `--max-semi-space-size`), desta vez o bundling e a
+checagem de tipos internos do Next completaram juntos, sem fragmentação
+de heap perceptível.
+
+## Varredura final de padrões proibidos
+
+Escopo: apenas as linhas efetivamente **adicionadas** pelo merge (`git
+diff c89c80f eaa5d3f`, linhas `+`), não o conteúdo inteiro de qualquer
+arquivo tocado — isso evita falso-positivo em documentação histórica
+pré-existente da main dentro de `project-status.ts` (que tem menções
+legítimas e antigas a Duh Lanches/O Pedreirão em notas de sprints
+anteriores, fora do escopo desta integração).
+
+- `<<<<<<<` / `=======` / `>>>>>>>`: **2 ocorrências**, ambas dentro do
+  texto deste próprio relatório (`docs/integrations/...md`), citando os
+  marcadores entre crases para narrar o bug de resolução — não são
+  marcadores reais. Zero marcadores de conflito reais confirmados também
+  por `git diff --check` e por busca direta nos arquivos staged antes do
+  commit.
+- `OPENAI_API_KEY` / `GEMINI_API_KEY` / `service_role` /
+  `NEXT_PUBLIC_OPENAI` (1 cada), `WebSocket`/`axios` (2 cada): todas dentro
+  de `src/app/admin/ecossistema/__tests__/integrity.structural.test.ts`,
+  como **padrões de detecção do próprio teste-guarda** (`secretPatterns`,
+  `externalCallPatterns`) que afirmam que ELES NÃO aparecem em nenhum
+  arquivo da sprint (`assert(offenders.length === 0, ...)`). Nenhum valor
+  de segredo real presente em nenhuma ocorrência.
+- `ANTHROPIC_API_KEY`, `WORKSPACE_PREVIEW_SECRET`, `META_APP_SECRET`,
+  `fetch(`, `localStorage`, `sessionStorage`, `Math.random`, `Date.now`,
+  `invoice`: **0 ocorrências** nas linhas adicionadas.
+- `Duh Lanches` (4) / `O Pedreirão` (3): exclusivamente em documentação e
+  asserções negativas confirmando que os pacotes de nicho e as fixtures da
+  Core 2.1 **não** referenciam esses clientes reais.
+- `NaN`/`Infinity` (117/7): quase todas em `financial-reconciliation` —
+  guardas explícitas garantindo que o resultado **nunca** é `NaN`/`Infinity`
+  (`percentageDifference` vira `null`), e nos comentários/testes que
+  documentam essa garantia.
+- `google`/`whatsapp`/`evolution`/`olaclick`/`aipede`/`fiscal` (17/25/9/3/3/32):
+  exclusivamente contratos (`src/lib/messaging/types.ts`,
+  `src/lib/fiscal/types.ts`, `global-calendar-v2/providers.ts`), docs de
+  roadmap e asserções negativas de teste confirmando ausência de chamada
+  real. `google_oauth` permanece `"blocked"`, `google_ical` permanece
+  `"planned"`, mensageria/fiscal permanecem `"not_configured"`/`"planned"`.
+- `operational_user` (24) / `validated` (3): `operational_user` aparece
+  apenas como membro de união de tipo (`ModuleSurface`) e em docs —
+  nunca vira `WorkspaceSurface`, role ou tipo aceito por API.
+  `validated` aparece só como parte do literal `"validated_problem"` (um
+  estágio do pipeline de pesquisa de produto) — zero ocorrências de
+  `readiness: "validated"` confirmado por grep direto.
+
+Nenhuma ocorrência exigiu correção.
+
+## Servidor local (porta 3100) e smoke test
+
+`npm run dev -- --hostname 127.0.0.1 --port 3100`, log em
+`.tmp/core-2.1-integration-dev.log` (não commitado). Pronto em 8,3s.
+
+| Rota | HTTP | Destino |
+|---|---|---|
+| `/` | 200 | — |
+| `/admin/dashboard` | 307 | `/login` |
+| `/admin/ecossistema` | 307 | `/login` |
+| `/admin/meu-negocio` | 307 | `/login` |
+| `/admin/contentos` | 307 | `/login` |
+| `/admin/relatorios` | 307 | `/login` |
+| `/admin/calendario` | 307 | `/login` |
+| `/admin/visualizar` | 307 | `/login` |
+
+Nenhum HTTP 500. `/admin/ecossistema` corretamente exige sessão (redirect
+server-side, não é um gate só de client component).
+
+Re-executados os 3 testes `*.e2e.test.ts` que haviam se auto-reportado
+"no server reachable" contra este servidor (`BASE_URL=http://127.0.0.1:3100`):
+
+- `mutation-guard-routes.e2e.test.ts` — **32 passed, 0 failed**.
+- `proxy-guard.e2e.test.ts` — **10 passed, 0 failed**.
+- `atomic-exit-endpoint.e2e.test.ts` — **4 passed, 4 failed**.
+
+As 4 falhas de `atomic-exit-endpoint.e2e.test.ts` foram investigadas e são
+**pré-existentes na main, não introduzidas por esta integração**:
+`src/app/api/admin/workspaces/preview/exit/route.ts` e o próprio arquivo
+de teste estão **byte-idênticos** antes/depois do merge (`git diff c89c80f
+eaa5d3f` vazio para ambos). Causa raiz: o teste assume que uma chamada sem
+sessão chega até a lógica própria da rota (que de fato devolve 303 +
+`Cache-Control: no-store`, confirmado lendo `buildSafeRedirect`/
+`buildAtomicExitRedirect` em `src/lib/workspaces/atomic-exit.ts`) — mas o
+matcher do `proxy.ts` (`/((?!_next/static|_next/image|favicon...).*)`,
+linha 176) intercepta **toda** rota não-pública antes disso e usa
+`NextResponse.redirect(...)`, que é 307 por padrão, sem `Cache-Control`.
+Essa interceptação mais ampla no proxy é posterior ao teste (que ainda
+assume o contrato antigo 303/405/no-store direto da rota) e não tem
+nenhuma relação com Core 2.1 — nenhum arquivo de `workspaces/` foi tocado
+pela feature. Registrado para visibilidade; não corrigido nesta sprint
+(fora de escopo — igual ao achado de `check:workspace-mutations`).
+
+Servidor de integração encerrado logo após os testes (não deixado
+rodando em background).
+
+## Pendências / achados fora do escopo desta integração
+
+Ambos herdados de `origin/main`, confirmados por diff vazio entre
+`origin/main` e o HEAD do merge nos arquivos envolvidos — nenhum dos dois
+é uma regressão desta sprint nem foi corrigido aqui:
+
+1. `src/app/api/meu-negocio/ai/analyze/route.ts` (POST) sem classificação
+   no ALLOWLIST de `check:workspace-mutations` (commit `a00819e`,
+   2026-07-28).
+2. `atomic-exit-endpoint.e2e.test.ts` desatualizado em relação ao gate
+   mais amplo do `proxy.ts` atual (4 de 8 asserções).
