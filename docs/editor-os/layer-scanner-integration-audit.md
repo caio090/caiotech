@@ -72,3 +72,15 @@ Não integrar nesta sprint nem nas próximas até:
 Estado final desta auditoria: **`experimental`** — nem `blocked` (não há
 impedimento técnico absoluto conhecido) nem `compatible` (não revalidado)
 nem `ready_for_controlled_merge` (falta o trabalho acima).
+
+## Nota — Sprint REC OS 3.0.1.1
+
+Nenhuma reauditoria de compatibilidade foi feita nesta sprint (branch e
+estado inalterados desde a Sprint REC OS 3.0.1). O único ajuste foi de
+transparência de UI: `EditorOSWorkspace.tsx` passou a exibir uma nota
+visível (`data-testid="layer-scanner-status-note"`, desktop apenas)
+explicando que "o scanner de camadas está em avaliação e ainda não faz
+parte do fluxo oficial" — antes disso, nada na interface do EditorOS
+mencionava o scanner (nem para dizer que ele não existe ainda). Nenhum
+código da branch `feat/editor-os-layer-scanner-v1` foi importado; nenhum
+Tesseract executado.

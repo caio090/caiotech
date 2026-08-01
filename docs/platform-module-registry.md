@@ -73,3 +73,10 @@ reais ainda diziam "Dados & Insights"/"Dados e Insights"
 `src/app/admin/relatorios/conteudo/page.tsx`), corrigidas nesta sprint.
 "Resultados" do REC OS (desempenho de conteúdo/campanha) não foi
 renomeado — é um conceito diferente.
+
+## Nota — Sprint REC OS 3.0.1.1
+
+Nenhuma mudança de nomenclatura adicional. Roadmap de Produção e Mapa do
+Cliente (módulos REC OS já registrados na 3.0.1) avançaram de `planned`
+para `qa_pending` — ver `src/config/project-status.ts` e
+`docs/rec-os/known-gaps-closure-3.0.1.1.md`.

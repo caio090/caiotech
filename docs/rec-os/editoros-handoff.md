@@ -1,4 +1,35 @@
-# Handoff para o EditorOS — Sprint REC OS 3.0.1
+# Handoff para o EditorOS — Sprint REC OS 3.0.1 → 3.0.1.1
+
+## Atualização da Sprint REC OS 3.0.1.1 — adaptador central implementado
+
+`src/lib/rec-os-workflow/editor-handoff.ts` adiciona
+`buildEditorAssetHandoff()` / `validateEditorAssetHandoff()` /
+`serializeEditorAssetHandoff()` / `parseEditorAssetHandoff()`, e
+`handleOpenEditor()` (`_guided-create-flow.tsx`) passou a usá-los de
+verdade, em vez de concatenar a URL manualmente.
+
+**Mecanismo escolhido** (dos quatro aceitos pelo brief): **parâmetros
+mínimos validados**. `serializeEditorAssetHandoff()` só coloca na URL
+`client`, `content_id`, `campaign_id` (quando presente), `format`,
+`has_asset` (derivado de `isEditorAssetHandoffReady()`), `handoff_at`
+(carimbo ISO) e `return_to` — **nunca** `copy`, `restrictions` ou o
+objeto inteiro. Nenhum `localStorage`/`sessionStorage`/banco novo foi
+criado para o handoff em si (o mecanismo pré-existente de
+`sessionStorage` para a imagem local, de uma sprint anterior, foi
+mantido intacto e é independente deste adaptador).
+
+**Expiração** (Fase 16): computada só pelo carimbo `handoff_at` — mais de
+2h e o `EditorOSPage` marca `handoffExpired`; `EditorOSWorkspace` mostra
+um aviso ("Este link de edição expirou...") com link de retorno seguro,
+sem quebrar a página nem exigir nenhum armazenamento adicional.
+
+**"Não abrir canvas vazio"**: interpretado nesta sprint como preservar a
+capacidade real e já existente do EditorOS de iniciar um design do zero
+(ele não é só um visualizador de imagem existente) — quando não há
+`hasAsset`, o workspace mostra uma nota discreta ("Nenhum ativo importado
+ainda — este editor abrirá para criação"), nunca bloqueia a abertura.
+Bloquear a criação do zero seria uma regressão de produto não pedida
+pelo texto do restante do brief.
 
 ## O que já funcionava antes desta sprint (confirmado por leitura)
 

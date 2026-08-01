@@ -85,3 +85,18 @@ nunca exportava `viewport` — confirmado ao vivo via `curl`, agora corrigido
 Rotina do Negócio ficam `planned`/`blocked` — ver `docs/diagnostic/`,
 `docs/research/osp-definition-audit.md` (nenhuma definição de OSP
 encontrada em todo o histórico local) e `docs/meu-negocio/business-rhythm-workspace.md`.
+
+## Nota — Sprint REC OS 3.0.1.1 (fechamento funcional)
+
+Roadmap de Produção (`/admin/contentos/roadmap`) e Mapa do Cliente
+(`/admin/contentos/mapa-cliente`) deixaram de ser apenas registry e
+viraram telas reais e navegáveis. Radar ganhou uma ação real ("Criar a
+partir desta oportunidade") que preserva contexto até o workspace Criar.
+Calendário contextual conectado de verdade (subnav/Roadmap/Mapa do
+Cliente → `/admin/calendario`, com banner de origem e retorno). Handoff
+do EditorOS passou a usar o adaptador estruturado
+(`build/validate/serialize/parse`) em vez de concatenação de URL. Bottom
+navigation: defeito real corrigido (3 rotas sugeridas na 3.0.1 não
+existiam em `configs.admin.nav`, silenciosamente descartadas). Ação
+rápida e busca do header deixaram de ser decorativas. Detalhes completos
+em `docs/rec-os/known-gaps-closure-3.0.1.1.md`.

@@ -34,3 +34,17 @@ Calendário — nunca abre um calendário genérico sem contexto. Google OAuth
 continua `blocked`, Google iCal continua `planned` — testado
 explicitamente que nenhuma referência a `google` aparece na URL
 construída por essa função.
+
+## Nota — Sprint REC OS 3.0.1.1 (conexão real)
+
+O contrato acima foi conectado de verdade nesta sprint: o subnav do REC
+OS, o Roadmap de Produção e o Mapa do Cliente agora usam
+`buildCalendarNavigationUrl()` para o link de "Calendário" (em vez de só
+`?client=`). `/admin/calendario/page.tsx` passou a: (1) aceitar `month`
+combinado no formato `YYYY-MM` (traduzido internamente para o par
+`year`/`month` que `resolveRequestedMonth()` já esperava — nenhuma
+mudança no contrato dessa função), e (2) ler `return_to` (sanitizado
+contra qualquer coisa fora de `/admin/`) para mostrar um banner "Aberto a
+partir do REC OS" com um link real de voltar
+(`_client-content.tsx`, `data-testid="calendar-context-banner"`).
+Nenhuma chamada ao Google em nenhum ponto desta conexão.

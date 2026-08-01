@@ -36,14 +36,21 @@ A navegação continua livre — os botões de step permitem pular para
 qualquer etapa a qualquer momento; a reordenação muda a numeração e o
 fluxo padrão de "Avançar", não impõe um wizard bloqueante.
 
-## Compromisso registrado (honestidade sobre o que NÃO mudou)
+## Atualização da Sprint REC OS 3.0.1.1 — envio movido para depois do Visual Final
 
-A ação real de envio (Calendário/Produção/Aprovação) continua acontecendo
-no passo "Destino & Especificações", que agora vem **antes** de "Visual
-Final" na ordem de exibição — decoupar "definir destino" de "executar
-envio" exigiria redesenhar as rotas `send-to-production`/
-`send-to-approval` já consumidas por `producao/page.tsx` e
-`aprovacoes/page.tsx`, fora do escopo seguro desta sprint. Como a
-navegação é livre (não um wizard bloqueante), nada impede voltar ao
-Visual Final depois de definir o destino antes do envio real acontecer
-alhures.
+O compromisso acima foi resolvido nesta sprint. "Destino &
+Especificações" agora só **escolhe** o destino (`destinationChoice` —
+Calendário/Produção/Aprovação), sem chamar nenhuma API. O envio real
+(`handleEnviar()`, que despacha para as mesmas funções já existentes
+`handleDestCalendario`/`handleDestProducao`/`handleDestAprovacao` — as
+rotas `send-to-production`/`send-to-approval` não foram tocadas) só fica
+disponível no rodapé do Visual Final, e só quando:
+
+1. um destino já foi escolhido; e
+2. `contentRequiresFinalAsset(brief.format)` é falso (formatos
+   somente-texto/mensagem/e-mail) OU já existe um ativo visual
+   (`hasVisualAsset`).
+
+Sem essas duas condições, o rodapé mostra a mensagem explicando o que
+falta — nunca um botão de envio que finge estar pronto. Fluxo final:
+Revisão interna → Destino e especificações → Visual Final → Enviar.

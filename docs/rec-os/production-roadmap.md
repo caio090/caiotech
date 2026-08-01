@@ -1,39 +1,52 @@
-# Roadmap de Produção — Sprint REC OS 3.0.1
+# Roadmap de Produção — Sprint REC OS 3.0.1 → 3.0.1.1
 
-**Estado: `planned`.** Nenhuma tela nova implementada nesta sprint —
-registrado como próxima etapa, priorizado abaixo dos fixes mobile P0
-(que tinham evidência real de defeito em produção via prints do usuário).
+**Estado: `qa_pending`.** A Sprint REC OS 3.0.1 registrou o contrato e
+adiou a tela; a Sprint REC OS 3.0.1.1 implementou a experiência navegável
+real em `/admin/contentos/roadmap`.
 
-## O que já existe hoje (reaproveitável)
+## Fonte única
 
-`src/lib/rec-os-hub.ts` já calcula, sobre `content_items` reais:
-`bucketContentStatus()` (agrupamento por status), contagens por cliente
-(`buildClientAttentionRows`), motivo de atenção (`AttentionReason`).
-Uma futura tela de Roadmap deve consumir essas mesmas funções — nunca
-recalcular o agrupamento de status uma segunda vez.
+`RecOsRoadmapItem` (`src/lib/rec-os-roadmap.ts`) — lida a partir de
+`content_items` (título, tipo, canal, status, scheduled_date,
+responsible_id) com left-join em `operational_tasks` (responsável/prazo
+operacional) e `approvals` (estado de aprovação mais recente), via
+`getRoadmapItems()` (`src/lib/rec-os-roadmap-data.ts`, único ponto que
+importa Supabase — o restante do módulo é puro e testável sem banco).
 
-## Contrato já registrado
+Campos que **não** existem como coluna real hoje (nunca inventados):
+`campaignId` e `priority` ficam sempre `null`. Não há entidade de
+campanha nem coluna de prioridade em `content_items`/`operational_tasks`.
 
-`RecOsWorkflowDefinition`/`REC_OS_WORKFLOW_STAGES`
-(`src/lib/rec-os-workflow/types.ts`) já modela as 4 macroetapas que as
-colunas do Quadro devem espelhar (Radar/Criar/Produzir/Finalizar +
-Agendar/Publicado como estados finais) — a implementação futura do Quadro
-deve usar esse mesmo registry para as colunas, não uma lista redigitada.
+## Quatro visualizações, uma fonte
 
-## Visualizações planejadas
+`_roadmap-client.tsx` mantém um único `useState<RoadmapFilters>` e um
+único array `filtered` (via `filterRoadmapItems()`); Quadro, Lista, Linha
+do tempo e Calendário recebem exatamente esse array — nenhuma fixture
+própria, filtros preservados ao trocar de visão.
 
-Quadro, Lista, Linha do tempo, Calendário — mesma fonte
-(`bucketContentStatus` + `content_items` reais), mesmos IDs de conteúdo em
-todas. Filtros planejados: cliente, mês, campanha, setor, responsável,
-status — os dois primeiros (cliente, status) já têm equivalente parcial em
-`rec-os-hub.ts`; mês/campanha/setor/responsável exigem colunas que
-`content_items` não expõe hoje sem uma auditoria de schema adicional.
+- **Quadro** (`groupRoadmapItemsByKanbanColumn`): 8 colunas
+  (Radar/Criar/Produzir/Revisar/Aprovar/Visual Final/Agendar/Publicado) —
+  **agrupamentos visuais** sobre os status canônicos existentes, nunca um
+  status novo. Cards não são arrastáveis (sem mutação segura definida
+  nesta sprint) — mudança de etapa continua pelas ações reais já
+  existentes em Produção/Aprovações/Destino.
+- **Lista**: busca por título/cliente, tabela no desktop
+  (`hidden md:block`), cards no mobile (`md:hidden`) — nunca força tabela
+  horizontal.
+- **Linha do tempo** (`bucketRoadmapItemsForTimeline`): dia/semana/mês,
+  bucket explícito "Sem data definida" para itens sem prazo.
+- **Calendário** (`roadmapItemsForMonth`): grade do mês selecionado +
+  "Abrir no Calendário Global" via `buildCalendarNavigationUrl()` real.
 
-## Próximos passos
+## Filtros
 
-1. Confirmar quais campos de filtro (mês, campanha, setor, responsável)
-   já existem na tabela real `content_items`/`operational_tasks` antes de
-   desenhar a UI.
-2. Implementar a visão Quadro primeiro (reaproveitando
-   `bucketContentStatus`), validar com dado real, só depois desenhar
-   Lista/Linha do tempo/Calendário sobre a mesma fonte.
+Status, formato, canal, responsável, estado de aprovação, mês e "somente
+atrasados" — todos com dado real. Campanha/setor/prioridade aparecem na
+sheet de filtros como "ainda não disponível", explicitamente, em vez de
+um filtro que nunca teria efeito.
+
+## Limitação honesta
+
+Nenhuma mutação (o Roadmap é 100% leitura). Drag-and-drop entre colunas
+do Quadro foi deliberadamente não implementado — exigiria uma rota de
+mutação de status nova, fora do escopo desta sprint de fechamento.

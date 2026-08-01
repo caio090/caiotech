@@ -1,28 +1,41 @@
-# Mapa do Cliente — Sprint REC OS 3.0.1
+# Mapa do Cliente — Sprint REC OS 3.0.1 → 3.0.1.1
 
-**Estado: `planned`.** Nenhuma tela nova implementada nesta sprint — mesma
-priorização de `production-roadmap.md` (fixes mobile P0 primeiro, por
-terem evidência real de defeito).
+**Estado: `qa_pending`.** Implementado em `/admin/contentos/mapa-cliente`
+(`src/app/admin/contentos/mapa-cliente/page.tsx`) na Sprint REC OS
+3.0.1.1.
 
-## Isolamento já garantido pela arquitetura existente
+## O que a tela mostra
 
-Quando implementado, o Mapa do Cliente deve reaproveitar exatamente o
-isolamento já existente e testado em `docs/workspace-visibility-matrix.md`:
-Agência alterna só entre seus próprios clientes; Cliente da Agência vê só
-o próprio workspace; Empresa Direta vê só o próprio negócio; Super Admin
-só via preview somente leitura (`resolveWorkspacePreview`). Nenhuma
-autorização nova precisa ser criada — a página é uma nova SUPERFÍCIE de
-apresentação sobre dados já isolados corretamente.
+Agrega, para um cliente, contagens reais de conteúdos (reaproveita
+`getRoadmapItems()`, a mesma fonte do Roadmap — nenhuma segunda consulta
+duplicada), aprovações pendentes e tarefas abertas (`approvals`/
+`operational_tasks`), próximos prazos, bloqueios (com motivo, derivado do
+status canônico) e responsáveis envolvidos. Cada card linca para o módulo
+real (Produção, Aprovações, Calendário) — nenhum dado é duplicado na
+tela, só resumido e linkado.
 
-## Dados a agregar (fontes reais já existentes)
+## Isolamento — o que foi realmente feito
 
-Campanhas e conteúdos (`content_items`), aprovações (`approvals`),
-calendário (`GlobalCalendarEvent`, `src/lib/global-calendar.ts`),
-responsáveis e bloqueios (`operational_tasks`). Nenhuma tabela nova.
+A página reaproveita **exatamente** os mesmos primitivos já auditados e
+usados por Produção/Aprovações: `requireAdminContentOSContext()` (gate de
+staff admin/super_admin) + `resolveClientContext()` (valida o `clientId`
+da URL contra `clients` reais — um id inválido/adulterado vira o mesmo
+estado de erro já usado no resto do REC OS, nunca um crash). Nenhuma
+segunda camada de autorização foi inventada.
 
-## Próximos passos
+Para o preview do Super Admin (`getWorkspacePreviewContext()`): quando o
+preview é de um workspace `agency_client`/`direct_business`, o
+`workspaceId` do preview **sempre vence** sobre qualquer `?client=`
+diferente na URL — e a página mostra um badge "Modo de visualização —
+somente leitura" (trivialmente verdadeiro, já que a página não tem
+nenhuma mutação, para nenhum visitante).
 
-Implementar como uma visão de leitura agregada por `client_id`, sempre
-atrás do mesmo filtro de workspace já usado em
-`src/app/api/admin/workspaces/route.ts` — nunca uma consulta direta sem
-esse filtro.
+## Limitação honesta
+
+Isolamento diferenciado por **login real** de agência/cliente-da-
+agência/empresa-direta (fora do preview do Super Admin) ainda não existe
+na plataforma como um todo — é a mesma lacuna já registrada para a bottom
+navigation na Sprint REC OS 3.0.1
+(`docs/mobile/mobile-app-shell.md`). `/admin/contentos/*` continua sendo
+uma área de staff (admin/agência), com o mesmo controle de acesso que já
+protege Produção/Aprovações/Roadmap — não um controle novo e mais fraco.

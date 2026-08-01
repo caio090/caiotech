@@ -149,3 +149,14 @@ existiam. Esta sprint implementou essas peças; a causa raiz mais provável
 de boa parte dos defeitos mobile reportados (viewport meta ausente) foi
 encontrada e corrigida. A QA Local 3.0.2 (Playwright) deve ser reaberta
 depois desta sprint.
+
+## Atualização — Sprint REC OS 3.0.1.1
+
+Sprint de fechamento funcional executada logo após a 3.0.1: fechou as
+lacunas que o próprio relatório da 3.0.1 havia declarado abertas (Radar
+sem ação real, Roadmap/Mapa do Cliente só registry, Calendário contextual
+não conectado, EditorOS com handoff não estruturado, bottom navigation
+com defeito real de rotas ausentes, ação rápida/busca decorativas). Ver
+`docs/rec-os/known-gaps-closure-3.0.1.1.md` para o detalhamento completo
+lacuna-por-lacuna. A QA Local 3.0.2 (Playwright) pode ser reaberta após
+esta sprint.

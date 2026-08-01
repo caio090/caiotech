@@ -82,3 +82,34 @@ verificadas por leitura de código, pela confirmação ao vivo da tag
 viewport via `curl`, e por `tsc`/build limpos — não por captura de tela
 real. QA visual fica para a próxima sprint dedicada de QA local
 (Playwright), quando a Sprint REC OS 3.0.1 estiver com commits confirmados.
+
+## Nota — Sprint REC OS 3.0.1.1 (defeito real corrigido + ação rápida/busca)
+
+A auditoria desta sprint encontrou que `SURFACE_BOTTOM_NAV_PRIMARY`
+(criado na Sprint REC OS 3.0.1) apontava para três rotas que **não
+existiam** em `configs.admin.nav` (`src/components/app-sidebar.tsx`):
+`/admin/ecossistema`, `/admin/leads` e `/admin/contentos/aprovacoes`. O
+filtro em `mobile-nav.tsx` (que só mostra rotas já autorizadas) as
+descartava silenciosamente — na prática, Super ADM tinha só 2 abas fixas
+no rodapé em vez de 4, e Cliente da Agência só 3 em vez de 4. Corrigido
+registrando as 3 rotas no config real da sidebar (a mesma fonte usada
+pelo desktop) — nenhuma segunda lista de rotas foi criada.
+`SURFACE_BOTTOM_NAV_ITEMS` (nova fonte tipada — id/label/route/
+requiredCapability/activeMatch/priority) substituiu as duas listas
+paralelas anteriores; `SURFACE_BOTTOM_NAV_PRIMARY`/`_LABEL` continuam
+exportados, derivados dela, para compatibilidade.
+
+"Ação rápida" (`src/components/quick-action-menu.tsx`) deixou de ser um
+`<button>` sem `onClick` — agora é um menu real, contextual por
+superfície (mesmo par de casos conhecidos com segurança: preview do
+Super Admin / sessão real de super_admin). Itens sem rota real (registrar
+lead manualmente, adicionar tarefa manualmente, registrar oportunidade de
+produto) ficam desabilitados com badge "Em breve" — nunca disparam uma
+ação inexistente.
+
+A busca do header (`<input placeholder="Buscar..." />`) nunca teve
+`value`/`onChange` — era decorativa em qualquer viewport, não só mobile.
+Substituída por `src/components/admin-search-sheet.tsx`: botão real que
+abre uma sheet com busca funcional, escopo honesto (só módulos/rotas já
+visíveis via `configs.admin.nav` — clientes/conteúdos ainda não são
+pesquisáveis).
