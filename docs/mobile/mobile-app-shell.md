@@ -113,3 +113,12 @@ Substituída por `src/components/admin-search-sheet.tsx`: botão real que
 abre uma sheet com busca funcional, escopo honesto (só módulos/rotas já
 visíveis via `configs.admin.nav` — clientes/conteúdos ainda não são
 pesquisáveis).
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+Ecossistema saiu dos 4 slots fixos do rodapé mobile do Super Admin
+(entrada operacional principal indevida, relatada pelo usuário) --
+substituído por Meu Escritório. Nenhuma outra superfície teve seus itens
+primários deslocados (Agência/Empresa Direta já tinham os 4 slots
+ocupados por itens validados). Ver
+docs/platform/ecosystem-status-reinterpretation.md.

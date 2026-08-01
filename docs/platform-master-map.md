@@ -100,3 +100,16 @@ navigation: defeito real corrigido (3 rotas sugeridas na 3.0.1 não
 existiam em `configs.admin.nav`, silenciosamente descartadas). Ação
 rápida e busca do header deixaram de ser decorativas. Detalhes completos
 em `docs/rec-os/known-gaps-closure-3.0.1.1.md`.
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+Corrigido defeito real de navegação autenticada em Calendário Global e
+REC OS (redirect indevido para /login em falha de config/permissão — ver
+docs/navigation/authenticated-internal-navigation.md). Ecossistema
+reinterpretado: mapa técnico movido para /admin/status/arquitetura,
+Ecossistema como slot operacional principal substituído por Meu
+Escritório (nova experiência /admin/escritorio). CRM: /admin/crm criado
+como alias de /admin/leads, mensagem de service role removida da UI. Ver
+docs/platform/ecosystem-status-reinterpretation.md,
+docs/meu-escritorio/business-office-workspace.md,
+docs/crm/canonical-crm-route.md.

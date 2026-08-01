@@ -48,3 +48,12 @@ contra qualquer coisa fora de `/admin/`) para mostrar um banner "Aberto a
 partir do REC OS" com um link real de voltar
 (`_client-content.tsx`, `data-testid="calendar-context-banner"`).
 Nenhuma chamada ao Google em nenhum ponto desta conexão.
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+Corrigido o defeito real que enviava admin autenticado para /login ao
+abrir o Calendário Global sempre que requireAdminContentOSContext()
+falhava por config/permissão (503/403), não por sessão. Ver
+docs/navigation/authenticated-internal-navigation.md. Meu Escritório
+(nova sprint) reaproveita os mesmos normalizadores deste módulo -- nenhum
+segundo cálculo de eventos.

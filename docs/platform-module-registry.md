@@ -80,3 +80,13 @@ Nenhuma mudança de nomenclatura adicional. Roadmap de Produção e Mapa do
 Cliente (módulos REC OS já registrados na 3.0.1) avançaram de `planned`
 para `qa_pending` — ver `src/config/project-status.ts` e
 `docs/rec-os/known-gaps-closure-3.0.1.1.md`.
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+"Ecossistema" deixa de ser um módulo operacional independente na
+navegação principal -- passa a ser um alias/conceito técnico, subordinado
+a Status ("Arquitetura da Plataforma"). "Meu Escritório" registrado como
+subexperiência operacional por workspace. "CRM" permanece um módulo
+canônico único (/admin/leads, com /admin/crm como alias) -- adaptação
+completa por superfície continua fora do escopo (crm_workspace_context:
+planned).

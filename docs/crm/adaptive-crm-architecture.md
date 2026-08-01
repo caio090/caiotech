@@ -71,3 +71,14 @@ inteiramente `planned`, sem nenhuma implementação nova.
    `workspace-capabilities.ts` — nunca uma segunda autorização paralela.
 3. Prototipar um nicho por vez (Alimentação primeiro, mesmo arquétipo já
    real no Centro de Comando) antes de generalizar para os demais.
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+CRM adaptativo completo continua fora do escopo (nenhum motor de
+temperatura, nenhuma automação de follow-up criados nesta sprint). O que
+foi corrigido: rota canônica única (/admin/leads + alias /admin/crm),
+remoção de entrada duplicada na navegação, e o vazamento de
+SUPABASE_SERVICE_ROLE_KEY na UI (ver docs/crm/crm-safe-data-access.md).
+resolveCrmWorkspaceContext() documenta o estado real de segmentação
+(platform-wide hoje) para orientar a evolução adaptativa futura sem
+fingir que ela já existe.

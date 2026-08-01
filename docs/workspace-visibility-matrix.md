@@ -99,3 +99,12 @@ sessões reais de agency/agency_client/direct_business fora de preview, a
 superfície ainda não é resolvida por `_layout-client.tsx` (cai no
 comportamento anterior, sem regressão). Ver
 `docs/mobile/mobile-app-shell.md`.
+
+## Nota — Sprint Navegação e Experiência 3.0.1.2
+
+Meu Escritório (/admin/escritorio) reaproveita o mesmo isolamento já
+documentado aqui (staff admin/super_admin via requireAdminContentOSContext()) --
+nenhuma matriz de visibilidade nova. resolveCrmWorkspaceContext()
+(src/lib/crm/workspace-context.ts) registra honestamente que o CRM
+(waitlist_entries) ainda não tem segmentação por workspace/agência/cliente --
+ver docs/crm/crm-workspace-context.md.

@@ -160,3 +160,13 @@ com defeito real de rotas ausentes, ação rápida/busca decorativas). Ver
 `docs/rec-os/known-gaps-closure-3.0.1.1.md` para o detalhamento completo
 lacuna-por-lacuna. A QA Local 3.0.2 (Playwright) pode ser reaberta após
 esta sprint.
+
+## Atualização — Sprint Navegação e Experiência 3.0.1.2
+
+Corrigido defeito real de sessão em Calendário Global e REC OS
+(redirect indevido para /login), reinterpretado Ecossistema/Status,
+implementado Meu Escritório, e consolidada a navegação do CRM (rota
+canônica + remoção de vazamento de service role na UI). Ver
+docs/rec-os/known-gaps-closure-3.0.1.1.md para a sprint anterior e os
+novos docs em docs/navigation/, docs/meu-escritorio/ e docs/crm/ para
+esta.
