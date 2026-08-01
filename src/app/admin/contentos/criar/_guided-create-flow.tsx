@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { CopyIdButton } from "@/components/copy-id-button";
 
-type StepId = "brief" | "content" | "visual" | "review" | "destination";
+type StepId = "brief" | "content" | "review" | "destination" | "visual";
 type BriefMode = "manual" | "ai";
 type SaveState = "idle" | "saving" | "saved" | "error";
 type DestinationResult = { type: "calendar" | "production" | "approval"; id?: string; contentId?: string; existed?: boolean } | null;
@@ -39,12 +39,19 @@ interface GuidedCreateFlowProps {
   initialContentId?: string | null;
 }
 
+// Sprint REC OS 3.0.1 (Fase 6/12): Visual Final agora é o último bloco
+// criativo exibido, depois de Revisão & Aprovação e Destino &
+// Especificações — antes ficava em 3º de 5, sugerindo que a revisão e o
+// destino aconteciam sobre um visual ainda não definido. A navegação
+// continua livre (os botões de step abaixo permitem pular para qualquer
+// etapa a qualquer momento) — esta ordem define apenas a numeração e o
+// fluxo padrão de "Avançar".
 const steps: Array<{ id: StepId; label: string; desc: string }> = [
-  { id: "brief",       label: "Brief",        desc: "Contexto e objetivo" },
-  { id: "content",     label: "Conteúdo",     desc: "Texto e estrutura" },
-  { id: "visual",      label: "Visual Final", desc: "Imagem, arte ou EditorOS" },
-  { id: "review",      label: "Revisão",      desc: "Checklist antes de aprovar" },
-  { id: "destination", label: "Destino",      desc: "Calendário, produção ou aprovação" },
+  { id: "brief",       label: "Ideia & Briefing",          desc: "Contexto, objetivo e conceito criativo" },
+  { id: "content",     label: "Aplicação & Formato",       desc: "Texto, formato e roteiro quando aplicável" },
+  { id: "review",      label: "Revisão & Aprovação",       desc: "Checklist interno e envio para aprovação" },
+  { id: "destination", label: "Destino & Especificações",  desc: "Calendário, produção ou aprovação" },
+  { id: "visual",      label: "Visual Final",              desc: "Imagem, arte ou EditorOS — último passo criativo" },
 ];
 
 const validSteps = new Set<StepId>(steps.map((s) => s.id));
@@ -52,6 +59,26 @@ const validSteps = new Set<StepId>(steps.map((s) => s.id));
 function normalizeStep(value?: string | null): StepId {
   if (value && validSteps.has(value as StepId)) return value as StepId;
   return "brief";
+}
+
+/**
+ * Fase 10 (roteiro condicional): `brief.format` é texto livre (Post,
+ * Reel, vídeo institucional...), não o enum estrito de
+ * `contentFormatRequiresScript()` — normaliza e verifica por palavra-chave
+ * em vez de igualdade exata, para não exigir que a pessoa digite o valor
+ * canônico certinho.
+ */
+const DIACRITICS_PATTERN = new RegExp("[̀-ͯ]", "g");
+function normalizeFormatText(value: string): string {
+  return value.normalize("NFD").replace(DIACRITICS_PATTERN, "").toLowerCase();
+}
+const SCRIPT_KEYWORDS = ["video", "reel", "anuncio", "apresentacao", "locucao"];
+function freeTextFormatRequiresScript(value: string): boolean {
+  const normalized = normalizeFormatText(value);
+  return SCRIPT_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+function freeTextFormatUsesPageStructure(value: string): boolean {
+  return normalizeFormatText(value).includes("carrossel");
 }
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -476,7 +503,7 @@ export function GuidedCreateFlow({
               {contentId ? "Editar conteúdo" : "Novo conteúdo guiado"}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              Fluxo único para brief, texto, visual, revisão e destino.
+              Fluxo único: Ideia &amp; Briefing → Aplicação &amp; Formato → Revisão &amp; Aprovação → Destino &amp; Especificações → Visual Final.
             </p>
           </div>
           <div className="flex flex-col gap-2 items-end">
@@ -519,8 +546,8 @@ export function GuidedCreateFlow({
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-black text-gray-900">1. Brief</h2>
-              <p className="text-sm text-gray-500">Defina o que deve ser criado antes de abrir texto ou visual.</p>
+              <h2 className="text-lg font-black text-gray-900">1. Ideia &amp; Briefing</h2>
+              <p className="text-sm text-gray-500">O que comunicar, por que agora, para quem — e o conceito criativo que vem disso.</p>
             </div>
             <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
               <button type="button" onClick={() => setBriefMode("manual")}
@@ -584,8 +611,8 @@ export function GuidedCreateFlow({
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-black text-gray-900">2. Conteúdo</h2>
-              <p className="text-sm text-gray-500">Escreva a estrutura que será revisada e enviada para visual.</p>
+              <h2 className="text-lg font-black text-gray-900">2. Aplicação &amp; Formato</h2>
+              <p className="text-sm text-gray-500">Escreva a estrutura que será revisada e aprovada antes do visual.</p>
             </div>
             <button type="button" onClick={copyContent}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">
@@ -596,8 +623,17 @@ export function GuidedCreateFlow({
             <Field label="Título / headline" value={content.title} onChange={(v) => setContentField("title", v)} />
             <Field label="Legenda" value={content.caption} onChange={(v) => setContentField("caption", v)} />
             <Field label="Texto principal" textarea value={content.mainText} onChange={(v) => setContentField("mainText", v)} />
-            <Field label="Roteiro" textarea value={content.script} onChange={(v) => setContentField("script", v)} />
-            <Field label="Estrutura de slides" textarea value={content.slides} onChange={(v) => setContentField("slides", v)} />
+            {freeTextFormatRequiresScript(brief.format) && (
+              <Field label="Roteiro" textarea value={content.script} onChange={(v) => setContentField("script", v)} placeholder="Obrigatório para vídeo, Reel, anúncio em vídeo ou apresentação narrada" />
+            )}
+            {freeTextFormatUsesPageStructure(brief.format) && (
+              <Field label="Estrutura de slides" textarea value={content.slides} onChange={(v) => setContentField("slides", v)} placeholder="Página a página: copy, hierarquia e CTA de cada slide do carrossel" />
+            )}
+            {!freeTextFormatRequiresScript(brief.format) && !freeTextFormatUsesPageStructure(brief.format) && (
+              <p className="lg:col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+                Roteiro e estrutura de slides aparecem automaticamente quando o formato (definido em Ideia &amp; Briefing) for vídeo, Reel, anúncio em vídeo, apresentação ou carrossel.
+              </p>
+            )}
             <Field label="Observações visuais" textarea value={content.visualNotes} onChange={(v) => setContentField("visualNotes", v)} />
           </div>
           <div className="mt-5 flex justify-between gap-2">
@@ -613,88 +649,9 @@ export function GuidedCreateFlow({
               </button>
               <button type="button" onClick={next}
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-                Ir para visual <ArrowRight className="h-4 w-4" />
+                Ir para revisão <ArrowRight className="h-4 w-4" />
               </button>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* STEP: Visual */}
-      {activeStep === "visual" && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="mb-5">
-            <h2 className="text-lg font-black text-gray-900">3. Visual Final</h2>
-            <p className="text-sm text-gray-500">Use upload manual, EditorOS ou aguarde provider de imagem aprovado.</p>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* IA */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <ImageIcon className="h-6 w-6 text-gray-500" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Gerar com IA</p>
-              <p className="mt-1 text-xs text-gray-500">Bloqueado até provider oficial ser configurado.</p>
-              <button type="button" disabled
-                className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
-                Geração indisponível
-              </button>
-            </div>
-
-            {/* Upload local */}
-            <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">
-              <Upload className="h-6 w-6 text-indigo-600" />
-              <p className="mt-3 text-sm font-bold text-indigo-950">Importar visual</p>
-              <p className="mt-1 text-xs text-indigo-700">PNG, JPG ou WEBP · máx. 5 MB</p>
-              <input type="file" accept=".png,.jpg,.jpeg,.webp"
-                className="mt-4 block w-full text-xs text-indigo-800"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleVisualFile(f);
-                }} />
-              {visualFileName && !visualFileError && (
-                <p className="mt-2 text-xs font-bold text-indigo-800">{visualFileName}</p>
-              )}
-              {visualHasSession && (
-                <p className="mt-1 text-[10px] text-indigo-500">
-                  Imagem temporária neste navegador. Não salva no servidor.
-                </p>
-              )}
-              {visualFileError && (
-                <p className="mt-2 text-xs text-red-600">{visualFileError}</p>
-              )}
-            </div>
-
-            {/* EditorOS */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-              <Layers className="h-6 w-6 text-purple-600" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Editar no EditorOS</p>
-              <p className="mt-1 text-xs text-gray-500">Salva o rascunho e abre o editor mantendo o cliente.</p>
-              {isSuperAdmin ? (
-                <button type="button" onClick={() => void handleOpenEditor()} disabled={saveState === "saving"}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-60">
-                  {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
-                  Abrir EditorOS
-                </button>
-              ) : (
-                <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                  EditorOS restrito a super_admin.
-                </p>
-              )}
-              {contentId && (
-                <p className="mt-2 text-[10px] text-gray-400">
-                  Projeto visual salvo neste navegador pelo EditorOS.
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="mt-5 flex justify-between">
-            <button type="button" onClick={prev}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
-              <ArrowLeft className="h-4 w-4" /> Voltar
-            </button>
-            <button type="button" onClick={next}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-              Revisar <ArrowRight className="h-4 w-4" />
-            </button>
           </div>
         </section>
       )}
@@ -703,8 +660,8 @@ export function GuidedCreateFlow({
       {activeStep === "review" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
-            <h2 className="text-lg font-black text-gray-900">4. Revisão</h2>
-            <p className="text-sm text-gray-500">Confirme o pacote antes de escolher o destino.</p>
+            <h2 className="text-lg font-black text-gray-900">3. Revisão &amp; Aprovação</h2>
+            <p className="text-sm text-gray-500">Confirme o pacote e marque para revisão interna antes de escolher o destino.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -773,8 +730,8 @@ export function GuidedCreateFlow({
       {activeStep === "destination" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
-            <h2 className="text-lg font-black text-gray-900">5. Destino</h2>
-            <p className="text-sm text-gray-500">Escolha a próxima etapa sem publicar automaticamente.</p>
+            <h2 className="text-lg font-black text-gray-900">4. Destino &amp; Especificações</h2>
+            <p className="text-sm text-gray-500">Escolha a próxima etapa sem publicar automaticamente. Defina o destino antes do Visual Final.</p>
           </div>
 
           {destError && (
@@ -871,11 +828,93 @@ export function GuidedCreateFlow({
               <p className="mt-1 text-xs text-gray-500">Publicação automática ainda não configurada.</p>
             </div>
           </div>
-          <div className="mt-5">
+          <div className="mt-5 flex justify-between gap-2">
             <button type="button" onClick={prev}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4" /> Voltar para revisão
             </button>
+            <button type="button" onClick={next}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+              Ir para Visual Final <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* STEP: Visual (Fase 12/15 — último bloco criativo) */}
+      {activeStep === "visual" && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="mb-5">
+            <h2 className="text-lg font-black text-gray-900">5. Visual Final</h2>
+            <p className="text-sm text-gray-500">Último passo criativo. Use upload manual, EditorOS ou aguarde provider de imagem aprovado.</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {/* IA */}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <ImageIcon className="h-6 w-6 text-gray-500" />
+              <p className="mt-3 text-sm font-bold text-gray-900">Gerar com IA</p>
+              <p className="mt-1 text-xs text-gray-500">A geração de imagem ainda não está disponível neste ambiente.</p>
+              <button type="button" disabled
+                className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
+                Geração indisponível
+              </button>
+            </div>
+
+            {/* Upload local */}
+            <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">
+              <Upload className="h-6 w-6 text-indigo-600" />
+              <p className="mt-3 text-sm font-bold text-indigo-950">Importar visual</p>
+              <p className="mt-1 text-xs text-indigo-700">PNG, JPG ou WEBP · máx. 5 MB</p>
+              <input type="file" accept=".png,.jpg,.jpeg,.webp"
+                className="mt-4 block w-full text-xs text-indigo-800"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleVisualFile(f);
+                }} />
+              {visualFileName && !visualFileError && (
+                <p className="mt-2 text-xs font-bold text-indigo-800">{visualFileName}</p>
+              )}
+              {visualHasSession && (
+                <p className="mt-1 text-[10px] text-indigo-500">
+                  Imagem temporária neste navegador. Não salva no servidor.
+                </p>
+              )}
+              {visualFileError && (
+                <p className="mt-2 text-xs text-red-600">{visualFileError}</p>
+              )}
+            </div>
+
+            {/* EditorOS */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+              <Layers className="h-6 w-6 text-purple-600" />
+              <p className="mt-3 text-sm font-bold text-gray-900">Editar no EditorOS</p>
+              <p className="mt-1 text-xs text-gray-500">Salva o rascunho e abre o editor mantendo o cliente.</p>
+              {isSuperAdmin ? (
+                <button type="button" onClick={() => void handleOpenEditor()} disabled={saveState === "saving"}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-60">
+                  {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Abrir EditorOS
+                </button>
+              ) : (
+                <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                  EditorOS restrito a super_admin.
+                </p>
+              )}
+              {contentId && (
+                <p className="mt-2 text-[10px] text-gray-400">
+                  Projeto visual salvo neste navegador pelo EditorOS.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-5 flex items-center justify-between gap-2">
+            <button type="button" onClick={prev}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
+              <ArrowLeft className="h-4 w-4" /> Voltar para destino
+            </button>
+            <p className="text-xs font-semibold text-emerald-700">
+              <CheckCircle2 className="mr-1 inline h-4 w-4" /> Último passo criativo — agendar ou publicar acontece em Calendário/Produção/Aprovação (passo anterior).
+            </p>
           </div>
         </section>
       )}
