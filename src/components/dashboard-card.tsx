@@ -24,11 +24,11 @@ export function DashboardCard({
 
   if (premium) {
     return (
-      <div className={cn("dashboard-card-premium reveal-up flex flex-col gap-3", className)}>
-        <div className="flex items-start justify-between">
-          <span className="text-sm font-medium" style={{ color: "#8888a0" }}>{title}</span>
+      <div className={cn("dashboard-card-premium reveal-up flex flex-col gap-3 min-w-0", className)}>
+        <div className="flex items-start justify-between gap-2">
+          <span className="min-w-0 flex-1 break-words text-sm font-medium" style={{ color: "#8888a0" }}>{title}</span>
           {Icon && (
-            <div className="p-2 rounded-xl" style={{ background: "rgba(123,110,246,0.12)", border: "1px solid rgba(123,110,246,0.2)" }}>
+            <div className="flex-shrink-0 p-2 rounded-xl" style={{ background: "rgba(123,110,246,0.12)", border: "1px solid rgba(123,110,246,0.2)" }}>
               <Icon className="w-4 h-4" style={{ color: "#7b6ef6" }} />
             </div>
           )}
@@ -52,14 +52,14 @@ export function DashboardCard({
 
   return (
     <div className={cn(
-      "bg-white rounded-2xl border p-5 flex flex-col gap-3 transition-shadow hover:shadow-md",
+      "bg-white rounded-2xl border p-4 sm:p-5 flex flex-col gap-3 transition-shadow hover:shadow-md min-w-0",
       alert ? "border-red-200" : "border-gray-100",
       className
     )}>
-      <div className="flex items-start justify-between">
-        <span className="text-sm font-medium text-gray-500">{title}</span>
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 flex-1 text-sm font-medium text-gray-500 break-words">{title}</span>
         {Icon && (
-          <div className={cn("p-2 rounded-xl", iconBg)}>
+          <div className={cn("flex-shrink-0 p-2 rounded-xl", iconBg)}>
             <Icon className={cn("w-4 h-4", iconColor)} />
           </div>
         )}

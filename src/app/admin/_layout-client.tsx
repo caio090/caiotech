@@ -587,7 +587,17 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">{children}</main>
       </div>
-      <MobileBottomNav variant="admin" />
+      <MobileBottomNav
+        variant="admin"
+        // Fase 31 (Sprint REC OS 3.0.1): a superfície só é conhecida com
+        // segurança em dois casos — preview ativo do Super Admin (já
+        // resolvido no servidor em previewContext.surface) ou a própria
+        // sessão real de super_admin. Para agency/agency_client/
+        // direct_business fora de preview, a superfície real ainda não é
+        // resolvida por este layout compartilhado — cai no comportamento
+        // anterior (ADMIN_PRIMARY fixo), sem regressão.
+        surface={previewContext?.surface ?? (userRole === "super_admin" ? "super_admin" : undefined)}
+      />
       <LokatVoicePanel />
     </div>
   );

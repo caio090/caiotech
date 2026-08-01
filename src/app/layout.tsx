@@ -1,7 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Sprint REC OS 3.0.1 (Fase 29/37): esta exportação nunca existiu — o app
+ * inteiro renderizava sem NENHUMA tag <meta name="viewport">, confirmado
+ * ao vivo (`curl http://127.0.0.1:3100/` não retornava a tag). Sem ela, o
+ * navegador mobile assume a largura de desktop e escala tudo para caber,
+ * exigindo zoom manual — a causa raiz mais provável, sozinha, de boa parte
+ * dos sintomas mobile reportados nesta sprint (conteúdo cortado, cards
+ * maiores que a viewport, zoom necessário após o login).
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.lokat.com.br"),

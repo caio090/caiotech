@@ -86,3 +86,16 @@ uma segunda árvore de permissões. `tenant_isolation` e
 `crm_workspace_isolation` (ambos `priority: "P1"`/`"P0"` em
 `project-status.ts`) tratam esse isolamento como gate de segurança, não
 como feature de produto.
+
+## Nota — Sprint REC OS 3.0.1 (bottom nav por superfície)
+
+`MobileBottomNav` ganhou um prop opcional `surface` (Fase 31) — quando
+informado, usa `SURFACE_BOTTOM_NAV_PRIMARY[surface]`
+(`src/lib/mobile-shell/types.ts`) filtrado contra os itens que a
+capability do usuário já libera, nunca concedendo acesso novo. Hoje só é
+resolvido com segurança para preview ativo do Super Admin
+(`previewContext.surface`) e para a sessão real de `super_admin` — para
+sessões reais de agency/agency_client/direct_business fora de preview, a
+superfície ainda não é resolvida por `_layout-client.tsx` (cai no
+comportamento anterior, sem regressão). Ver
+`docs/mobile/mobile-app-shell.md`.

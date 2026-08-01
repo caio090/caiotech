@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { configs, SidebarVariant } from "@/components/app-sidebar";
 import { MoreHorizontal, X } from "lucide-react";
+import type { WorkspaceSurface } from "@/lib/workspaces/types";
+import { SURFACE_BOTTOM_NAV_PRIMARY } from "@/lib/mobile-shell/types";
 
 const accentColor: Record<SidebarVariant, string> = {
   admin:       "text-indigo-600",
@@ -37,22 +39,46 @@ const ADMIN_PRIMARY = [
 interface MobileBottomNavProps {
   variant: SidebarVariant;
   badges?: Record<string, number>;
+  /**
+   * Fase 31 (Sprint REC OS 3.0.1): quando informado, os 4 itens fixos do
+   * rodapé passam a ser os de `SURFACE_BOTTOM_NAV_PRIMARY[surface]` — nunca
+   * concede acesso a uma rota nova: o resultado é sempre filtrado contra
+   * `allItems` (o que a capability do usuário já libera para este
+   * `variant`). Hoje só é passado quando a superfície é conhecida com
+   * segurança (sessão real de super_admin, ou preview ativo do Super
+   * Admin — que já resolve `surface` no servidor). Ausente, cai no
+   * comportamento anterior (ADMIN_PRIMARY fixo) — nenhuma regressão.
+   */
+  surface?: WorkspaceSurface;
 }
 
-export function MobileBottomNav({ variant, badges }: MobileBottomNavProps) {
+export function MobileBottomNav({ variant, badges, surface }: MobileBottomNavProps) {
   const pathname = usePathname();
   const color    = accentColor[variant];
   const bg       = accentBg[variant];
   const allItems = configs[variant].nav;
   const [showMais, setShowMais] = useState(false);
 
-  const primaryItems = variant === "admin"
-    ? allItems.filter((i) => ADMIN_PRIMARY.includes(i.href))
-    : allItems.slice(0, 4);
+  const surfacePrimaryHrefs = surface ? SURFACE_BOTTOM_NAV_PRIMARY[surface] : null;
+  const effectivePrimaryHrefs = surfacePrimaryHrefs
+    ? allItems.filter((i) => surfacePrimaryHrefs.includes(i.href)).map((i) => i.href)
+    : null;
+  // Se a superfície não libera nenhum dos itens sugeridos para este
+  // `variant` (ex.: capability ainda não concedida), cai no padrão antigo
+  // em vez de mostrar um rodapé vazio.
+  const usesSurfaceConfig = variant === "admin" && !!effectivePrimaryHrefs && effectivePrimaryHrefs.length > 0;
 
-  const secondaryItems = variant === "admin"
-    ? allItems.filter((i) => !ADMIN_PRIMARY.includes(i.href))
-    : allItems.slice(4);
+  const primaryItems = usesSurfaceConfig
+    ? allItems.filter((i) => effectivePrimaryHrefs!.includes(i.href))
+    : variant === "admin"
+      ? allItems.filter((i) => ADMIN_PRIMARY.includes(i.href))
+      : allItems.slice(0, 4);
+
+  const secondaryItems = usesSurfaceConfig
+    ? allItems.filter((i) => !effectivePrimaryHrefs!.includes(i.href))
+    : variant === "admin"
+      ? allItems.filter((i) => !ADMIN_PRIMARY.includes(i.href))
+      : allItems.slice(4);
 
   const hasSecondary = secondaryItems.length > 0;
 

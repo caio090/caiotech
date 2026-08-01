@@ -102,7 +102,7 @@ export default async function AdminDashboardPage() {
         <SmartSuggestionsPanel suggestions={adminSuggestions} className="mb-5" />
       )}
       <PageHeader title="Dashboard" description="Visão geral da agência">
-        <button className="text-sm text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2">
+        <button className="w-full sm:w-auto justify-center text-sm text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2">
           <Zap className="w-4 h-4" />
           Ação rápida
         </button>
