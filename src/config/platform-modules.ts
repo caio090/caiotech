@@ -207,7 +207,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
   {
     id: "crm_leads_clientes",
     name: "CRM (Leads e Clientes)",
-    description: "Pipeline de leads/waitlist e gestão de clientes da agência.",
+    description: "Hoje: pipeline de leads/waitlist e gestão de clientes da agência (leads/funil/oportunidades). Roadmap adaptativo (Sprint Recovery 2.1.3, não implementado): núcleo universal (Lead/Contato/Empresa/Oportunidade/Pipeline/Follow-up/Temperatura), superfícies isoladas por workspace (Super Admin/Agência/Cliente/Empresa Direta/Operacional), adaptação por nicho (Alimentação/Materiais de construção/Agência e serviços/Construção civil/Varejo), motor de follow-up, motor de temperatura, dashboards Essencial/Gestor e assistente de IA sem ação automática — ver src/lib/crm-adaptive/ e docs/crm/.",
     category: "commercial",
     routes: ["/admin/leads", "/admin/clientes"],
     surfaces: [
@@ -223,8 +223,10 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     dependsOn: ["workspaces_core"],
     integrations: [],
     maturity: "production",
+    readinessAreaId: "crm",
     nicheSupport: false,
     owner: "commercial",
+    notes: "CRM adaptativo classificado priority P2 em project-status.ts (P1 só para crm_workspace_isolation, um gate de segurança). Bloqueio: depende de official_domain_qa do MVP P0/P1 atual antes de competir por atenção. Próxima etapa: prototipar o adaptador de nicho Alimentação (único arquétipo real hoje) sobre o núcleo universal, sem tocar o CRM real (leads/funil) desta entrada. Maturidade do CRM adaptativo em si (distinto do CRM real acima): planned.",
   },
   {
     id: "financeiro",
