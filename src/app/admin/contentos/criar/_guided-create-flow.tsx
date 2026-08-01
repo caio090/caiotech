@@ -4,13 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList,
-  Copy, FileCheck2, ImageIcon, Layers, Loader2, PenLine, Send, Upload, Wand2,
+  Copy, FileCheck2, FolderOpen, ImageIcon, Layers, Loader2, PenLine, Send, Upload, Wand2,
 } from "lucide-react";
 import { CopyIdButton } from "@/components/copy-id-button";
+import type { RadarOpportunity } from "@/lib/rec-os-workflow/radar-opportunities";
+import {
+  buildEditorAssetHandoff, validateEditorAssetHandoff, serializeEditorAssetHandoff,
+} from "@/lib/rec-os-workflow/editor-handoff";
 
 type StepId = "brief" | "content" | "review" | "destination" | "visual";
 type BriefMode = "manual" | "ai";
 type SaveState = "idle" | "saving" | "saved" | "error";
+type DestinationChoice = "calendar" | "production" | "approval" | null;
 type DestinationResult = { type: "calendar" | "production" | "approval"; id?: string; contentId?: string; existed?: boolean } | null;
 
 export interface GuidedCreateDraft {
@@ -37,6 +42,8 @@ interface GuidedCreateFlowProps {
   isSuperAdmin: boolean;
   initialDraft?: GuidedCreateDraft | null;
   initialContentId?: string | null;
+  /** Sprint REC OS 3.0.1.1 (Fase 2/3) — presente só quando veio de "Criar a partir desta oportunidade" no Radar, e só para conteúdo novo (nunca sobrescreve um rascunho existente). */
+  seedOpportunity?: RadarOpportunity | null;
 }
 
 // Sprint REC OS 3.0.1 (Fase 6/12): Visual Final agora é o último bloco
@@ -80,6 +87,24 @@ function freeTextFormatRequiresScript(value: string): boolean {
 function freeTextFormatUsesPageStructure(value: string): boolean {
   return normalizeFormatText(value).includes("carrossel");
 }
+
+/**
+ * Fase 26 — nenhum formato somente-texto/mensagem/e-mail exige um ativo
+ * visual final; todo o resto (arte, carrossel, story, reel, vídeo, anúncio,
+ * banner, outdoor, telão, impresso) exige. Formato aqui é texto livre
+ * (definido em Ideia & Briefing), então a checagem é por palavra-chave —
+ * mesmo padrão de freeTextFormatRequiresScript.
+ */
+const TEXT_ONLY_FORMAT_KEYWORDS = ["mensagem", "e-mail", "email", "somente texto", "texto puro"];
+function contentRequiresFinalAsset(value: string): boolean {
+  if (!value.trim()) return true;
+  const normalized = normalizeFormatText(value);
+  return !TEXT_ONLY_FORMAT_KEYWORDS.some((k) => normalized.includes(normalizeFormatText(k)));
+}
+
+const DESTINATION_LABEL: Record<NonNullable<DestinationChoice>, string> = {
+  calendar: "Calendário", production: "Produção", approval: "Aprovação",
+};
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
@@ -130,6 +155,7 @@ export function GuidedCreateFlow({
   clientId, clientName, clientSegment,
   initialStep, isSuperAdmin,
   initialDraft, initialContentId,
+  seedOpportunity,
 }: GuidedCreateFlowProps) {
   const router = useRouter();
   const [activeStep, setActiveStep] = useState<StepId>(() =>
@@ -147,6 +173,9 @@ export function GuidedCreateFlow({
   const [destLoading, setDestLoading] = useState<string | null>(null);
   const [destResult, setDestResult] = useState<DestinationResult>(null);
   const [destError, setDestError] = useState<string | null>(null);
+  // Fase 25 — Destino apenas ESCOLHE o destino; o envio de fato só acontece
+  // depois do Visual Final (ver handleEnviar()).
+  const [destinationChoice, setDestinationChoice] = useState<DestinationChoice>(null);
 
   // Visual file state
   const [visualFileName, setVisualFileName] = useState(initialDraft?.visual?.local_file_name ?? "");
@@ -155,15 +184,15 @@ export function GuidedCreateFlow({
 
   // Form state
   const [brief, setBrief] = useState({
-    objective: initialDraft?.brief?.objective ?? "",
+    objective: initialDraft?.brief?.objective ?? seedOpportunity?.objective ?? "",
     format:    initialDraft?.brief?.format ?? "Post estático",
     campaign:  initialDraft?.brief?.campaign ?? "",
     offer:     initialDraft?.brief?.offer ?? "",
-    audience:  initialDraft?.brief?.audience ?? "",
+    audience:  initialDraft?.brief?.audience ?? seedOpportunity?.audience ?? "",
     message:   initialDraft?.brief?.message ?? "",
     cta:       initialDraft?.brief?.cta ?? "",
     references:initialDraft?.brief?.references ?? "",
-    notes:     initialDraft?.brief?.notes ?? "",
+    notes:     initialDraft?.brief?.notes ?? (seedOpportunity ? `Origem: Radar (demonstração) — ${seedOpportunity.title}. ${seedOpportunity.opportunity}` : ""),
     deadline:  initialDraft?.brief?.deadline ?? "",
   });
   const [content, setContent] = useState({
@@ -417,8 +446,36 @@ export function GuidedCreateFlow({
         return;
       }
     }
-    const returnTo = `/admin/contentos/criar?client=${clientId}&content_id=${targetId}&step=visual`;
-    router.push(`/admin/contentos/editor-os?client=${clientId}&content_id=${targetId}&return_to=${encodeURIComponent(returnTo)}`);
+    // Fase 14 — adaptador central em vez de concatenação de string solta.
+    // copy/restrictions nunca vão para a URL (só IDs/metadados mínimos).
+    const returnRoute = `/admin/contentos/criar?client=${clientId}&content_id=${targetId}&step=visual`;
+    const handoff = buildEditorAssetHandoff({
+      workspaceId: clientId,
+      clientId,
+      contentId: targetId,
+      campaignId: null,
+      assetId: null,
+      assetSource: visualHasSession ? "upload" : "editor_os",
+      fileUrl: null,
+      mimeType: null,
+      width: null,
+      height: null,
+      format: brief.format || null,
+      destination: destinationChoice,
+      briefingId: null,
+      conceptId: null,
+      copy: content.mainText || null,
+      restrictions: [],
+      returnRoute,
+    });
+    const errors = validateEditorAssetHandoff(handoff);
+    if (errors.length > 0) {
+      setSaveState("error");
+      setSaveMessage(`Não foi possível abrir o EditorOS: ${errors.join(", ")}.`);
+      return;
+    }
+    const params = serializeEditorAssetHandoff(handoff);
+    router.push(`/admin/contentos/editor-os?${params.toString()}`);
   }
 
   // ── Destination handlers ───────────────────────────────────────────────────
@@ -484,6 +541,26 @@ export function GuidedCreateFlow({
     } catch { setDestLoading(null); setDestError("Erro de conexão."); }
   }
 
+  // Fase 25/26 — "Enviar" só acontece aqui, depois do Visual Final, e só
+  // dispara a API real (send-to-production/send-to-approval, já existentes)
+  // quando o ativo final não é mais obrigatório ou já existe. As três
+  // funções acima permanecem inalteradas — só o PONTO em que são chamadas
+  // muda (antes ficavam nos próprios botões do step Destino).
+  const hasVisualAsset = Boolean(visualFileName) || visualHasSession;
+  const requiresFinalAsset = contentRequiresFinalAsset(brief.format);
+  const canSend = !!destinationChoice && (!requiresFinalAsset || hasVisualAsset);
+
+  async function handleEnviar() {
+    if (!destinationChoice) return;
+    if (requiresFinalAsset && !hasVisualAsset) {
+      setDestError("Selecione ou envie um arquivo antes de enviar — este formato exige um ativo visual final.");
+      return;
+    }
+    if (destinationChoice === "calendar") await handleDestCalendario();
+    else if (destinationChoice === "production") await handleDestProducao();
+    else await handleDestAprovacao();
+  }
+
   const summary = useMemo(() => [
     ["Cliente", clientName],
     ["Segmento", clientSegment ?? "Não informado"],
@@ -544,6 +621,11 @@ export function GuidedCreateFlow({
       {/* STEP: Brief */}
       {activeStep === "brief" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          {seedOpportunity && !initialContentId && (
+            <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-xs text-indigo-700 flex items-center gap-2" data-testid="seed-origin-badge">
+              <span className="font-bold">Origem: Radar (demonstração)</span> · {seedOpportunity.title}
+            </div>
+          )}
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-black text-gray-900">1. Ideia &amp; Briefing</h2>
@@ -726,98 +808,32 @@ export function GuidedCreateFlow({
         </section>
       )}
 
-      {/* STEP: Destination */}
+      {/* STEP: Destination (Fase 25 — escolhe o destino; não envia mais aqui) */}
       {activeStep === "destination" && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-5">
             <h2 className="text-lg font-black text-gray-900">4. Destino &amp; Especificações</h2>
-            <p className="text-sm text-gray-500">Escolha a próxima etapa sem publicar automaticamente. Defina o destino antes do Visual Final.</p>
+            <p className="text-sm text-gray-500">Escolha para onde este conteúdo vai. O envio de fato acontece depois do Visual Final.</p>
           </div>
 
-          {destError && (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {destError}
-            </div>
-          )}
-
-          {destResult?.type === "production" && (
-            <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 space-y-2">
-              <p className="font-semibold">
-                {destResult.existed
-                  ? "Este conteúdo já possui uma tarefa de produção."
-                  : "Tarefa de produção criada."}
-              </p>
-              {destResult.id && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium">Tarefa:</span>
-                  <span className="font-mono break-all">{destResult.id}</span>
-                  <CopyIdButton id={destResult.id} label="Copiar ID da tarefa" />
-                </div>
-              )}
-              {destResult.contentId && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium">Conteúdo:</span>
-                  <span className="font-mono break-all">{destResult.contentId}</span>
-                  <CopyIdButton id={destResult.contentId} label="Copiar ID do conteúdo" />
-                </div>
-              )}
-              <a
-                href={`/admin/contentos/producao?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&task=${destResult.id}` : ""}`}
-                className="inline-block text-xs font-bold underline"
-              >
-                Ver em Produção →
-              </a>
-            </div>
-          )}
-
-          {destResult?.type === "approval" && (
-            <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-2">
-              <p className="font-semibold">
-                {destResult.existed
-                  ? "Este conteúdo já possui uma aprovação em andamento."
-                  : "Aprovação criada com sucesso."}
-              </p>
-              {destResult.id && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium">Aprovação:</span>
-                  <span className="font-mono break-all">{destResult.id}</span>
-                  <CopyIdButton id={destResult.id} label="Copiar ID da aprovação" />
-                </div>
-              )}
-              {destResult.contentId && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium">Conteúdo:</span>
-                  <span className="font-mono break-all">{destResult.contentId}</span>
-                  <CopyIdButton id={destResult.contentId} label="Copiar ID do conteúdo" />
-                </div>
-              )}
-              <a
-                href={`/admin/contentos/aprovacoes?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&approval=${destResult.id}` : ""}`}
-                className="inline-block text-xs font-bold underline"
-              >
-                Ver em Aprovações →
-              </a>
-            </div>
-          )}
-
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <button type="button" onClick={() => void handleDestCalendario()} disabled={destLoading === "calendar"}
-              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
-              {destLoading === "calendar" ? <Loader2 className="h-6 w-6 animate-spin text-indigo-600" /> : <CalendarDays className="h-6 w-6 text-indigo-600" />}
+            <button type="button" data-testid="destination-choice-calendar" onClick={() => setDestinationChoice("calendar")}
+              className={`rounded-2xl border p-4 text-left transition-colors ${destinationChoice === "calendar" ? "border-indigo-400 bg-indigo-50" : "border-gray-200 hover:bg-gray-50"}`}>
+              <CalendarDays className="h-6 w-6 text-indigo-600" />
               <p className="mt-3 text-sm font-bold text-gray-900">Calendário</p>
               <p className="mt-1 text-xs text-gray-500">Planejar data e janela de publicação.</p>
             </button>
 
-            <button type="button" onClick={() => void handleDestProducao()} disabled={!!destLoading}
-              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
-              {destLoading === "production" ? <Loader2 className="h-6 w-6 animate-spin text-emerald-600" /> : <ClipboardList className="h-6 w-6 text-emerald-600" />}
+            <button type="button" data-testid="destination-choice-production" onClick={() => setDestinationChoice("production")}
+              className={`rounded-2xl border p-4 text-left transition-colors ${destinationChoice === "production" ? "border-emerald-400 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"}`}>
+              <ClipboardList className="h-6 w-6 text-emerald-600" />
               <p className="mt-3 text-sm font-bold text-gray-900">Produção</p>
               <p className="mt-1 text-xs text-gray-500">Enviar para fila operacional.</p>
             </button>
 
-            <button type="button" onClick={() => void handleDestAprovacao()} disabled={!!destLoading}
-              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50 disabled:opacity-60">
-              {destLoading === "approval" ? <Loader2 className="h-6 w-6 animate-spin text-amber-600" /> : <FileCheck2 className="h-6 w-6 text-amber-600" />}
+            <button type="button" data-testid="destination-choice-approval" onClick={() => setDestinationChoice("approval")}
+              className={`rounded-2xl border p-4 text-left transition-colors ${destinationChoice === "approval" ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:bg-gray-50"}`}>
+              <FileCheck2 className="h-6 w-6 text-amber-600" />
               <p className="mt-3 text-sm font-bold text-gray-900">Aprovação</p>
               <p className="mt-1 text-xs text-gray-500">Revisar antes de compartilhar link.</p>
             </button>
@@ -828,6 +844,13 @@ export function GuidedCreateFlow({
               <p className="mt-1 text-xs text-gray-500">Publicação automática ainda não configurada.</p>
             </div>
           </div>
+
+          {destinationChoice && (
+            <p className="mt-4 text-xs font-semibold text-indigo-700">
+              Destino selecionado: {DESTINATION_LABEL[destinationChoice]}. Continue para o Visual Final para concluir o envio.
+            </p>
+          )}
+
           <div className="mt-5 flex justify-between gap-2">
             <button type="button" onClick={prev}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
@@ -848,7 +871,7 @@ export function GuidedCreateFlow({
             <h2 className="text-lg font-black text-gray-900">5. Visual Final</h2>
             <p className="text-sm text-gray-500">Último passo criativo. Use upload manual, EditorOS ou aguarde provider de imagem aprovado.</p>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-4">
             {/* IA */}
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <ImageIcon className="h-6 w-6 text-gray-500" />
@@ -857,6 +880,17 @@ export function GuidedCreateFlow({
               <button type="button" disabled
                 className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
                 Geração indisponível
+              </button>
+            </div>
+
+            {/* Biblioteca de ativos (Fase 17) — sem fonte real hoje, nunca simulada */}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4" data-testid="asset-library-card">
+              <FolderOpen className="h-6 w-6 text-gray-500" />
+              <p className="mt-3 text-sm font-bold text-gray-900">Biblioteca de ativos</p>
+              <p className="mt-1 text-xs text-gray-500">Reaproveitar arquivos já enviados para este cliente.</p>
+              <button type="button" disabled data-testid="asset-library-disabled"
+                className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
+                Biblioteca de ativos ainda não disponível
               </button>
             </div>
 
@@ -907,14 +941,64 @@ export function GuidedCreateFlow({
               )}
             </div>
           </div>
-          <div className="mt-5 flex items-center justify-between gap-2">
+          {/* Fase 25/26 — o envio de fato só acontece aqui, depois do ativo final. */}
+          {destError && (
+            <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{destError}</div>
+          )}
+
+          {destResult?.type === "production" && (
+            <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 space-y-2">
+              <p className="font-semibold">{destResult.existed ? "Este conteúdo já possui uma tarefa de produção." : "Tarefa de produção criada."}</p>
+              {destResult.id && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Tarefa:</span>
+                  <span className="font-mono break-all">{destResult.id}</span>
+                  <CopyIdButton id={destResult.id} label="Copiar ID da tarefa" />
+                </div>
+              )}
+              <a href={`/admin/contentos/producao?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&task=${destResult.id}` : ""}`} className="inline-block text-xs font-bold underline">
+                Ver em Produção →
+              </a>
+            </div>
+          )}
+
+          {destResult?.type === "approval" && (
+            <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-2">
+              <p className="font-semibold">{destResult.existed ? "Este conteúdo já possui uma aprovação em andamento." : "Aprovação criada com sucesso."}</p>
+              {destResult.id && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium">Aprovação:</span>
+                  <span className="font-mono break-all">{destResult.id}</span>
+                  <CopyIdButton id={destResult.id} label="Copiar ID da aprovação" />
+                </div>
+              )}
+              <a href={`/admin/contentos/aprovacoes?client=${clientId}${destResult.contentId ? `&content_id=${destResult.contentId}` : ""}${destResult.id ? `&approval=${destResult.id}` : ""}`} className="inline-block text-xs font-bold underline">
+                Ver em Aprovações →
+              </a>
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <button type="button" onClick={prev}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               <ArrowLeft className="h-4 w-4" /> Voltar para destino
             </button>
-            <p className="text-xs font-semibold text-emerald-700">
-              <CheckCircle2 className="mr-1 inline h-4 w-4" /> Último passo criativo — agendar ou publicar acontece em Calendário/Produção/Aprovação (passo anterior).
-            </p>
+
+            {!destinationChoice ? (
+              <p className="text-xs font-semibold text-amber-700">
+                <CheckCircle2 className="mr-1 inline h-4 w-4" /> Último passo criativo — volte a Destino &amp; Especificações e escolha um destino para poder enviar.
+              </p>
+            ) : requiresFinalAsset && !hasVisualAsset ? (
+              <p className="text-xs font-semibold text-red-700" data-testid="visual-asset-required-message">
+                Selecione ou envie um arquivo antes de enviar — este formato exige um ativo visual final.
+              </p>
+            ) : (
+              <button type="button" data-testid="enviar-destino-button" onClick={() => void handleEnviar()} disabled={!canSend || !!destLoading}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                {destLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Enviar para {DESTINATION_LABEL[destinationChoice]}
+              </button>
+            )}
           </div>
         </section>
       )}
