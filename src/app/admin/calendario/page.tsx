@@ -23,10 +23,29 @@ import {
 } from "@/lib/global-calendar";
 import { GlobalCalendarContent } from "./_client-content";
 
+const RETURN_TO_ALLOWED_PREFIX = "/admin/";
+const RETURN_TO_BLOCKED_PREFIXES = ["http://", "https://", "//", "javascript:", "data:"];
+
+/** Fase 13 — só aceita um caminho relativo dentro de /admin/; qualquer outra coisa é ignorada, nunca quebra a página. */
+function sanitizeCalendarReturnTo(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const decoded = decodeURIComponent(raw);
+  if (RETURN_TO_BLOCKED_PREFIXES.some((p) => decoded.startsWith(p))) return null;
+  if (!decoded.startsWith(RETURN_TO_ALLOWED_PREFIX)) return null;
+  return decoded;
+}
+
+/** buildCalendarNavigationUrl() do REC OS manda `month` como "YYYY-MM"; resolveRequestedMonth() espera ano/mês separados — traduz sem alterar o contrato existente da função. */
+function splitCombinedMonth(month: string | undefined): { year?: string; month?: string } {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return {};
+  const [y, m] = month.split("-");
+  return { year: y, month: String(Number(m)) };
+}
+
 export default async function AdminGlobalCalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; client?: string; source?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; client?: string; source?: string; return_to?: string; content_id?: string; campaign?: string }>;
 }) {
   const params = await searchParams;
 
@@ -34,7 +53,9 @@ export default async function AdminGlobalCalendarioPage({
   if (ctx instanceof Response) redirect("/login");
   const { adminDb } = ctx;
 
-  const { year, month } = resolveRequestedMonth(params.year, params.month);
+  const combinedMonth = splitCombinedMonth(params.month);
+  const { year, month } = resolveRequestedMonth(combinedMonth.year ?? params.year, combinedMonth.month ?? params.month);
+  const returnTo = sanitizeCalendarReturnTo(params.return_to);
   const requestedSource = resolveRequestedSource(params.source);
   const window = buildMonthWindow(year, month);
   const { startIso, endIso } = timestampWindowBounds(window.gridStartKey, window.gridEndKey);
@@ -181,6 +202,7 @@ export default async function AdminGlobalCalendarioPage({
       sourceErrors={sourceErrors}
       serverToday={serverToday.dateKey}
       timezone={GLOBAL_CALENDAR_TIMEZONE}
+      returnTo={returnTo}
     />
   );
 }

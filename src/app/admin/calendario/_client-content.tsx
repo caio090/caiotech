@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  CalendarDays, ChevronLeft, ChevronRight, X, ArrowRight,
+  CalendarDays, ChevronLeft, ChevronRight, X, ArrowRight, ArrowLeft,
   Sparkles, ClipboardList, Send, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -172,11 +172,13 @@ interface Props {
   sourceErrors: CalendarEventSource[];
   serverToday: string; // YYYY-MM-DD in America/Fortaleza
   timezone: string;
+  /** Fase 13 — presente quando a navegação veio de um botão contextual do REC OS (buildCalendarNavigationUrl). */
+  returnTo?: string | null;
 }
 
 export function GlobalCalendarContent({
   initialEvents, initialYear, initialMonth, initialSelectedDay, initialFilterClient, initialFilterSource,
-  clients, sourceErrors, serverToday, timezone,
+  clients, sourceErrors, serverToday, timezone, returnTo,
 }: Props) {
   // Purely operational — never holds year/month/client/source, only whether a
   // full-page navigation was just kicked off, so the selects can disable
@@ -266,6 +268,15 @@ export function GlobalCalendarContent({
           <p className="text-xs text-gray-400">Conteúdos, produção e aprovações de todos os clientes — somente leitura</p>
         </div>
       </div>
+
+      {returnTo && (
+        <div className="mb-4 flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 text-xs text-indigo-700" data-testid="calendar-context-banner">
+          <span>Aberto a partir do REC OS.</span>
+          <Link href={returnTo} data-testid="calendar-return-link" className="flex items-center gap-1 font-bold hover:underline">
+            <ArrowLeft className="w-3 h-3" /> Voltar
+          </Link>
+        </div>
+      )}
 
       {sourceErrors.length > 0 && (
         <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700">
