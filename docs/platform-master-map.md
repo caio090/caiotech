@@ -73,3 +73,15 @@ Três adições sem alterar a arquitetura de plataforma existente:
    dashboards, IA) como contratos puros, mesmo padrão de
    `src/lib/messaging/types.ts`/`src/lib/fiscal/types.ts` da Core 2.1.
    **Não implementado** — ver `docs/crm/`.
+
+## Nota — Sprint REC OS 3.0.1 (fluxo criativo, mobile, Diagnóstico/OSP/Rotina)
+
+`src/lib/rec-os-workflow/` reorganiza o fluxo real do REC OS em 4
+macroetapas (Radar/Criar/Produzir/Finalizar) sobre os mesmos status
+persistidos — nenhum status renomeado. `src/lib/mobile-shell/` registra
+bottom nav por superfície. Causa raiz crítica corrigida: `src/app/layout.tsx`
+nunca exportava `viewport` — confirmado ao vivo via `curl`, agora corrigido
+(ver `docs/mobile/mobile-app-shell.md`). Diagnóstico-como-gateway, OSP e
+Rotina do Negócio ficam `planned`/`blocked` — ver `docs/diagnostic/`,
+`docs/research/osp-definition-audit.md` (nenhuma definição de OSP
+encontrada em todo o histórico local) e `docs/meu-negocio/business-rhythm-workspace.md`.

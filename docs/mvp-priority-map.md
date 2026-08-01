@@ -33,3 +33,14 @@ obrigatórios (`MODULE_VALIDATION_REQUIREMENTS`). Ver
 `docs/roadmap/august-2026-mvp-recovery.md` para o plano de recuperação com
 checkpoints de 01 a 07 de agosto de 2026. CRM adaptativo (Trilha 4 futura)
 está documentado em `docs/crm/` — nenhuma implementação nova nesta sprint.
+
+## Nota — Sprint REC OS 3.0.1
+
+`mobile_app_shell`, `mobile_bottom_navigation` e `crm_mobile_experience`
+entraram como P0 (defeitos reais confirmados por print do usuário, não
+refinamento cosmético). `rec_os_canonical_creation_flow`,
+`rec_os_briefing_concept_workspace`, `rec_os_finalization_workspace`,
+`rec_os_roadmap`, `rec_os_editor_handoff`,
+`editor_os_layer_scanner_integration`, `crm_mobile_filters`,
+`business_diagnostic_gateway` e `visible_reports_naming` entraram como P1.
+Ver `src/config/project-status.ts`.
