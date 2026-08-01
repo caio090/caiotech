@@ -177,7 +177,8 @@ export interface EditorAssetHandoff {
   mimeType: string | null;
   width: number | null;
   height: number | null;
-  format: ContentFormat | null;
+  /** Texto livre no fluxo real de criação (brief.format não é o enum estrito) — ver ContentFormat para o vocabulário canônico. */
+  format: ContentFormat | string | null;
   destination: string | null;
   briefingId: string | null;
   conceptId: string | null;

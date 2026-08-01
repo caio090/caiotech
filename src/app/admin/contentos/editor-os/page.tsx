@@ -7,6 +7,7 @@ import { getFeatureFlag } from "@/lib/feature-flags";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getAdminContentOSClients } from "@/lib/admin-contentos-clients";
 import { InlineClientPicker } from "@/components/inline-client-picker";
+import { parseEditorAssetHandoff } from "@/lib/rec-os-workflow/editor-handoff";
 import EditorOSWorkspace from "./EditorOSWorkspace";
 
 const FORMATS = [
@@ -86,6 +87,9 @@ interface PageProps {
     content_id?: string;
     briefing_id?: string;
     return_to?: string;
+    format?: string;
+    has_asset?: string;
+    handoff_at?: string;
   }>;
 }
 
@@ -151,6 +155,15 @@ export default async function EditorOSPage({ searchParams }: PageProps) {
 
   const returnTo = sanitizeReturnTo(params.return_to);
 
+  // Fase 16 — handoff "expirado" é puramente computado a partir do
+  // carimbo de tempo na URL (sem nenhum armazenamento adicional). Uma
+  // expiração nunca quebra a página — só mostra um aviso e continua com o
+  // cliente/conteúdo já resolvidos acima.
+  const handoff = parseEditorAssetHandoff({
+    client: params.client, content_id: params.content_id, campaign_id: params.campaign_id,
+    format: params.format, has_asset: params.has_asset, handoff_at: params.handoff_at, return_to: params.return_to,
+  });
+
   return (
     <EditorOSWorkspace
       client={client}
@@ -160,6 +173,8 @@ export default async function EditorOSPage({ searchParams }: PageProps) {
       contentId={params.content_id ?? null}
       briefingId={params.briefing_id ?? null}
       returnTo={returnTo}
+      handoffExpired={handoff.expired}
+      hasAsset={handoff.hasAsset}
     />
   );
 }

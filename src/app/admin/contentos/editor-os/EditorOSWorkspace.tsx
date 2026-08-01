@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Layers } from "lucide-react";
+import { ArrowLeft, Layers, ScanLine } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { EDITOR_OS_LAYER_SCANNER_STATUS } from "@/lib/rec-os-workflow/types";
 
 const CanvasEditor = dynamic(
   () => import("./CanvasEditor").then((mod) => mod.CanvasEditor),
@@ -33,6 +34,10 @@ interface EditorOSWorkspaceProps {
   contentId: string | null;
   briefingId: string | null;
   returnTo?: string | null;
+  /** Fase 16 — handoff expirado (>2h desde a criação do link) nunca quebra a página, só avisa. */
+  handoffExpired?: boolean;
+  /** Fase 15 — nenhum ativo importado ainda no handoff: o editor abre normalmente para criação, não é um "canvas vazio" indevido. */
+  hasAsset?: boolean;
 }
 
 export default function EditorOSWorkspace({
@@ -41,6 +46,8 @@ export default function EditorOSWorkspace({
   socialChannels,
   contentId,
   returnTo,
+  handoffExpired,
+  hasAsset,
 }: EditorOSWorkspaceProps) {
   const backHref = returnTo
     ?? (client
@@ -78,6 +85,11 @@ export default function EditorOSWorkspace({
           </>
         )}
 
+        <div className="hidden lg:flex items-center gap-1.5 text-[10px] text-zinc-500" title={EDITOR_OS_LAYER_SCANNER_STATUS.reason} data-testid="layer-scanner-status-note">
+          <ScanLine className="w-3 h-3" />
+          Scanner de camadas: {EDITOR_OS_LAYER_SCANNER_STATUS.label.toLowerCase()} — ainda não faz parte do fluxo oficial.
+        </div>
+
         {socialChannels && socialChannels.length > 0 && (
           <div className="ml-auto flex gap-1">
             {socialChannels.slice(0, 4).map((ch) => (
@@ -88,6 +100,18 @@ export default function EditorOSWorkspace({
           </div>
         )}
       </header>
+
+      {handoffExpired && (
+        <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 flex items-center justify-between gap-3">
+          <span>Este link de edição expirou. Você pode continuar editando este cliente, mas o contexto do conteúdo original pode estar desatualizado.</span>
+          {returnTo && <Link href={returnTo} className="font-bold underline shrink-0">Voltar com segurança</Link>}
+        </div>
+      )}
+      {!hasAsset && contentId && (
+        <div className="shrink-0 bg-zinc-800/60 px-4 py-1.5 text-[10px] text-zinc-400">
+          Nenhum ativo importado ainda — este editor abrirá para criação.
+        </div>
+      )}
 
       {/* Editor fills remaining height */}
       <div className="flex-1 overflow-hidden">
