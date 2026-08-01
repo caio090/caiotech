@@ -22,6 +22,7 @@ import {
   type CalendarEventSource,
 } from "@/lib/global-calendar";
 import { GlobalCalendarContent } from "./_client-content";
+import { AdminContentOSUnavailableState } from "@/components/admin-contentos-unavailable-state";
 
 const RETURN_TO_ALLOWED_PREFIX = "/admin/";
 const RETURN_TO_BLOCKED_PREFIXES = ["http://", "https://", "//", "javascript:", "data:"];
@@ -49,8 +50,18 @@ export default async function AdminGlobalCalendarioPage({
 }) {
   const params = await searchParams;
 
+  // Sprint Navegação e Experiência 3.0.1.2 (Fase 4) — antes, QUALQUER falha
+  // de requireAdminContentOSContext() (401/403/503) virava redirect("/login"),
+  // então um admin autenticado com sessão válida (já confirmada pelo proxy)
+  // caía no login sempre que o serviço estivesse indisponível (ex.: sem
+  // SUPABASE_SERVICE_ROLE_KEY neste ambiente local) — o estado real deste
+  // ambiente. Só 401 (genuinamente "sem sessão") ainda vai para /login.
   const ctx = await requireAdminContentOSContext();
-  if (ctx instanceof Response) redirect("/login");
+  if (ctx instanceof Response) {
+    if (ctx.status === 401) redirect("/login");
+    const retryQs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]).toString();
+    return <AdminContentOSUnavailableState status={ctx.status} retryHref={`/admin/calendario${retryQs ? `?${retryQs}` : ""}`} />;
+  }
   const { adminDb } = ctx;
 
   const combinedMonth = splitCombinedMonth(params.month);

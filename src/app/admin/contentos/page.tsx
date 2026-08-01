@@ -11,6 +11,7 @@ import {
 } from "@/lib/rec-os-hub";
 import { RecOSHubContent } from "./_hub-client-content";
 import { ContentosSubNavServer } from "./_contentos-subnav-server";
+import { AdminContentOSUnavailableState } from "@/components/admin-contentos-unavailable-state";
 
 export default async function AdminContentosPage({
   searchParams,
@@ -19,8 +20,17 @@ export default async function AdminContentosPage({
 }) {
   const params = await searchParams;
 
+  // Sprint Navegação e Experiência 3.0.1.2 (Fase 5) — mesmo defeito do
+  // Calendário: REC OS (o hub principal, entrada canônica de /admin/contentos)
+  // enviava qualquer admin autenticado ao /login sempre que
+  // requireAdminContentOSContext() retornava 403/503 — nunca era realmente
+  // "sem sessão". Só 401 (genuinamente sem sessão) ainda redireciona.
   const ctx = await requireAdminContentOSContext();
-  if (ctx instanceof Response) redirect("/login");
+  if (ctx instanceof Response) {
+    if (ctx.status === 401) redirect("/login");
+    const retryQs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]).toString();
+    return <AdminContentOSUnavailableState status={ctx.status} retryHref={`/admin/contentos${retryQs ? `?${retryQs}` : ""}`} />;
+  }
   const { adminDb } = ctx;
 
   // Fase 3/4 — full authorized client list, independent of who has content
