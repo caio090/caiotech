@@ -15,7 +15,7 @@ import {
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
   ScrollText, Palette, Video, MousePointerClick, Link2, SlidersHorizontal,
-  Shield, Clapperboard, UsersRound,
+  Shield, Clapperboard, UsersRound, Briefcase,
 } from "lucide-react";
 import { RecDropIcon } from "@/components/icons/RecDropIcon";
 
@@ -34,7 +34,7 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/admin/inicio",            label: "Início",           icon: Home },
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
-      { href: "/admin/ecossistema",       label: "Ecossistema",      icon: Map },
+      { href: "/admin/escritorio",        label: "Meu Escritório",   icon: Briefcase },
       { href: "/admin/meu-negocio",       label: "Meu Negócio",      icon: Sparkles },
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
@@ -46,6 +46,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/equipe",            label: "Equipe",           icon: UsersRound },
       { href: "/admin/diagnosticos",      label: "Diagnósticos",     icon: Activity },
       { href: "/admin/relatorios",        label: "Relatórios",       icon: BarChart3 },
+      { href: "/admin/status",            label: "Status",           icon: Activity },
       { href: "/admin/financeiro",        label: "Financeiro",       icon: DollarSign },
       { href: "/admin/super/billing",     label: "Billing & Planos", icon: CreditCard },
       { href: "/admin/super/accounts",    label: "Contas",           icon: Shield },

@@ -21,6 +21,15 @@
  * `SURFACE_BOTTOM_NAV_PRIMARY`/`SURFACE_BOTTOM_NAV_LABEL` continuam
  * exportados, derivados deste, para não quebrar `mobile-nav.tsx` nem os
  * testes da Sprint 3.0.1.
+ *
+ * Sprint Navegação e Experiência 3.0.1.2 (Fase 19) — "Ecossistema" saiu da
+ * posição operacional principal (virou Arquitetura da Plataforma, dentro
+ * de Status — ver docs/platform/ecosystem-status-reinterpretation.md) e
+ * "Meu Escritório" ocupou o lugar coerente para Super ADM. Agência e
+ * Empresa Direta já tinham os 4 slots primários ocupados por itens já
+ * validados (REC OS/Operação/Clientes; Meu Negócio/CRM/Calendário) — Meu
+ * Escritório fica reachable para elas via o menu "Mais" (configs.admin.nav
+ * já inclui a rota), sem deslocar nenhum item primário existente.
  */
 import type { WorkspaceSurface } from "@/lib/workspaces/types";
 
@@ -41,7 +50,7 @@ export interface SurfaceBottomNavItem {
 export const SURFACE_BOTTOM_NAV_ITEMS: Record<WorkspaceSurface, SurfaceBottomNavItem[]> = {
   super_admin: [
     { id: "inicio", label: "Início", route: "/admin/dashboard", requiredCapability: "dashboard.view", activeMatch: "exact", priority: 1 },
-    { id: "ecossistema", label: "Ecossistema", route: "/admin/ecossistema", requiredCapability: "platform.ecosystem.view", activeMatch: "prefix", priority: 2 },
+    { id: "escritorio", label: "Meu Escritório", route: "/admin/escritorio", requiredCapability: "business_office.view", activeMatch: "prefix", priority: 2 },
     { id: "rec_os", label: "REC OS", route: "/admin/contentos", requiredCapability: "content.view", activeMatch: "prefix", priority: 3 },
     { id: "crm", label: "CRM", route: "/admin/leads", requiredCapability: "crm.view", activeMatch: "prefix", priority: 4 },
   ],
