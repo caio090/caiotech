@@ -24,3 +24,13 @@ Prioridade fixa: endereço cadastrado → cidade manual → geolocalização do 
 ## Feriados e datas sazonais (`holidays.ts`)
 
 Cada data guarda fonte, região, segmento, relevância e confiança — nenhuma data é tratada como "verdade universal" sem esse contexto. Nenhuma pesquisa ou importação real de datas nesta sprint.
+
+## Nota — Sprint REC OS 3.0.1 (calendário contextual)
+
+`CalendarNavigationContext`/`buildCalendarNavigationUrl()`
+(`src/lib/rec-os-workflow/types.ts`) preservam workspace/cliente/campanha/
+conteúdo/mês/filtros/rota-de-retorno ao navegar do REC OS para o
+Calendário — nunca abre um calendário genérico sem contexto. Google OAuth
+continua `blocked`, Google iCal continua `planned` — testado
+explicitamente que nenhuma referência a `google` aparece na URL
+construída por essa função.
