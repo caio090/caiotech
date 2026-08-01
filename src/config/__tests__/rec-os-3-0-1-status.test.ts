@@ -50,9 +50,19 @@ const crmAdaptiveCore = PROJECT_AREAS.find((a) => a.id === "crm_adaptive_core");
 assert(!!crmAdaptiveCore && crmAdaptiveCore.readiness === "planned", "crm_adaptive_core continua planned (Sprint Recovery 2.1.3, não alterado)");
 
 console.log("[test] Diagnóstico/Rotina do Negócio permanecem planned (nunca implementados às pressas)");
-for (const id of ["business_diagnostic_gateway", "diagnostic_ai_conversation", "diagnostic_context_distribution", "business_rhythm_workspace", "rec_os_roadmap", "rec_os_client_map", "paid_media_handoff"]) {
+for (const id of ["business_diagnostic_gateway", "diagnostic_ai_conversation", "diagnostic_context_distribution", "business_rhythm_workspace", "paid_media_handoff"]) {
   const area = PROJECT_AREAS.find((a) => a.id === id)!;
   assert(area.readiness === "planned", `${id}: readiness planned (nenhuma implementação nova)`);
+}
+
+// Sprint REC OS 3.0.1.1 fechou rec_os_roadmap/rec_os_client_map com telas
+// reais (/admin/contentos/roadmap, /admin/contentos/mapa-cliente) — não são
+// mais apenas registry. Ver src/config/__tests__/rec-os-3-0-1-1-status.test.ts
+// para a cobertura completa da sprint de fechamento.
+console.log("[test] rec_os_roadmap/rec_os_client_map avançaram para qa_pending (Sprint REC OS 3.0.1.1)");
+for (const id of ["rec_os_roadmap", "rec_os_client_map"]) {
+  const area = PROJECT_AREAS.find((a) => a.id === id)!;
+  assert(area.readiness === "qa_pending", `${id}: readiness qa_pending (telas reais implementadas na Sprint REC OS 3.0.1.1)`);
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
