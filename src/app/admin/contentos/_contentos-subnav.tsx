@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { buildCalendarNavigationUrl } from "@/lib/rec-os-workflow/types";
 
 interface NavLink {
   href: string;
@@ -20,6 +21,8 @@ const BASE_LINKS: NavLink[] = [
   { href: "/admin/contentos/criar",      label: "✦ Criar",     acceptsClient: true },
   { href: "/admin/contentos/producao",   label: "Produção",    acceptsClient: true },
   { href: "/admin/contentos/aprovacoes", label: "Aprovações",  acceptsClient: true },
+  { href: "/admin/contentos/roadmap",    label: "Roadmap",     acceptsClient: true },
+  { href: "/admin/contentos/mapa-cliente", label: "Mapa do Cliente", acceptsClient: true },
   { href: "/admin/calendario",           label: "Calendário",  acceptsClient: true },
   { href: "/admin/contentos/resultados", label: "Resultados",  acceptsClient: true },
   { href: "/admin/conexoes",             label: "Conexões",    acceptsClient: false },
@@ -48,10 +51,18 @@ export function ContentosSubNav({ initialClientId }: { initialClientId?: string 
     return pathname.startsWith(href);
   }
 
+  // Fase 13 — o link de Calendário do REC OS passa a usar o helper
+  // canônico (preserva cliente + returnRoute), em vez de só `?client=`.
+  const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
+  const calendarHref = buildCalendarNavigationUrl("/admin/calendario", {
+    workspaceId: clientId || "global", clientId: clientId || null, campaignId: null, contentId: null,
+    month: null, filters: {}, returnRoute: currentUrl,
+  });
+
   return (
     <nav ref={navRef} className="flex items-center gap-1 mb-6 bg-purple-50 border border-purple-100 rounded-xl p-1 overflow-x-auto w-full max-w-full scrollbar-none">
       {BASE_LINKS.map(({ href, label, acceptsClient }) => {
-        const dest   = acceptsClient && clientId ? `${href}?client=${clientId}` : href;
+        const dest   = href === "/admin/calendario" ? calendarHref : acceptsClient && clientId ? `${href}?client=${clientId}` : href;
         const active = isActive(href);
         return (
           <Link
