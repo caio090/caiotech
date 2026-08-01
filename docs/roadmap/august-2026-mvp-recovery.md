@@ -138,3 +138,14 @@ checkpoints de 02-03/08 absorvem a correção e reexecução — o checkpoint de
 isso empurrar o marco de 07/08, o novo marco deve ser registrado com a
 mesma disciplina desta sprint (data explícita, motivo, sem maquiagem) —
 nunca silenciosamente adiado sem registro.
+
+## Atualização — Sprint REC OS 3.0.1
+
+A pré-condição desta sprint (Sprint REC OS 3.0.1) foi cumprida após um
+bloqueio real: a Sprint QA Local 3.0.2 anterior parou corretamente com
+`BLOCKER_REC_OS_3_0_1_NOT_EXECUTED` ao confirmar, por auditoria de
+histórico git, que o fluxo criativo canônico/mobile/CRM mobile ainda não
+existiam. Esta sprint implementou essas peças; a causa raiz mais provável
+de boa parte dos defeitos mobile reportados (viewport meta ausente) foi
+encontrada e corrigida. A QA Local 3.0.2 (Playwright) deve ser reaberta
+depois desta sprint.
