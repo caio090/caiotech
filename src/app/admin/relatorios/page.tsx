@@ -138,7 +138,7 @@ export default function AdminRelatoriosPage() {
 
   return (
     <div>
-      <PageHeader title="Central de Dados & Insights" description="Relatórios, fontes de dados e análises por cliente">
+      <PageHeader title="Relatórios" description="Relatórios, fontes de dados e análises por cliente">
         <button
           onClick={() => setShowExport(true)}
           className="flex items-center gap-2 text-sm font-medium text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"

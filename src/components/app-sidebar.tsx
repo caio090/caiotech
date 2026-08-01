@@ -42,7 +42,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/clientes",          label: "Clientes",         icon: Users },
       { href: "/admin/equipe",            label: "Equipe",           icon: UsersRound },
       { href: "/admin/diagnosticos",      label: "Diagnósticos",     icon: Activity },
-      { href: "/admin/relatorios",        label: "Dados & Insights", icon: BarChart3 },
+      { href: "/admin/relatorios",        label: "Relatórios",       icon: BarChart3 },
       { href: "/admin/financeiro",        label: "Financeiro",       icon: DollarSign },
       { href: "/admin/super/billing",     label: "Billing & Planos", icon: CreditCard },
       { href: "/admin/super/accounts",    label: "Contas",           icon: Shield },

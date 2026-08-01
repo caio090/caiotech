@@ -64,3 +64,12 @@ registrar núcleo universal, superfícies, capacidades, adaptação por
 nicho, dependências, maturidade, bloqueios, prioridade e próxima etapa da
 evolução adaptativa — sem declará-la implementada. O CRM real hoje
 continua sendo só leads/funil/oportunidades (maturidade inalterada).
+
+## Nota — Sprint REC OS 3.0.1 (nomenclatura Relatórios)
+
+O rótulo visível "Relatórios" foi padronizado em toda a UI — 3 ocorrências
+reais ainda diziam "Dados & Insights"/"Dados e Insights"
+(`src/components/app-sidebar.tsx`, `src/app/admin/relatorios/page.tsx`,
+`src/app/admin/relatorios/conteudo/page.tsx`), corrigidas nesta sprint.
+"Resultados" do REC OS (desempenho de conteúdo/campanha) não foi
+renomeado — é um conceito diferente.

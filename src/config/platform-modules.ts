@@ -277,7 +277,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
   },
   {
     id: "relatorios",
-    name: "Relatórios (Dados & Insights)",
+    name: "Relatórios",
     description: "Central de relatórios — hoje sem um único modelo de dado; consome marketing-intelligence e analytics do cardápio digital.",
     category: "intelligence",
     routes: ["/admin/relatorios", "/admin/relatorios/conteudo", "/admin/relatorios/faturamento"],
@@ -296,7 +296,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "qa_pending",
     nicheSupport: false,
     owner: "intelligence",
-    notes: "Fase 19 desta sprint só renomeia o rótulo visível para 'Relatórios' quando ainda aparecer 'Dados e Insights' — rota e IDs técnicos preservados. Ganha ReportViewMode (Essencial/Analítica) sobre a mesma fonte.",
+    notes: "Nome visível padronizado para 'Relatórios' em toda a UI (sidebar, PageHeader, breadcrumbs) na Sprint REC OS 3.0.1 — uma sprint anterior já tinha essa intenção registrada aqui, mas 3 ocorrências reais ainda diziam 'Dados & Insights'/'Dados e Insights' (src/components/app-sidebar.tsx, src/app/admin/relatorios/page.tsx, src/app/admin/relatorios/conteudo/page.tsx), agora corrigidas. Rota e IDs técnicos preservados. Ganha ReportViewMode (Essencial/Analítica) sobre a mesma fonte. 'Resultados' do REC OS (desempenho de conteúdo/campanha) não foi renomeado — é um conceito diferente.",
   },
   {
     id: "fontes_dados",
