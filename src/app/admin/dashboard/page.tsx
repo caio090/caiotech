@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { DashboardCard } from "@/components/dashboard-card";
 import {
   Users, Target, FolderOpen, CheckSquare, BarChart3,
-  DollarSign, AlertTriangle, TrendingUp, Zap, UserRoundPlus, Clock,
+  DollarSign, AlertTriangle, TrendingUp, UserRoundPlus, Clock,
   Sparkles, Video, GraduationCap, Link2, FileText,
   Package, Truck, ShoppingBag, MapPin, BarChart2, Eye, Bot,
 } from "lucide-react";
@@ -14,6 +14,9 @@ import { SmartSuggestionsPanel } from "@/components/smart-suggestions-panel";
 import { getAdminSuggestions } from "@/lib/ai-suggestions";
 import { CurrentUserCard } from "@/components/current-user-card";
 import { MeuDiaBlock } from "./_meu-dia";
+import { QuickActionMenu } from "@/components/quick-action-menu";
+import { getWorkspacePreviewContext } from "@/lib/workspaces/context";
+import type { WorkspaceSurface } from "@/lib/workspaces/types";
 
 interface RealApproval {
   id: string;
@@ -90,6 +93,18 @@ export default async function AdminDashboardPage() {
 
   const fullNameForCard = firstName || null;
 
+  // Fase 23 — mesmo padrão já usado para a bottom navigation (Sprint REC OS
+  // 3.0.1): superfície só é considerada conhecida com segurança nos casos
+  // já resolvidos pelo preview do Super Admin ou pela própria sessão real
+  // de super_admin. Nos demais casos, cai no conjunto de ações "default".
+  let surface: WorkspaceSurface | undefined;
+  if (isSupabaseConfigured) {
+    try {
+      const preview = await getWorkspacePreviewContext();
+      surface = preview.context?.surface ?? (userRole === "super_admin" ? "super_admin" : undefined);
+    } catch { surface = userRole === "super_admin" ? "super_admin" : undefined; }
+  }
+
   return (
     <div>
       <CurrentUserCard
@@ -102,10 +117,7 @@ export default async function AdminDashboardPage() {
         <SmartSuggestionsPanel suggestions={adminSuggestions} className="mb-5" />
       )}
       <PageHeader title="Dashboard" description="Visão geral da agência">
-        <button className="w-full sm:w-auto justify-center text-sm text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2">
-          <Zap className="w-4 h-4" />
-          Ação rápida
-        </button>
+        <QuickActionMenu surface={surface} />
       </PageHeader>
 
       {/* KPIs — row 1 */}

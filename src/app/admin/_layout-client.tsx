@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell, Search, ArrowLeft, CheckSquare,
+  Bell, ArrowLeft, CheckSquare,
   UserRoundPlus, X, UsersRound, Activity, Target,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
+import { AdminSearchSheet } from "@/components/admin-search-sheet";
 import { LokatVoicePanel } from "@/components/lokat-voice-panel";
 import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
 import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
@@ -366,16 +367,7 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
             ? "bg-black/20 backdrop-blur-md border-b border-white/10"
             : "bg-white border-b border-gray-100"
         )}>
-          <div className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 w-32 md:w-72 transition-colors",
-            isInicioPage ? "bg-white/10 border border-white/15" : "bg-gray-50 border border-gray-200"
-          )}>
-            <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <input
-              placeholder="Buscar..."
-              className="text-sm bg-transparent outline-none text-gray-600 placeholder-gray-400 w-full"
-            />
-          </div>
+          <AdminSearchSheet dark={isInicioPage} />
 
           <div className="flex items-center gap-2 md:gap-3">
             {/* Admin notification bell — matches client pattern */}

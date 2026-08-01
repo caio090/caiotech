@@ -29,8 +29,13 @@ assert((dashboardCard.match(/break-words/g) ?? []).length >= 2, "break-words apl
 assert((dashboardCard.match(/flex-shrink-0/g) ?? []).length >= 2, "ícone nunca é espremido pelo título longo");
 
 console.log("[test] Ação rápida — full width no mobile");
+// Sprint REC OS 3.0.1.1 (Fase 23): o <button> estático virou QuickActionMenu
+// (menu real, contextual por superfície) — a classe de largura mobile foi
+// junto para dentro do componente, dashboard/page.tsx só monta <QuickActionMenu />.
 const dashboardPage = read("src/app/admin/dashboard/page.tsx");
-assert(dashboardPage.includes("w-full sm:w-auto"), "botão Ação rápida não ultrapassa a viewport no mobile");
+const quickActionMenu = read("src/components/quick-action-menu.tsx");
+assert(dashboardPage.includes("<QuickActionMenu"), "dashboard monta o menu de ação rápida real");
+assert(quickActionMenu.includes("w-full sm:w-auto"), "botão Ação rápida não ultrapassa a viewport no mobile (agora dentro do componente)");
 
 console.log("[test] Bottom navigation por superfície (Fase 31)");
 assert(Object.keys(SURFACE_BOTTOM_NAV_PRIMARY).length === 4, "4 superfícies mapeadas");
