@@ -65,6 +65,19 @@ export interface ProjectAreaStatus {
   risk?: RiskLevel;
   notes?: string;
   last_updated: string;
+  // ── Sprint Recovery 2.1.3 — camada de execução (ver src/config/delivery-status.ts) ──
+  // Todos aditivos e opcionais: nenhuma área existente precisa preenchê-los.
+  // `overdue` nunca é um campo aqui — é sempre derivado por
+  // resolveDeliveryStatus(), nunca marcado manualmente (ver Fase 7/29).
+  priority?: import("./delivery-status").DeliveryPriority;
+  targetDate?: string; // YYYY-MM-DD
+  statusDate?: string; // YYYY-MM-DD — data de referência usada para avaliar prazo, nunca Date.now() direto
+  releaseBlocker?: boolean;
+  validationRequired?: import("./delivery-status").ValidationStage[];
+  validationEvidence?: string;
+  ownerArea?: string;
+  dependencies?: string[];
+  nextCheckpoint?: string;
 }
 
 export const V1_PROGRESS = 81;  // IMUTÁVEL — alterar apenas após QA formal
@@ -103,6 +116,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     phase: "v1", readiness: "validated",
     qa: { status: "approved", date: "2026-07-01", auditor: "interno", result: ["Login funcional", "RLS ativo", "Convites testados"] },
     risk: "none", last_updated: "2026-07-12",
+    priority: "P0",
   },
   {
     id: "db_schema", name: "Schema do banco", category: "banco",
@@ -307,6 +321,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Briefing, roteiro, decupagem, produção audiovisual.",
     phase: "v1", readiness: "implemented",
     qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+    priority: "P1",
   },
   {
     id: "storyboard", name: "Storyboard", category: "conteudo",
@@ -369,6 +384,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Faturamento, Meta insights, diagnóstico.",
     phase: "v1", readiness: "implemented",
     qa: { status: "pending" }, risk: "low", last_updated: "2026-07-12",
+    priority: "P1",
   },
   {
     id: "diagnostics", name: "Diagnósticos admin", category: "admin",
@@ -387,6 +403,109 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     next_actions: ["Modal de detalhes do lead", "UTM tracking melhorado", "QA da coluna Instagram"],
     estimate: { hoursMin: 4, hoursLikely: 6, hoursMax: 10 },
     last_updated: "2026-07-13",
+    priority: "P2",
+  },
+
+  // ── Sprint Recovery 2.1.3 — arquitetura futura do CRM adaptativo (Fase 15-22).
+  // Nenhuma linha de código funcional nova; só o registro do roadmap. Ver
+  // docs/crm/*.md. `crm` acima continua sendo o CRM real hoje (leads/funil);
+  // as 8 áreas abaixo são a evolução adaptativa planejada, nunca implementada
+  // nesta sprint. ──────────────────────────────────────────────────────────
+  {
+    id: "crm_adaptive_core",
+    name: "CRM Adaptativo — Núcleo universal",
+    category: "crm",
+    description: "Tipos conceituais universais (Lead, Contato, Empresa, Oportunidade, Pipeline, Etapa, Atividade, Follow-up, Responsável, Origem, Temperatura, Score, Probabilidade, Valor, Próxima ação, Motivo de perda, Histórico, Tarefa, Documento, Mensagem, Tag, Segmento) — ver docs/crm/adaptive-crm-architecture.md.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Somente arquitetura registrada nesta sprint — nenhuma tabela, API ou tela nova. O CRM real hoje continua sendo a área 'crm' (leads/funil/oportunidades).",
+    priority: "P2",
+  },
+  {
+    id: "crm_surface_matrix",
+    name: "CRM Adaptativo — Matriz de superfícies",
+    category: "crm",
+    description: "Visibilidade futura por superfície: Super Admin (CRM comercial da própria Lokat, nunca misturado com leads internos de clientes), Agência (CRM próprio + acesso condicional ao CRM de um cliente só quando módulo ativo/capability/relacionamento válido), Cliente da Agência (CRM próprio quando contratado, nunca vê o comercial da agência), Empresa Direta (CRM próprio, adaptado por nicho), Usuário Operacional (só leads atribuídos, nunca configuração global) — ver docs/crm/crm-surface-matrix.md.",
+    phase: "future",
+    readiness: "qa_pending",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Documentação da matriz de isolamento futura. Reaproveita o mesmo princípio já validado em workspace-capabilities.ts — não cria uma segunda autorização paralela quando implementado.",
+    priority: "P2",
+  },
+  {
+    id: "crm_niche_adapters",
+    name: "CRM Adaptativo — Adaptadores por nicho",
+    category: "crm",
+    description: "Conceitos adaptados por nicho (Alimentação, Materiais de construção, Agência e serviços, Construção civil, Varejo geral) sobre o mesmo núcleo universal — ver docs/crm/crm-niche-adapters.md.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Reaproveita business-niche-packs.ts como padrão de adaptação (nunca copia o módulo, só adapta linguagem/campos/terminologia). Pedido explícito não seguido nesta sprint: transformar pedido comum em oportunidade comercial automaticamente sem regra confirmada.",
+    priority: "P2",
+  },
+  {
+    id: "crm_follow_up_engine",
+    name: "CRM Adaptativo — Motor de Follow-up",
+    category: "crm",
+    description: "FollowUpDefinition/Schedule/Execution/Outcome/Rule — tipos manual/automatic/suggested/recurring/event_triggered, estados pending/due_today/overdue/completed/cancelled/rescheduled/waiting_response — ver docs/crm/crm-follow-up-model.md.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Nenhuma mensagem é enviada nesta sprint — só o modelo de dados e estados foi registrado.",
+    priority: "P2",
+  },
+  {
+    id: "crm_lead_temperature_engine",
+    name: "CRM Adaptativo — Motor de Temperatura do Lead",
+    category: "crm",
+    description: "Estados cold/warming/warm/hot/customer/inactive/lost (Frio/Em aquecimento/Morno/Quente/Cliente/Inativo/Perdido). Score futuro consideraria recência, frequência, interação, canal, resposta, reunião, proposta, orçamento, comportamento, perfil, fit, valor, urgência e histórico — configurável por nicho, nunca calculado só por opinião manual. Ver docs/crm/crm-lead-temperature-model.md.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Nenhum motor de cálculo implementado nesta sprint — só os estados conceituais e os fatores futuros do score.",
+    priority: "P2",
+  },
+  {
+    id: "crm_dashboard_engine",
+    name: "CRM Adaptativo — Dashboards Essencial e Gestor",
+    category: "crm",
+    description: "Visão Essencial (novos leads, leads quentes, follow-ups de hoje/atrasados, propostas abertas, valor em negociação, conversão, próxima ação) e Visão Gestor (funil, conversão por etapa, tempo por etapa, origem, responsável, valor, previsão, perdas, motivos, temperatura, SLA, cohort, comparação de períodos, nicho, produto, canal) — mesma fonte para os dois modos. Ver docs/crm/crm-dashboard-model.md.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Segue o mesmo princípio de Visão simples/Modo Gestor já usado em Meu Negócio (mesmo estado, mesma fonte, densidade diferente).",
+    priority: "P2",
+  },
+  {
+    id: "crm_intelligence_assistant",
+    name: "CRM Adaptativo — Assistente de IA (futuro)",
+    category: "crm",
+    description: "Capacidades futuras: resumir lead, sugerir próxima ação/follow-up, identificar lead esfriando, detectar falta de resposta, classificar intenção, preparar reunião, gerar plano de fechamento, identificar objeções, sugerir perguntas, revisar proposta, prever risco, analisar perda. A IA nunca decide automaticamente fechar/descartar lead, alterar valor, enviar mensagem, prometer condição ou mover oportunidade — toda ação exige revisão ou regra explícita.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Segue o mesmo padrão 'sem IA falsa' de src/lib/intelligence/availability.ts — nenhuma chamada real nesta sprint, nenhuma ação automática desenhada.",
+    priority: "P2",
+  },
+  {
+    id: "crm_workspace_isolation",
+    name: "CRM Adaptativo — Isolamento por workspace",
+    category: "crm",
+    description: "Garantia de que o CRM de cada workspace (agência, cliente da agência, empresa direta) nunca vaza para outro, reaproveitando workspace-capabilities.ts quando implementado — não uma autorização paralela.",
+    phase: "future",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Classificado P1 (não P2 como as demais áreas de CRM adaptativo) porque isolamento entre tenants é um gate de segurança, não uma feature de produto — mesmo critério de tenant_isolation.",
+    priority: "P1",
   },
   {
     id: "team", name: "Equipe", category: "admin",
@@ -624,6 +743,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     ],
     sql_dependency: "SQL 88 — conversation_links",
     last_updated: "2026-07-14",
+    priority: "P2",
     notes: "state=blocked_external_infra. CustomerInboxProvider interface e chatwoot-disabled provider implementados. Feature flag crm_inbox=disabled. Painel de integrações mostra status 'não instalado'.",
   },
   {
@@ -673,6 +793,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
       ],
     },
     last_updated: "2026-07-19",
+    priority: "P1",
     notes: "Sprint 3.1A: rota /admin/calendario (requireAdminContentOSContext, adminDb), src/lib/global-calendar.ts com normalizadores puros. Sprint 3.1A.1: hotfix dos 4 P1 do QA (navegação mensal, filtro client, lista de clientes, scheduled_at). Verificado via script ad-hoc, sem framework de teste instalado. Somente leitura, sem SQL, sem reuniões, sem Google Calendar/Meet — adiados para 3.1C/3.1D. Arquitetura original em docs/architecture/GLOBAL_CALENDAR_V1.md.",
   },
   {
@@ -846,6 +967,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "planned",
     qa: { status: "not_started" },
     last_updated: "2026-07-20",
+    priority: "P2",
     notes: "Somente na branch feat/motor-lokat-preview-v1. Nesta versão o contexto é só exibido — preenchimento automático do formulário do REC OS é a próxima fatia, não implementada.",
   },
   {
@@ -868,6 +990,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "planned",
     qa: { status: "not_started" },
     last_updated: "2026-07-20",
+    priority: "P2",
     notes: "Somente na branch feat/motor-lokat-preview-v1. Controle de estoque registrado como próxima capacidade.",
   },
 
@@ -918,6 +1041,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-31",
+    priority: "P1",
     notes: "Já em main desde a release canônica 1.0 (mergeado via fix/product-engineering-usability-v1). Nenhuma LLM conectada, nenhum preenchimento automático como fato. Hotfix 1.1.1: os 4 quadrantes passaram a ser agrupados visualmente sob dois títulos explícitos (Ambiente interno / Ambiente externo) com explicação — estrutura dos itens em si não foi alterada. Hotfix canônico 1.0.1: confirmado que o agrupamento já existia e renderiza corretamente; só o texto de 'Ambiente externo' foi ajustado para bater exatamente com a redação oficial ('do mercado e do contexto'). Sprint Meu Negócio 2.1.2: SwotItem ganhou campos aditivos opcionais (status/linkedModule/linkedCompetitorId/linkedGoalId) e a matriz foi reconectada dentro do Centro de Comando real (área DNA & Estratégia) com cruzamentos determinísticos (potencializar/proteger/melhorar para aproveitar/reduzir risco) — nenhuma decisão automática, nenhum item existente perdido.",
     next_actions: ["QA reconfirmar que Ambiente interno/externo estão explícitos e que nenhum item SWOT existente foi perdido no reagrupamento"],
   },
@@ -941,6 +1065,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-31",
+    priority: "P1",
     notes: "Novo nesta sprint, dentro da área DNA & Estratégia do Centro de Comando real (src/app/admin/meu-negocio/_strategy/_strategy-eight-ps.tsx). Não é um framework de mercado — é a metodologia LOKAT (4Ps tradicionais + Público + Posicionamento + Processo + Performance), documentada em docs/meu-negocio/lokat-8ps-framework.md.",
   },
   {
@@ -963,6 +1088,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-31",
+    priority: "P1",
     notes: "Restaura a camada estratégica que existia (business_dna/business_manual/business_four_ps/business_swot/sales_goals) mas estava desconectada da experiência real desde a migração para o Centro de Comando. Usa o mesmo padrão de deep navigation (SECTIONS/SUBSECTIONS/activeSubsection) já existente nas demais áreas — nenhuma lista de navegação duplicada. Compartilha Visão simples/Modo Gestor com o resto do Centro de Comando (mesmo estado, não um segundo).",
   },
   {
@@ -996,6 +1122,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-22",
+    priority: "P1",
     notes: "Somente na branch fix/product-engineering-usability-v1 (base feat/product-engineering-preview-v1). Nenhuma persistência — tudo em memória durante a sessão. Hotfix 1.1.1 (P1 do QA): a edição detalhada (composição, custos, operação, posicionamento, campos por segmento) não estava evidente/acessível após criar um item — corrigido com um workspace dedicado por item e um botão de edição explícito. Serviço nunca exige estoque/ingredientes/embalagem/validade (novo campo ProductServiceItem.kind filtra esses campos do segmento).",
     next_actions: ["QA reconfirmar que criar produto e criar serviço abrem fluxos com campos diferentes", "QA reconfirmar que o botão 'Editar produto/serviço' abre o workspace e 'Voltar ao Portfólio' retorna sem perder dados"],
   },
@@ -1132,6 +1259,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
+    priority: "P1",
     notes: "Somente na branch feat/workspace-panels-v1. Auditoria prévia encontrou três vocabulários de papel/tipo de conta não sincronizados (access-control.ts, account-permissions.ts, account-types.ts) — este módulo não os substitui, fica acima deles.",
     next_actions: ["QA local: confirmar que a resolução de contexto não quebra nenhum papel existente"],
   },
@@ -1155,6 +1283,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-24",
+    priority: "P1",
     notes: "Somente na branch hotfix/workspaces-isolation-mobile-v1. Usuário comum, agência e cliente da agência não veem o switcher (gate único: userRole === 'super_admin', mesmo padrão já usado pelo widget de Status V1). Hotfix 1.0.1: removido o useEffect que buscava opções de entidade. Hotfix 1.0.2 (Fase 16): falha ao entrar em preview não fecha mais o menu silenciosamente. Hotfix 1.0.4 tentou caber Painel ADM/Visualizar como na mesma linha do header via cálculo de pixel (busca w-32 + menu 'Mais' para CRM/Status V1) — o QA local em 390×844 reprovou os dois de novo. Hotfix 1.0.5: solução mais robusta (Opção C do ticket) — os dois controles ganharam uma barra dedicada, só deles, abaixo do header, visível apenas em mobile (md:hidden), sem disputar espaço com busca/sino/CRM/Status V1/avatar; o menu 'Mais' foi removido, CRM e Status V1 voltaram a ser sempre visíveis no header normal. Também corrigido nesta sprint: o dropdown do switcher (w-72) alinhado à direita da nova barra (justify-end, não center) para não estourar a borda esquerda em 390px; adicionado aria-label, Escape-para-fechar e retorno de foco ao gatilho. Mensagens do seletor agora distinguem 5 estados (carregando/lista/vazio-blueprint/vazio-real/erro) — erro HTTP nunca mais vira lista vazia silenciosa.",
     next_actions: ["QA local: confirmar ausência do switcher para papéis não super_admin", "QA visual em 390×844 (sem navegador neste ambiente — pendente para o próximo QA): confirmar a barra dedicada e o dropdown do switcher dentro da viewport"],
   },
@@ -1169,6 +1298,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     last_updated: "2026-07-26",
     notes: "Somente na branch hotfix/workspaces-isolation-mobile-v1. Hotfix 1.0.1 fechou a lacuna do readOnly enviado pelo chamador. Hotfix 1.0.2 isolou a chave de assinatura. Hotfix 1.0.4 corrigiu o P0 de dados reais aparecendo como 'empresa direta' e o P1 do 'Atendido por: —'. Hotfix 1.0.5 encontrou a causa raiz de um P1 diferente do QA local seguinte: os TRÊS blueprints (Agência, Cliente, Empresa) retornavam 'Nenhum registro encontrado' — não porque a lógica de fixtures estivesse errada, mas porque /api/admin/workspaces exigia hasSupabaseServiceRoleKey() ANTES de olhar para surface/source, para toda superfície, inclusive as blueprint-only que nunca deveriam precisar de Supabase. SUPABASE_SERVICE_ROLE_KEY não está configurada neste .env.local (confirmado por grep, 0 ocorrências) — todo GET batia em 503, e o switcher convertia isso em lista vazia silenciosa. Corrigido com um contrato explícito ?source=blueprint|real (padrão: blueprint) — blueprint nunca mais depende de service role key nem consulta Supabase; real continua exigindo ambos. WorkspaceOption ganhou os campos completos (surface, source, parentWorkspaceId/Name, relationshipType, status, readOnly). Hotfix 1.0.6: um QA local confirmou Super Admin autenticado, sidebar e topbar CRM carregando normalmente em /admin/dashboard, mas 'Painel ADM'/'Visualizar como' nunca apareciam. Investigação (não apenas CSS): WorkspaceViewSwitcher e WorkspaceExitButton sempre estiveram corretamente importados e renderizados no único shell real (src/app/admin/_layout-client.tsx, usado por src/app/admin/layout.tsx — nenhum shell duplicado ou órfão existe). A causa real era a resolução de papel: _layout-client.tsx lia profiles.role sozinho, sem fallback, e retornava cedo quando o profile vinha nulo — deixando userRole preso em null para sempre. src/proxy.ts (o gate real que já deixou esse mesmo usuário chegar a /admin/dashboard) e o redirect de login já usam profile.role ?? user_metadata.role ?? app_metadata.role há tempos, exatamente porque uma conta real pode ter profiles.role nulo/desatualizado com o metadata de Auth correto. Corrigido replicando esse mesmo fallback em _layout-client.tsx. Hotfix 1.0.7 (segunda causa raiz, a mesma sintomatologia): o fallback do 1.0.6 ainda dependia de um fetch client-side (auth.getUser() + consulta a profiles) rodando dentro de um useEffect, cuja falha era engolida por um catch {} — quando esse fetch falhava ou demorava, userRole continuava null e os mesmos controles voltavam a sumir, sem nenhum erro visível. Corrigido eliminando essa dependência: src/lib/access-control.ts ganhou resolveEffectiveUserRole() — o único resolvedor puro e canônico, com a mesma precedência (profile.role → user_metadata.role → app_metadata.role → null), agora compartilhado por src/proxy.ts, o redirect de login e src/app/admin/layout.tsx. O layout do admin resolve o papel inteiramente no servidor (mesma sessão já autenticada) e passa initialUserRole como prop para AdminLayoutShell, que inicializa seu estado diretamente dele — a primeira renderização (servidor e cliente) já reflete o papel correto, sem esperar nenhum efeito. A consulta client-side remanescente busca somente nome/avatar (nunca mais papel) e seu catch agora registra um aviso sanitizado (sem e-mail, id, token ou payload) em vez de falhar em silêncio. QA Production 1.0.7 confirmou P0 = 0 (sessão Super Admin real, Painel ADM, Visualizar como, WorkspaceViewSwitcher, Status V1, os três blueprints, agência pai, Duh/Pedreirão ausentes dos seletores, sem React #418/hydration/500/503/segredo exposto) mas achou dois novos problemas: P1 — trocar de blueprint só refletia após reload manual; P2 — sair do preview podia deixar a URL em /admin/visualizar. Hotfix 1.0.8: causa raiz do P1 confirmada lendo src/app/api/admin/workspaces/preview/route.ts — as duas respostas de sucesso sempre retornam destination:\"/admin/visualizar\", o mesmo pathname fixo; como o usuário trocando de blueprint já está nessa rota, router.push(destination) virava um no-op de mesma URL no App Router, e mesmo na primeira ativação (dashboard → /admin/visualizar) o layout compartilhado (src/app/admin/layout.tsx) podia continuar servido do Router Cache do cliente, que não tem visibilidade de que o cookie de preview mudou no servidor. A saída (workspace-exit-button.tsx) tinha a mesma lacuna: o DELETE limpa o cookie no servidor, mas um router.push() puro não dava ao cliente nenhum motivo para reexecutar aquele mesmo layout compartilhado. Corrigido chamando router.refresh() logo depois de router.push() nos dois componentes (workspace-view-switcher.tsx e workspace-exit-button.tsx) — router.refresh() é o único primitivo do App Router que de fato invalida o Router Cache e força os server components da rota atual (o layout incluído) a reexecutar contra o cookie atual, independente de a URL ter mudado ou não. QA Production 1.0.8 confirmou P0 = 0 novamente (commit ecea95c publicado, sessão Super Admin, Painel ADM, Visualizar como, três blueprints, agência pai, Duh/Pedreirão ausentes, sem React #418/hydration/500/503/token exposto, troca de blueprint já funcionando sem F5) mas achou: (a) stale visual na SAÍDA — banner e painel anterior podiam permanecer visíveis até refresh; (b) um problema mais sério no próprio código: a navegação de saída rodava dentro de um bloco finally, incondicionalmente — se o DELETE falhasse, a URL ainda mudava para /admin/dashboard enquanto o cookie de preview continuava ativo no servidor, um estado inconsistente; (c) latência de 4-7s ao trocar blueprint. Hotfix 1.0.9: causa da corrida e da latência — router.push() e router.refresh() são DOIS round-trips separados do App Router (uma navegação soft, depois um refetch RSC independente da mesma árvore), empilhados sobre os próprios efeitos client-side do layout (busca de nome, busca de notificações) reexecutando de novo por cima disso — três fases de trabalho assíncrono que o usuário via como uma única pausa longa sem retorno visual. Decisão de arquitetura: troca de workspace é uma fronteira de contexto privilegiado, equivalente a troca de tenant — não uma navegação comum. router.push()/router.refresh() foram REMOVIDOS por completo (useRouter nem é mais importado) dos dois componentes (workspace-view-switcher.tsx, workspace-exit-button.tsx) e substituídos por exatamente uma navegação real de documento — window.location.assign(destination) na ativação, window.location.replace(\"/admin/dashboard\") na saída — disparada somente após validar res.ok + body.ok + (na ativação) a igualdade exata com o único destination permitido. A navegação de saída deixou de existir dentro de finally: em qualquer falha do DELETE, nada navega, o preview permanece visível, e uma mensagem sanitizada com nova tentativa aparece. Ambos os fluxos ganharam proteção contra duplo clique (if (entering/exiting) return;) e um overlay de estado (\"Trocando ambiente...\" / \"Saindo da visualização...\"). As respostas do POST e do DELETE ganharam Cache-Control: no-store; o formato do cookie (HttpOnly, assinatura, Secure em Production) não foi alterado. Guard HTTP 403 e QA mobile real continuam pendentes (mesmo roteiro sanitizado do hotfix 1.0.8, rota /api/admin/contentos/drafts reutilizada, nenhuma rota nova). Hotfix 1.0.10 — QA Production 1.0.9 confirmou P0 = 0 (READY, commit correto, domínio oficial, sessão Super Admin real, Visualizar como, os três blueprints, troca Agência→Cliente/Cliente→Empresa/Empresa→Agência sem F5, overlay 'Trocando ambiente...', banner correto, Duh/Pedreirão ausentes, sem React #418/hydration/500/503) mas achou um P1 real na SAÍDA: a URL mudava para /admin/dashboard mas o banner e o botão 'Sair da visualização' permaneciam no DOM até um refresh manual. Causa raiz real, encontrada nesta sprint: NÃO era (só) uma corrida entre o Set-Cookie do DELETE e a navegação — era que workspace-preview-banner.tsx tinha seu PRÓPRIO botão de saída ('Sair da visualização', o controle de fato clicado durante um preview ativo), com sua própria função exit() nunca tocada pelo hotfix 1.0.9: ainda chamava fetch(DELETE) dentro de um try com a navegação (router.push) incondicional dentro de finally — exatamente a classe de bug que 1.0.9 achava ter eliminado, só que em um segundo controle de saída duplicado e desalinhado (workspace-exit-button.tsx, o botão 'Painel ADM', foi o único corrigido em 1.0.9). Decisão de arquitetura: a saída deixou de ser fetch()+navegação client-side inteiramente — agora é uma transação HTTP única: um <form method=\"post\" action=\"/api/admin/workspaces/preview/exit\"> real, atendido por um endpoint dedicado (src/app/api/admin/workspaces/preview/exit/route.ts) que resolve o papel canônico no servidor (getCurrentUser + profiles.role === super_admin, nunca confia em nada do cliente), apaga o cookie de preview e retorna HTTP 303 para /admin/dashboard NA MESMA resposta (src/lib/workspaces/atomic-exit.ts) — Set-Cookie e Location saem juntos, então não existe mais uma segunda requisição para competir com a primeira. Falhas (sem sessão, papel não é mais super_admin) nunca tocam o cookie e apenas redirecionam para um destino seguro (/login ou /admin/dashboard), sem fingir que uma saída aconteceu. Ambos os controles de saída (workspace-exit-button.tsx e workspace-preview-banner.tsx) foram migrados para esse mesmo <form>, eliminando a duplicação de lógica que causou o P1. A rota antiga DELETE /api/admin/workspaces/preview permanece inalterada (ainda usada por clear-invalid-preview-cookie.tsx, um caso de uso legítimo e diferente — limpeza best-effort de cookie já inválido/expirado). Hotfix 1.0.11 — QA Production 1.0.10 pelo Claude Web executou os dois controles reais (Sair da visualização e Painel ADM); ambos navegaram para /api/admin/workspaces/preview/exit mas receberam 403 {\"error\":\"Esta ação está indisponível no modo de visualização.\",\"code\":\"WORKSPACE_PREVIEW_READ_ONLY\"} — sem 303, sem remoção de cookie, sem saída. Causa raiz: src/proxy.ts (defesa em profundidade contra mutações durante preview) mantém sua própria allowlist de exceções em runtime (MUTATION_GUARD_EXEMPT_PATHS), completamente separada da classificação usada por scripts/check-workspace-mutation-coverage.ts (só análise estática de arquivos, sem nenhum efeito em produção). O hotfix 1.0.10 classificou a nova rota /api/admin/workspaces/preview/exit apenas nesse script — nunca a adicionou à allowlist real do proxy, que a bloqueava como qualquer outra mutação de negócio sob /api/admin/, antes mesmo de a requisição alcançar o route handler. Corrigido com uma exceção exata e testável: isWorkspacePreviewControlMutation() (src/lib/workspaces/mutation-guard-runtime.ts, módulo puro sem dependência de next/server) libera SOMENTE method === \"POST\" && pathname === \"/api/admin/workspaces/preview/exit\" — nenhum prefixo, substring, trailing slash ou outro verbo nesse mesmo path. A decisão inteira do guard (shouldBlockMutationInPreview()) foi extraída de src/proxy.ts para esse mesmo módulo, que agora é a única fonte de verdade tanto para o proxy quanto para os testes — proxy.ts não mantém mais cópias locais de MUTATION_GUARD_EXEMPT_PATHS/MUTABLE_API_NAMESPACES. O endpoint de saída em si (autenticação, papel super_admin, Set-Cookie+303 na mesma resposta) não foi alterado. QA Production 1.0.11 pendente.",
     next_actions: ["QA Production 1.0.11 (Claude Web): confirmar que 'Sair da visualização' e 'Painel ADM' agora completam a saída (303 → /admin/dashboard, cookie removido, sem 403 WORKSPACE_PREVIEW_READ_ONLY)", "QA mobile real e comprovação do guard HTTP 403 em rota empresarial durante preview ativo continuam pendentes"],
+    priority: "P0",
+    validationRequired: ["authenticated_local_qa", "official_domain_qa"],
   },
   {
     id: "agency_workspace_shell",
@@ -1179,6 +1310,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-25",
+    priority: "P1",
     notes: "Somente na branch hotfix/workspaces-isolation-mobile-v1. Não lê agency_clients para popular uma carteira real ainda — próxima ação depende do provisionamento (docs/workspace-provisioning-plan.md). Hotfix 1.0.5: corrigido o bug que fazia a Agência de Teste (Blueprint) retornar 'Nenhum registro encontrado' no seletor — causa era o endpoint do picker exigir service role key para toda superfície, mesmo a puramente demonstrativa; ver workspace_preview_security. Hotfix 1.0.6: os controles de entrada no preview (Painel ADM / Visualizar como) voltaram a aparecer para o Super Admin real neste shell — causa raiz e correção detalhadas em workspace_preview_security.",
     next_actions: ["Ler agency_clients para popular a carteira de clientes real da agência, uma vez que existam registros reais"],
   },
@@ -1191,6 +1323,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-23",
+    priority: "P1",
     notes: "Somente na branch hotfix/workspaces-isolation-mobile-v1. O /client/* real não foi alterado — só o preview (/admin/visualizar) aponta para lá com o client_id resolvido. Hotfix 1.0.4: corrigido o banner mostrando 'Atendido por: —' para o Cliente de Teste 02 (blueprint). Hotfix 1.0.5: corrigido o bug que fazia o picker do Cliente de Teste 02 retornar 'Nenhum registro encontrado' (mesma causa raiz do serviço role key exigido cedo demais, ver workspace_preview_security); Cliente de Teste 02 agora carrega parentWorkspaceId/Name e relationshipType corretos desde a própria resposta do picker, não só depois de entrar no preview.",
   },
   {
@@ -1202,6 +1335,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-24",
+    priority: "P1",
     notes: "Somente na branch hotfix/workspaces-isolation-mobile-v1. Nota corrigida no hotfix 1.0.4: a versão anterior dizia 'testável via preview de um cliente real marcado como não vinculado a nenhuma agência' — essa era exatamente a inferência que causou o P0 do QA da 1.0.3. Hotfix 1.0.5: corrigido um segundo bug que impedia até o blueprint de aparecer — Empresa/Autônomo de Teste (Blueprint) retornava 'Nenhum registro encontrado' porque o picker exigia service role key mesmo para esta superfície, que nunca deveria precisar de Supabase (ver workspace_preview_security). Confirmado por teste automatizado (workspace-picker-source.test.ts) que o branco blueprint desta superfície nunca referencia hasSupabaseServiceRoleKey/adminDb.",
     next_actions: ["Não reabilitar workspace real nesta superfície sem um campo de classificação confiável aplicado ao banco"],
   },
@@ -1268,6 +1402,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
       "Reavaliar a classificação de CRM se um card CRM for adicionado a alguma superfície de preview",
       "Rodar tsc --noEmit / next build / next dev assim que o ambiente local voltar a suportar mais de ~750MB por processo Node — não foi possível localmente em 1.0.10 nem 1.0.11",
     ],
+    priority: "P0",
+    validationRequired: ["authenticated_local_qa", "official_domain_qa"],
   },
   {
     id: "workspace_preview_audit_log",
@@ -1279,6 +1415,76 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     qa: { status: "not_started" },
     last_updated: "2026-07-23",
     notes: "Somente na branch feat/workspace-panels-v1. Deliberadamente NÃO persiste em tabela — hoje só um console.info(JSON) por evento. Sem SQL criado ou executado nesta sprint; persistência real é trabalho futuro, dependente de aprovação de schema. Hotfix 1.0.2 (Fase 23): reconfirmado que nenhum dado sensível (token, cookie, payload completo, e-mail, nome de cliente) é logado — só uid, surface, workspaceId, isBlueprint e timestamp. Nenhum logger estruturado existe hoje no projeto (grep confirmou), então console.info seguiu sendo a escolha honesta.",
+  },
+
+  // ── Sprint Recovery 2.1.3 — gates de release P0, registrados como áreas de
+  // processo (não de feature) para aparecerem na matriz de prontidão do MVP ──
+  {
+    id: "tenant_isolation",
+    name: "Isolamento entre tenants (agências, clientes, empresas diretas)",
+    category: "admin",
+    description: "Garantia de que nenhuma consulta ou mutação de um workspace retorna/afeta dado de outro workspace — cobre agency_workspaces, agency_clients, direct_business e o preview do Super Admin.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    last_updated: "2026-07-31",
+    notes: "Área de processo criada na Sprint Recovery 2.1.3 para consolidar num único lugar o que já está espalhado em workspace_preview_security, workspace_capability_matrix e docs/workspace-visibility-matrix.md — não é um recurso novo, é um marco de release. QA formal (authenticated_local_qa + official_domain_qa) ainda não executado com dois tenants reais simultâneos.",
+    priority: "P0",
+    validationRequired: ["authenticated_local_qa", "official_domain_qa"],
+  },
+  {
+    id: "canonical_routes",
+    name: "Rotas canônicas do painel admin",
+    category: "admin",
+    description: "Uma única rota real por área do admin, sem duas versões coexistindo sem redirecionamento claro (o mesmo princípio já aplicado à home pública em public_home_canonical_route, agora como gate de release geral do painel admin).",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    last_updated: "2026-07-31",
+    notes: "Área de processo criada na Sprint Recovery 2.1.3. Cobertura estrutural já existe em layout-shell.structural.test.ts (rotas/navegação do admin) e command-center-deep-navigation.structural.test.ts (Meu Negócio) — falta QA autenticado confirmando que não há rota duplicada/órfã navegável em Production.",
+    priority: "P0",
+    validationRequired: ["structural_test", "authenticated_local_qa", "official_domain_qa"],
+    validationEvidence: "layout-shell.structural.test.ts (28 asserções) e command-center-deep-navigation.structural.test.ts (25 asserções) — estrutural, ainda sem QA autenticado.",
+  },
+  {
+    id: "production_release_integrity",
+    name: "Integridade do release de Production",
+    category: "infraestrutura",
+    description: "Gate consolidado antes de qualquer publicação: tsc limpo, build de produção com exit 0 real, ESLint limpo nos arquivos alterados, git diff --check limpo, e ausência de segredo com valor exposto no delta publicado.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    last_updated: "2026-07-31",
+    notes: "Área de processo criada na Sprint Recovery 2.1.3 para dar um nome único ao que já era verificado ad-hoc em cada relatório de sprint (tsc/build/eslint/diff-check) — consolida a checklist, não introduz um gate novo.",
+    priority: "P0",
+    releaseBlocker: false,
+  },
+  {
+    id: "authenticated_local_qa",
+    name: "QA autenticado local (Codex Web)",
+    category: "infraestrutura",
+    description: "QA com sessão real de Super Admin contra o servidor local de QA (http://127.0.0.1:3100, ver docs/development/local-qa-standard.md) — cobre Workspaces, Meu Negócio, DNA & Estratégia, Ecossistema.",
+    phase: "v2",
+    readiness: "qa_pending",
+    qa: { status: "pending" },
+    last_updated: "2026-07-31",
+    notes: "Área de processo criada na Sprint Recovery 2.1.3. Sem sessão real de Super Admin disponível neste ambiente de execução — QA autenticado depende do Codex Web.",
+    priority: "P0",
+    targetDate: "2026-08-01",
+  },
+  {
+    id: "official_domain_qa",
+    name: "QA no domínio oficial (www.lokat.com.br)",
+    category: "infraestrutura",
+    description: "QA autenticado repetido no domínio oficial de Production, após deployment — última validação antes do marco de uso diário interno.",
+    phase: "v2",
+    readiness: "planned",
+    qa: { status: "not_started" },
+    last_updated: "2026-07-31",
+    notes: "Área de processo criada na Sprint Recovery 2.1.3. Depende de authenticated_local_qa e production_release_integrity estarem concluídos antes.",
+    priority: "P0",
+    targetDate: "2026-08-05",
+    dependencies: ["authenticated_local_qa", "production_release_integrity"],
   },
 
   // ── Contas, painéis e roteamento (branch feat/accounts-panel-routing-v1) ──
@@ -1310,6 +1516,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "deployed",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P1",
     notes: "100% em memória, sem persistência e sem nenhuma consulta/mutação ao Supabase — confirmado por teste estrutural (nenhum arquivo novo referencia Supabase ou fetch()). A auditoria anterior (feat/accounts-panel-routing-v1) confirmou que agency_workspaces/agency_clients têm 0 linhas reais e que não existe 'Gerenciar empresa' real — esta sprint respeita esse limite: a tela de seleção de empresa usa fixtures locais (Duh Lanches como 'active'/food_service, O Pedreirão como 'available_for_activation'/retail, sem experiência retail construída), nunca uma consulta real a clients/agency_clients. Todos os números de exemplo (Smash de Exemplo, relatório de CMV) estão marcados como simulação e batem exatamente com os valores do ticket, verificados por teste real (não apenas exibidos): custo dos ingredientes R$ 8,62, CMV do produto 34,48%, consumo real R$ 37.000/CMV real 37%, consumo teórico R$ 33.000/CMV teórico 33%, lacuna R$ 4.000/4 pontos percentuais. Fator de correção e rendimento de cocção são funções puras separadas (perda de limpeza ≠ perda de cocção), nunca misturadas. Transferência central→cozinha nunca permite saldo negativo (rejeitada, não clampada) e preserva o total consolidado entre as duas localizações. Contagem de inventário trata explicitamente saldo zero, contado zero, valores negativos e unidade incompatível — nunca divide por zero. 111 asserções reais passando (25 em stock/calculations, 21 em costing/calculations incluindo os números exatos do ticket, 65 estruturais). Um bug real de import foi encontrado e corrigido durante a validação no servidor local (buildPurchaseDrafts estava sendo importado do módulo errado) — só foi pego rodando o servidor de fato, não pelos testes ad-hoc isolados, reforçando por que o Fase de 'servidor local' do ticket não é dispensável. ESLint limpo nos arquivos alterados (incluindo a correção de um react-hooks/purity de Date.now() reutilizando o generateId() já existente em _shared.tsx). tsc --noEmit e next build continuam bloqueados pelo mesmo teto de memória (~700-750MB) dos hotfixes 1.0.10/1.0.11/exit-guard — mas, diferente dessas sprints, `next dev` funcionou desta vez (compilação sob demanda, não o programa inteiro de uma vez) e serviu /login (200) e /admin/meu-negocio (307, redirect correto sem sessão) em http://localhost:3002 — sem validação visual autenticada (sem navegador/sessão de Super Admin disponível neste ambiente, mesma lacuna disclosed desde os primeiros hotfixes de Workspaces). Pendência de REC OS (dois nomes 'REC OS' no dashboard, calendário interno navegando para o calendário global) registrada em rec_os_global_hub — nenhum código REC OS foi tocado. Release integrada (2026-07-30): feat/meu-negocio-motion-3d-refinement-v1 (HEAD e13ced9915b99f3e6b278ce5b60533e8e73953c4) mergeada em main sem squash/rebase (merge commit 7442d1d8368101a6ee183e1d7a8b486cf07e9893, dois pais: reconciliação de status divergente e o tip da feature) — traz junto, da mesma branch, o período central/personalizado (business-period), a classificação de dados (data-quality), o cardápio digital como provedor externo (digital-menu), faturamento explícito (revenue), Centro de Comando, Visão simples/Modo Gestor, refinamento de motion/GSAP/Three.js e a correção definitiva do seletor de período personalizado (validação real, reabertura correta, comparação correta, mobile 390px, suíte de testes renderizados via jsdom/@testing-library/react substituindo os testes puramente textuais anteriores). Gates na main: tsc limpo, ESLint limpo nos arquivos incorporados, 40 suítes de teste (~973 asserções) passando, build de produção OK, git diff --check limpo. npm audit: 6 vulnerabilidades altas, todas preexistentes na versão do Next.js já fixada em origin/main antes deste merge (não introduzidas por esta feature) — documentadas, sem bump de versão nesta release. (Nota: 'readiness' não tem o valor \"released_to_main\" no tipo AreaReadiness deste arquivo — mapeado para \"deployed\", que já significa exatamente isso: em produção, QA pendente.) Hotfix v1.0.1 (2026-07-30): Codex Web encontrou em Production que o período personalizado ainda aceitava intervalo invertido e que 01/07-15/07 revertia para o mês inteiro na reabertura — causa raiz comprovada por teste (não assumida): o submit confiava só no estado React, que um input nativo type=\"date\" pode deixar desatualizado em relação ao DOM (autofill, automação disparando só um dos eventos input/change). Corrigido em hotfix/meu-negocio-custom-period-production-v1 (HEAD 145d1ee0ea0c348398a5b1db57e17dfe431a530e): submit agora lê FormData do próprio formulário como barreira final, onInput adicionado ao lado de onChange, inputs ganharam name estável. Testado nos três caminhos de evento (onChange, input-only, valor de DOM alterado diretamente sem nenhum evento React antes do requestSubmit — o cenário mais próximo do bug relatado). Mergeado em main sem squash/rebase (merge commit bde33b8b8a720fc4815366a240878a60664f8f21, dois pais: a main anterior e o tip do hotfix), gates aprovados (tsc, ESLint, 52 suítes de teste, build, diff --check) e publicado em Production (deployment dpl_Hoc2forSdsyVZekSE9JZAUE5HJE4, alias www.lokat.com.br, aliasError null). Smoke test sem sessão aprovado nos dois domínios, sem HTTP 500. QA autenticado oficial do Codex Web sobre este HEAD específico ainda não foi realizado — Production não está marcada como totalmente validada só por isso.",
     next_actions: [
       "QA visual autenticado oficial (Codex Web) em https://www.lokat.com.br/admin/meu-negocio com sessão real de Super Admin, especificamente sobre o HEAD bde33b8b8a720fc4815366a240878a60664f8f21 (hotfix v1.0.1) — cobrindo período personalizado, revenue, data classification e motion",
@@ -1562,6 +1769,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "Analyzer é deterministic_stub (agrupamento/ranking por regra explícita, nunca geração de texto). Nenhum dado real de conversa/cliente.",
   },
   {
@@ -1573,6 +1781,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "Não é um banco paralelo. ModuleDataContract é derivado direto de platform-modules.ts, nunca uma segunda fonte de 'quem consome o quê'.",
   },
   {
@@ -1617,6 +1826,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "CURRENT_INTELLIGENCE_AVAILABILITY é sempre 'unavailable' nesta sprint -- nenhuma chamada a OpenAI/Gemini, nenhum import da branch experimental do Assistente.",
   },
   {
@@ -1650,6 +1860,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "Split nunca é somado junto com taxa. Taxa ausente nunca é tratada como zero confirmado. calculateFinancialDifference nunca retorna NaN/Infinity (percentageDifference vira null quando não calculável).",
   },
   {
@@ -1672,6 +1883,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "qa_pending",
     qa: { status: "pending" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "Google OAuth permanece 'blocked' -- status congelado, não alterado sem autorização formal. Google por URL fica 'planned'. Nenhuma conexão real.",
   },
   {
@@ -1738,6 +1950,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     readiness: "planned",
     qa: { status: "not_started" },
     last_updated: "2026-07-30",
+    priority: "P2",
     notes: "Integração somente mapeada -- todos os providers ficam 'not_configured'. Nenhum número conectado, nenhum webhook, nenhuma instância Evolution.",
   },
   {
