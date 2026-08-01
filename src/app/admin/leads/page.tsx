@@ -11,6 +11,7 @@ import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
 import { LEAD_PROFILE_TYPES, getLeadProfileBadge } from "@/lib/lead-profile-types";
 import { CrmMobileLeadList } from "@/components/crm/crm-mobile-lead-list";
 import { CrmMobileFilterSheet } from "@/components/crm/crm-mobile-filter-sheet";
+import { resolveCrmDataState, crmStateCopy } from "@/lib/crm/data-state";
 
 type WaitlistEntry = {
   id: string;
@@ -270,6 +271,16 @@ export default function AdminLeadsPage() {
 
   const semFollowUp = useMemo(() => entries.filter((e) => e.status === "new").length, [entries]);
 
+  // Sprint Navegação e Experiência 3.0.1.2 (Fase 28/29) — "0 leads" e "não
+  // foi possível carregar" são fatos diferentes; antes, uma falha (ex.:
+  // service_role_missing) renderizava as mesmas contagens de `entries=[]`
+  // (tudo "0") com só um aviso pequeno acima — visualmente indistinguível
+  // de "realmente zero leads".
+  const crmState = resolveCrmDataState(
+    loading ? null : { ok: !error, code: error ?? undefined, entryCount: entries.length },
+  );
+  const crmDataUnavailable = crmState === "unavailable" || crmState === "unauthorized";
+
   const KPI_CARDS = [
     { label: "Todos",        icon: Users,         count: total,                     color: "text-indigo-600",  bg: "bg-indigo-50",  srcKey: "all"         },
     { label: "Beta",         icon: Zap,           count: bySrc["Beta"] ?? 0,        color: "text-purple-600",  bg: "bg-purple-50",  srcKey: "Beta"        },
@@ -348,7 +359,9 @@ export default function AdminLeadsPage() {
                 <Icon className={`w-4 h-4 ${color}`} strokeWidth={1.5} />
               </div>
               <div>
-                <p className={`text-xl font-black ${count > 0 ? color : "text-gray-300"}`}>{count}</p>
+                <p className={`text-xl font-black ${crmDataUnavailable ? "text-gray-300" : count > 0 ? color : "text-gray-300"}`} data-testid="crm-kpi-value">
+                  {crmDataUnavailable ? "—" : count}
+                </p>
                 <p className="text-[10px] text-gray-400 leading-tight">{label}</p>
               </div>
             </button>
@@ -356,15 +369,22 @@ export default function AdminLeadsPage() {
         })}
       </div>
 
-      {/* Waitlist shortcut */}
+      {/* Sprint Navegação e Experiência 3.0.1.2 (Fase 22) — antes, este card
+          descrevia /admin/super/waitlist e /admin/super/leads como "entrada
+          no CRM", reforçando a confusão relatada (bug #8): essas duas rotas
+          usam a MESMA tabela (waitlist_entries, via /api/admin/waitlist),
+          mas são ferramentas de onboarding de plataforma do Super Admin
+          (conceder acesso beta, mudar tipo de conta) — não uma segunda
+          entrada do CRM comercial. A relação real fica explícita aqui em
+          vez de fingir que são a mesma coisa. */}
       <div className="mb-5 bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
             <ListOrdered className="w-4 h-4 text-indigo-500" strokeWidth={1.5} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-800">Waitlist — Lista de Espera</p>
-            <p className="text-[10px] text-gray-400">Leads captados pelo site, modal e /pre-acesso · entrada no CRM</p>
+            <p className="text-xs font-bold text-gray-800">Onboarding de plataforma (Super Admin)</p>
+            <p className="text-[10px] text-gray-400">Mesma base de contatos, ferramenta separada — conceder acesso beta e classificar tipo de conta</p>
           </div>
         </div>
         <div className="flex gap-2 flex-shrink-0">
@@ -372,13 +392,13 @@ export default function AdminLeadsPage() {
             href="/admin/super/waitlist"
             className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition-colors"
           >
-            Ver waitlist →
+            Lista Beta →
           </Link>
           <Link
             href="/admin/super/leads"
             className="text-xs font-medium text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
           >
-            Central →
+            Central de Leads (visão unificada) →
           </Link>
         </div>
       </div>
@@ -390,14 +410,16 @@ export default function AdminLeadsPage() {
           {typeError}
         </div>
       )}
-      {error && (
-        <div className="mb-5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700 flex items-start gap-2">
+      {/* Sprint Navegação e Experiência 3.0.1.2 (Fase 26/28) — nunca mais
+          repassa o `code` técnico (ex.: "service_role_missing") nem o nome
+          de uma variável de ambiente para o usuário final. */}
+      {crmDataUnavailable && (
+        <div className="mb-5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700 flex items-start gap-2" data-testid="crm-unavailable-banner">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          {error === "unauthenticated" || error === "forbidden"
-            ? "Acesso restrito a administradores."
-            : error === "service_role_missing"
-              ? "SUPABASE_SERVICE_ROLE_KEY não configurada — leads indisponíveis."
-              : error}
+          <div>
+            <p className="font-bold">{crmStateCopy(crmState).title}</p>
+            <p className="mt-0.5">{crmStateCopy(crmState).description}</p>
+          </div>
         </div>
       )}
 
