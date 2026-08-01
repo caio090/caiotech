@@ -55,3 +55,21 @@ metas, sazonalidade, qualidade dos dados) dentro do Centro de Comando real
 `docs/meu-negocio/living-business-manual.md`. Reaproveita `DataConfidence`
 do Data Hub desta mesma sprint (Core 2.1) para a escala de confiança —
 não é um segundo sistema de proveniência.
+
+## Nota — Sprint Recovery 2.1.3 (padronização de QA, status e CRM adaptativo)
+
+Três adições sem alterar a arquitetura de plataforma existente:
+
+1. `src/config/local-qa.ts` + `scripts/qa-*.ts` — padrão único de QA local
+   (porta 3100 oficial, 3200 Production local, 3000 nunca QA). Ver
+   `docs/development/local-qa-standard.md`.
+2. `src/config/delivery-status.ts` — camada de execução (prioridade,
+   prazo, bloqueio de release, estágios de validação) sobre
+   `project-status.ts`, sem alterar `readiness`/`V1_PROGRESS`/
+   `V2_PROGRESS`. Ver `docs/roadmap/august-2026-mvp-recovery.md` e
+   `docs/status/progress-recalibration-method.md`.
+3. `src/lib/crm-adaptive/` — arquitetura futura do CRM adaptativo
+   (núcleo universal, superfícies, nichos, follow-up, temperatura,
+   dashboards, IA) como contratos puros, mesmo padrão de
+   `src/lib/messaging/types.ts`/`src/lib/fiscal/types.ts` da Core 2.1.
+   **Não implementado** — ver `docs/crm/`.

@@ -56,3 +56,11 @@ real). Nenhum módulo de plataforma novo foi criado para isso — DNA e
 estratégia são parte do módulo `meu_negocio` existente, não um módulo
 "Motor LOKAT" concorrente (Motor LOKAT continua sendo um mecanismo/badge
 interno, não uma entrada própria no registry).
+
+## Nota — Sprint Recovery 2.1.3 (CRM adaptativo no registry)
+
+O módulo `crm` existente em `platform-modules.ts` foi atualizado para
+registrar núcleo universal, superfícies, capacidades, adaptação por
+nicho, dependências, maturidade, bloqueios, prioridade e próxima etapa da
+evolução adaptativa — sem declará-la implementada. O CRM real hoje
+continua sendo só leads/funil/oportunidades (maturidade inalterada).

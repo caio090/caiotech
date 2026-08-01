@@ -33,3 +33,10 @@ arquivo (`business-profile/types.ts`, usado pelos pacotes de nicho acima)
 — três vocabulários de segmento coexistem hoje no código
 (`motor-lokat`, `business-archetypes`, `business-profile`), nenhum deles
 unificado nesta sprint; documentado aqui para visibilidade, não corrigido.
+
+## Nota — Sprint Recovery 2.1.3 (CRM adaptativo por nicho)
+
+`src/lib/crm-adaptive/niches.ts` (`CRM_NICHE_CONCEPTS`) reaproveita
+exatamente o `BusinessSegment` deste arquivo (`business-profile/types.ts`)
+para os conceitos futuros de CRM por nicho — não introduz um quarto
+vocabulário de segmento. Ver `docs/crm/crm-niche-adapters.md`.

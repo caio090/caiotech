@@ -75,3 +75,14 @@ de agency/direct_business", já que hoje não existe esse sub-papel na
 autorização real (todo usuário autenticado herda a superfície inteira). Esta
 matriz continua sendo a fonte de verdade para o que é de fato bloqueado no
 servidor.
+
+## Nota — Sprint Recovery 2.1.3 (isolamento futuro do CRM adaptativo)
+
+`docs/crm/crm-surface-matrix.md` registra a visibilidade futura do CRM
+adaptativo por superfície (`CRM_SURFACE_VISIBILITY` em
+`src/lib/crm-adaptive/types.ts`). Quando implementado, deve reaproveitar
+`workspace-capabilities.ts` como única fonte de autorização — não introduz
+uma segunda árvore de permissões. `tenant_isolation` e
+`crm_workspace_isolation` (ambos `priority: "P1"`/`"P0"` em
+`project-status.ts`) tratam esse isolamento como gate de segurança, não
+como feature de produto.
