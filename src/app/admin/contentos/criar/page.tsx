@@ -11,6 +11,18 @@ import { GuidedCreateFlow } from "./_guided-create-flow";
 import type { GuidedCreateDraft } from "./_guided-create-flow";
 import { InlineClientPicker } from "@/components/inline-client-picker";
 import { PageHeader } from "@/components/page-header";
+import { findRadarOpportunity } from "@/lib/rec-os-workflow/radar-opportunities";
+
+/**
+ * Sprint REC OS 3.0.1.1 (Fase 3) — `seed`/`section` na URL só resolvem
+ * contra um catálogo fixo conhecido (RADAR_DEMO_OPPORTUNITIES) — um `seed`
+ * desconhecido ou adulterado simplesmente resolve para `null` e o fluxo
+ * segue normal, sem conceder nenhum acesso extra e sem quebrar a página.
+ */
+function resolveSection(section: string | undefined): string | null {
+  if (section === "ideia") return "brief";
+  return null;
+}
 
 async function CriarClientRequiredState({ invalidClientId }: { invalidClientId: string | null }) {
   const clients = isSupabaseConfigured ? await getAdminContentOSClients() : [];
@@ -43,11 +55,13 @@ async function CriarClientRequiredState({ invalidClientId }: { invalidClientId: 
 export default async function AdminContentosCriarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; step?: string; content_id?: string }>;
+  searchParams: Promise<{ client?: string; step?: string; content_id?: string; seed?: string; section?: string }>;
 }) {
   const params = await searchParams;
   const clientId = params.client ?? null;
   const contentId = params.content_id ?? null;
+  const seedOpportunity = findRadarOpportunity(params.seed);
+  const resolvedStep = resolveSection(params.section) ?? params.step ?? null;
 
   if (!clientId) {
     return <CriarClientRequiredState invalidClientId={null} />;
@@ -120,10 +134,11 @@ export default async function AdminContentosCriarPage({
         clientId={clientId}
         clientName={clientName}
         clientSegment={clientSegment}
-        initialStep={params.step ?? null}
+        initialStep={resolvedStep}
         isSuperAdmin={role === "super_admin"}
         initialDraft={initialDraft}
         initialContentId={initialContentId}
+        seedOpportunity={initialContentId ? null : seedOpportunity}
       />
     </>
   );
