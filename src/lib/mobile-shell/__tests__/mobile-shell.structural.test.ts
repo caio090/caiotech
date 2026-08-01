@@ -42,7 +42,7 @@ assert(Object.keys(SURFACE_BOTTOM_NAV_PRIMARY).length === 4, "4 superfícies map
 for (const surface of ["super_admin", "agency", "agency_client", "direct_business"] as const) {
   assert(SURFACE_BOTTOM_NAV_PRIMARY[surface].length + 1 <= MAX_BOTTOM_NAV_ITEMS, `${surface}: máximo 5 itens (4 fixos + Mais)`);
 }
-assert(SURFACE_BOTTOM_NAV_LABEL.super_admin.join(",") === "Início,Ecossistema,REC OS,CRM", "rótulos Super ADM batem com o ticket");
+assert(SURFACE_BOTTOM_NAV_LABEL.super_admin.join(",") === "Início,Meu Escritório,REC OS,CRM", "rótulos Super ADM batem com o ticket (Sprint 3.0.1.2 substituiu Ecossistema por Meu Escritório)");
 assert(SURFACE_BOTTOM_NAV_LABEL.agency.join(",") === "Início,REC OS,Operação,Clientes", "rótulos Agência batem com o ticket");
 assert(SURFACE_BOTTOM_NAV_LABEL.agency_client.join(",") === "Início,Conteúdos,Aprovações,Calendário", "rótulos Cliente da Agência batem com o ticket");
 assert(SURFACE_BOTTOM_NAV_LABEL.direct_business.join(",") === "Início,Meu Negócio,CRM,Calendário", "rótulos Empresa Direta batem com o ticket");

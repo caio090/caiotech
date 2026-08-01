@@ -39,7 +39,7 @@ for (const surface of surfaces as (keyof typeof SURFACE_BOTTOM_NAV_ITEMS)[]) {
 }
 
 console.log("[test] 72/73/74/75 — rótulos batem exatamente com o que o ticket pediu por superfície");
-assert(SURFACE_BOTTOM_NAV_LABEL.super_admin.join(",") === "Início,Ecossistema,REC OS,CRM", "Super ADM: Início/Ecossistema/REC OS/CRM");
+assert(SURFACE_BOTTOM_NAV_LABEL.super_admin.join(",") === "Início,Meu Escritório,REC OS,CRM", "Super ADM: Início/Meu Escritório/REC OS/CRM (Sprint 3.0.1.2 — Ecossistema saiu da posição operacional)");
 assert(SURFACE_BOTTOM_NAV_LABEL.agency.join(",") === "Início,REC OS,Operação,Clientes", "Agência: Início/REC OS/Operação/Clientes");
 assert(SURFACE_BOTTOM_NAV_LABEL.agency_client.join(",") === "Início,Conteúdos,Aprovações,Calendário", "Cliente da Agência: Início/Conteúdos/Aprovações/Calendário");
 assert(SURFACE_BOTTOM_NAV_LABEL.direct_business.join(",") === "Início,Meu Negócio,CRM,Calendário", "Empresa Direta: Início/Meu Negócio/CRM/Calendário");
