@@ -9,6 +9,8 @@ import {
 import Link from "next/link";
 import { getPlannedIntegrations, INTEGRATION_TYPES } from "@/lib/integrations";
 import { LEAD_PROFILE_TYPES, getLeadProfileBadge } from "@/lib/lead-profile-types";
+import { CrmMobileLeadList } from "@/components/crm/crm-mobile-lead-list";
+import { CrmMobileFilterSheet } from "@/components/crm/crm-mobile-filter-sheet";
 
 type WaitlistEntry = {
   id: string;
@@ -399,8 +401,21 @@ export default function AdminLeadsPage() {
         </div>
       )}
 
-      {/* Source filter */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      {/* Filtros mobile (Fase 35): mesmo estado srcFilter/statusFilter, em sheet */}
+      <CrmMobileFilterSheet
+        sourceOptions={SOURCE_TABS.map((f) => ({ key: f.key, label: f.label, count: f.key === "all" ? total : (bySrc[f.key] ?? 0) }))}
+        sourceValue={srcFilter}
+        onSourceChange={setSrcFilter}
+        statusOptions={(["all", "new", "contacted", "invited", "accepted", "archived"] as const).map((s) => ({
+          key: s, count: s === "all" ? total : (byStatus[s] ?? 0),
+          label: s === "all" ? `Todos (${total})` : `${STATUS_LABEL[s] ?? s}${byStatus[s] ? ` (${byStatus[s]})` : ""}`,
+        }))}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+      />
+
+      {/* Source filter (desktop) */}
+      <div className="hidden md:flex flex-wrap items-center gap-2 mb-3">
         <div className="flex items-center gap-1 text-[10px] text-gray-400 mr-1">
           <Target className="w-3 h-3" /> Origem:
         </div>
@@ -422,8 +437,8 @@ export default function AdminLeadsPage() {
         })}
       </div>
 
-      {/* Status filter */}
-      <div className="flex flex-wrap items-center gap-2 mb-5">
+      {/* Status filter (desktop) */}
+      <div className="hidden md:flex flex-wrap items-center gap-2 mb-5">
         <div className="flex items-center gap-1 text-[10px] text-gray-400 mr-1">
           <Clock className="w-3 h-3" /> Etapa:
         </div>
@@ -444,7 +459,7 @@ export default function AdminLeadsPage() {
         ))}
       </div>
 
-      {/* Table */}
+      {/* Table (desktop) / Cards (mobile) */}
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center mb-6">
           <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin mx-auto mb-2" />
@@ -456,7 +471,7 @@ export default function AdminLeadsPage() {
           <p className="text-sm text-gray-400">Nenhum lead para este filtro.</p>
         </div>
       ) : filtered.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border border-gray-100 mb-6">
+        <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-100 mb-6">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
@@ -573,6 +588,34 @@ export default function AdminLeadsPage() {
           </table>
         </div>
       ) : null}
+
+      {!loading && !error && filtered.length > 0 && (
+        <div className="mb-6">
+          <CrmMobileLeadList
+            leads={filtered.map((e) => {
+              const phone = e.phone?.replace(/\D/g, "") ?? "";
+              return {
+                id: e.id,
+                name: e.name,
+                email: e.email,
+                phone: e.phone,
+                sourceLabel: getSourceLabel(e.source),
+                sourceClassName: SOURCE_COLOR[getSourceLabel(e.source)] ?? "bg-gray-50 text-gray-500 border-gray-100",
+                statusLabel: STATUS_LABEL[e.status] ?? e.status,
+                statusClassName: STATUS_COLOR[e.status] ?? "bg-gray-50 text-gray-500",
+                createdAtLabel: new Date(e.created_at).toLocaleDateString("pt-BR"),
+                intentLabel: getIntentLabel(e.interest),
+                whatsappUrl: phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${e.name}! Obrigado pelo interesse na Lokat OS.`)}` : null,
+              };
+            })}
+            onOpenAgent={(id) => {
+              const lead = filtered.find((e) => e.id === id);
+              if (!lead) return;
+              setAgenteLead(lead); setAgenteTone("consultivo"); setAgenteObj("agendar_demo"); setAgenteResult("");
+            }}
+          />
+        </div>
+      )}
 
       {/* Pipeline */}
       <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-5">

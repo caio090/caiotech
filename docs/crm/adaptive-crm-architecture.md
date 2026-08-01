@@ -54,6 +54,14 @@ uma regra explícita — mesmo princípio "sem IA falsa" de
 - Nenhum motor de temperatura/score calculando de verdade.
 - Nenhuma automação de follow-up enviando mensagem.
 
+## Nota — Sprint REC OS 3.0.1 (CRM mobile é diferente de CRM adaptativo)
+
+Esta sprint implementou uma experiência **mobile** para o CRM real hoje
+(`crm`/`crm_leads_clientes` — leads/funil/oportunidades), não o CRM
+adaptativo descrito neste documento. Ver
+`docs/mobile/crm-mobile-experience.md`. O CRM adaptativo continua
+inteiramente `planned`, sem nenhuma implementação nova.
+
 ## Próximos passos (fora desta sprint)
 
 1. Desenhar o schema real (SQL) só depois de `official_domain_qa` do MVP
