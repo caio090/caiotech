@@ -184,6 +184,12 @@ export default function WaitlistPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      {/* Sprint Navegação e Experiência 3.0.1.2 (Fase 22) — link de volta
+          explícito para o CRM canônico, deixando clara a relação (mesma
+          base de contatos, ferramenta de onboarding separada). */}
+      <Link href="/admin/leads" className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-indigo-600">
+        ← CRM
+      </Link>
       {/* Super admin tabs */}
       <div className="flex gap-2 mb-2 flex-wrap">
         <Link

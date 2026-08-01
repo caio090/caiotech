@@ -464,14 +464,20 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
               </AnimatePresence>
             </div>
 
+            {/* Sprint Navegação e Experiência 3.0.1.2 (Fase 25/30) — antes,
+                este botão mostrava o texto "CRM" ao lado do ícone, duplicando
+                a entrada de texto "CRM" que a sidebar já tem para a mesma
+                rota. Mantido como indicador (ícone + contador de leads
+                novos — função realmente distinta de um item de navegação),
+                sem o rótulo de texto que competia com a sidebar. */}
             <Link
               href="/admin/leads"
-              title="CRM — Leads"
+              title="Novos leads no CRM"
+              aria-label="Novos leads no CRM"
               onClick={() => { markCrmSeen(); setNewLeadCount(0); }}
-              className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5 text-indigo-500"
+              className="relative p-2 rounded-xl hover:bg-gray-50 transition-colors flex items-center text-indigo-500"
             >
               <Target className="w-4 h-4" />
-              <span className="text-[10px] font-bold hidden md:inline">CRM</span>
               {newLeadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center leading-none px-0.5">
                   {newLeadCount > 9 ? "9+" : newLeadCount}
