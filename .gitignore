@@ -47,6 +47,12 @@ dev-err*.txt
 dev-server.log
 .tmp/
 
+# Playwright (Sprint QA Local 3.0.2) — traces/screenshots/videos/storageState
+# live under .tmp/playwright/ (already covered above); these are defensive
+# fallbacks in case a run ever writes to Playwright's own defaults.
+/playwright-report/
+/test-results/
+
 # Project-scoped agent skills installed from audited external repositories
 .agents/skills/gsap-*/
 .agents/skills/threejs-*/
