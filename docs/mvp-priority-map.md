@@ -44,3 +44,13 @@ refinamento cosmético). `rec_os_canonical_creation_flow`,
 `editor_os_layer_scanner_integration`, `crm_mobile_filters`,
 `business_diagnostic_gateway` e `visible_reports_naming` entraram como P1.
 Ver `src/config/project-status.ts`.
+
+## Nota — Sprint E2E CI 3.0.2.2
+
+`e2e_ci_infrastructure`, `e2e_super_admin_identity`,
+`authenticated_browser_qa`, `mobile_browser_qa` e
+`workspace_preview_browser_qa` entraram como P1 (infraestrutura de QA
+autenticado real, resolvendo o BLOCKER_LOCAL_AUTH_FIXTURE_UNAVAILABLE da
+sprint anterior via uma conta E2E dedicada e GitHub Actions).
+`official_remote_qa` (um ambiente remoto fixo distinto do CI efêmero)
+permanece P2/planned. Ver `src/config/project-status.ts`.

@@ -170,3 +170,14 @@ canônica + remoção de vazamento de service role na UI). Ver
 docs/rec-os/known-gaps-closure-3.0.1.1.md para a sprint anterior e os
 novos docs em docs/navigation/, docs/meu-escritorio/ e docs/crm/ para
 esta.
+
+## Atualização — Sprint E2E CI 3.0.2.2
+
+QA visual autenticado migrado de "bloqueado localmente por falta de
+credencial" para "executável via GitHub Actions" com uma conta E2E
+dedicada e isolada. Workflow `.github/workflows/local-e2e-qa.yml`
+disparado exclusivamente por push em
+`integration/lokat-core-platform-map-v1`. Ver
+`docs/qa/github-actions-authenticated-e2e.md` para o resultado da
+primeira execução e limitações (ex.: monitoramento via `gh` CLI
+indisponível neste ambiente de agente).
