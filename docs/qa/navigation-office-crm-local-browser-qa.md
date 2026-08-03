@@ -107,3 +107,16 @@ este processo) em `.env.local`, usando um dos pares documentados em
 `TEST_EMAIL`/`_PASSWORD`), depois repetir `npx playwright test` — toda a
 infraestrutura (config, projetos por viewport, storageState) já está
 pronta para funcionar sem nenhuma alteração adicional.
+
+## Atualização — Sprint E2E CI 3.0.2.2
+
+O BLOCKER_LOCAL_AUTH_FIXTURE_UNAVAILABLE registrado acima foi resolvido
+externamente: existe agora uma conta E2E dedicada (Super Admin, isolada,
+sem dado comercial real) com credenciais no GitHub Environment
+`local-e2e-qa`. `tests/e2e/auth.setup.ts` foi adaptado para consumir
+`E2E_SUPER_ADMIN_EMAIL`/`E2E_SUPER_ADMIN_PASSWORD`. A suíte completa de
+testes autenticados (Calendário, REC OS, Meu Escritório, CRM, mobile,
+overflow, Workspace Preview) foi escrita nesta sprint e roda via GitHub
+Actions (`.github/workflows/local-e2e-qa.yml`), não mais localmente —
+ver `docs/qa/github-actions-authenticated-e2e.md` para o resultado da
+primeira execução.
