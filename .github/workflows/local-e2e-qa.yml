@@ -1,0 +1,142 @@
+name: LOKAT OS Local E2E QA
+
+on:
+  push:
+    branches:
+      - integration/lokat-core-platform-map-v1
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lokat-local-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  authenticated-e2e:
+    name: authenticated-e2e
+    runs-on: ubuntu-latest
+    environment: local-e2e-qa
+    timeout-minutes: 45
+
+    steps:
+      # 1. Checkout — sem persistir credenciais: o runner nunca deve conseguir dar push.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # 2. Setup Node — Node 24, não Node 20: auditoria confirmou que os
+      #    scripts de QA (qa:doctor/qa:smoke/check:workspace-mutations)
+      #    dependem do suporte nativo a TypeScript do Node, ausente até a
+      #    série 20.x. Ver docs/qa/github-actions-authenticated-e2e.md.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      # 3. Instalação reprodutível — nunca npm install no CI.
+      - name: npm ci
+        run: npm ci
+
+      # 4. Confirmar versões (nenhum valor sensível envolvido).
+      - name: Confirm Node/npm versions
+        run: |
+          node --version
+          npm --version
+
+      # 5. Só o Chrome que o Playwright precisa — nenhum outro navegador.
+      - name: Install Chrome for Playwright
+        run: npx playwright install --with-deps chrome
+
+      # 6. TypeScript.
+      - name: TypeScript
+        run: npx tsc --noEmit --skipLibCheck
+
+      # 7. Mutation coverage.
+      - name: Workspace mutation coverage
+        run: npm run check:workspace-mutations
+
+      # 8-9. Sobe o Next.js em background na porta oficial de QA e aguarda
+      #      readiness com um loop de curl previsível — nunca imprime env.
+      - name: Start Next.js on 127.0.0.1:3100
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          mkdir -p .tmp
+          nohup npm run dev:qa > .tmp/actions-dev.log 2>&1 &
+          echo $! > .tmp/actions-dev.pid
+
+          max_attempts=30
+          interval=2
+          attempt=0
+          until curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100/ | grep -q "200"; do
+            attempt=$((attempt+1))
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "E2E_LOCAL_SERVER_UNAVAILABLE"
+              echo "--- últimas linhas do log (sanitizado) ---"
+              tail -n 40 .tmp/actions-dev.log | grep -viE "supabase|key|secret|password|token" || true
+              exit 1
+            fi
+            sleep "$interval"
+          done
+          echo "Servidor pronto em http://127.0.0.1:3100"
+
+      # 10-11. Mesmos gates do QA local.
+      - name: QA doctor
+        run: npm run qa:doctor
+
+      - name: QA smoke
+        run: npm run qa:smoke
+
+      # 12. Playwright — os secrets de autenticação só existem neste passo.
+      - name: Run Playwright
+        env:
+          E2E_SUPER_ADMIN_EMAIL: ${{ secrets.E2E_SUPER_ADMIN_EMAIL }}
+          E2E_SUPER_ADMIN_PASSWORD: ${{ secrets.E2E_SUPER_ADMIN_PASSWORD }}
+        run: npx playwright test
+
+      # 13. Resumo sanitizado — nenhum valor de secret, nunca um upload de artifact.
+      - name: Generate sanitized summary
+        if: always()
+        run: node scripts/e2e-summary.ts >> "$GITHUB_STEP_SUMMARY"
+
+      # 14. Encerra o servidor incondicionalmente.
+      - name: Stop Next.js
+        if: always()
+        run: |
+          if [ -f .tmp/actions-dev.pid ]; then
+            kill "$(cat .tmp/actions-dev.pid)" 2>/dev/null || true
+          fi
+
+      # 15. Nenhum storageState pode ter sido rastreado pelo Git.
+      - name: Confirm no storageState was tracked
+        if: always()
+        run: |
+          if git ls-files --others --exclude-standard | grep -q "super-admin.json"; then
+            echo "storageState apareceu como candidato a untracked (esperado, ignorado por .gitignore) — confirmando que NÃO está rastreado:"
+          fi
+          if git ls-files | grep -q "super-admin.json"; then
+            echo "ERRO: storageState está rastreado pelo Git."
+            exit 1
+          fi
+          echo "OK: nenhum storageState rastreado."
+
+      # 16. Confirma que o checkout não foi alterado pela execução (fora de .tmp/).
+      - name: Confirm checkout is unchanged outside .tmp/
+        if: always()
+        run: |
+          CHANGED=$(git status --porcelain | grep -v "^?? \.tmp/" || true)
+          if [ -n "$CHANGED" ]; then
+            echo "ERRO: o checkout foi alterado fora de .tmp/ durante a execução:"
+            echo "$CHANGED"
+            exit 1
+          fi
+          echo "OK: checkout inalterado fora de .tmp/."
