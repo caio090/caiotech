@@ -55,6 +55,24 @@ provider de IA real é conectado.
 2. **Copiar a arquitetura do Nectar/OpenJarvis/GAIA diretamente.** Rejeitada — nenhuma licença foi verificada nesta sprint (ver `docs/research/gota-neural-external-references-v1.md`, `LICENSE_NOT_VERIFIED`), e a decisão registrada é absorver só padrões conceituais (orchestration patterns, agent registry patterns), nunca código.
 3. **Fazer a Gota Neural depender de um Provider específico como parte do core.** Rejeitada explicitamente (Fase 32 do brief, "No Provider Lock-In") — o padrão Capability → Integration Definition → Adapter → Connection garante que nenhum provider vira requisito do core.
 
+## V1.1 — Correções pós-auditoria CODEX WEB
+
+Auditoria independente (CODEX WEB) sobre a V1 retornou
+`APPROVED_WITH_CORRECTIONS` (0 P0, 4 P1, 3 P2). Nenhuma decisão
+arquitetural deste ADR foi revertida — as correções são exclusivamente
+de contrato, dentro do espírito já registrado aqui:
+
+- `connected` deixou de ser gate universal de capability (`ConnectionRequirement` condicional) — reforça, não contradiz, "connected != permitted" (Consequences, item 4).
+- `isAgentRuntimeAvailable()` corrigido para nunca retornar `true` nesta Foundation (era um falso positivo semântico) — reforça a decisão original de que nenhum runtime real existe ainda.
+- `NeuralVisibilityPolicy` adicionada como dimensão nova, distinta de Permission — nenhuma mudança na decisão de Security abaixo, apenas uma lacuna preenchida.
+- `ConnectorEvent`/`ConnectorMetric` completam o conjunto NIS (Manifest/Snapshot/Health já existiam) — mesma disciplina de "contract-only, sem endpoint" já adotada.
+- `PlanningLevel`/`PlanningHorizon`/`ObjectiveReference` (planning.ts) são aditivos e opcionais — não alteram nenhum contrato existente de forma destrutiva.
+- `ResponseBlock` corrigido para ser uma discriminated union real — mudança de shape (campos antes soltos agora vivem em `payload` tipado por tipo), mas API pública (`type`, `sourceRefs`, `status`, `actions`) preservada.
+
+Ver `docs/architecture/gota-neural-foundation-v1.md`, seção "V1.1 —
+Correções da auditoria independente CODEX WEB", para a tabela completa
+gap → correção.
+
 ## Security
 
 - Nenhum import de client de mutação (Supabase admin/service role, APIs de pagamento/mensageria) em `src/lib/neural-core/` — verificado por grep e por teste estrutural.
