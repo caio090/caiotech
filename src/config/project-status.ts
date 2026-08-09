@@ -2014,7 +2014,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Sprint REC OS 3.0.1.1: experiência navegável real em /admin/contentos/roadmap. Fonte única RecOsRoadmapItem (src/lib/rec-os-roadmap.ts) lida de content_items/operational_tasks/approvals; as 4 visualizações (_roadmap-client.tsx) consomem exatamente o mesmo array filtrado.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
     last_updated: "2026-08-09",
-    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo). Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001): corrigida divergência de contagem entre Quadro e as demais visões -- kanbanColumnForStatus() não resolvia o alias legado 'ajuste' (REC_OS_STATUS_ALIASES), omitindo esses itens só do Quadro. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md.",
+    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo). Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001): corrigida divergência de contagem entre Quadro e as demais visões -- kanbanColumnForStatus() não resolvia o alias legado 'ajuste' (REC_OS_STATUS_ALIASES), omitindo esses itens só do Quadro. Sprint QA Fix 3.0.2.6 (CI-PRODUCT-ROADMAP-SOURCE-UNAVAILABLE-001, status: fixed_pending_rerun): fonte 403/503 (ex.: sem SUPABASE_SERVICE_ROLE_KEY em CI) era tratada como 'roadmap vazio' sem acionar o aviso existente, e o EmptyState genérico escondia as 4 visões inteiras quando filtered.length===0 -- agora o aviso honesto aparece e as 4 visões continuam navegáveis. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md e docs/qa/e2e-final-fix-3.0.2.6.md.",
     priority: "P1",
   },
   {
@@ -2258,8 +2258,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "admin",
     description: "src/lib/business-office/{types,data}.ts -- reaproveita EXATAMENTE os normalizadores do Calendário Global (content_items/operational_tasks/approvals), nenhuma fonte de verdade nova. Reuniões/financeiro/campanhas/decisões/metas/documentos ficam explicitamente 'ainda não conectado', nunca zero fabricado.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-01",
-    notes: "Ver docs/meu-escritorio/today-week-month-model.md.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/meu-escritorio/today-week-month-model.md. Sprint QA Fix 3.0.2.6 (CI-PRODUCT-OFFICE-SHELL-001, status: fixed_pending_rerun): 503 de requireAdminContentOSContext() (ex.: sem SUPABASE_SERVICE_ROLE_KEY em CI) substituía a página inteira por AdminContentOSUnavailableState, escondendo escritorio-root/Hoje/Semana/Mês -- agora 503 mantém o shell operacional com aviso honesto; 401 e 403 continuam tratados como antes. Ver docs/qa/e2e-final-fix-3.0.2.6.md.",
     priority: "P1",
   },
   {
@@ -2278,8 +2278,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "crm",
     description: "/admin/leads confirmado como única implementação admin real (nenhum /admin/crm pré-existente); /admin/crm criado como alias/redirect. Nome visível 'CRM' padronizado em sidebar/header/bottom-nav.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-01",
-    notes: "Ver docs/crm/canonical-crm-route.md. /admin/super/waitlist e /admin/super/leads permanecem ferramentas separadas de onboarding de plataforma (mesma tabela, propósito distinto) -- relação agora explícita na UI (links '← CRM' e rótulos honestos), não fundidas numa única implementação.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/crm/canonical-crm-route.md. /admin/super/waitlist e /admin/super/leads permanecem ferramentas separadas de onboarding de plataforma (mesma tabela, propósito distinto) -- relação agora explícita na UI (links '← CRM' e rótulos honestos), não fundidas numa única implementação. Sprint QA Fix 3.0.2.6 (CI-HARNESS-CRM-PIPELINE-STRICT-001, status: fixed_pending_rerun): teste E2E do texto 'Pipeline comercial' corrigido para exact:true (batia por engano na descrição 'Leads e pipeline comercial' do PageHeader, substring case-insensitive) -- nenhuma alteração de produto. Ver docs/qa/e2e-final-fix-3.0.2.6.md.",
     priority: "P1",
   },
   {
