@@ -5,6 +5,8 @@
  * nenhuma mutação real nesta sprint.
  */
 export * from "./provenance";
+export * from "./visibility";
+export * from "./planning";
 export * from "./context";
 export * from "./intake";
 export * from "./activation";
