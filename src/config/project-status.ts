@@ -2341,8 +2341,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "admin",
     description: "playwright.config.ts (5 projetos de viewport + auth-setup + unauthenticated), 15 arquivos de spec/helpers em tests/e2e/, .github/workflows/local-e2e-qa.yml (push-triggered, permissions: contents:read, Environment local-e2e-qa, sem upload de artifact sensível, resumo sanitizado via GITHUB_STEP_SUMMARY).",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-03",
-    notes: "Ver docs/qa/github-actions-authenticated-e2e.md. Node 24 usado no workflow (não Node 20) -- auditoria confirmou que qa:doctor/qa:smoke/check:workspace-mutations dependem do suporte nativo a TypeScript do Node, ausente na série 20.x.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/qa/github-actions-authenticated-e2e.md. Node 24 usado no workflow (não Node 20) -- auditoria confirmou que qa:doctor/qa:smoke/check:workspace-mutations dependem do suporte nativo a TypeScript do Node, ausente na série 20.x. Incidente CI-PLAYWRIGHT-BROWSER-001 (auth-setup caía no Chromium Headless Shell padrão em vez do Chrome instalado pelo workflow) -- status: fixed_pending_rerun. Ver docs/qa/incidents/ci-playwright-browser-001.md.",
     priority: "P1",
   },
   {

@@ -74,6 +74,18 @@ página.
 - Falha de `qa:doctor`/`qa:smoke`/TypeScript/mutation coverage antes do Playwright — infraestrutura ou harness, nunca produto.
 - Falha de um `.spec.ts` específico depois de tudo acima passar — provável falha de produto (ou de seletor/harness, se o mesmo padrão já funcionou localmente antes) — precisa da leitura do nome do teste e do resumo para classificar.
 
+## Incidente CI-PLAYWRIGHT-BROWSER-001 (hotfix E2E CI 3.0.2.3)
+
+A primeira run (`30833304673`) falhou em `auth-setup` porque esse projeto
+Playwright era o único sem `use` próprio e por isso herdava um `use`
+global que não declarava `channel: "chrome"`, caindo no Chromium Headless
+Shell padrão do Playwright — nunca instalado pelo workflow (que só
+instala Chrome). Corrigido movendo `channel: "chrome"` para o `use`
+global. Detalhes completos em
+[`docs/qa/incidents/ci-playwright-browser-001.md`](incidents/ci-playwright-browser-001.md).
+Nenhuma falha de produto foi comprovada por essa primeira run — a suíte
+autenticada nunca chegou a executar.
+
 ## Limitações desta primeira versão
 
 - Sem `gh` CLI disponível no ambiente de execução deste agente — o
