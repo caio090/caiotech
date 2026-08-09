@@ -26,6 +26,7 @@ export default defineConfig({
     ? [["list"], ["json", { outputFile: ".tmp/playwright/report.json" }]]
     : [["list"], ["html", { outputFolder: ".tmp/playwright/report", open: "never" }]],
   use: {
+    channel: "chrome",
     baseURL: "http://127.0.0.1:3100",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
