@@ -2579,6 +2579,20 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     notes: "Ver docs/product/lokat-os-activation-v1.md e docs/architecture/lkt-orchestration-framework-v1.md. Nenhum classifier implementado.",
     priority: "P3",
   },
+
+  // ── Sprint Gota Neural Foundation V1 — camada de orquestração ──────────
+  {
+    id: "gota_neural_foundation",
+    name: "Gota Neural — Foundation (contract-first)",
+    category: "admin",
+    description: "Contratos TypeScript em src/lib/neural-core/ (Context, Activation, Capabilities, Integrations, Agents, Response Blocks, Actions, Confirmation, Memory, Briefing, LKT/NIS awareness) e Neural Orchestrator determinístico (sem LLM). Cobertura de 20 casos de teste (segurança de Company obrigatória, draft-only actions, no-silent-mutation, memory != conversation).",
+    phase: "future",
+    readiness: "implemented",
+    qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/gota-neural-foundation-v1.md e ADR-GOTA-NEURAL-001.md. Somente contratos e orchestrator determinístico — nenhuma persistência, LLM, agente executando, integração externa ou UI. Não validated: aguarda auditoria externa (CODEX WEB) antes de qualquer integração/UI.",
+    priority: "P2",
+  },
 ];
 
 // ── Histórico de eventos versionado ─────────────────────────
