@@ -164,21 +164,29 @@ export function RoadmapClient({
         </div>
       )}
 
-      {filtered.length === 0 ? (
+      {/*
+        Sprint QA Fix 3.0.2.6 (CI-PRODUCT-ROADMAP-SOURCE-UNAVAILABLE-001) —
+        antes, filtered.length === 0 substituía as 4 visões inteiras por um
+        único EmptyState genérico, indistinguível de "fonte de dados
+        indisponível" e escondendo roadmap-kanban/roadmap-list mesmo quando
+        a pessoa só queria trocar de visão para conferir. Agora o aviso de
+        vazio aparece como informação, e as 4 visões continuam navegáveis
+        (cada uma já mostra seu próprio estado vazio honesto por dentro —
+        ex.: coluna "Vazio" no Quadro) — consistente com o restante do
+        arquivo: mesma fonte única (`filtered`) alimentando todas as visões.
+      */}
+      {filtered.length === 0 && (
         <EmptyState
           icon={LayoutGrid}
           title={items.length === 0 ? "Nenhum conteúdo no roadmap ainda" : "Nenhum item para estes filtros"}
           description={items.length === 0 ? "Quando um conteúdo for criado no REC OS, ele aparece aqui automaticamente." : "Ajuste ou limpe os filtros para ver os itens."}
         />
-      ) : (
-        <>
-          {view === "quadro" && <KanbanView items={filtered} showClient={showClientColumn} />}
-          {view === "lista" && <ListView items={filtered} showClient={showClientColumn} search={search} onSearch={setSearch} />}
-          {view === "linha_do_tempo" && <TimelineView items={filtered} granularity={granularity} onGranularityChange={setGranularity} showClient={showClientColumn} />}
-          {view === "calendario" && (
-            <CalendarView items={filtered} month={month} onMonthChange={setMonth} calendarNavUrl={calendarNavUrl} showClient={showClientColumn} />
-          )}
-        </>
+      )}
+      {view === "quadro" && <KanbanView items={filtered} showClient={showClientColumn} />}
+      {view === "lista" && <ListView items={filtered} showClient={showClientColumn} search={search} onSearch={setSearch} />}
+      {view === "linha_do_tempo" && <TimelineView items={filtered} granularity={granularity} onGranularityChange={setGranularity} showClient={showClientColumn} />}
+      {view === "calendario" && (
+        <CalendarView items={filtered} month={month} onMonthChange={setMonth} calendarNavUrl={calendarNavUrl} showClient={showClientColumn} />
       )}
 
       {showFilters && (

@@ -43,6 +43,14 @@ export default async function AdminContentosRoadmapPage({
           clientStatus = "absent";
           items = await getRoadmapItems(adminDb, { clientId: null });
         }
+      } else {
+        // Sprint QA Fix 3.0.2.6 (CI-PRODUCT-ROADMAP-SOURCE-UNAVAILABLE-001)
+        // — antes, uma resposta 403/503 de requireAdminContentOSContext()
+        // (ex.: sem SUPABASE_SERVICE_ROLE_KEY, o estado real do Environment
+        // de CI local-e2e-qa) era silenciosamente tratada como "roadmap
+        // genuinamente vazio", sem nunca acionar o aviso já existente
+        // abaixo -- indistinguível de uma conta sem nenhum conteúdo real.
+        loadError = true;
       }
     } catch {
       loadError = true;
