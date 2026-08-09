@@ -10,10 +10,11 @@
  * produz o mesmo plano.
  */
 import type { CanonicalBusinessContext, InitiativeContext } from "./context";
-import { AGENT_REGISTRY, isAgentRuntimeAvailable, type AgentDefinition, type AgentDomain } from "./agents";
+import { AGENT_REGISTRY, isAgentContractAvailable, type AgentDefinition, type AgentDomain } from "./agents";
 import { resolveCapabilityPrecedence, type Capability, type CapabilityState, type UnmetCapability } from "./capabilities";
 import type { ResponseBlockType } from "./response-blocks";
 import { createDraftAction, type NeuralActionDraft } from "./actions";
+import type { PlanningContext } from "./planning";
 
 export interface NeuralRequest {
   id: string;
@@ -23,6 +24,8 @@ export interface NeuralRequest {
   initiative?: InitiativeContext;
   requestedAt: string;
   requestedBy: string;
+  /** Fase 35 — planejamento já estruturado pelo chamador; NUNCA inferido de texto livre pelo Orchestrator. */
+  planningContext?: PlanningContext;
 }
 
 /** Fase 43 — uma solicitação pode tocar múltiplos domínios ao mesmo tempo (ex.: "campanha sazonal" -> strategy+content+crm+calendar). */
@@ -42,6 +45,8 @@ export interface NeuralPlan {
   missingCapabilities: UnmetCapability[];
   responseBlockPlan: ResponseBlockType[];
   draftActions: NeuralActionDraft[];
+  /** Fase 35 — eco do `planningContext` da request, quando fornecido; o Orchestrator nunca o infere sozinho. */
+  planningContext?: PlanningContext;
 }
 
 /** Fase 40/Princípio Central — nenhuma ação operacional nasce sem Company. */
@@ -93,6 +98,7 @@ export class NeuralOrchestrator {
         missingCapabilities: [],
         responseBlockPlan: [],
         draftActions: [],
+        planningContext: request.planningContext,
       };
     }
 
@@ -104,8 +110,10 @@ export class NeuralOrchestrator {
 
     const missingCapabilities = resolveMissingCapabilities(domains.requiredCapabilities, capabilityStates);
 
-    const runtimeReadyAgents = candidateAgents.filter(isAgentRuntimeAvailable);
-    const responseBlockPlan = [...new Set(runtimeReadyAgents.flatMap((a) => a.supportedResponseBlocks))];
+    // Fase 9 — "contract available" decide quais response blocks o PLANO pode
+    // antecipar; nunca "runtime available" (não existe runtime nesta Foundation).
+    const contractReadyAgents = candidateAgents.filter(isAgentContractAvailable);
+    const responseBlockPlan = [...new Set(contractReadyAgents.flatMap((a) => a.supportedResponseBlocks))];
 
     return {
       requestId: request.id,
@@ -116,6 +124,7 @@ export class NeuralOrchestrator {
       missingCapabilities,
       responseBlockPlan,
       draftActions: [], // Foundation não gera drafts automaticamente -- ver createDraftAction para quando um agente real precisar
+      planningContext: request.planningContext, // eco do que o chamador forneceu -- nunca inferido aqui
     };
   }
 }

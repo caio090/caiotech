@@ -46,7 +46,29 @@ export function findAgent(id: AgentDomain): AgentDefinition | undefined {
   return AGENT_REGISTRY.find((a) => a.id === id);
 }
 
-/** Fase 39 — nunca chamar um agente `planned`/`locked`/`experimental`/`unavailable` de "disponível para execução". */
-export function isAgentRuntimeAvailable(agent: AgentDefinition): boolean {
+/**
+ * V1.1 (Fase 8-9 da correção CODEX WEB, P1 #2): a V1 fazia
+ * `isAgentRuntimeAvailable()` retornar `true` para `status ===
+ * "available_contract"`, o que é um falso positivo semântico -- nenhum
+ * Agent Runtime existe nesta Foundation. `available_contract` significa
+ * apenas "a definição/contrato do agente existe e pode ser referenciada
+ * pelo Orchestrator para planejamento", nunca "um LLM agent está
+ * executável". Esta função responde a pergunta correta: "o contrato
+ * pode ser usado para montar um plano?".
+ */
+export function isAgentContractAvailable(agent: AgentDefinition): boolean {
   return agent.status === "available_contract";
+}
+
+/**
+ * Fase 9 — nesta Foundation NENHUM agente tem runtime real (sem LLM, sem
+ * execução de fato). Esta função sempre retorna `false` nesta sprint;
+ * mantida como API explícita (em vez de removida) para que uma sprint
+ * futura que implemente um Agent Runtime real tenha um único ponto a
+ * atualizar, e para que nenhum consumidor precise reintroduzir
+ * `status === "available_contract"` como proxy de "roda de verdade".
+ */
+export function isAgentRuntimeAvailable(agent: AgentDefinition): boolean {
+  void agent;
+  return false;
 }
