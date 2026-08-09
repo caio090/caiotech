@@ -1,6 +1,17 @@
+// Sprint Recalibração LOKAT OS 2026-08 (correção pós-auditoria
+// independente) — este arquivo mantinha V1_PROGRESS/V2_PROGRESS
+// hardcoded de forma independente de src/config/project-status.ts, que
+// é o sistema detalhado (203 áreas, calcV1Readiness()) e passa a ser
+// canônico. A divergência já estava materializada: esta tela mostrava
+// 81% enquanto a recalibração registrava 65%. Fachada temporária:
+// reexporta os dois valores do arquivo canônico em vez de manter um
+// segundo número hardcoded. PROJECT_DEADLINE_V1/MILESTONES_V1/V2
+// permanecem aqui -- fora do escopo desta divergência específica.
+// Consolidação mais profunda dos dois arquivos fica para uma sprint
+// futura (ver docs/recalibration/lokat-os-recalibration-2026-08.md).
+export { V1_PROGRESS, V2_PROGRESS } from "@/config/project-status";
+
 export const PROJECT_DEADLINE_V1 = "2026-07-31";
-export const V1_PROGRESS = 81;
-export const V2_PROGRESS = 12;
 
 export function getDaysRemainingV1(): number {
   const deadline = new Date("2026-07-31T23:59:59");
