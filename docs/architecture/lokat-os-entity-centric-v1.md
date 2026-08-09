@@ -56,11 +56,23 @@ múltiplas agências por conta (ver Migração Futura em
 
 ### Company
 
-**Já existe.** A tabela `clients` já é, na prática e na documentação
-existente, a entidade "empresa atendida" — `LOKAT_TENANCY_MAPPING.md` já
-o rotula explicitamente como "Company / Tenant". O que falta não é a
-tabela, é a CAMADA DE EXPERIÊNCIA em torno dela (ver Central da Empresa,
-abaixo) e a consolidação de dados hoje espalhados:
+**`PARTIAL_REUSE`** (classificação confirmada por auditoria
+independente — não é um reaproveitamento 1:1 completo). A tabela
+`clients` já é, na prática e na documentação existente, a base
+operacional correta para "empresa atendida" — `LOKAT_TENANCY_MAPPING.md`
+já o rotula explicitamente como "Company / Tenant". Mas `clients` ainda
+concentra nomenclatura e relações históricas de "cliente de agência"
+(o nome da tabela, `owner_id` como dono/agência, campos pensados para
+esse relacionamento específico) — o domínio `Company` que esta
+arquitetura propõe precisa ENCAPSULAR `clients`, não apenas renomeá-la
+na documentação. Isso significa: uma camada de leitura/contrato
+(`Company`) que resolve para `clients` por baixo, permitindo que o
+conceito de Company inclua no futuro empresas que não são "clientes de
+uma agência" (ex.: o próprio uso interno do Lokat, Camada Dogfooding) sem
+forçar essa relação onde ela não existe. O que falta não é só a
+tabela — é essa camada de encapsulamento, a CAMADA DE EXPERIÊNCIA em
+torno dela (ver Central da Empresa, abaixo) e a consolidação de dados
+hoje espalhados:
 
 | Conceito | Onde vive hoje | Estado real |
 |---|---|---|

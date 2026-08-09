@@ -24,7 +24,7 @@ de propor uma reescrita.
 
 ## Estado atual (evidência, não opinião)
 
-- 190 áreas rastreadas em `project-status.ts`: 16 `validated`, 6 `deployed`, 8 `implemented`, 104 `qa_pending`, 9 `blocked`, 46 `planned`, 1 `in_progress`.
+- 203 áreas rastreadas em `project-status.ts` (190 antes desta sprint + 13 novas áreas conceituais Entity-Centric/tech-debt, ver "Status config changed"): 16 `validated`, 6 `deployed`, 8 `implemented`, 104 `qa_pending`, 10 `blocked`, 58 `planned`, 1 `in_progress`. *(Correção pós-auditoria independente: a primeira versão deste documento usava o denominador antigo, 190, em alguns cálculos — corrigido para 203 em todo o documento.)*
 - 140+ rotas reais no repositório (`find src/app -name page.tsx`), cobrindo 7 superfícies distintas (público, admin, contentos, client, operacional, growth, academy, financeiro).
 - `clients` já cumpre o papel de Company; não existe `workspaces` física (nem é urgente — já registrado como V3); não existe `Project`/`WorkItem` genérico.
 - Meu Negócio já é, na prática, o protótipo mais próximo de uma "Company Central" — mas roda sobre uma única empresa de demonstração (fixture), com 17 dos 19 campos de DNA nascendo vazios por padrão (nunca fabricados).
@@ -39,7 +39,7 @@ de propor uma reescrita.
 | **IMPLEMENTED_QA_VALIDATED** | As 16 áreas `validated` + o contrato testado pela run E2E autenticada final (navegação, Workspace Preview, mutation guard, CRM mobile, overflow, Meu Escritório, Roadmap). |
 | **IMPLEMENTED_NOT_VALIDATED** | As 104 áreas `qa_pending` — código existe, QA formal não. |
 | **BLOCKED** | 9 áreas — em geral aguardando decisão externa (SQL pendente de aprovação, licença de motor externo). |
-| **TECH_DEBT** | `_client-content.tsx` órfão em Meu Negócio; três vocabulários de role/account-type pré-capability-registry (já mitigado, não eliminado); fragmentação de resolução de contexto por módulo (o próprio motivo desta recalibração). |
+| **TECH_DEBT** | `src/app/admin/meu-negocio/_client-content.tsx` órfão (P3 — dead code confirmado, sem importador real; não confundir com o padrão de nome `_client-content.tsx`, comum e majoritariamente vivo no resto do repositório); dois sistemas `project-status` paralelos (P1 — ver seção própria abaixo); três vocabulários de role/account-type pré-capability-registry (já mitigado, não eliminado); fragmentação de resolução de contexto por módulo (P2 hoje, torna-se P1 antes de expor ações de IA ou contexto persistente — o próprio motivo desta recalibração). |
 | **NEW_SCOPE_2026_08** | Entity-Centric (Company Central, Project, Work Items, Domain Events, AI Context, Capabilities por plano, Connector/NIS) — 100% conceitual nesta sprint. |
 | **FUTURE** | Compras Inteligentes, Finance avançado, Growth avançado, Connector real, primeiro piloto externo. |
 | **EXTERNAL_INTEGRATIONS** | CE.SDK (EditorOS), Chatwoot, Postiz — todos `BLOQUEADO` por licença/infraestrutura, sem mudança nesta sprint. |
@@ -51,6 +51,11 @@ reclassificação retroativa do que já existe.
 
 ## Percentuais recalculados
 
+*(Seção reescrita após auditoria independente — os nomes abaixo
+substituem a versão anterior, que rotulava métricas diferentes como se
+fossem a mesma "progresso", causando confusão. Cada linha agora mede
+UMA coisa específica, nomeada para não ser confundida com as outras.)*
+
 Metodologia: reaproveita os pesos JÁ CODIFICADOS em `READINESS_WEIGHTS`
 e a fórmula já existente `calcV1Readiness()` (`src/config/project-status.ts`)
 — nenhuma tabela de pesos nova foi inventada. `planned`/`blocked` = 0.10
@@ -59,14 +64,45 @@ falta QA formal), `validated` = 1.00. Itens concept-only (a nova camada
 Entity-Centric) não entram em nenhum destes cálculos — não existe código
 para medir ainda.
 
+### Métricas de escopo (readiness ponderado)
+
 | Métrica | Valor | Base de cálculo |
 |---|---|---|
-| **A. Original V1 Completion** | **65** | `calcV1Readiness()` aplicado às 31 áreas atualmente marcadas `phase: "v1"`, mesma fórmula já existente no código. |
-| **B. Current MVP Readiness** | **~53** (proxy) | Áreas de categoria `crm`+`conteudo` (56 áreas) como aproximação do novo escopo MVP recalibrado — proxy imperfeito, ver limitação abaixo. |
-| **C. Platform Vision Progress** | **57** | Mesma fórmula aplicada às 190 áreas totais rastreadas — não inclui a camada Entity-Centric nova (sem código ainda, denominador ainda vai crescer quando ela ganhar áreas próprias). |
-| **D. QA Confidence** | **8%** (16/190) | Fração de áreas com `readiness: "validated"` sobre o total — a métrica mais conservadora e mais honesta das quatro. |
+| **Historical V1 Completion Estimate** | **81%** | Valor manual fixado em 2026-07-12 (commit `f1d0c9f`), antes de existir o sistema atual de 190+ áreas — preservado como registro histórico, não uma medição comparável às demais linhas desta tabela. |
+| **Current Tracked V1 Readiness** | **65%** | `calcV1Readiness()` aplicado às 31 áreas atualmente marcadas `phase: "v1"` — mesma fórmula já existente no código, sobre o conjunto de áreas de hoje. Não é "o V1 caiu"; é uma métrica diferente, mais rigorosa, substituindo uma estimativa manual antiga. |
+| **Historical/Manual V2 Delivery Estimate** | **12%** | Valor manual preservado — ver decisão de não recalcular abaixo. Não acompanhado, nesta sprint, de uma métrica de "cobertura arquitetural V2" separada (melhoria recomendada, não implementada). |
+| **Platform Vision Progress** | **53.7%** | Mesma fórmula aplicada às 203 áreas totais rastreadas hoje (não às 190 desta sprint — corrigido pós-auditoria). Cresce em denominador conforme a camada Entity-Centric ganha áreas próprias, sem que isso signifique regressão. |
 
-**Limitação registrada, não escondida:** a métrica B usa categorias
+### Métricas de confiança de QA (nunca uma métrica única — ver correção abaixo)
+
+A versão anterior deste documento publicava um único "QA Confidence: 8%",
+que a auditoria independente corretamente apontou como enganoso: soa
+como "8% de confiança no sistema todo", quando na verdade mistura duas
+coisas muito diferentes — quantas áreas têm QA FORMAL registrado
+(baixo, porque é um processo caro e ainda não aplicado a tudo) vs.
+quantos dos testes que RODARAM realmente passaram (altíssimo). São
+separadas agora:
+
+| Métrica | Valor | O que mede |
+|---|---|---|
+| **Formal Validation Coverage (por área)** | **7.9%** (16/203) | Fração de áreas com `readiness: "validated"` sobre o total rastreado — a métrica mais rigorosa; a maioria das áreas nunca passou por QA formal ainda, o que é esperado num produto deste tamanho, não um sinal de qualidade ruim. |
+| **E2E Executed Pass Rate** | **100%** (166/166) | De todos os testes que RODARAM na run autenticada final (`31333187756`), quantos passaram — a suíte que executa está inteiramente verde, 0 P0-P3. |
+| **E2E Suite Execution Rate** | **87.4%** (166/190) | Dos 190 testes descobertos pela suíte, quantos realmente rodaram (o restante foi pulado por falta de dado/contexto na conta de QA, nunca por falha). |
+| **E2E Not-Validated Rate** | **12.6%** (24/190) | Os mesmos 24 skips — dado de forma direta, sem escondê-lo atrás de uma média. |
+
+**Leitura correta:** o produto tem baixa cobertura de QA FORMAL
+(esperado, produto em crescimento) e altíssima taxa de acerto no que já
+é testado automaticamente (o oposto de "pouca confiança"). Nenhuma
+dessas quatro métricas deve ser citada sozinha como "a" métrica de
+confiança do produto.
+
+### Current MVP Readiness (proxy, mantido com a mesma limitação já registrada)
+
+| Métrica | Valor | Base de cálculo |
+|---|---|---|
+| **Current MVP Readiness (proxy)** | **~51%** | Áreas de categoria `crm`+`conteudo` (51 áreas) como aproximação do novo escopo MVP recalibrado — proxy imperfeito, ver limitação abaixo. |
+
+**Limitação registrada, não escondida:** esta métrica usa categorias
 (`crm`, `conteudo`) como proxy do novo recorte de MVP porque
 `project-status.ts` não tem hoje um campo "está no MVP recalibrado?" —
 essa é uma melhoria de tracking recomendada, não implementada nesta
@@ -90,25 +126,37 @@ não sincronizados**:
   detalhado NUNCA é lido para exibição, só aparece em comentários/notas
   de texto e no teste unitário do próprio arquivo.
 
-Consequência prática: **a mudança de V1_PROGRESS decidida nesta sprint
-(81→65, ver abaixo) NÃO altera nenhum número visível na interface hoje**
-— o badge que o usuário vê continua vindo de `src/lib/project-status.ts`,
-inalterado por esta sprint (permanece 81%). Adicionalmente,
+Consequência prática identificada originalmente: a mudança de
+V1_PROGRESS decidida nesta sprint (81→65) não alterava, por si só,
+nenhum número visível na interface — o badge vinha de
+`src/lib/project-status.ts`, um arquivo à parte. **Isso foi corrigido
+ainda dentro desta sprint, em resposta à auditoria independente — ver
+"Correção pós-auditoria" logo abaixo.** Adicionalmente,
 `PROJECT_DEADLINE_V1 = "2026-07-31"` nesse segundo arquivo já é uma data
 passada em relação a hoje (2026-08-09) — outro sinal de que esse arquivo
-está desatualizado e desconectado do sistema de tracking mais recente.
+estava desatualizado; esse campo específico (e os `MILESTONES_V1/V2`)
+não foram alterados nesta correção, só os dois números de progresso.
 
-**Decisão desta sprint:** não tocar em `src/lib/project-status.ts`.
-Alterar o número real exibido na interface é uma mudança de maior
-visibilidade e impacto do que o escopo desta sprint (auditoria +
-planejamento, sem componente de produto) autoriza sem confirmação
-explícita. Esta descoberta é registrada aqui como o achado de duplicação
-mais importante da auditoria (Camada 19) e como TECH_DEBT prioritário: a
-consolidação dos dois arquivos num único sistema de verdade é
-recomendada como um dos primeiros itens da Faixa A do roadmap
-recalibrado, antes mesmo do trabalho de Company/Project — corrigir
-tracking duplicado é mais barato agora do que depois de mais sprints
-lerem do arquivo errado.
+**Decisão original desta sprint:** não tocar em `src/lib/project-status.ts`
+— alterar o número real exibido na interface parecia uma mudança de
+maior visibilidade do que uma sprint de auditoria/planejamento deveria
+fazer sem confirmação explícita.
+
+**Correção pós-auditoria independente (mesma sprint, resposta ao
+achado P1):** a auditoria confirmou o risco como "alto e já
+materializado" (a interface mostra 81% enquanto a recalibração registra
+65%) e recomendou explicitamente tornar `src/config/project-status.ts`
+canônico, convertendo `src/lib/project-status.ts` numa FACHADA
+TEMPORÁRIA — reexportando `V1_PROGRESS`/`V2_PROGRESS` do arquivo
+detalhado em vez de manter um segundo valor hardcoded e divergente.
+Implementado: `src/lib/project-status.ts` agora reexporta os dois
+valores de `src/config/project-status.ts`; `PROJECT_DEADLINE_V1` e
+`MILESTONES_V1`/`MILESTONES_V2` permanecem no arquivo simples (fora do
+escopo da divergência apontada). Consequência visível: o badge "V1 XX%"
+na interface passa a mostrar **65%**, não mais 81% — mudança
+intencional, não efeito colateral. Consolidação mais profunda (unificar
+os dois arquivos de fato) permanece recomendada para a Faixa A do
+roadmap, não feita nesta sprint.
 
 ## V1_PROGRESS / V2_PROGRESS — decisão
 

@@ -16,15 +16,23 @@ mais). Ordem de Product Priority recomendada por esta auditoria:
 
 ```
 1. Entity-Centric foundation (Company/Project/Work Item conceituais — já formalizados nesta sprint)
-2. Company Central (evoluir Meu Negócio, não criar do zero)
-3. Project/Work Item spine (mínimo necessário para Dogfooding)
-4. Module connectivity (conectar módulos existentes aos Work Items, começando pelo padrão já provado em Meu Escritório)
-5. AI context (Level 0-1, sobre a spine já existente)
-6. Capabilities (plan registry, reaproveitando WorkspaceCapabilityGate)
-7. Dogfooding (uso interno real)
-8. Connector contract (só depois de ter algo real para conectar)
-9. Premium modules (Finance avançado, Growth, Compras Inteligentes)
+2. Company context unificado (consolidar a resolução de "qual empresa" hoje fragmentada entre módulos, sobre clients já existente)
+3. Project/Work Item spine (entidade nova + projeção sobre content_items/operational_tasks/approvals — mínimo necessário para Dogfooding)
+4. Company Central (evoluir Meu Negócio consumindo a spine acima, não criar do zero — depende do item 3 existir de verdade, nunca antes)
+5. Module connectivity (conectar módulos existentes aos Work Items, começando pelo padrão já provado em Meu Escritório)
+6. AI context (Level 0-1, sobre a spine já existente)
+7. Capabilities (plan registry, reaproveitando WorkspaceCapabilityGate — paralelo, não depende dos itens acima)
+8. Dogfooding (uso interno real)
+9. Connector contract (só depois de ter algo real para conectar)
+10. Premium modules (Finance avançado, Growth, Compras Inteligentes)
 ```
+
+**Correção pós-auditoria independente:** a versão anterior desta lista
+colocava "Company Central" (item 2) antes de "Project/Work Item spine"
+(item 3), contradizendo o próprio grafo de dependências desta seção
+(que sempre teve Company Central consumindo Work Items, nunca o
+contrário). Reordenado para bater com o grafo: Company context → Project
+→ Work Items → Company Central.
 
 Esta ordem é uma RECOMENDAÇÃO baseada na auditoria (dependências reais),
 não uma decisão de negócio — precisa de validação humana antes de virar
@@ -32,7 +40,20 @@ compromisso.
 
 ## Grafo de dependências
 
+**Pré-requisito adicionado pós-auditoria independente:** antes de
+qualquer trabalho novo de Project/Work Item, consolidar (a) o sistema
+duplicado de status (`src/lib/project-status.ts` vs
+`src/config/project-status.ts` — fachada já implementada nesta sprint,
+consolidação completa ainda pendente) e (b) um contrato único de
+resolução de contexto Company/Workspace (hoje cada módulo resolve
+`client_id`/`account_type` à sua própria maneira — ver
+`lokat-os-module-connectivity-map-v1.md`). Sem isso, a Company Central e
+o AI Context herdariam a mesma fragmentação que esta recalibração inteira
+existe para resolver.
+
 ```
+Governança de status + contrato único de resolução Company/Workspace (pré-requisito, ver acima)
+   ↓
 Company foundation (já existe: `clients`)
    ↓
 Company context (unificar resolução de contexto — hoje fragmentada entre módulos)

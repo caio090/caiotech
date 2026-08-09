@@ -46,6 +46,8 @@ Requisitos mínimos:
 - Project + Work Items funcionando de ponta a ponta (mesmo sem UI de Company Central formal — pode nascer dentro do Meu Escritório/Operacional existentes).
 - Board/kanban equivalente ao Trello atual (já existe em `/operacional/kanban` — avaliar extensão em vez de nova tela).
 - Documentos estruturados equivalentes ao uso atual de Notion (briefing, decisões, notas de projeto) — via LOKAT Docs conceitual.
+- **Calendário, CRM essencial, REC OS e aprovações precisam estar EXPLICITAMENTE dentro do mínimo diário** — são módulos que o próprio time já usa diariamente hoje; excluí-los do Dogfooding MVP faria o time continuar dependendo das ferramentas atuais para essa parte do fluxo, contradizendo o objetivo (achado da auditoria independente).
+- **O que NÃO precisa entrar no Dogfooding MVP** (excesso a evitar): editor documental completo (LOKAT Docs pode nascer com templates simples, não um editor rico), IA ampla (Level 0-1 basta), e Company Central COMPLETA (contratos mínimos de contexto bastam inicialmente — a tela completa é do External Pilot em diante).
 
 ### External Pilot MVP
 **Pergunta que resolve:** o que um primeiro cliente/projeto externo real precisa para operar dentro do LOKAT OS.
@@ -58,12 +60,29 @@ Requisitos (nenhum cliente específico hardcoded):
 - CRM/contatos quando aplicável ao caso.
 - Connector com escopo mínimo (mesmo que só leitura inicial — `connector_readable` sem `connector_eventable`).
 - Health check e data ownership garantidos (ver NIS).
+- **Itens que faltavam nesta lista (achado da auditoria independente) e são obrigatórios antes de um piloto real:**
+  - **Ativação da empresa** (Company Activation — hoje só existe como fluxo conceitual, ver Camada 4 da entidade-central; sem isso não há como o piloto sequer começar a usar a Company real).
+  - **Isolamento/autorização** entre o piloto externo e o resto da plataforma (garantia de que dados de um piloto não vazam para outro workspace).
+  - **Recuperação operacional** (o que acontece se o Connector cair, se um sync falhar — não pode deixar o piloto num estado inconsistente sem saída).
+  - **Suporte** (canal real para o piloto reportar problema — não implementado hoje).
+  - **Auditoria** (log mínimo de quem fez o quê, necessário antes de dados reais de terceiros entrarem no sistema).
+  - **Critérios claros de saída** (o que define "o piloto funcionou" ou "o piloto deve ser descontinuado" — sem isso o piloto nunca termina nem é avaliado objetivamente).
 
 ### Public MVP
 Tudo do External Pilot MVP, mais: capability registry aplicado de
 verdade (plano determina o que a conta vê), self-service de onboarding,
 e os módulos CORE_MVP listados acima estáveis e validados (não apenas
 `qa_pending`).
+
+**Lacuna identificada pela auditoria independente — Company Activation
+gap:** falta uma jornada INTEGRADA de ponta a ponta (cadastro →
+diagnóstico → prioridades → primeiro Project → primeiro Work Item). Hoje
+essas peças existem separadamente (cadastro via onboarding atual,
+diagnóstico via `business-strategy/*`, Project/Work Item ainda
+conceituais) mas nunca foram desenhadas como um ÚNICO fluxo contínuo —
+sem isso, o self-service do Public MVP não tem um caminho real de
+"primeira empresa criada até primeiro Work Item concluído" para o
+usuário seguir sozinho.
 
 ## Trello / Notion / Drive — escopo mínimo de substituição
 
