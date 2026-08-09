@@ -3,6 +3,13 @@
  * Nenhuma busca de dado real; builder puro sobre dados já recebidos
  * (mesmo padrão de `BusinessOfficeFeedItem`, src/lib/business-office/types.ts,
  * que já normaliza várias fontes num único array).
+ *
+ * V1.1 (Fase 37 da correção CODEX WEB, P2 #5): `BriefingPrioritySignal`
+ * é urgência operacional (o que precisa de atenção AGORA), uma dimensão
+ * DIFERENTE de `PlanningLevel` (ver planning.ts, estratégico/tático/
+ * operacional). As duas nunca são fundidas -- `SIGNAL_WEIGHT` não foi
+ * alterado nesta correção e não deve ser usado para representar
+ * estratégia.
  */
 
 export type BusinessBriefingItemKind =
