@@ -17,7 +17,13 @@ test.describe("CRM canônico", () => {
 
   test("Pipeline comercial pertence à mesma página do CRM (não é outro banco)", async ({ page }) => {
     await page.goto("/admin/leads");
-    await expect(page.getByText("Pipeline comercial")).toBeVisible();
+    // Sprint QA Fix 3.0.2.6 (CI-HARNESS-CRM-PIPELINE-STRICT-001) —
+    // getByText() sem exact:true é substring case-insensitive por padrão,
+    // então "Pipeline comercial" também batia em "Leads e pipeline
+    // comercial" (PageHeader description), causando strict-mode violation.
+    // O texto do produto está correto nas duas ocorrências -- só o
+    // seletor do teste precisava desambiguar.
+    await expect(page.getByText("Pipeline comercial", { exact: true })).toBeVisible();
   });
 
   test("Waitlist/Central aparecem como ferramentas relacionadas, não como um segundo CRM", async ({ page }) => {
