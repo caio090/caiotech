@@ -80,7 +80,24 @@ export interface ProjectAreaStatus {
   nextCheckpoint?: string;
 }
 
-export const V1_PROGRESS = 81;  // IMUTÁVEL — alterar apenas após QA formal
+// Sprint Recalibração LOKAT OS 2026-08 — V1_PROGRESS recalculado de 81
+// para 65. O valor anterior (81) foi fixado em 2026-07-12 (commit
+// f1d0c9f), num arquivo de 79 linhas, ANTES de existir o sistema atual
+// de 190 áreas com pesos por readiness — era uma estimativa manual
+// anterior ao próprio mecanismo de cálculo objetivo abaixo
+// (calcV1Readiness()), não um valor comparável ponto a ponto com o novo.
+// 65 é produzido pela MESMA fórmula já existente neste arquivo, sobre o
+// conjunto atual de 31 áreas phase:"v1". A queda não é regressão de
+// produto — é o denominador (composição do conjunto v1) e a metodologia
+// mudando. Ver docs/recalibration/lokat-os-recalibration-2026-08.md.
+export const V1_PROGRESS = 65;  // IMUTÁVEL — alterar apenas após QA formal ou recalibração explícita registrada em docs/recalibration/
+// V2_PROGRESS permanece 12, NÃO recalculado nesta sprint: aplicar a
+// mesma fórmula às 127 áreas phase:"v2" daria ~66, mas a maioria delas é
+// qa_pending por terem sido REGISTRADAS em sprints de arquitetura/
+// planejamento, não porque o código foi implementado e só falta QA
+// formal (a suposição por trás do peso 0.75). Contar isso como
+// progresso real violaria "itens concept-only não contam como
+// implementados". Ver docs/recalibration/lokat-os-recalibration-2026-08.md.
 export const V2_PROGRESS = 12;  // IMUTÁVEL — alterar apenas após QA formal
 
 // Pesos de prontidão por readiness (0.0 – 1.0).
@@ -792,9 +809,9 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
         "Novo QA Codex Web necessário antes de marcar validated — verificar especialmente que a navegação nativa resolve os sintomas de atraso/inversão relatados",
       ],
     },
-    last_updated: "2026-07-19",
+    last_updated: "2026-08-09",
     priority: "P1",
-    notes: "Sprint 3.1A: rota /admin/calendario (requireAdminContentOSContext, adminDb), src/lib/global-calendar.ts com normalizadores puros. Sprint 3.1A.1: hotfix dos 4 P1 do QA (navegação mensal, filtro client, lista de clientes, scheduled_at). Verificado via script ad-hoc, sem framework de teste instalado. Somente leitura, sem SQL, sem reuniões, sem Google Calendar/Meet — adiados para 3.1C/3.1D. Arquitetura original em docs/architecture/GLOBAL_CALENDAR_V1.md.",
+    notes: "Sprint 3.1A: rota /admin/calendario (requireAdminContentOSContext, adminDb), src/lib/global-calendar.ts com normalizadores puros. Sprint 3.1A.1: hotfix dos 4 P1 do QA (navegação mensal, filtro client, lista de clientes, scheduled_at). Verificado via script ad-hoc, sem framework de teste instalado. Somente leitura, sem SQL, sem reuniões, sem Google Calendar/Meet — adiados para 3.1C/3.1D. Arquitetura original em docs/architecture/GLOBAL_CALENDAR_V1.md. Sprint Recalibração 2026-08: run E2E autenticada final validou o contrato testado (navegação, ausência de erro), mas permanece qa_pending (não validated) -- roadmap_calendar_context_navigation continua not_validated (skip). Nenhum enum novo criado (validated_partial não existe em AreaReadiness). Ver docs/recalibration/lokat-os-recalibration-2026-08.md.",
   },
   {
     id: "client_360",
@@ -1974,7 +1991,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "4 macroetapas (Radar/Criar/Produzir/Finalizar) em src/lib/rec-os-workflow/types.ts, sobre os mesmos status reais de content_items — nenhum status renomeado. Visual Final reordenado para último bloco criativo em _guided-create-flow.tsx (antes ficava em 3º de 5, antes de Revisão/Destino).",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
     last_updated: "2026-08-01",
-    notes: "Ver docs/rec-os/canonical-creative-flow.md. Navegação continua livre (steps clicáveis), não um wizard bloqueante. Sprint REC OS 3.0.1.1: 'Enviar' (Calendário/Produção/Aprovação) foi movido para o passo Visual Final, gated por contentRequiresFinalAsset() — Destino agora só escolhe o destino, não envia mais. Radar → Criar ganhou ação real (CreateContentSeed) preservando contexto.",
+    notes: "Ver docs/rec-os/canonical-creative-flow.md. Navegação continua livre (steps clicáveis), não um wizard bloqueante. Sprint REC OS 3.0.1.1: 'Enviar' (Calendário/Produção/Aprovação) foi movido para o passo Visual Final, gated por contentRequiresFinalAsset() — Destino agora só escolhe o destino, não envia mais. Radar → Criar ganhou ação real (CreateContentSeed) preservando contexto. Sprint Recalibração 2026-08: skip E2E radar_create_opportunity permanece not_validated (conta de QA sem oportunidade real no Radar) -- não convertido para passed. Ver docs/recalibration/lokat-os-recalibration-2026-08.md.",
     priority: "P1",
   },
   {
@@ -2003,8 +2020,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "conteudo",
     description: "Ordem obrigatória implementada em _guided-create-flow.tsx: Revisão & Aprovação → Destino & Especificações → Visual Final (último bloco criativo).",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-01",
-    notes: "Ver docs/rec-os/finalization-workspace.md.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/rec-os/finalization-workspace.md. Sprint Recalibração 2026-08: skip E2E rec_os_final_send permanece not_validated (conta de QA sem conteúdo real em estado de envio final) -- não convertido para passed. Ver docs/recalibration/lokat-os-recalibration-2026-08.md.",
     priority: "P1",
   },
   {
@@ -2014,7 +2031,7 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     description: "Sprint REC OS 3.0.1.1: experiência navegável real em /admin/contentos/roadmap. Fonte única RecOsRoadmapItem (src/lib/rec-os-roadmap.ts) lida de content_items/operational_tasks/approvals; as 4 visualizações (_roadmap-client.tsx) consomem exatamente o mesmo array filtrado.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
     last_updated: "2026-08-09",
-    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo). Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001): corrigida divergência de contagem entre Quadro e as demais visões -- kanbanColumnForStatus() não resolvia o alias legado 'ajuste' (REC_OS_STATUS_ALIASES), omitindo esses itens só do Quadro. Sprint QA Fix 3.0.2.6 (CI-PRODUCT-ROADMAP-SOURCE-UNAVAILABLE-001, status: fixed_pending_rerun): fonte 403/503 (ex.: sem SUPABASE_SERVICE_ROLE_KEY em CI) era tratada como 'roadmap vazio' sem acionar o aviso existente, e o EmptyState genérico escondia as 4 visões inteiras quando filtered.length===0 -- agora o aviso honesto aparece e as 4 visões continuam navegáveis. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md e docs/qa/e2e-final-fix-3.0.2.6.md.",
+    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo). Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001): corrigida divergência de contagem entre Quadro e as demais visões -- kanbanColumnForStatus() não resolvia o alias legado 'ajuste' (REC_OS_STATUS_ALIASES), omitindo esses itens só do Quadro. Sprint QA Fix 3.0.2.6 (CI-PRODUCT-ROADMAP-SOURCE-UNAVAILABLE-001, status: fixed_pending_rerun): fonte 403/503 (ex.: sem SUPABASE_SERVICE_ROLE_KEY em CI) era tratada como 'roadmap vazio' sem acionar o aviso existente, e o EmptyState genérico escondia as 4 visões inteiras quando filtered.length===0 -- agora o aviso honesto aparece e as 4 visões continuam navegáveis. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md e docs/qa/e2e-final-fix-3.0.2.6.md. Sprint Recalibração 2026-08: skip E2E roadmap_alias_ajuste_e2e permanece not_validated -- cobertura unitária existe (28/28 em rec-os-roadmap.test.ts), mas a conta de QA não tem um item de conteúdo real com status 'ajuste' para confirmar E2E. Ver docs/recalibration/lokat-os-recalibration-2026-08.md.",
     priority: "P1",
   },
   {
@@ -2394,6 +2411,139 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     last_updated: "2026-08-03",
     notes: "Ver docs/roadmap/august-2026-mvp-recovery.md.",
     priority: "P2",
+  },
+
+  // ── Sprint Recalibração LOKAT OS 2026-08 — arquitetura Entity-Centric
+  // (conceitual, sem implementação; nenhuma área abaixo é validated) ──────
+  {
+    id: "entity_centric_architecture",
+    name: "Arquitetura Entity-Centric (Workspace→Company→Project→Work Items→Modules→Events→AI)",
+    category: "admin",
+    description: "Decisão formal (ADR-ENTITY-CENTRIC-001) de reorganizar o produto ao redor de entidades de negócio compartilhadas em vez de módulos isolados. Reaproveita clients (Company) e o padrão de projeção já provado por BusinessOfficeFeedItem (Work Items) -- nenhuma tabela nova criada nesta sprint.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-entity-centric-v1.md e docs/architecture/adr/ADR-ENTITY-CENTRIC-001.md. Conceitual apenas.",
+    priority: "P1",
+  },
+  {
+    id: "company_core",
+    name: "Company como entidade central (clients já cumpre o papel)",
+    category: "admin",
+    description: "clients já é, na prática e na documentação existente (LOKAT_TENANCY_MAPPING.md), a entidade Company/Tenant -- nenhuma tabela nova necessária. Falta a camada de experiência (Central da Empresa) e a consolidação de dados hoje espalhados (onboarding_profiles, business-strategy).",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-entity-centric-v1.md, seção Mapa de Entidades.",
+    priority: "P1",
+  },
+  {
+    id: "company_central",
+    name: "Central da Empresa (cockpit contextual por Company)",
+    category: "admin",
+    description: "Tela conceitual: identidade, diagnóstico, nível, prioridades, projetos ativos, atividades, pendências, aprovações, agenda, CRM/marketing resumidos, indicadores, alertas, próximos marcos, qualidade dos dados, integrações, IA contextual. Meu Negócio (RestaurantWorkspace) já é o protótipo funcional mais próximo -- recomenda-se evoluí-lo, não criar do zero.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-entity-centric-v1.md e docs/product/lokat-os-mvp-2026-08.md. Não implementada nesta sprint.",
+    priority: "P1",
+  },
+  {
+    id: "project_core",
+    name: "Project como entidade nova (ciclo de vida diferente de Company)",
+    category: "admin",
+    description: "Não existe hoje um Project genérico cross-módulo -- rec_projects é específico do REC OS (produção audiovisual). Contrato conceitual definido: objective/problem/diagnosis_snapshot/strategy/desired_result/level/status/roadmap/deliverables/work_items/... Sem SQL, sem migration.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-entity-centric-v1.md.",
+    priority: "P1",
+  },
+  {
+    id: "work_items_core",
+    name: "Work Items (projeção compartilhada, nunca tabela monolítica)",
+    category: "admin",
+    description: "Padrão já provado em produção por BusinessOfficeFeedItem (src/lib/business-office/types.ts) -- projeta content_items/operational_tasks/approvals num shape comum, sem duplicar estado. A generalização formalizada aqui estende esse mesmo padrão para o resto do sistema.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-entity-centric-v1.md, seção Work / Operational Items.",
+    priority: "P1",
+  },
+  {
+    id: "domain_events",
+    name: "Domain Events (cola entre módulos)",
+    category: "admin",
+    description: "Nenhum barramento de eventos existe hoje. Catálogo conceitual priorizado para o MVP (project.*, work_item.*, approval.*, lead.*, content.*, campaign.*, revenue/expense, document.*, integration.*) definido sem implementação.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-os-module-connectivity-map-v1.md.",
+    priority: "P2",
+  },
+  {
+    id: "ai_context",
+    name: "AI Context hierárquico (Global/Company/Project/Module/Item)",
+    category: "admin",
+    description: "src/lib/ai-suggestions.ts já existe como ponto único de IA contextual (pontual, dentro do REC OS). Formalização de hierarquia de escopo, AI Context Pack (com escopo/relevância/limites/privacidade/provenance/confidence) e níveis de autonomia (Level 0 explica até Level 3 executa após confirmação) -- nenhuma alteração de código.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-ai-context-v1.md. IA nunca gera score sem explicabilidade (fórmula/componentes/proveniência/confiança).",
+    priority: "P2",
+  },
+  {
+    id: "capability_registry",
+    name: "Capability Registry por plano (MVP/Premium)",
+    category: "admin",
+    description: "WorkspaceCapability (workspace-capabilities.ts) já gateia por SURFACE; feature-flags.ts já liga/desliga providers internos por ambiente. O novo eixo (plan capabilities: crm.basic/advanced, financial.*, analytics.*, etc.) é ortogonal aos dois -- recomenda-se estender WorkspaceCapabilityGate, não duplicar o mecanismo.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-capabilities-v1.md.",
+    priority: "P2",
+  },
+  {
+    id: "dogfooding_mvp",
+    name: "Dogfooding MVP (Lokat usando o próprio LOKAT OS)",
+    category: "admin",
+    description: "Requisitos mínimos para o time Lokat parar de depender de Trello/Notion no fluxo principal: Company real (não fixture) para os projetos internos, Project+Work Items ponta a ponta, kanban (já existe em /operacional/kanban), documentos estruturados (LOKAT Docs conceitual).",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-mvp-2026-08.md e docs/product/lokat-os-roadmap-recalibrated-2026-08.md (caminho crítico).",
+    priority: "P1",
+  },
+  {
+    id: "external_pilot_mvp",
+    name: "External Pilot MVP (primeiro cliente/projeto externo real)",
+    category: "admin",
+    description: "Requisitos conceituais: Company+Project reais, Work Items, documentos, calendário, CRM/contatos quando aplicável, Connector com escopo mínimo, health check, data ownership garantido. Nenhum cliente específico hardcoded.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-mvp-2026-08.md. Depende de dogfooding_mvp e lokat_project_connector_contract estáveis primeiro (ver caminho crítico do roadmap recalibrado).",
+    priority: "P2",
+  },
+  {
+    id: "lokat_integration_standard",
+    name: "Lokat Integration Standard / NIS (Control Plane vs Data Plane)",
+    category: "integracao",
+    description: "Formalização conceitual: LOKAT OS como Control Plane, cliente mantém seu Data Plane próprio, conectado via Lokat Project Connector. Reaproveita a disciplina já aplicada em LOKAT_TENANCY_MAPPING.md (provider nunca recebe client_id/role não validado do frontend).",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-integration-standard-v1.md. Distinto de src/lib/providers/ (motores internos) -- nomear como 'Connector', nunca 'Provider', para evitar confusão no código.",
+    priority: "P2",
+  },
+  {
+    id: "dual_project_status_tracking_debt",
+    name: "TECH_DEBT: dois sistemas de status paralelos (src/lib vs src/config)",
+    category: "admin",
+    description: "src/lib/project-status.ts (simples, PROJECT_DEADLINE_V1/MILESTONES_V1-V2) é o que realmente alimenta os badges 'V1 XX%' na interface (_status-client.tsx, _layout-client.tsx) -- V1_PROGRESS deste arquivo (src/config/project-status.ts) nunca é lido para exibição, só em comentários e no teste próprio. Descoberto durante a recalibração ao editar V1_PROGRESS aqui e perceber que nenhum número visível mudaria. PROJECT_DEADLINE_V1 do outro arquivo (2026-07-31) já é uma data passada.",
+    phase: "future", readiness: "blocked", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/recalibration/lokat-os-recalibration-2026-08.md, seção 'Achado crítico'. Consolidação recomendada como um dos primeiros itens da Faixa A do roadmap recalibrado -- não corrigido nesta sprint (fora de escopo: sem componente de produto).",
+    priority: "P2",
+  },
+  {
+    id: "lokat_project_connector_contract",
+    name: "Lokat Project Connector — contrato (Manifest/Snapshot/Events/Metrics/Health)",
+    category: "integracao",
+    description: "Endpoints conceituais (GET /v1/manifest, /snapshot, /events, /metrics, /health), catálogo de capabilities (project/calendar/deliverables/pendings/approvals/crm/...), Event Envelope (version/project_id/event_id/event_name/occurred_at/source_system/entity/payload). Nenhum endpoint implementado.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/architecture/lokat-integration-standard-v1.md. integration_connections (SQL 86) permanece BLOQUEADO/aguardando aprovação, inalterado por esta sprint.",
+    priority: "P3",
   },
 ];
 

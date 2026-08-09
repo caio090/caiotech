@@ -29,8 +29,14 @@ for (const id of NEW_IDS) {
   const area = PROJECT_AREAS.find((a) => a.id === id)!;
   assert(area.readiness !== "validated", `${id}: readiness nunca é validated`);
 }
-assert(V1_PROGRESS === 81, "V1_PROGRESS permanece 81");
-assert(V2_PROGRESS === 12, "V2_PROGRESS permanece 12");
+// Sprint Recalibração LOKAT OS 2026-08: V1_PROGRESS recalculado
+// deliberadamente de 81 para 65 (mesma fórmula calcV1Readiness() já
+// existente, sobre o conjunto atual de áreas phase:"v1" -- ver
+// docs/recalibration/lokat-os-recalibration-2026-08.md). Este teste
+// continua travando o valor contra mudanças ACIDENTAIS futuras, agora
+// no novo baseline.
+assert(V1_PROGRESS === 65, "V1_PROGRESS recalibrado para 65 (Sprint Recalibração 2026-08)");
+assert(V2_PROGRESS === 12, "V2_PROGRESS permanece 12 (não recalculado nesta sprint -- ver justificativa no doc de recalibração)");
 const globalCalendar = PROJECT_AREAS.find((a) => a.id === "global_calendar")!;
 assert(globalCalendar.readiness === "qa_pending", "global_calendar permanece qa_pending");
 
