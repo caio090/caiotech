@@ -1,0 +1,105 @@
+# LOKAT OS — Roadmap Recalibrado 2026-08
+
+**Sprint:** Recalibração LOKAT OS 2026-08
+**Status:** Planejamento. Nenhuma implementação, nenhuma data comercial prometida.
+
+## Prioridades recalibradas
+
+Duas dimensões separadas, nunca fundidas:
+
+- **Product Priority** — o que move mais a visão do produto para frente.
+- **Technical Severity** — o que quebra ou bloqueia algo hoje (P0-P3 de QA, inalterado, ver `project-status.ts`).
+
+Um item pode ser Product Priority alta e Technical Severity zero (ex.:
+Company Central — nada está quebrado, mas é a peça que destrava tudo o
+mais). Ordem de Product Priority recomendada por esta auditoria:
+
+```
+1. Entity-Centric foundation (Company/Project/Work Item conceituais — já formalizados nesta sprint)
+2. Company Central (evoluir Meu Negócio, não criar do zero)
+3. Project/Work Item spine (mínimo necessário para Dogfooding)
+4. Module connectivity (conectar módulos existentes aos Work Items, começando pelo padrão já provado em Meu Escritório)
+5. AI context (Level 0-1, sobre a spine já existente)
+6. Capabilities (plan registry, reaproveitando WorkspaceCapabilityGate)
+7. Dogfooding (uso interno real)
+8. Connector contract (só depois de ter algo real para conectar)
+9. Premium modules (Finance avançado, Growth, Compras Inteligentes)
+```
+
+Esta ordem é uma RECOMENDAÇÃO baseada na auditoria (dependências reais),
+não uma decisão de negócio — precisa de validação humana antes de virar
+compromisso.
+
+## Grafo de dependências
+
+```
+Company foundation (já existe: `clients`)
+   ↓
+Company context (unificar resolução de contexto — hoje fragmentada entre módulos)
+   ↓
+Project relation (entidade nova)
+   ↓
+Work Items (projeção sobre content_items/operational_tasks/approvals — padrão já provado)
+   ↓
+Domain Events (opcional para MVP; necessário para Connector)
+   ↓
+Company Central (consome Company context + Work Items)
+   ↓
+AI Context (consome Company Central + Work Items)
+   ↓
+Capabilities (paralelo — não depende da cadeia acima)
+   ↓
+Connectors (depende de Domain Events + Company Central estáveis)
+   ↓
+Advanced modules (Finance avançado, Growth, Compras Inteligentes — paralelos entre si)
+```
+
+**Paralelizável desde já:** Capabilities (plan registry) não depende de
+nenhuma peça nova da cadeia Entity-Centric — pode avançar em paralelo,
+reaproveitando `WorkspaceCapabilityGate`.
+
+## Timeline
+
+**Premissas explícitas** (não são compromisso comercial):
+- Baseado no ritmo real de commits/sprints observado neste repositório (múltiplas sprints de correção/QA concluídas em sequência rápida nesta série, mas cada uma delas foi CORRETIVA/DE QA sobre código já existente — muito mais rápida que construir uma entidade nova com schema, RLS e QA de produção).
+- Trabalho de schema novo (Project, Work Item) exige: desenho de schema, SQL, RLS, migration, QA funcional, QA de regressão nos módulos que passarem a alimentar Work Items — um ciclo mais lento que os hotfixes de harness/CSS desta série.
+- Nenhuma data de calendário é prometida; contagem é em "sprints equivalentes" ao padrão já observado neste projeto (uma sprint = um ciclo de auditoria→implementação→QA→push como os já executados).
+
+| Fase | Earliest | Likely | Conservative |
+|---|---|---|---|
+| **MVP Dogfooding** | 3 sprints | 5 sprints | 8 sprints |
+| **MVP External Pilot** | 6 sprints | 10 sprints | 16 sprints |
+| **MVP Public** | 10 sprints | 18 sprints | 30 sprints |
+
+Justificativa do maior salto (Dogfooding → External Pilot): o Pilot
+exige o Connector (algo que nunca existiu no repositório, sem
+precedente de código reaproveitável além do padrão de `providers/`
+interno) e Data Ownership real — ambos exigem desenho de segurança
+cuidadoso, não só UI.
+
+## Caminho crítico
+
+```
+Company context unificado → Project entity → Work Item projection
+→ Company Central mínima → Dogfooding MVP
+```
+
+Tudo mais (AI Context, Capabilities, Connector, Premium) pode atrasar
+sem bloquear o Dogfooding MVP — mas o caminho acima é sequencial e não
+pode ser paralelizado (cada peça depende da anterior existir de verdade,
+não só conceitualmente).
+
+## Riscos principais
+
+1. **Duplicar Work Items em vez de projetar** — se cada módulo criar sua própria tabela "tarefa" em vez de reaproveitar `content_items`/`operational_tasks`/`approvals` via projeção, a arquitetura vira exatamente o problema que tenta resolver (Camada 5 do brief já alerta para isso).
+2. **Company Central como "mais um dashboard"** — o risco identificado no próprio brief: se a nova tela repetir dado já visível em outro módulo sem uni-los de verdade, vira duplicação de UI, não unificação de contexto.
+3. **IA "inventando" score/prioridade** — mitigado pela exigência de explicabilidade já formalizada em `lokat-os-ai-context-v1.md` e `lokat-os-entity-centric-v1.md`.
+4. **Connector prematuro** — construir o Connector antes de ter Company/Project/Work Item estáveis internamente significa desenhar um contrato externo sobre uma fundação que ainda vai mudar.
+5. **Pressão de memória do ambiente local** — não é risco de produto, mas já demonstrou impacto real nesta série de sprints (múltiplos OOMs durante QA local); recomenda-se que qualquer trabalho de schema/migration futuro valide em CI (GitHub Actions), não dependa exclusivamente do ambiente local para QA de produção.
+
+## Faixas paralelas (podem avançar simultaneamente)
+
+- **Faixa A (fundação):** Company context → Project → Work Item.
+- **Faixa B (capabilities):** plan registry sobre `WorkspaceCapabilityGate`, sem dependência da Faixa A.
+- **Faixa C (documentação):** LOKAT Docs conceitual → mínimo viável de templates, sem dependência da Faixa A além de `company_id`/`project_id` como referência.
+- **Faixa D (NIS):** desenho detalhado do contrato do Connector pode avançar em paralelo (documentação, sem implementação) — só a IMPLEMENTAÇÃO do Connector depende da Faixa A estar pronta.
