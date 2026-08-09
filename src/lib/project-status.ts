@@ -1,7 +1,7 @@
 // Sprint Recalibração LOKAT OS 2026-08 (correção pós-auditoria
 // independente) — este arquivo mantinha V1_PROGRESS/V2_PROGRESS
 // hardcoded de forma independente de src/config/project-status.ts, que
-// é o sistema detalhado (203 áreas, calcV1Readiness()) e passa a ser
+// é o sistema detalhado (206 áreas, calcV1Readiness()) e passa a ser
 // canônico. A divergência já estava materializada: esta tela mostrava
 // 81% enquanto a recalibração registrava 65%. Fachada temporária:
 // reexporta os dois valores do arquivo canônico em vez de manter um
@@ -11,6 +11,28 @@
 // futura (ver docs/recalibration/lokat-os-recalibration-2026-08.md).
 export { V1_PROGRESS, V2_PROGRESS } from "@/config/project-status";
 
+// Sprint Recalibração Corrections 2026-08.2 — classificação explícita
+// (Fase 2), sem refactor: `src/config/project-status.ts` é a fonte
+// CANÔNICA para tracked areas, readiness, QA, prioridades, riscos e
+// progresso atual (V1_PROGRESS/V2_PROGRESS já vêm de lá, ver acima).
+// PROJECT_DEADLINE_V1 e MILESTONES_V1/V2 abaixo são **legacy
+// compatibility metadata** até uma consolidação futura -- NUNCA devem
+// ser apresentados como uma segunda fonte canônica concorrente.
+//
+// Classificação (nenhuma das duas é duplicação real do canônico, logo
+// nenhuma foi alterada nesta sprint):
+// - PROJECT_DEADLINE_V1: não tem equivalente em project-status.ts (não
+//   é duplicação) e já é uma data passada (2026-07-31, antes de hoje)
+//   -- não é "informação operacional ainda válida", é um alvo histórico
+//   que já venceu. Categoria (C): metadata histórica/legada.
+// - MILESTONES_V1/V2: usam granularidade e rótulos narrativos próprios
+//   (frases), sem correspondência 1:1 com os IDs de PROJECT_AREAS --
+//   não há forma mecânica segura de derivar um do outro sem inventar um
+//   mapeamento que não existe hoje. Categoria (C): metadata
+//   histórica/legada, mesma classificação do deadline.
+// Registrado como dívida não bloqueante em
+// dual_project_status_tracking_debt (project-status.ts) para
+// consolidação futura -- não mexido aqui.
 export const PROJECT_DEADLINE_V1 = "2026-07-31";
 
 export function getDaysRemainingV1(): number {

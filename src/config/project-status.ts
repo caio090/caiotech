@@ -82,14 +82,15 @@ export interface ProjectAreaStatus {
 
 // Sprint Recalibração LOKAT OS 2026-08 — V1_PROGRESS recalculado de 81
 // para 65. O valor anterior (81) foi fixado em 2026-07-12 (commit
-// f1d0c9f), num arquivo de 79 linhas, ANTES de existir o sistema atual
-// de 190 áreas com pesos por readiness — era uma estimativa manual
-// anterior ao próprio mecanismo de cálculo objetivo abaixo
+// f1d0c9f), num arquivo de 79 linhas SEM NENHUM PROJECT_AREAS ainda
+// (0 áreas rastreadas naquele momento) — era uma estimativa manual
+// anterior à própria existência do mecanismo de cálculo objetivo abaixo
 // (calcV1Readiness()), não um valor comparável ponto a ponto com o novo.
 // 65 é produzido pela MESMA fórmula já existente neste arquivo, sobre o
-// conjunto atual de 31 áreas phase:"v1". A queda não é regressão de
-// produto — é o denominador (composição do conjunto v1) e a metodologia
-// mudando. Ver docs/recalibration/lokat-os-recalibration-2026-08.md.
+// conjunto atual de 31 áreas phase:"v1" (de 206 áreas totais rastreadas
+// hoje). A queda não é regressão de produto — é o denominador
+// (composição do conjunto v1) e a metodologia mudando. Ver
+// docs/recalibration/lokat-os-recalibration-2026-08.md.
 export const V1_PROGRESS = 65;  // IMUTÁVEL — alterar apenas após QA formal ou recalibração explícita registrada em docs/recalibration/
 // V2_PROGRESS permanece 12, NÃO recalculado nesta sprint: aplicar a
 // mesma fórmula às 127 áreas phase:"v2" daria ~66, mas a maioria delas é
@@ -2543,6 +2544,39 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     phase: "future", readiness: "planned", qa: { status: "not_started" },
     last_updated: "2026-08-09",
     notes: "Ver docs/architecture/lokat-integration-standard-v1.md. integration_connections (SQL 86) permanece BLOQUEADO/aguardando aprovação, inalterado por esta sprint.",
+    priority: "P3",
+  },
+
+  // ── Sprint Recalibração Corrections 2026-08.2 — contratos de Activation
+  // (conceituais, sem implementação; nenhuma área abaixo é validated) ────
+  {
+    id: "company_activation",
+    name: "Company Activation (contrato conceitual)",
+    category: "admin",
+    description: "Fluxo Welcome/Mini Tutorial -> Tell us about your business -> Context Intake -> Fact Extraction -> Unknowns -> User Confirmation -> Initial Diagnosis -> Direction/Priorities -> Suggested Initiative -> Suggested Connections -> Operational Entry Point. Inclui Context Intake multimodal (text/audio/document/external_ai_import) e Suggested Connections com estados skippable.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-activation-v1.md. Nenhuma UI, upload, áudio, LLM ou parser implementado.",
+    priority: "P2",
+  },
+  {
+    id: "project_activation",
+    name: "Project Activation (contrato conceitual)",
+    category: "admin",
+    description: "Fluxo Select Company -> Describe Initiative -> Interpret Objective -> Initiative Classification -> Scope -> Deliverables -> Modules -> Connections -> Work Items -> Execution. Distinto de Company Activation (responde 'o que vamos fazer', não 'quem é esta empresa').",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-activation-v1.md. Formaliza também Company vs Project vs Campaign (Campaign.company_id required, Campaign.project_id optional).",
+    priority: "P2",
+  },
+  {
+    id: "initiative_classification",
+    name: "Initiative Classification (conceito de orquestração)",
+    category: "admin",
+    description: "Classificação de uma descrição livre de intenção em project | campaign | operational_improvement | content_action | commercial_action | internal_initiative. Não necessariamente entidade persistida -- orienta qual aplicação do loop LKT usar.",
+    phase: "future", readiness: "planned", qa: { status: "not_started" },
+    last_updated: "2026-08-09",
+    notes: "Ver docs/product/lokat-os-activation-v1.md e docs/architecture/lkt-orchestration-framework-v1.md. Nenhum classifier implementado.",
     priority: "P3",
   },
 ];
