@@ -2013,8 +2013,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "conteudo",
     description: "Sprint REC OS 3.0.1.1: experiência navegável real em /admin/contentos/roadmap. Fonte única RecOsRoadmapItem (src/lib/rec-os-roadmap.ts) lida de content_items/operational_tasks/approvals; as 4 visualizações (_roadmap-client.tsx) consomem exatamente o mesmo array filtrado.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-01",
-    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo).",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/rec-os/production-roadmap.md. Campanha/setor/prioridade não são colunas reais em content_items — filtros para eles ficam explicitamente 'ainda não disponível' na sheet, nunca simulados. Quadro não é arrastável (mudança de etapa via ações reais no conteúdo). Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001): corrigida divergência de contagem entre Quadro e as demais visões -- kanbanColumnForStatus() não resolvia o alias legado 'ajuste' (REC_OS_STATUS_ALIASES), omitindo esses itens só do Quadro. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md.",
     priority: "P1",
   },
   {
@@ -2361,8 +2361,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "admin",
     description: "Testes reais de navegador para navegação autenticada, Calendário Global, REC OS, Meu Escritório, CRM canônico e seus estados -- todos somente leitura, guardados por assertNoDangerousMutation().",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-03",
-    notes: "Ver docs/qa/e2e-read-only-test-policy.md. Resultado da primeira execução no GitHub Actions registrado em docs/qa/github-actions-authenticated-e2e.md.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/qa/e2e-read-only-test-policy.md. Primeira execução autenticada completa (run 31328853644): 121 passed, 45 failed, 0 P0. Sprint QA Fix 3.0.2.5 corrigiu os P1/P2 comprovados com causa raiz confirmada (roadmap kanban, overflow harness, workspace preview race, CRM mobile empty state) -- ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md. Meu Escritório e Pipeline comercial (CRM) permanecem sem causa confirmada por auditoria estática -- aguardando trace da run para diagnóstico.",
     priority: "P1",
   },
   {
@@ -2371,8 +2371,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "admin",
     description: "tests/e2e/dashboard-mobile.spec.ts, crm-mobile.spec.ts e overflow.spec.ts rodam em mobile-390/393/430 (+ tablet-768 e desktop-chrome para overflow).",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-03",
-    notes: "Ver docs/qa/github-actions-authenticated-e2e.md.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/qa/github-actions-authenticated-e2e.md. Sprint QA Fix 3.0.2.5: tests/e2e/helpers/overflow.ts corrigido para ignorar descendentes de scrollers intencionais (roadmap kanban, subnav do REC OS, filtros de Status/Arquitetura), não só o container -- causa raiz do overflow estrutural relatado em criar/produção/roadmap/mapa-cliente/status/arquitetura. crm-mobile.spec.ts corrigido para aceitar o estado vazio honesto (crm-leads-empty-state, novo testid aditivo) além dos cards, já que a conta E2E não tem lead real. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md.",
     priority: "P1",
   },
   {
@@ -2381,8 +2381,8 @@ export const PROJECT_AREAS: ProjectAreaStatus[] = [
     category: "admin",
     description: "tests/e2e/workspace-preview.spec.ts usa os blueprints fixos (Agência/Empresa Direta) para confirmar banner, somente leitura, saída, e que uma mutação real é bloqueada com WORKSPACE_PREVIEW_READ_ONLY.",
     phase: "v2", readiness: "qa_pending", qa: { status: "pending" },
-    last_updated: "2026-08-03",
-    notes: "Ver docs/qa/e2e-read-only-test-policy.md.",
+    last_updated: "2026-08-09",
+    notes: "Ver docs/qa/e2e-read-only-test-policy.md. Sprint QA Fix 3.0.2.5: corrigida corrida no harness (enterPreview() checava .count() do botão Blueprint antes do fetch assíncrono de /api/admin/workspaces resolver) -- confirmado que ?source=blueprint nunca depende de service role key nem do Supabase, então não era limitação de ambiente. Ver docs/qa/incidents/qa-fix-3-0-2-5-authenticated-e2e-findings.md.",
     priority: "P1",
   },
   {
