@@ -37,13 +37,38 @@ setup("authenticate as super admin", async ({ page }) => {
   }
 
   await page.goto("/login");
-  await page.getByLabel(/e-?mail/i).fill(EMAIL);
-  await page.getByLabel(/senha|password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /entrar|login/i }).click();
-  await page.waitForURL(/\/admin\//, { timeout: 15000 });
 
-  // Login sem erro: nenhuma mensagem de erro visível na própria página pós-submit.
-  await expect(page.getByText(/credenciais inválidas|senha incorreta|erro ao entrar/i)).toHaveCount(0);
+  // Sprint E2E Harness 3.0.2.4 (CI-E2E-AUTH-SELECTOR-001) — getByLabel()
+  // falhava porque o label visual de /login não tem associação semântica
+  // (sem htmlFor/id) com o input. Nenhum input tem `name`, então o
+  // seletor estável seguinte na ordem de preferência é `type`, único no
+  // DOM inicial da tela (o único outro input type="text" -- o código de
+  // convite -- só existe depois de um clique em "Recebi um convite",
+  // nunca disparado aqui). Ver src/app/(public)/login/page.tsx.
+  const emailInput = page.locator('input[type="email"]');
+  const passwordInput = page.locator('input[type="password"]');
+  try {
+    await expect(emailInput).toBeVisible({ timeout: 10_000 });
+    await expect(passwordInput).toBeVisible({ timeout: 10_000 });
+  } catch {
+    throw new Error(
+      "E2E_AUTH_LOGIN_FORM_UNAVAILABLE — /login não renderizou o formulário " +
+      "de e-mail/senha esperado (input[type=email]/input[type=password])."
+    );
+  }
+  await emailInput.fill(EMAIL);
+  await passwordInput.fill(PASSWORD);
+  await page.getByRole("button", { name: /entrar/i }).click();
+
+  await page
+    .waitForURL(/\/admin\//, { timeout: 15000 })
+    .catch(() => {
+      throw new Error(
+        "E2E_AUTH_LOGIN_REJECTED — formulário de /login foi enviado, mas a " +
+        "navegação para uma rota /admin/ não ocorreu (credencial rejeitada " +
+        "ou erro de conexão). Nenhum e-mail/senha/token é impresso por design."
+      );
+    });
 
   // Confirma acesso de Super Admin numa rota exclusiva antes de salvar a sessão.
   await page.goto("/admin/status/arquitetura");
