@@ -11,15 +11,27 @@ async function enterPreview(page: Page, surfaceLabel: string) {
   await page.getByRole("button", { name: "Visualizar como outro painel" }).click();
   await page.getByRole("button", { name: surfaceLabel, exact: true }).click();
 
+  // Sprint QA Fix 3.0.2.5 (CI-HARNESS-WORKSPACE-PREVIEW-RACE-001) — as
+  // opções de blueprint vêm de um fetch assíncrono
+  // (/api/admin/workspaces?source=blueprint, nunca depende de service role
+  // — ver comentário na Fase 1-5 do hotfix 1.0.5 em
+  // src/app/api/admin/workspaces/route.ts). `.count()` não espera essa
+  // resposta chegar; checar count() logo após o clique corria a corrida
+  // contra o fetch e saía do loop achando que não havia mais passos, antes
+  // mesmo do botão "Blueprint" aparecer. Agora espera explicitamente o
+  // botão ficar visível (com um timeout curto e tolerante) antes de decidir
+  // se há mais uma etapa na cadeia.
+  //
   // Pode exigir 1 ou 2 seleções em cadeia (ex.: Cliente da agência -> agência -> cliente).
   for (let i = 0; i < 2; i++) {
     const blueprintOption = page.locator("button", { hasText: "Blueprint" }).first();
-    if (await blueprintOption.count() > 0) {
-      await blueprintOption.click();
-      if (await page.getByText(/Visualização do Super ADM/).count() > 0) break;
-    } else {
-      break;
-    }
+    const appeared = await blueprintOption
+      .waitFor({ state: "visible", timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) break;
+    await blueprintOption.click();
+    if (await page.getByText(/Visualização do Super ADM/).count() > 0) break;
   }
 }
 

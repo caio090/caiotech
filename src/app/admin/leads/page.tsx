@@ -488,7 +488,7 @@ export default function AdminLeadsPage() {
           <p className="text-sm text-gray-400">Carregando leads...</p>
         </div>
       ) : !error && filtered.length === 0 ? (
-        <div className="bg-gray-50 rounded-2xl border border-gray-100 p-10 text-center mb-6">
+        <div className="bg-gray-50 rounded-2xl border border-gray-100 p-10 text-center mb-6" data-testid="crm-leads-empty-state">
           <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
           <p className="text-sm text-gray-400">Nenhum lead para este filtro.</p>
         </div>

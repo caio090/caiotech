@@ -8,15 +8,25 @@ import { findOverflow, assertNoOverflow } from "./helpers/overflow";
  * vazio/indisponível, nunca inventa registros.
  */
 test.describe("CRM mobile", () => {
-  test("tabela desktop não é a interface principal; cards ou estado adaptado aparecem", async ({ page }) => {
+  test("tabela desktop não é a interface principal; cards, estado vazio ou indisponível aparecem", async ({ page }) => {
     await page.goto("/admin/leads");
     await expect(page).not.toHaveURL(/\/login/);
 
     const desktopTable = page.locator("table").first();
     if (await desktopTable.count() > 0) await expect(desktopTable).not.toBeVisible();
 
+    // Sprint QA Fix 3.0.2.5 (CI-HARNESS-CRM-MOBILE-EMPTY-001) — a conta E2E
+    // pode legitimamente não ter nenhum lead real: <CrmMobileLeadList> só
+    // renderiza quando filtered.length > 0 (ver src/app/admin/leads/page.tsx),
+    // então cards (available_with_data), o estado vazio honesto
+    // (available_empty, crm-leads-empty-state) ou o banner de
+    // indisponibilidade (unavailable/unauthorized, crm-unavailable-banner)
+    // são todas adaptações mobile válidas — nunca a tabela desktop. Esta
+    // asserção antes só aceitava o primeiro caso.
     const mobileList = page.getByTestId("crm-mobile-lead-list");
-    await expect(mobileList).toBeVisible();
+    const emptyState = page.getByTestId("crm-leads-empty-state");
+    const unavailableBanner = page.getByTestId("crm-unavailable-banner");
+    await expect(mobileList.or(emptyState).or(unavailableBanner)).toBeVisible();
   });
 
   test("botão Filtros abre sheet com Origem/Etapa/Aplicar/Limpar", async ({ page }) => {
