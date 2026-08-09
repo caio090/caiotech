@@ -24,7 +24,7 @@ de propor uma reescrita.
 
 ## Estado atual (evidência, não opinião)
 
-- 203 áreas rastreadas em `project-status.ts` (190 antes desta sprint + 13 novas áreas conceituais Entity-Centric/tech-debt, ver "Status config changed"): 16 `validated`, 6 `deployed`, 8 `implemented`, 104 `qa_pending`, 10 `blocked`, 58 `planned`, 1 `in_progress`. *(Correção pós-auditoria independente: a primeira versão deste documento usava o denominador antigo, 190, em alguns cálculos — corrigido para 203 em todo o documento.)*
+- 206 áreas rastreadas em `project-status.ts` (190 antes desta série de sprints + 13 áreas conceituais Entity-Centric/tech-debt + 3 contratos de Activation na correção 2026-08.2): 16 `validated`, 6 `deployed`, 9 `implemented`, 104 `qa_pending`, 9 `blocked`, 61 `planned`, 1 `in_progress` (o `dual_project_status_tracking_debt` moveu de `blocked` para `implemented` nesta mesma correção, refletindo a fachada já implementada). *(Nota: este denominador muda a cada sprint que registra novas áreas conceituais — o valor correto é sempre o resultado de `PROJECT_AREAS.length` no HEAD atual, não um número fixo neste texto. Histórico: 190 → 203 → 206 ao longo desta série de correções.)*
 - 140+ rotas reais no repositório (`find src/app -name page.tsx`), cobrindo 7 superfícies distintas (público, admin, contentos, client, operacional, growth, academy, financeiro).
 - `clients` já cumpre o papel de Company; não existe `workspaces` física (nem é urgente — já registrado como V3); não existe `Project`/`WorkItem` genérico.
 - Meu Negócio já é, na prática, o protótipo mais próximo de uma "Company Central" — mas roda sobre uma única empresa de demonstração (fixture), com 17 dos 19 campos de DNA nascendo vazios por padrão (nunca fabricados).
@@ -71,7 +71,7 @@ para medir ainda.
 | **Historical V1 Completion Estimate** | **81%** | Valor manual fixado em 2026-07-12 (commit `f1d0c9f`), antes de existir o sistema atual de 190+ áreas — preservado como registro histórico, não uma medição comparável às demais linhas desta tabela. |
 | **Current Tracked V1 Readiness** | **65%** | `calcV1Readiness()` aplicado às 31 áreas atualmente marcadas `phase: "v1"` — mesma fórmula já existente no código, sobre o conjunto de áreas de hoje. Não é "o V1 caiu"; é uma métrica diferente, mais rigorosa, substituindo uma estimativa manual antiga. |
 | **Historical/Manual V2 Delivery Estimate** | **12%** | Valor manual preservado — ver decisão de não recalcular abaixo. Não acompanhado, nesta sprint, de uma métrica de "cobertura arquitetural V2" separada (melhoria recomendada, não implementada). |
-| **Platform Vision Progress** | **53.7%** | Mesma fórmula aplicada às 203 áreas totais rastreadas hoje (não às 190 desta sprint — corrigido pós-auditoria). Cresce em denominador conforme a camada Entity-Centric ganha áreas próprias, sem que isso signifique regressão. |
+| **Platform Vision Progress** | **53.3%** | Mesma fórmula aplicada às 206 áreas totais rastreadas hoje. Cresce em denominador a cada sprint que a camada Entity-Centric/Activation ganha áreas próprias, sem que isso signifique regressão — sempre recalcular a partir de `PROJECT_AREAS.length` real, nunca copiar este número em texto por muito tempo. |
 
 ### Métricas de confiança de QA (nunca uma métrica única — ver correção abaixo)
 
@@ -85,7 +85,7 @@ separadas agora:
 
 | Métrica | Valor | O que mede |
 |---|---|---|
-| **Formal Validation Coverage (por área)** | **7.9%** (16/203) | Fração de áreas com `readiness: "validated"` sobre o total rastreado — a métrica mais rigorosa; a maioria das áreas nunca passou por QA formal ainda, o que é esperado num produto deste tamanho, não um sinal de qualidade ruim. |
+| **Formal Validation Coverage (por área)** | **7.8%** (16/206) | Fração de áreas com `readiness: "validated"` sobre o total rastreado — a métrica mais rigorosa; a maioria das áreas nunca passou por QA formal ainda, o que é esperado num produto deste tamanho, não um sinal de qualidade ruim. |
 | **E2E Executed Pass Rate** | **100%** (166/166) | De todos os testes que RODARAM na run autenticada final (`31333187756`), quantos passaram — a suíte que executa está inteiramente verde, 0 P0-P3. |
 | **E2E Suite Execution Rate** | **87.4%** (166/190) | Dos 190 testes descobertos pela suíte, quantos realmente rodaram (o restante foi pulado por falta de dado/contexto na conta de QA, nunca por falha). |
 | **E2E Not-Validated Rate** | **12.6%** (24/190) | Os mesmos 24 skips — dado de forma direta, sem escondê-lo atrás de uma média. |
@@ -110,34 +110,44 @@ sprint (ver Status Config abaixo).
 
 ## Achado crítico durante esta sprint: dois sistemas de status paralelos
 
-Ao editar `V1_PROGRESS` para aplicar a decisão abaixo, a auditoria
-descobriu que **existem dois arquivos `project-status` independentes,
-não sincronizados**:
+**Estado ENCONTRADO originalmente** (antes de qualquer correção nesta
+sprint): ao editar `V1_PROGRESS`, a auditoria descobriu que **existiam
+dois arquivos `project-status` independentes, não sincronizados**:
 
-- `src/config/project-status.ts` — o sistema detalhado (190 áreas,
-  `calcV1Readiness()`, pesos por readiness) que esta recalibração inteira
-  audita e estende.
+- `src/config/project-status.ts` — o sistema detalhado (190 áreas
+  rastreadas naquele momento, 206 hoje após as sucessivas adições
+  conceituais desta série de sprints — ver "Status config changed" —
+  `calcV1Readiness()`, pesos por readiness) que esta recalibração
+  inteira audita e estende.
 - `src/lib/project-status.ts` — um arquivo MUITO mais simples e mais
   antigo (`PROJECT_DEADLINE_V1`, `V1_PROGRESS`, `V2_PROGRESS`,
-  `MILESTONES_V1`/`MILESTONES_V2` como lista plana de marcos) que é o
-  que REALMENTE alimenta os dois números "V1 XX%" visíveis na interface
+  `MILESTONES_V1`/`MILESTONES_V2` como lista plana de marcos) que, NAQUELE
+  MOMENTO, tinha seu PRÓPRIO `V1_PROGRESS = 81` hardcoded e era o que
+  REALMENTE alimentava os dois números "V1 XX%" visíveis na interface
   (`src/app/admin/status/_status-client.tsx:656` e
   `src/app/admin/_layout-client.tsx:517`) — o `V1_PROGRESS` do arquivo
-  detalhado NUNCA é lido para exibição, só aparece em comentários/notas
+  detalhado NÃO era lido para exibição, só aparecia em comentários/notas
   de texto e no teste unitário do próprio arquivo.
 
-Consequência prática identificada originalmente: a mudança de
-V1_PROGRESS decidida nesta sprint (81→65) não alterava, por si só,
-nenhum número visível na interface — o badge vinha de
-`src/lib/project-status.ts`, um arquivo à parte. **Isso foi corrigido
-ainda dentro desta sprint, em resposta à auditoria independente — ver
-"Correção pós-auditoria" logo abaixo.** Adicionalmente,
-`PROJECT_DEADLINE_V1 = "2026-07-31"` nesse segundo arquivo já é uma data
-passada em relação a hoje (2026-08-09) — outro sinal de que esse arquivo
-estava desatualizado; esse campo específico (e os `MILESTONES_V1/V2`)
-não foram alterados nesta correção, só os dois números de progresso.
+**Estado ATUAL (corrigido ainda dentro desta sprint, em resposta à
+auditoria independente — Correção Pós-Auditoria 2026-08.2):**
+`src/lib/project-status.ts` **não tem mais um `V1_PROGRESS`/`V2_PROGRESS`
+próprios** — ambos são reexportados diretamente de
+`src/config/project-status.ts` (`export { V1_PROGRESS, V2_PROGRESS }
+from "@/config/project-status"`), coberto por
+`src/lib/__tests__/project-status.test.ts`. Ou seja: hoje, o arquivo
+detalhado **É** lido para exibição, através da fachada. O badge "V1 XX%"
+na interface mostra **65%** (o valor canônico), não mais 81%.
+`PROJECT_DEADLINE_V1 = "2026-07-31"` (já uma data passada em relação a
+hoje, 2026-08-09) e `MILESTONES_V1`/`MILESTONES_V2` permanecem no
+arquivo simples, classificados explicitamente como **legacy
+compatibility metadata** (ver comentário em `src/lib/project-status.ts`
+e decisão completa abaixo) — nunca uma segunda fonte canônica
+concorrente, mas também não fingindo ser uma consolidação total enquanto
+esses dois campos não migrarem.
 
-**Decisão original desta sprint:** não tocar em `src/lib/project-status.ts`
+**Decisão original desta sprint (já superada pela correção acima,
+mantida aqui só como registro histórico):** não tocar em `src/lib/project-status.ts`
 — alterar o número real exibido na interface parecia uma mudança de
 maior visibilidade do que uma sprint de auditoria/planejamento deveria
 fazer sem confirmação explícita.
@@ -162,15 +172,18 @@ roadmap, não feita nesta sprint.
 
 *(Nota: a decisão abaixo se aplica a `src/config/project-status.ts` — o
 sistema detalhado. Ver "Achado crítico" acima sobre o segundo arquivo,
-`src/lib/project-status.ts`, que continua inalterado e é o que a
-interface realmente exibe.)*
+`src/lib/project-status.ts` — que, após a correção pós-auditoria
+registrada acima, agora reexporta esses dois valores em vez de manter
+uma cópia própria, e É o que a interface realmente exibe hoje.)*
 
 **Achado de auditoria (não opinião):** `V1_PROGRESS = 81` foi fixado em
-2026-07-12 (commit `f1d0c9f`), num arquivo de 79 linhas — ANTES de
-existir o sistema atual de 190 áreas com pesos por readiness. Ou seja,
-81 é uma estimativa manual anterior ao próprio mecanismo de cálculo
-objetivo que o código tem hoje (`calcV1Readiness()`), não um valor
-comparável ponto a ponto com o 65 computado agora.
+2026-07-12 (commit `f1d0c9f`), num arquivo de 79 linhas SEM NENHUM
+`PROJECT_AREAS` ainda (0 áreas rastreadas naquele momento — o sistema de
+pesos por readiness nem existia). Ou seja, 81 é uma estimativa manual
+anterior à própria existência do mecanismo de cálculo objetivo que o
+código tem hoje (`calcV1Readiness()`), não um valor comparável ponto a
+ponto com o 65 computado agora sobre as 31 áreas `phase:"v1"` das 206
+áreas totais rastreadas hoje.
 
 **Decisão:** atualizar `V1_PROGRESS` de `81` para `65`, com o valor
 histórico preservado em comentário no código. Justificativa: 65 é

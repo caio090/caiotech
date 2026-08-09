@@ -107,6 +107,23 @@ piloto que pareça "genérica o suficiente" deve ser generalizada antes de
 entrar no core; o resto fica como configuração específica daquele
 Connector.
 
+## ExternalPilotOperationalSafety (adicionado — Sprint Recalibração Corrections 2026-08.2, Fase 8)
+
+Contrato conceitual para o que acontece quando algo dá errado durante um
+External Pilot que usa Connector — nenhum runtime implementado nesta
+sprint, só o contrato:
+
+- **Integration failure** — uma chamada ao Connector falha: o LOKAT OS mostra o último estado conhecido com `staleness` explícito (ver "External Source Safety" abaixo), nunca finge que o dado está atualizado.
+- **Unavailable external source** — o Connector está fora do ar: módulos que dependem dele mostram estado honesto de indisponibilidade (mesmo padrão já usado em `AdminContentOSUnavailableState` para 503 internos), nunca erro genérico nem tela em branco.
+- **Degraded connector** — funciona parcialmente (ex.: leitura ok, eventos atrasados): reportado via `health` do Connector, nunca escondido.
+- **Disable integration** — desligar um Connector é sempre possível e nunca é destrutivo (ver Data Ownership abaixo).
+- **Manual fallback** — quando um dado automatizado falha, deve existir um caminho manual equivalente (ex.: entrada manual de um Work Item que normalmente viria de um evento de Connector).
+- **Retry/recovery** — falhas transitórias devem ter uma política de retry conhecida, não silenciosa e não infinita.
+- **Audit trail** — toda falha e toda tentativa de recovery fica registrada (mesmo princípio de auditabilidade já exigido do External Pilot Core).
+- **Support escalation** — uma falha não resolvida automaticamente tem um caminho claro até o canal de suporte do piloto.
+- **Data preservation** — nenhuma falha de Connector pode apagar dado já existente no LOKAT OS (mesmo princípio de Data Ownership abaixo, aplicado a falhas, não só a desconexão deliberada).
+- **Exit/rollback** — se o piloto for descontinuado, existe um caminho definido para o cliente levar seus dados (nunca ficam presos).
+
 ## Data Ownership
 
 Princípio não-negociável: **dados da empresa pertencem à empresa.** Um

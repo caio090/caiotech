@@ -92,11 +92,16 @@ reaproveitando `WorkspaceCapabilityGate`.
 | **MVP External Pilot** | 6 sprints | 10 sprints | 16 sprints |
 | **MVP Public** | 10 sprints | 18 sprints | 30 sprints |
 
-Justificativa do maior salto (Dogfooding → External Pilot): o Pilot
-exige o Connector (algo que nunca existiu no repositório, sem
-precedente de código reaproveitável além do padrão de `providers/`
-interno) e Data Ownership real — ambos exigem desenho de segurança
-cuidadoso, não só UI.
+Justificativa do maior salto (Dogfooding → External Pilot): mesmo no
+cenário SEM Connector (External Pilot Core, ver
+`lokat-os-mvp-2026-08.md` — Connector é `CONDITIONAL`, não obrigatório
+para todo piloto), o Pilot já exige isolamento/autorização real entre
+workspaces, auditabilidade e Data Ownership — nenhum desses existe hoje
+com o rigor necessário para dados de terceiros. As estimativas LIKELY e
+CONSERVATIVE desta tabela assumem o cenário mais comum e mais caro (um
+piloto que PRECISA do Connector, sem precedente de código reaproveitável
+além do padrão de `providers/` interno) — um piloto que dispensa
+Connector pode chegar mais perto do EARLIEST.
 
 ## Caminho crítico
 

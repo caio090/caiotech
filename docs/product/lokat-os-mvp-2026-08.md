@@ -41,41 +41,78 @@ sobre estado de QA (isso continua vindo de `project-status.ts`).
 **Pergunta que resolve:** o que precisa existir para o próprio time
 Lokat parar de depender de Trello/Notion no fluxo principal?
 
-Requisitos mínimos:
+*(Estrutura em 3 categorias — correção pós-auditoria 2026-08.2, Fase 6:
+a lista anterior era um bullet-point plano; agora é explícito o que é
+contexto permanente, o que é operação do dia a dia, e o que é
+conhecimento/referência.)*
+
+**CORE CONTEXT** (fundação, sem isso nada mais funciona de verdade):
 - Company real (não fixture) para pelo menos os projetos internos do time.
 - Project + Work Items funcionando de ponta a ponta (mesmo sem UI de Company Central formal — pode nascer dentro do Meu Escritório/Operacional existentes).
-- Board/kanban equivalente ao Trello atual (já existe em `/operacional/kanban` — avaliar extensão em vez de nova tela).
-- Documentos estruturados equivalentes ao uso atual de Notion (briefing, decisões, notas de projeto) — via LOKAT Docs conceitual.
-- **Calendário, CRM essencial, REC OS e aprovações precisam estar EXPLICITAMENTE dentro do mínimo diário** — são módulos que o próprio time já usa diariamente hoje; excluí-los do Dogfooding MVP faria o time continuar dependendo das ferramentas atuais para essa parte do fluxo, contradizendo o objetivo (achado da auditoria independente).
-- **O que NÃO precisa entrar no Dogfooding MVP** (excesso a evitar): editor documental completo (LOKAT Docs pode nascer com templates simples, não um editor rico), IA ampla (Level 0-1 basta), e Company Central COMPLETA (contratos mínimos de contexto bastam inicialmente — a tela completa é do External Pilot em diante).
+- Contexto operacional compartilhado (a mesma Company/Project reconhecida por todos os módulos abaixo, nunca resolvida módulo a módulo).
+
+**DAILY OPERATIONS** (o que o time realmente usa todo dia — não pode ficar de fora):
+- Meu Escritório.
+- Calendário.
+- CRM essencial.
+- REC OS.
+- Aprovações.
+- Pendências.
+
+**KNOWLEDGE** (mínimo para não depender mais do Notion):
+- Documentos/referências mínimas (LOKAT Docs conceitual, templates simples).
+- Briefing.
+- Decisões.
+
+**O que NÃO é exigido no Dogfooding MVP** (excesso a evitar, achado da auditoria): Company Central COMPLETA (contratos mínimos de contexto bastam), Gota Neural completa, IA ampla (Level 0-1 basta), editor documental Notion-like completo, e Connector completo (Dogfooding é 100% interno, não precisa de integração externa).
 
 ### External Pilot MVP
 **Pergunta que resolve:** o que um primeiro cliente/projeto externo real precisa para operar dentro do LOKAT OS.
 
-Requisitos (nenhum cliente específico hardcoded):
+**External Pilot Core** (sempre obrigatório, nenhum cliente específico hardcoded):
 - Company + Project reais.
 - Work Items (tasks/deliverables/approvals).
-- Documentos.
-- Calendário.
-- CRM/contatos quando aplicável ao caso.
-- Connector com escopo mínimo (mesmo que só leitura inicial — `connector_readable` sem `connector_eventable`).
-- Health check e data ownership garantidos (ver NIS).
-- **Itens que faltavam nesta lista (achado da auditoria independente) e são obrigatórios antes de um piloto real:**
-  - **Ativação da empresa** (Company Activation — hoje só existe como fluxo conceitual, ver Camada 4 da entidade-central; sem isso não há como o piloto sequer começar a usar a Company real).
-  - **Isolamento/autorização** entre o piloto externo e o resto da plataforma (garantia de que dados de um piloto não vazam para outro workspace).
-  - **Recuperação operacional** (o que acontece se o Connector cair, se um sync falhar — não pode deixar o piloto num estado inconsistente sem saída).
-  - **Suporte** (canal real para o piloto reportar problema — não implementado hoje).
-  - **Auditoria** (log mínimo de quem fez o quê, necessário antes de dados reais de terceiros entrarem no sistema).
-  - **Critérios claros de saída** (o que define "o piloto funcionou" ou "o piloto deve ser descontinuado" — sem isso o piloto nunca termina nem é avaliado objetivamente).
+- Authorization/isolamento entre o piloto e o resto da plataforma (garantia de que dados de um piloto não vazam para outro workspace).
+- Approvals.
+- Histórico operacional (o que já aconteceu neste piloto, não só o estado atual).
+- Recovery/error handling (o que acontece se algo falhar — ver contrato de segurança operacional abaixo).
+- Auditabilidade (log mínimo de quem fez o quê, necessário antes de dados reais de terceiros entrarem no sistema).
+- Canal de suporte (real, para o piloto reportar problema).
+- Critérios claros de saída (o que define "o piloto funcionou" ou "deve ser descontinuado").
+- Data ownership garantido (ver NIS — dados do piloto pertencem ao piloto).
+
+**Connector: CONDITIONAL, não universal** (correção pós-auditoria —
+a versão anterior deste documento tratava o Connector como requisito
+sempre presente do External Pilot; isso estava errado). O Connector só
+é necessário QUANDO o piloto precisa integrar um sistema externo que já
+existe do lado do cliente. Um piloto cujo trabalho nasce inteiramente
+dentro do LOKAT OS (sem sistema externo prévio a sincronizar) é um
+External Pilot válido sem nenhum Connector — Calendário/CRM/contatos
+entram na lista apenas quando o CASO do piloto exigir, não como
+requisito fixo de todos os pilotos.
 
 ### Public MVP
-Tudo do External Pilot MVP, mais: capability registry aplicado de
+Tudo do External Pilot Core, mais: capability registry aplicado de
 verdade (plano determina o que a conta vê), self-service de onboarding,
 e os módulos CORE_MVP listados acima estáveis e validados (não apenas
 `qa_pending`).
 
+**Jornada completa (correção pós-auditoria — antes só se mencionava a
+lacuna; agora a jornada está formalizada em detalhe em
+`docs/product/lokat-os-activation-v1.md`):**
+
+```
+Access → Create/Resolve Company → Company Activation → Initial Context
+→ Diagnosis → Priorities → Initiative Classification
+→ First Project or Campaign → First Work Item → Operational Entry Point
+```
+
+`Operational Entry Point` pode futuramente ser a Company Central ou
+outra superfície contextual — não definido rigidamente aqui.
+
 **Lacuna identificada pela auditoria independente — Company Activation
-gap:** falta uma jornada INTEGRADA de ponta a ponta (cadastro →
+gap (agora endereçada em `lokat-os-activation-v1.md`):** faltava uma
+jornada INTEGRADA de ponta a ponta (cadastro →
 diagnóstico → prioridades → primeiro Project → primeiro Work Item). Hoje
 essas peças existem separadamente (cadastro via onboarding atual,
 diagnóstico via `business-strategy/*`, Project/Work Item ainda
@@ -108,6 +145,11 @@ Tipos de documento previstos: `diagnosis`, `proposal`, `scope`,
 implementado nesta sprint.
 
 ## Central de Projetos — motor, não módulo isolado
+
+*(Esta sequência é uma APLICAÇÃO específica do loop geral de
+orquestração LKT — ver `docs/architecture/lkt-orchestration-framework-v1.md`
+para o framework completo e a tabela de correspondência. Não são duas
+frameworks concorrentes.)*
 
 ```
 Opportunity → Diagnosis → Strategy → Offer → Architecture → Scope
