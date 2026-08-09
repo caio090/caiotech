@@ -12,6 +12,8 @@ import type { WorkspaceSurface } from "@/lib/workspaces/types";
 import type { WorkspaceCapability } from "@/config/workspace-capabilities";
 import type { DomainEvent } from "@/lib/domain-events/types";
 import type { Provenance, NeuralConfidence } from "./provenance";
+import type { NeuralVisibilityPolicy } from "./visibility";
+import type { PlanningContext } from "./planning";
 
 // ── Workspace / Company / Project — nunca resolvidos módulo a módulo ──────
 
@@ -54,6 +56,8 @@ export interface CompanyContext {
   capabilities: WorkspaceCapability[];
   connections: string[];
   sources: Provenance[];
+  /** Fase 32 — Company pode referenciar planejamento estratégico quando existir; nunca obrigatório. */
+  planningContext?: PlanningContext;
 }
 
 export interface ProjectContext {
@@ -71,6 +75,8 @@ export interface ProjectContext {
   connectionRefs: string[];
   metricRefs: string[];
   sourceRefs: Provenance[];
+  /** Fase 33 — ProjectContext pode referenciar planejamento (level/horizon/objective); nunca obrigatório. */
+  planningContext?: PlanningContext;
 }
 
 // ── Company / Project / Campaign — decisão arquitetural preservada ────────
@@ -84,6 +90,8 @@ export interface Campaign {
   objective: string | null;
   status: "draft" | "active" | "paused" | "completed" | "cancelled";
   sourceRefs: Provenance[];
+  /** Fase 33 — Campaign pode referenciar planejamento; nunca obrigatório. */
+  planningContext?: PlanningContext;
 }
 
 export type InitiativeType =
@@ -105,6 +113,8 @@ export interface InitiativeContext {
   /** Pistas de domínio (ex.: ["content", "crm"]) -- nunca hardcoded a partir de uma frase específica. */
   domainHints: string[];
   sourceRefs: Provenance[];
+  /** Fase 33/35 — planejamento já estruturado pelo chamador; NUNCA inferido de texto livre nesta sprint. */
+  planningContext?: PlanningContext;
 }
 
 // ── Living Business Context (Fase 10-12) ──────────────────────────────────
@@ -118,6 +128,8 @@ export interface ConfirmedFact {
   verifiedAt?: string;
   confidence?: NeuralConfidence;
   observedAt?: string;
+  /** Fase 16/17 — quando ausente, resolve para o default restritivo (ver visibility.ts). Permite marcar fatos como margem interna, custo de equipe, etc. */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 export type DerivedKnowledgeKind = "insight" | "opportunity" | "risk" | "gap" | "blocker" | "hypothesis";
@@ -130,6 +142,8 @@ export interface DerivedKnowledge {
   projectId?: string;
   provenance: Provenance; // sempre obrigatória -- nunca "achismo" sem origem
   confidence: NeuralConfidence;
+  /** Fase 16 — quando ausente, resolve para o default restritivo (ver visibility.ts). */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 /** Transitório -- nunca vira BusinessMemory sozinho (ver memory.ts, "Conversation is not Memory"). */
@@ -152,6 +166,8 @@ export interface DocumentReference {
   kind: "pdf" | "docx" | "txt" | "markdown" | "other";
   label: string;
   provenance: Provenance;
+  /** Fase 16 — quando ausente, resolve para o default restritivo (ver visibility.ts). */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 /** Dados vindos de um Connector (ver lkt.ts para ConnectorSource) -- nunca tratados como fato atual sem checar staleness. */
@@ -161,6 +177,8 @@ export interface IntegrationDataEntry {
   capability: string;
   observedAt: string;
   provenance: Provenance;
+  /** Fase 16 — quando ausente, resolve para o default restritivo (ver visibility.ts). */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 export interface LivingBusinessContext {

@@ -3,6 +3,7 @@
  * Sem vector DB, sem embeddings, sem Supabase -- só o shape.
  */
 import type { ConversationContext } from "./context";
+import type { NeuralVisibilityPolicy } from "./visibility";
 
 export type NeuralMemoryType = "fact" | "preference" | "decision" | "strategy" | "history" | "derived_insight";
 
@@ -17,6 +18,8 @@ export interface NeuralMemoryEntry {
   importance: "low" | "medium" | "high";
   createdAt: string;
   expiresAt?: string;
+  /** Fase 16 — quando ausente, resolve para o default restritivo (ver visibility.ts). */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 /** `BusinessMemory` é só um alias semântico para a lista de entradas -- reforça a distinção do título da Fase 53. */

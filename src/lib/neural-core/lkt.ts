@@ -10,8 +10,10 @@
  * -- reaproveitada aqui em vez de duplicar um enum paralelo de estágios.
  */
 import { CANONICAL_FLOW_STEPS, type CanonicalFlowStep } from "@/lib/domain-events/canonical-flow";
+import type { DomainEvent } from "@/lib/domain-events/types";
 import type { Capability } from "./capabilities";
 import type { Provenance } from "./provenance";
+import type { PlanningLevel } from "./planning";
 
 /** As 9 fases conceituais do loop LKT geral (independente da aplicação específica). */
 export const LKT_STAGES = [
@@ -48,6 +50,9 @@ export interface ExecutionMapEntry {
   connectionId?: string;
   workItemDraftRef?: string;
   status: "recommended" | "confirmed" | "not_applicable";
+  /** Fase 34 — relaciona a entrada a um nível de planejamento e a um objetivo, sem transformar PlanningLevel em módulo. */
+  planningLevel?: PlanningLevel;
+  objectiveRef?: string;
 }
 
 export interface ExecutionMap {
@@ -98,4 +103,56 @@ export interface ConnectorHealth {
   connectorId: string;
   status: "healthy" | "degraded" | "offline";
   checkedAt: string;
+}
+
+/**
+ * V1.1 (Fase 19-24 da correção CODEX WEB, P1 #4): a V1 tinha
+ * Manifest/Snapshot/Health mas nenhum contrato explícito de Events ou
+ * Metrics -- o contrato NIS/Connector estava incompleto. `ConnectorEvent`
+ * formaliza a diferença entre um evento vindo do connector boundary
+ * (sistema externo) e um `DomainEvent` canônico interno (já
+ * implementado, `src/lib/domain-events/`): ConnectorEvent nunca é
+ * publicado automaticamente como DomainEvent aqui -- o fluxo futuro
+ * (ConnectorEvent -> validation/normalization -> DomainEvent) não é
+ * implementado nesta Foundation. Nenhum Event Bus paralelo é criado --
+ * `DomainEvent` continua sendo o único barramento canônico.
+ */
+export interface ConnectorEvent {
+  version: string;
+  connectorId: string;
+  sourceSystem: string;
+  companyId: string;
+  projectId?: string;
+  eventId: string;
+  eventName: string;
+  occurredAt: string;
+  entity: string;
+  payload: Readonly<Record<string, string | number | boolean | null>>;
+  provenance: Provenance;
+  /**
+   * Só preenchido depois que uma normalização futura (fora de escopo)
+   * de fato publicar um DomainEvent a partir deste ConnectorEvent --
+   * nunca preenchido automaticamente por este contrato. `undefined`
+   * significa "ainda não normalizado", nunca "não aplicável".
+   */
+  normalizedDomainEventId?: DomainEvent["id"];
+}
+
+/**
+ * Fase 22 — não assume apenas marketing; serve futuramente para
+ * sales/financial/operations/commerce/analytics/logistics. Nenhum
+ * fetch/HTTP/token real -- contrato apenas.
+ */
+export interface ConnectorMetric {
+  connectorId: string;
+  sourceSystem: string;
+  companyId: string;
+  projectId?: string;
+  metricKey: string;
+  value: number;
+  unit?: string;
+  period?: string;
+  observedAt: string;
+  provenance: Provenance;
+  stale?: boolean;
 }

@@ -5,6 +5,7 @@
  */
 import type { Provenance } from "./provenance";
 import type { AgentDomain } from "./agents";
+import type { NeuralVisibilityPolicy } from "./visibility";
 
 export type ActionSafetyLevel = "INSIGHT" | "SUGGESTION" | "DRAFT" | "CONFIRMED_ACTION";
 
@@ -34,6 +35,8 @@ export interface NeuralActionDraft {
   createdByAgent?: AgentDomain;
   sourceRefs: Provenance[];
   safetyLevel: ActionSafetyLevel;
+  /** Fase 16 — quando ausente, resolve para o default restritivo (ver visibility.ts). */
+  visibility?: NeuralVisibilityPolicy;
 }
 
 /**
