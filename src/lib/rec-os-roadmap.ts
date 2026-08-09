@@ -6,7 +6,7 @@
  * testável pelo harness `.tmp/run-ts-test.cjs`; a busca real nas tabelas
  * fica em `src/lib/rec-os-roadmap-data.ts`.
  */
-import { resolveMacroStage, type RecOsMacroStage } from "./rec-os-workflow/types";
+import { resolveMacroStage, REC_OS_STATUS_ALIASES, type RecOsMacroStage } from "./rec-os-workflow/types";
 
 export type RoadmapApprovalState = "aguardando" | "aprovado" | "alteracao_solicitada" | "reprovado" | null;
 
@@ -178,8 +178,18 @@ export const KANBAN_COLUMNS: { id: KanbanColumnId; label: string; statuses: stri
   { id: "publicado", label: "Publicado", statuses: ["publicado"] },
 ];
 
+/**
+ * Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001) — resolve aliases
+ * legados (ex.: "ajuste" -> "alteracao_solicitada") antes de procurar a
+ * coluna, exatamente como resolveMacroStage() já faz. Sem isso, itens com
+ * um status alias (real em produção, ver src/app/admin/contentos/producao/page.tsx)
+ * eram silenciosamente omitidos do Quadro enquanto continuavam aparecendo
+ * em Lista/Linha do tempo/Calendário — a causa confirmada da divergência
+ * de contagem entre as visões.
+ */
 export function kanbanColumnForStatus(status: string): KanbanColumnId | null {
-  const col = KANBAN_COLUMNS.find((c) => c.statuses.includes(status));
+  const canonical = REC_OS_STATUS_ALIASES[status] ?? status;
+  const col = KANBAN_COLUMNS.find((c) => c.statuses.includes(canonical));
   return col?.id ?? null;
 }
 

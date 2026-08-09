@@ -4,7 +4,7 @@
  */
 import {
   mapContentRowToRoadmapItem, filterRoadmapItems, EMPTY_ROADMAP_FILTERS, isRoadmapItemOverdue,
-  groupRoadmapItemsByKanbanColumn, KANBAN_COLUMNS, bucketRoadmapItemsForTimeline, roadmapItemsForMonth,
+  groupRoadmapItemsByKanbanColumn, kanbanColumnForStatus, KANBAN_COLUMNS, bucketRoadmapItemsForTimeline, roadmapItemsForMonth,
   nextActionForStatus, type RecOsRoadmapItem, type ContentItemRow,
 } from "../rec-os-roadmap";
 
@@ -87,6 +87,16 @@ console.log("[test] Colunas do Quadro são agrupamentos visuais — nenhum statu
 assert(KANBAN_COLUMNS.length === 8, "8 colunas: Radar/Criar/Produzir/Revisar/Aprovar/Visual Final/Agendar/Publicado");
 assert(KANBAN_COLUMNS.every((c) => c.statuses.every((s) => typeof s === "string")), "colunas referenciam apenas strings de status já existentes");
 assert(KANBAN_COLUMNS.find((c) => c.id === "publicado")!.statuses.includes("publicado"), "coluna Publicado mapeia o status real 'publicado'");
+
+console.log("[test] Sprint QA Fix 3.0.2.5 (CI-PRODUCT-ROADMAP-KANBAN-001) — status alias 'ajuste' não é dropado do Quadro");
+assert(kanbanColumnForStatus("ajuste") === "aprovar", "'ajuste' resolve para a mesma coluna de 'alteracao_solicitada' (REC_OS_STATUS_ALIASES)");
+const ajusteItem = mapContentRowToRoadmapItem(row({ id: "9", status: "ajuste", client_id: "cA" }), null, null);
+const itemsWithAlias = [...items, ajusteItem];
+const filteredWithAlias = filterRoadmapItems(itemsWithAlias, EMPTY_ROADMAP_FILTERS, "2026-08-01T12:00:00Z");
+const groupedWithAlias = groupRoadmapItemsByKanbanColumn(filteredWithAlias);
+const groupedWithAliasTotal = Object.values(groupedWithAlias).reduce((sum, arr) => sum + arr.length, 0);
+assert(groupedWithAliasTotal === filteredWithAlias.length, "Quadro: item com status 'ajuste' não é silenciosamente omitido (antes: contagem divergia de Lista/Linha do tempo/Calendário)");
+assert(groupedWithAlias.aprovar.some((i) => i.id === "9"), "item 'ajuste' aparece na coluna Aprovar, junto de alteracao_solicitada/reprovado");
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
