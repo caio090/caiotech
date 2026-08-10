@@ -10,7 +10,12 @@ import PlanosClient from "./_planos-client";
  * diferente (oferta/preços vs. marca/produto).
  */
 export const metadata: Metadata = {
-  title: "Planos e preços | LOKAT OS",
+  // `title.absolute` (não uma string simples) é a forma documentada de
+  // garantir que o template `%s | LOKAT OS` do layout raiz nunca seja
+  // reaplicado por cima -- confirmado em produção que uma string simples
+  // aqui, atravessando o layout de (public), ainda sofria o template
+  // (renderizava "Planos e preços | LOKAT OS | LOKAT OS").
+  title: { absolute: "Planos e preços | LOKAT OS" },
   description:
     "Compare os planos da LOKAT OS — comunidade, start, pro e agência. 14 dias grátis, sem cartão, sem cobrança automática.",
   alternates: {

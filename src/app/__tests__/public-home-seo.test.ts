@@ -24,8 +24,8 @@ const homeClient = read("src/app/_home-client.tsx");
 assert(homePage.includes("import HomeClient from \"./_home-client\"") && homePage.includes("<HomeClient />"), "page.tsx renderiza o conteúdo real da Home, não um placeholder");
 assert(!homePage.includes("\"use client\""), "casca de servidor da Home não é um Client Component (export const metadata exige Server Component)");
 
-console.log("[test] 2 — Home title exato");
-assert(homePage.includes('title: "LOKAT OS | Gestão, operação e inteligência para sua empresa"'), "title exato exigido pelo brief");
+console.log("[test] 2 — Home title exato (title.absolute -- nunca sofre o template %s | LOKAT OS do layout raiz)");
+assert(homePage.includes('title: { absolute: "LOKAT OS | Gestão, operação e inteligência para sua empresa" }'), "title exato exigido pelo brief");
 
 console.log("[test] 3 — Home description exata");
 assert(
@@ -43,8 +43,8 @@ assert(planosPage.includes('canonical: "https://www.lokat.com.br/planos"'), "can
 assert(!planosPage.includes('canonical: "https://www.lokat.com.br/"'), "canonical de /planos NUNCA é o mesmo valor exato da Home");
 
 console.log("[test] 6 — Home e Planos não compartilham mais title/description (raiz do bug original)");
-const homeTitleMatch = homePage.match(/title:\s*"([^"]+)"/);
-const planosTitleMatch = planosPage.match(/title:\s*"([^"]+)"/);
+const homeTitleMatch = homePage.match(/title:\s*\{\s*absolute:\s*"([^"]+)"/);
+const planosTitleMatch = planosPage.match(/title:\s*\{\s*absolute:\s*"([^"]+)"/);
 assert(!!homeTitleMatch && !!planosTitleMatch && homeTitleMatch[1] !== planosTitleMatch[1], "Home e /planos têm <title> distintos (antes: idênticos, herdados do layout raiz)");
 
 console.log("[test] 7 — sitemap contém `/` e `/planos`, nunca áreas autenticadas");

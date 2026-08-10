@@ -13,7 +13,11 @@ import HomeClient from "./_home-client";
  * `_home-client.tsx` mantém toda a interatividade existente inalterada.
  */
 export const metadata: Metadata = {
-  title: "LOKAT OS | Gestão, operação e inteligência para sua empresa",
+  // `title.absolute`, não uma string simples -- forma documentada para
+  // garantir que o template `%s | LOKAT OS` do layout raiz nunca seja
+  // reaplicado por cima (ver o mesmo ajuste em /planos/page.tsx, onde uma
+  // string simples ainda sofria o template em produção).
+  title: { absolute: "LOKAT OS | Gestão, operação e inteligência para sua empresa" },
   description:
     "Centralize projetos, clientes, conteúdo, calendário e operação. Trabalhe com o Jarvis conectado ao contexto da sua empresa.",
   alternates: {
