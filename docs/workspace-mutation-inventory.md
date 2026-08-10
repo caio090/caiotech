@@ -72,6 +72,9 @@ funcional no shell de demonstração hoje. Duas consequências práticas:
 | `api/meu-negocio/ai/analyze/route.ts` | POST | Meu Negócio | Chamada externa (OpenAI) do Assistente LOKAT — Sprint Meu Negócio 2.1.2 aplicou `withMutationProtection` (faltava desde a sprint que criou a rota); side effect e custo mesmo sem persistência, por isso "protected" e não "read_only_operation" |
 | `api/billing/checkout/route.ts` | POST | Financeiro (plataforma) | Side effect financeiro real (cria checkout session) |
 | `api/admin/users/delete-test-account/route.ts` | DELETE | Equipe | Linkado de `/admin/equipe` — alteração de autenticação (hard delete de usuário) |
+| `api/jarvis/chat/route.ts` | POST | Jarvis (Sprint MVP Experience Completion V0.1) | Chamada externa (OpenAI Responses API, streaming), sem persistência — protegida por "chamada externa", mesmo padrão de `api/ai/*` |
+| `api/jarvis/transcribe/route.ts` | POST | Jarvis | Chamada externa (OpenAI Whisper); áudio processado só em memória, nunca gravado |
+| `api/jarvis/speech/route.ts` | POST | Jarvis | Chamada externa (OpenAI TTS); áudio de saída devolvido direto ao browser, nunca persistido |
 
 ## Meu Negócio — `demo_memory_only`, confirmado por inspeção
 
