@@ -245,6 +245,54 @@ Os contratos desta Foundation (`PlanningContext`, `ObjectiveReference`,
 `LivingBusinessContext`, `BusinessBriefing`) já permitem que essas
 perguntas sejam respondidas futuramente sem refatoração destrutiva.
 
+## Jarvis (Sprint MVP Experience Completion V0.1)
+
+Jarvis é a interface de voz/conversa sobre o LOKAT NEURAL CORE — não um
+segundo cérebro. Ele não tem memory system próprio, não tem agent
+registry próprio, não tem orchestrator próprio: monta um contexto
+autorizado (Company Context + `ProjectProjection`/`WorkItemProjection`/
+`CompanyCentralView` já existentes, com um allowlist estrutural de
+campos nunca sensíveis) e conversa sobre ele via `src/lib/jarvis/`.
+
+**Modo de voz desta versão: `JARVIS_VOICE_MODE = TURN_BASED`**
+(push-to-talk: segurar para falar → transcrever → responder em texto →
+gerar fala → reproduzir). `FULL_REALTIME` (conversa contínua via
+WebRTC/streaming bidirecional) é `FUTURE` — deliberadamente fora de
+escopo desta sprint (Fase 36/K).
+
+Superfícies reais:
+- `src/app/api/jarvis/status` — presença de `OPENAI_API_KEY` (nunca o valor).
+- `src/app/api/jarvis/context` — resumo seguro (nome da empresa, contagens) para o header do painel.
+- `src/app/api/jarvis/chat` — chat streaming real (Responses API), Company sempre revalidada server-side, uma requisição ativa por usuário, `store: false` (nenhuma conversa persistida do lado da OpenAI), histórico só em memória do componente (nunca localStorage/sessionStorage/banco).
+- `src/app/api/jarvis/transcribe` — transcrição (Whisper), áudio só em memória, nunca gravado.
+- `src/app/api/jarvis/speech` — fala (TTS, voz built-in `alloy`), áudio de saída nunca persistido.
+
+Todas as rotas usam `withMutationProtection` (mesmo guard de
+`docs/architecture/lokat-integration-standard-v1.md`/workspace preview
+usado pelas rotas `/api/ai/*` pré-existentes) — nenhuma chamada
+custeada à OpenAI acontece durante uma sessão de preview read-only.
+
+Autonomia: mesmo teto desta Foundation, `LEVEL_2_PREPARE_DRAFT`. Jarvis
+nunca executa mutação de negócio (nunca envia mensagem, publica,
+aprova, edita lead, cria pagamento ou deleta dado) — no máximo prepara
+uma sugestão em texto para o usuário decidir ("Preencher comigo",
+"Anexar relatório"). `ResponseBlock`/`NeuralActionDraft` estruturados
+NÃO foram conectados às respostas do Jarvis nesta sprint (ele responde
+em texto natural); isso fica documentado como próximo passo, não como
+"pronto".
+
+## Meu Escritório — degradação progressiva (Sprint MVP Experience Completion V0.1)
+
+`getBusinessOfficeFeed()` já usava `Promise.allSettled()` por fonte
+(`content_items`/`operational_tasks`/`approvals`) antes desta sprint;
+o que faltava era a superfície visual. `src/lib/business-office/source-health.ts`
+traduz os `sourceErrors` já retornados em status honestos
+(`connected`/`degraded`/`unavailable`/`not_connected`) — uma fonte
+falhando nunca apaga as outras, e um painel "Fontes do Escritório"
+(recolhível, nunca dominante) substitui o antigo bloco fixo "Ainda não
+conectado". Zero real (nenhum item) é sempre distinguido de fonte
+indisponível (erro na busca) — nunca tratados como equivalentes.
+
 ## Security
 
 - Nenhum import de cliente de mutação (Supabase admin, service role, APIs de pagamento/mensagem) nem de SDK de IA/runtime real (OpenAI/Anthropic/Google Generative AI/WhatsApp/Stripe/Mercado Pago) em `src/lib/neural-core/` — confirmado por auditoria de código e por teste estrutural.
@@ -253,7 +301,7 @@ perguntas sejam respondidas futuramente sem refatoração destrutiva.
 - Nenhuma dimensão de segurança (Authorization/Client Visibility/Connector Access/AI Access) confundida com outra — reaproveita o modelo já formalizado em `lokat-integration-standard-v1.md`. Visibility (V1.1) e Permission continuam dimensões distintas dentro dessa mesma disciplina.
 - Nenhum agente do `AGENT_REGISTRY` tem `isAgentRuntimeAvailable() === true` — confirmado por teste estrutural sobre o registry inteiro.
 
-## Non-goals desta sprint
+## Non-goals desta sprint (Foundation V1 — histórico)
 
 Nenhuma UI, nenhum chat visual, nenhum microfone/speech-to-text, nenhuma
 API de OpenAI/Anthropic/Gemini, nenhum runtime multi-agente, nenhuma
@@ -261,6 +309,12 @@ vector memory/embeddings, nenhum banco (Company/Project/Campaign/Work
 Item table), nenhum connector real (Meta/Google Ads/WhatsApp/UTMify),
 nenhum pixel/webhook runtime, nenhum checkout/payment, nenhuma
 integração de Google Calendar/Drive, nenhum executor autônomo.
+
+**Atualização (Sprint MVP Experience Completion V0.1):** chat visual e
+microfone/speech-to-text/text-to-speech DEIXARAM de ser non-goal — Jarvis
+(ver seção acima) entrega isso de fato, com OpenAI real server-side.
+Multi-agent runtime, connectors reais, checkout/payment, vector
+memory/embeddings e executor autônomo continuam non-goals inalterados.
 
 ## Next phases (não iniciadas)
 
