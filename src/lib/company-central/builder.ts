@@ -4,20 +4,9 @@
  * monta a view -- nenhum fetch escondido aqui (Fase 52).
  */
 import type { ProjectProjection } from "@/lib/project-projection/types";
+import { isActiveProject } from "@/lib/project-projection/adapters";
 import type { WorkItemProjection } from "@/lib/work-item-projection/types";
 import type { CompanyCentralIdentity, CompanyCentralView, CompanyCentralModuleShortcut } from "./types";
-
-/**
- * Heurística conservadora, não uma máquina de estados formal (rec_projects
- * não tem um enum de status fechado e documentado hoje) — só os status
- * claramente terminais são tratados como "não ativo". Documentado aqui em
- * vez de arriscar excluir projetos reais por engano.
- */
-const TERMINAL_PROJECT_STATUSES = new Set(["concluido", "finalizado", "cancelado", "arquivado"]);
-
-function isActiveProject(project: ProjectProjection): boolean {
-  return !TERMINAL_PROJECT_STATUSES.has(project.status);
-}
 
 export const COMPANY_CENTRAL_MODULE_SHORTCUTS_BASE: CompanyCentralModuleShortcut[] = [
   { label: "Meu Escritório", href: "/admin/escritorio" },

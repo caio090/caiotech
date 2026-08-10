@@ -61,3 +61,16 @@ export async function getProjectProjection(
   const projects = await getProjectProjections(adminDb, companyId);
   return projects.find((p) => p.id === projectId || p.sourceEntityId === projectId) ?? null;
 }
+
+/**
+ * Sprint MVP Experience Completion V0.1 — heurística compartilhada de
+ * "projeto ativo", movida para cá (de company-central/builder.ts) para que
+ * Meu Escritório e Company Central nunca divirjam sobre o que conta como
+ * ativo. Conservadora: rec_projects não tem um enum de status fechado e
+ * documentado hoje -- só status claramente terminais contam como não-ativos.
+ */
+const TERMINAL_PROJECT_STATUSES = new Set(["concluido", "finalizado", "cancelado", "arquivado"]);
+
+export function isActiveProject(project: ProjectProjection): boolean {
+  return !TERMINAL_PROJECT_STATUSES.has(project.status);
+}

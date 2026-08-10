@@ -1,19 +1,21 @@
 import { redirect } from "next/navigation";
-import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
-import { AdminContentOSUnavailableState } from "@/components/admin-contentos-unavailable-state";
-import { getBusinessOfficeFeed, GLOBAL_CALENDAR_TIMEZONE } from "@/lib/business-office/data";
-import { getFortalezaToday } from "@/lib/global-calendar";
-import type { BusinessOfficeFeedItem } from "@/lib/business-office/types";
-import { EscritorioClient } from "./_escritorio-client";
+import { AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { CompanyContextHeader } from "@/components/company-context-header";
+import { CompanyContextRequiredState } from "@/components/company-context-required-state";
+import { resolveCompanyContext } from "@/lib/company-context/resolve";
+import { createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { getBusinessOfficeFeed, GLOBAL_CALENDAR_TIMEZONE } from "@/lib/business-office/data";
+import { getProjectProjections } from "@/lib/project-projection/adapters";
+import { EscritorioClient } from "./_escritorio-client";
 
 /**
- * Sprint Navegação e Experiência 3.0.1.2 (Fase 10) — Meu Escritório: "o que
- * preciso fazer hoje/esta semana/este mês" — nunca outro dashboard
- * genérico. Auditoria confirmou: não havia rota equivalente antes desta
- * sprint (a busca mais próxima, /admin/ecossistema, respondia "quais
- * módulos existem", não "o que fazer agora" — por isso não foi reaproveitada,
- * e sim reinterpretada como Arquitetura da Plataforma, dentro de Status).
+ * Sprint MVP Experience Completion V0.1 (Parte B) — Meu Escritório passa a
+ * usar o mesmo Company Context resolver das demais páginas do Spine
+ * (antes, esta página só sabia o `?client=` cru, sem nome/validação real).
+ * A rota continua restrita a admin/agência (nunca ao portal do cliente,
+ * que tem sua própria área em /client/*) -- resolveCompanyContext também
+ * aceita role "cliente", então isso é checado explicitamente abaixo.
  */
 export default async function AdminEscritorioPage({
   searchParams,
@@ -22,42 +24,40 @@ export default async function AdminEscritorioPage({
 }) {
   const params = await searchParams;
   const clientId = params.client ?? null;
+  const nextPath = clientId ? `/admin/escritorio?client=${clientId}` : "/admin/escritorio";
 
-  const ctx = await requireAdminContentOSContext();
-  if (ctx instanceof Response) {
-    if (ctx.status === 401) redirect("/login");
-    if (ctx.status === 403) {
-      return (
-        <AdminContentOSUnavailableState
-          status={403}
-          retryHref={clientId ? `/admin/escritorio?client=${clientId}` : "/admin/escritorio"}
-        />
-      );
-    }
+  const resolution = await resolveCompanyContext(clientId);
+  if (!resolution.valid) {
+    if (resolution.reason === "not_authenticated") redirect("/login");
+    if (resolution.reason === "role_not_supported") redirect("/admin/dashboard");
+    return (
+      <>
+        <PageHeader title="Meu Escritório" description="O que fazer hoje, esta semana e como foi este mês — a partir dos módulos reais." />
+        <CompanyContextRequiredState reason={resolution.reason ?? "company_required"} nextPath={nextPath} />
+      </>
+    );
+  }
+  const context = resolution.context!;
+  if (context.role === "cliente") redirect("/client/home");
+
+  if (!hasSupabaseServiceRoleKey()) {
+    return (
+      <>
+        <PageHeader title="Meu Escritório" description="O que fazer hoje, esta semana e como foi este mês — a partir dos módulos reais." />
+        <CompanyContextHeader companyName={context.companyName} />
+        <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-700 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          Este recurso está temporariamente indisponível. Não foi possível carregar os dados agora — tente novamente em instantes. Sua sessão continua ativa.
+        </div>
+      </>
+    );
   }
 
-  // Sprint QA Fix 3.0.2.6 (CI-PRODUCT-OFFICE-SHELL-001) — 503 ("fonte de
-  // dados temporariamente indisponível", o estado real quando
-  // SUPABASE_SERVICE_ROLE_KEY não está configurada -- deliberadamente
-  // ausente no Environment de CI local-e2e-qa) não é falta de permissão:
-  // a pessoa continua autenticada e com acesso, só uma fonte de dados está
-  // fora do ar agora. Diferente de 403 (acima), mantém o shell operacional
-  // (Hoje/Semana/Mês) visível com um aviso honesto, em vez de substituir a
-  // página inteira por um estado genérico.
-  let items: BusinessOfficeFeedItem[] = [];
-  let todayKey = getFortalezaToday().dateKey;
-  let unavailableBanner: string | null = null;
-
-  if (ctx instanceof Response) {
-    unavailableBanner = "Este recurso está temporariamente indisponível. Não foi possível carregar os dados agora — tente novamente em instantes. Sua sessão continua ativa.";
-  } else {
-    const result = await getBusinessOfficeFeed(ctx.adminDb, { clientId });
-    items = result.items;
-    todayKey = result.todayKey;
-    if (result.sourceErrors.length > 0) {
-      unavailableBanner = "Não foi possível carregar alguns dados agora. Os números abaixo podem estar incompletos.";
-    }
-  }
+  const adminDb = createSupabaseAdminClient();
+  const [officeResult, projects] = await Promise.all([
+    getBusinessOfficeFeed(adminDb, { clientId: context.companyId }),
+    getProjectProjections(adminDb, context.companyId),
+  ]);
 
   return (
     <>
@@ -65,12 +65,15 @@ export default async function AdminEscritorioPage({
         title="Meu Escritório"
         description="O que fazer hoje, esta semana e como foi este mês — a partir dos módulos reais."
       />
-      {unavailableBanner && (
-        <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-700">
-          {unavailableBanner}
-        </div>
-      )}
-      <EscritorioClient items={items} todayKey={todayKey} timezone={GLOBAL_CALENDAR_TIMEZONE} />
+      <EscritorioClient
+        items={officeResult.items}
+        todayKey={officeResult.todayKey}
+        timezone={GLOBAL_CALENDAR_TIMEZONE}
+        sourceErrors={officeResult.sourceErrors}
+        companyName={context.companyName}
+        companyId={context.companyId}
+        activeProjects={projects}
+      />
     </>
   );
 }
