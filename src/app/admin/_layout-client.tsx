@@ -10,7 +10,7 @@ import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { AdminSearchSheet } from "@/components/admin-search-sheet";
-import { LokatVoicePanel } from "@/components/lokat-voice-panel";
+import { JarvisPanel } from "@/components/jarvis/jarvis-panel";
 import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
 import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
 import { WorkspacePreviewBanner } from "@/components/workspaces/workspace-preview-banner";
@@ -596,7 +596,7 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
         // anterior (ADMIN_PRIMARY fixo), sem regressão.
         surface={previewContext?.surface ?? (userRole === "super_admin" ? "super_admin" : undefined)}
       />
-      <LokatVoicePanel />
+      <JarvisPanel />
     </div>
   );
 }
