@@ -10,7 +10,7 @@ import { getBusinessOfficeFeed } from "@/lib/business-office/data";
 import { isJarvisConfigured, streamJarvisChat } from "@/lib/jarvis/client";
 import { buildJarvisContextText } from "@/lib/jarvis/context-builder";
 import { buildJarvisSystemInstructions } from "@/lib/jarvis/instructions";
-import { validateReportAttachment, buildReportContentParts } from "@/lib/jarvis/report";
+import { validateReportAttachment, validateReportAttachmentBuffer, buildReportContentParts } from "@/lib/jarvis/report";
 import { logJarvisRequest, sanitizeError } from "@/lib/jarvis/safety";
 import { tryAcquireJarvisSlot, releaseJarvisSlot, MAX_MESSAGE_CHARS, MAX_HISTORY_MESSAGES } from "@/lib/jarvis/cost-controls";
 import type { JarvisChatRequestBody } from "@/lib/jarvis/types";
@@ -54,10 +54,19 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
 
   let attachmentParts: ReturnType<typeof buildReportContentParts> | undefined;
   if (body.attachment) {
-    const validation = validateReportAttachment(body.attachment);
-    if (!validation.valid) {
+    // Fase 33 — checagem barata de metadata primeiro (rejeita cedo), depois
+    // a autoridade real: decodifica o base64 e valida o Buffer efetivo
+    // (tamanho real + assinatura) antes de montar o input para o modelo.
+    const metadataValidation = validateReportAttachment(body.attachment);
+    if (!metadataValidation.valid) {
       releaseJarvisSlot(user.id);
-      return NextResponse.json({ error: "invalid_attachment", reason: validation.reason }, { status: 400 });
+      return NextResponse.json({ error: "invalid_attachment", reason: metadataValidation.reason }, { status: 400 });
+    }
+    const decodedBuffer = Buffer.from(body.attachment.dataBase64, "base64");
+    const realValidation = validateReportAttachmentBuffer(decodedBuffer, body.attachment.type);
+    if (!realValidation.valid) {
+      releaseJarvisSlot(user.id);
+      return NextResponse.json({ error: "invalid_attachment", reason: realValidation.reason }, { status: 400 });
     }
     attachmentParts = buildReportContentParts(body.attachment);
   }

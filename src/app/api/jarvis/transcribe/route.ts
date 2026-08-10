@@ -3,13 +3,19 @@ import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isJarvisConfigured, transcribeAudio } from "@/lib/jarvis/client";
 import { logJarvisRequest, sanitizeError } from "@/lib/jarvis/safety";
-import { validateAudioFile } from "@/lib/jarvis/audio-validation";
+import { validateAudioFile, validateAudioBuffer } from "@/lib/jarvis/audio-validation";
 
 /**
  * Sprint MVP Experience Completion V0.1 (Parte E7) — transcrição
  * autenticada. Áudio processado inteiramente em memória (arrayBuffer -> Buffer
  * -> transcribeAudio -> descartado); nunca gravado em disco, nunca
  * Supabase Storage, nunca banco.
+ *
+ * Sprint MVP Dogfood Security + Voice Closure V0.1 (P1 #2) — a validação de
+ * metadata (`validateAudioFile`, barata, rejeita cedo) NUNCA é a única
+ * checagem: `validateAudioBuffer` reavalia o Buffer real recebido (tamanho
+ * efetivo, assinatura/magic bytes, duração quando derivável) antes de
+ * chamar a OpenAI.
  */
 export const POST = withMutationProtection(async function POST(request: NextRequest) {
   const authClient = await createServerSupabaseClient();
@@ -37,6 +43,13 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   try {
     const arrayBuffer = await audio.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    const realValidation = validateAudioBuffer(buffer, audio.type);
+    if (!realValidation.valid) {
+      logJarvisRequest({ requestId, mode: "transcribe", durationMs: Date.now() - startedAt, status: "blocked", error: realValidation.reason });
+      return NextResponse.json({ error: realValidation.reason }, { status: 400 });
+    }
+
     const text = await transcribeAudio(buffer, audio.type);
     logJarvisRequest({ requestId, mode: "transcribe", durationMs: Date.now() - startedAt, status: "ok" });
     return NextResponse.json({ ok: true, text, requestId });
