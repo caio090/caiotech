@@ -4,7 +4,12 @@ import { canAccessAdmin, canAccessContenOS } from "@/lib/access-control";
 import { SelecionarClienteContent } from "./_client-content";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
 
-export default async function SelecionarClientePage() {
+export default async function SelecionarClientePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
   let clients: Array<{ id: string; company_name: string | null }> = [];
   let userRole = "";
 
@@ -76,11 +81,15 @@ export default async function SelecionarClientePage() {
     }
   }
 
+  // Só aceita destino relativo dentro do próprio app -- nunca "//host" nem "scheme://" (open redirect).
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : null;
+
   return (
     <SelecionarClienteContent
       clients={clients}
       userRole={userRole}
       isSupabaseActive={isSupabaseConfigured}
+      next={safeNext}
     />
   );
 }

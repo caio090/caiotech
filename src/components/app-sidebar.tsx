@@ -15,7 +15,7 @@ import {
   GraduationCap, BookMarked, Play, Package, Activity,
   LogOut, KanbanSquare, ClipboardList, CalendarDays, UserCheck,
   ScrollText, Palette, Video, MousePointerClick, Link2, SlidersHorizontal,
-  Shield, Clapperboard, UsersRound, Briefcase,
+  Shield, Clapperboard, UsersRound, Briefcase, Building2, FolderKanban,
 } from "lucide-react";
 import { RecDropIcon } from "@/components/icons/RecDropIcon";
 
@@ -34,7 +34,9 @@ export const configs: Record<SidebarVariant, {
     nav: [
       { href: "/admin/inicio",            label: "Início",           icon: Home },
       { href: "/admin/dashboard",         label: "Dashboard",        icon: LayoutDashboard },
+      { href: "/admin/empresa",           label: "Empresa",          icon: Building2 },
       { href: "/admin/escritorio",        label: "Meu Escritório",   icon: Briefcase },
+      { href: "/admin/projetos",          label: "Projetos",         icon: FolderKanban },
       { href: "/admin/meu-negocio",       label: "Meu Negócio",      icon: Sparkles },
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },

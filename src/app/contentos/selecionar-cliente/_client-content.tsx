@@ -13,9 +13,11 @@ interface Props {
   clients: Client[];
   userRole: string;
   isSupabaseActive: boolean;
+  /** Fase 27 (MVP Dogfood Spine) — quando presente, redireciona para cá em vez do padrão /contentos/home. Já validado como caminho relativo seguro pela página servidora. */
+  next?: string | null;
 }
 
-export function SelecionarClienteContent({ clients, userRole, isSupabaseActive }: Props) {
+export function SelecionarClienteContent({ clients, userRole, isSupabaseActive, next }: Props) {
   const [search, setSearch]       = useState("");
   const [selectedId, setSelectedId] = useState<string>("");
 
@@ -35,7 +37,9 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive }
     if (!client) return;
     localStorage.setItem(ACTIVE_CLIENT_KEY, selectedId);
     localStorage.setItem(ACTIVE_CLIENT_NAME_KEY, client.company_name ?? "");
-    window.location.href = `/contentos/home?client=${selectedId}`;
+    const destination = next ?? "/contentos/home";
+    const separator = destination.includes("?") ? "&" : "?";
+    window.location.href = `${destination}${separator}client=${selectedId}`;
   }
 
   const isAdmin = userRole === "admin";
