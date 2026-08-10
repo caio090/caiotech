@@ -107,6 +107,40 @@ export function assertCompanyAccess(context: ResolvedCompanyContext | null, targ
   return context.companyId === targetCompanyId;
 }
 
+/**
+ * Sprint MVP Dogfood Security + Voice Closure V0.1 (P0) — correção do gap
+ * apontado pela auditoria CODEX WEB: `validateExplicitCompany()` sozinha só
+ * provava "esta Company existe e está visível", nunca "este usuário tem
+ * vínculo real com ela" -- qualquer sessão `role === "admin"` conseguia
+ * fornecer o UUID de qualquer Company visível no banco e resolvê-la.
+ *
+ * Fase 4/5 — `super_admin` é o único papel REAL e já nomeado explicitamente
+ * como global em todo o repo (`canAccessPlatformCentral`, RLS de
+ * `agency_workspaces`/`agency_clients`) -- só ele preserva acesso
+ * incondicional. `admin` precisa provar a relação através de estruturas que
+ * JÁ EXISTEM (Fase 3: nenhuma tabela nova):
+ *   1. `client_user_access` (user_id, client_id) -- já usada para conceder
+ *      acesso de um usuário específico a um client específico;
+ *   2. `agency_clients` + `agency_workspaces.owner_user_id` -- a mesma
+ *      relação que a RLS de `agency_workspaces`/`agency_clients` já usa
+ *      para "esta agência pertence a este usuário, este client pertence a
+ *      esta agência".
+ * Função PURA -- decide só a partir de relações já buscadas, testável sem
+ * banco. `resolveCompanyContext()` busca os dados reais e chama esta função.
+ */
+export interface AdminCompanyAuthorizationInputs {
+  role: string;
+  hasExplicitClientUserAccessGrant: boolean;
+  ownedAgencyIds: string[];
+  agencyIdsLinkedToCompany: string[];
+}
+
+export function isCompanyAuthorizedForAdmin(inputs: AdminCompanyAuthorizationInputs): boolean {
+  if (inputs.role === "super_admin") return true;
+  if (inputs.hasExplicitClientUserAccessGrant) return true;
+  return inputs.ownedAgencyIds.some((id) => inputs.agencyIdsLinkedToCompany.includes(id));
+}
+
 // ── Async orchestration (I/O real, sem duplicar auth) ───────────────────
 
 async function resolveClientSurface(companyId: string): Promise<WorkspaceSurface> {
@@ -150,6 +184,58 @@ async function validateExplicitCompany(companyId: string): Promise<{ id: string;
   } catch {
     return null;
   }
+}
+
+/**
+ * Sprint MVP Dogfood Security + Voice Closure V0.1 (Fase 6) — busca as
+ * relações REAIS (nenhuma tabela nova) e delega a decisão a
+ * `isCompanyAuthorizedForAdmin()`. Fail closed: qualquer erro de consulta
+ * vira lista vazia / grant ausente, NUNCA autorização implícita.
+ */
+async function fetchAdminCompanyAuthorization(userId: string, companyId: string, role: string): Promise<boolean> {
+  if (role === "super_admin") return true;
+
+  const adminDb = createSupabaseAdminClient();
+
+  let hasExplicitClientUserAccessGrant = false;
+  try {
+    const { data } = await adminDb
+      .from("client_user_access")
+      .select("id")
+      .eq("client_id", companyId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    hasExplicitClientUserAccessGrant = !!data;
+  } catch {
+    // tabela pode não existir ainda — nunca autoriza por conta disso, só não decide sozinha aqui.
+  }
+
+  let ownedAgencyIds: string[] = [];
+  try {
+    const { data } = await adminDb.from("agency_workspaces").select("id").eq("owner_user_id", userId);
+    ownedAgencyIds = ((data ?? []) as { id: string }[]).map((row) => row.id);
+  } catch {
+    ownedAgencyIds = [];
+  }
+
+  let agencyIdsLinkedToCompany: string[] = [];
+  if (ownedAgencyIds.length > 0) {
+    try {
+      const { data } = await adminDb
+        .from("agency_clients")
+        .select("agency_id")
+        .eq("client_id", companyId)
+        .eq("status", "active")
+        .in("agency_id", ownedAgencyIds);
+      agencyIdsLinkedToCompany = ((data ?? []) as { agency_id: string }[]).map((row) => row.agency_id);
+    } catch {
+      agencyIdsLinkedToCompany = [];
+    }
+  }
+
+  return isCompanyAuthorizedForAdmin({ role, hasExplicitClientUserAccessGrant, ownedAgencyIds, agencyIdsLinkedToCompany });
 }
 
 /**
@@ -212,7 +298,13 @@ export async function resolveCompanyContext(explicitCompanyId?: string | null): 
   let explicitCompanyRequestedButInvalid = false;
   if (role && canAccessAdmin(role) && explicitCompanyId) {
     const validated = await validateExplicitCompany(explicitCompanyId);
-    if (validated) {
+    // P0 (CODEX WEB): existir e estar visível não é suficiente -- precisa
+    // de uma relação real de autorização (super_admin global, ou
+    // client_user_access / agency_clients+agency_workspaces.owner_user_id
+    // para "admin"). Fail closed: qualquer resultado negativo cai no MESMO
+    // "company_not_found" do UUID inexistente, nunca revela existência.
+    const authorized = validated ? await fetchAdminCompanyAuthorization(user.id, validated.id, role) : false;
+    if (validated && authorized) {
       const surface = await resolveClientSurface(validated.id);
       adminSelectedCompany = { companyId: validated.id, companyName: validated.company_name, surface };
     } else {
