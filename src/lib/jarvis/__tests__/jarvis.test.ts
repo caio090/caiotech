@@ -3,8 +3,8 @@
  * Sprint MVP Experience Completion V0.1 (Missão J) — segurança e limites do Jarvis.
  */
 import { isJarvisConfigured } from "../client";
-import { validateReportAttachment, buildReportContentParts } from "../report";
-import { validateAudioFile } from "../audio-validation";
+import { validateReportAttachment, validateReportAttachmentBuffer, buildReportContentParts } from "../report";
+import { validateAudioFile, validateAudioBuffer } from "../audio-validation";
 import { redactSecrets, sanitizeError } from "../safety";
 import { tryAcquireJarvisSlot, releaseJarvisSlot, isJarvisSlotBusy, MAX_MESSAGE_CHARS } from "../cost-controls";
 import { buildJarvisContextText } from "../context-builder";
@@ -182,6 +182,71 @@ console.log("[test] 17 — chat history não persistida: nenhum arquivo de UI do
     if (/localStorage|sessionStorage|indexedDB/i.test(codeOnly)) offenders.push(file);
   }
   assert(offenders.length === 0, `nenhum componente do Jarvis usa localStorage/sessionStorage/indexedDB para conversa (offenders: ${offenders.join(", ") || "nenhum"})`);
+}
+
+console.log("[test] 18 — metadata says small but real buffer oversized -> reject (validateAudioBuffer nunca confia só em File.size)");
+{
+  const declaredSmall = { size: 10, type: "audio/webm" };
+  assert(validateAudioFile(declaredSmall).valid === true, "metadata declarada passa na checagem barata");
+  const actualOversizedBuffer = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(11 * 1024 * 1024)]);
+  const realCheck = validateAudioBuffer(actualOversizedBuffer, "audio/webm");
+  assert(realCheck.valid === false && realCheck.reason === "oversized_audio", "buffer real (11MB) excede o limite mesmo que a metadata declarada dissesse 10 bytes");
+}
+
+console.log("[test] 19 — metadata says nonempty but actual buffer empty -> reject");
+{
+  const declaredNonEmpty = { size: 5000, type: "audio/webm" };
+  assert(validateAudioFile(declaredNonEmpty).valid === true, "metadata declarada passa na checagem barata");
+  const actualEmptyBuffer = Buffer.alloc(0);
+  const realCheck = validateAudioBuffer(actualEmptyBuffer, "audio/webm");
+  assert(realCheck.valid === false && realCheck.reason === "empty_audio", "buffer real vazio é rejeitado mesmo que a metadata dissesse 5000 bytes");
+}
+
+console.log("[test] 20 — invalid PDF signature -> reject no fluxo real do Jarvis (validateReportAttachmentBuffer)");
+{
+  const fakePdfBuffer = Buffer.from("not actually a pdf, just renamed");
+  const result = validateReportAttachmentBuffer(fakePdfBuffer, "application/pdf");
+  assert(result.valid === false && result.reason === "invalid_signature", "payload sem cabeçalho %PDF- é rejeitado mesmo declarado como application/pdf");
+}
+
+console.log("[test] 21 — invalid image signature -> reject");
+{
+  const fakePngBuffer = Buffer.from("GIF89a-not-a-real-png");
+  const result = validateReportAttachmentBuffer(fakePngBuffer, "image/png");
+  assert(result.valid === false && result.reason === "invalid_signature", "payload sem assinatura PNG real é rejeitado mesmo declarado como image/png");
+}
+
+console.log("[test] 22 — valid supported payload accepts (PDF real, CSV real)");
+{
+  const realPdfBuffer = Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.from("conteudo qualquer")]);
+  assert(validateReportAttachmentBuffer(realPdfBuffer, "application/pdf").valid === true, "PDF real com cabeçalho correto é aceito");
+  const realCsvBuffer = Buffer.from("coluna1,coluna2\nvalor1,valor2\n", "utf8");
+  assert(validateReportAttachmentBuffer(realCsvBuffer, "text/csv").valid === true, "CSV real e decodificável é aceito");
+}
+
+console.log("[test] 23 — unsupported MIME -> reject (audio e relatório)");
+{
+  const audioResult = validateAudioBuffer(Buffer.from([1, 2, 3, 4]), "video/mp4");
+  assert(audioResult.valid === false && audioResult.reason === "invalid_mime", "video/mp4 não está na allowlist de áudio -- rejeitado");
+  const reportResult = validateReportAttachmentBuffer(Buffer.from([1, 2, 3, 4]), "application/x-msdownload");
+  assert(reportResult.valid === false && reportResult.reason === "invalid_mime", "executável não está na allowlist de relatório -- rejeitado");
+}
+
+console.log("[test] 24 — Jarvis herda o resolver de Company único (nenhum segundo resolver permissivo)");
+{
+  const jarvisDirs = [
+    path.join(__dirname, "..", "..", "..", "app", "api", "jarvis", "chat"),
+    path.join(__dirname, "..", "..", "..", "app", "api", "jarvis", "context"),
+  ];
+  const offenders: string[] = [];
+  for (const dir of jarvisDirs) {
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith(".ts")) continue;
+      const content = fs.readFileSync(path.join(dir, file), "utf8");
+      if (!content.includes("resolveCompanyContext")) offenders.push(`${dir}/${file}`);
+    }
+  }
+  assert(offenders.length === 0, `toda rota de contexto do Jarvis chama resolveCompanyContext() -- nenhum resolver paralelo (offenders: ${offenders.join(", ") || "nenhum"})`);
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
