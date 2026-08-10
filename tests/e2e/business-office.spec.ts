@@ -17,28 +17,113 @@ import { installQualityListeners } from "./helpers/quality-listeners";
  * visível. Nada aqui usa service role, bypassa resolveCompanyContext ou força
  * um UUID — a Company só existe porque a própria UI aceitou a seleção.
  */
+type CompanySelectionState =
+  | { kind: "COMPANIES_AVAILABLE" }
+  | { kind: "NO_COMPANIES"; diagnostic: string }
+  | { kind: "DEMO_MODE"; diagnostic: string }
+  | { kind: "UNEXPECTED_REDIRECT"; url: string }
+  | { kind: "UNEXPECTED_PAGE"; diagnostic: string };
+
+/**
+ * Sprint CI Repair V3 (Fase 7) — diagnóstico sanitizado: só metadados de
+ * estrutura/contagem e um recorte curto de texto visível, nunca IDs
+ * completos, e-mail, secret ou token. Só é chamado nos ramos em que a
+ * página não está mostrando nenhum dado real de Company (estado vazio,
+ * demo ou desconhecido), então não há dado empresarial sensível em risco.
+ */
+async function collectSanitizedDiagnostic(page: Page): Promise<string> {
+  const url = page.url();
+  const title = await page.title().catch(() => "(unavailable)");
+  const headings = await page.getByRole("heading").allTextContents().catch(() => []);
+  const buttonCount = await page.getByRole("button").count().catch(() => -1);
+  const linkCount = await page.getByRole("link").count().catch(() => -1);
+  const inputCount = await page.locator("input").count().catch(() => -1);
+  const bodyTextRaw = await page.locator("body").innerText().catch(() => "");
+  const bodyText = bodyTextRaw.replace(/\s+/g, " ").trim().slice(0, 1500);
+  return [
+    `url=${url}`,
+    `title=${title}`,
+    `headings=${JSON.stringify(headings.slice(0, 10))}`,
+    `buttons=${buttonCount} links=${linkCount} inputs=${inputCount}`,
+    `bodyText="${bodyText}"`,
+  ].join(" | ");
+}
+
+/**
+ * Sprint CI Repair V3 (Fase 9-13) — resolve qual dos estados reais e
+ * conhecidos de /contentos/selecionar-cliente está renderizado, em vez de
+ * assumir que "o botão não apareceu em 10s" significa bug de seletor.
+ *
+ * `page.tsx` (lido por completo nesta sprint) engole qualquer exceção da
+ * consulta a `clients` num catch silencioso e deixa `clients = []` — ou
+ * seja, "zero Companies reais" e "falha silenciosa de consulta/sessão"
+ * renderizam o MESMO estado vazio no DOM. Isso é uma limitação real de
+ * observabilidade do próprio produto (não desta sprint, não corrigida
+ * aqui — nenhuma alteração de produto é permitida), então NO_COMPANIES
+ * cobre ambos os casos honestamente, sem fingir uma distinção que o DOM
+ * não oferece.
+ *
+ * Sem sleeps arbitrários: cada estado é uma condição real (Promise.race
+ * entre três locators reais, cada um só resolve quando sua própria
+ * condição fica verdadeira).
+ */
+async function resolveCompanySelectionState(page: Page): Promise<CompanySelectionState> {
+  if (!page.url().includes("/contentos/selecionar-cliente")) {
+    return { kind: "UNEXPECTED_REDIRECT", url: page.url() };
+  }
+
+  const demoText = page.getByText("Modo demonstração ativo");
+  const noClientsText = page.getByText("Nenhum cliente cadastrado.");
+  // Fase 8: nenhuma classe Tailwind no seletor. Fase 11/12: único button
+  // fora da lista de Companies é "Entrar na REC OS" (confirmado por
+  // auditoria completa de _client-content.tsx nesta sprint) — excluí-lo
+  // por nome real é uma exclusão semântica, não uma posição CSS.
+  const clientCardCandidates = page.getByRole("button").filter({ hasNotText: "Entrar na REC OS" });
+
+  const raceResult = await Promise.race([
+    demoText.waitFor({ state: "visible", timeout: 12_000 }).then(() => "demo" as const).catch(() => "timeout" as const),
+    noClientsText.waitFor({ state: "visible", timeout: 12_000 }).then(() => "empty" as const).catch(() => "timeout" as const),
+    clientCardCandidates.first().waitFor({ state: "visible", timeout: 12_000 }).then(() => "cards" as const).catch(() => "timeout" as const),
+  ]);
+
+  if (!page.url().includes("/contentos/selecionar-cliente")) {
+    return { kind: "UNEXPECTED_REDIRECT", url: page.url() };
+  }
+
+  if (raceResult === "cards") return { kind: "COMPANIES_AVAILABLE" };
+  if (raceResult === "demo") return { kind: "DEMO_MODE", diagnostic: await collectSanitizedDiagnostic(page) };
+  if (raceResult === "empty") return { kind: "NO_COMPANIES", diagnostic: await collectSanitizedDiagnostic(page) };
+  return { kind: "UNEXPECTED_PAGE", diagnostic: await collectSanitizedDiagnostic(page) };
+}
+
 async function selectFirstAuthorizedCompanyAndGoto(page: Page, targetPath: string): Promise<string> {
   await page.goto(`/contentos/selecionar-cliente?next=${encodeURIComponent(targetPath)}`);
 
-  const noClientsMessage = page.getByText("Nenhum cliente cadastrado.");
-  if (await noClientsMessage.isVisible().catch(() => false)) {
-    throw new Error(
-      "E2E_NO_AUTHORIZED_COMPANY_AVAILABLE — nenhuma Company real e visível foi encontrada para o usuário de QA em /contentos/selecionar-cliente. " +
-        "O ambiente de QA precisa ter ao menos um client real cadastrado para estes testes.",
-    );
+  const state = await resolveCompanySelectionState(page);
+  switch (state.kind) {
+    case "UNEXPECTED_REDIRECT":
+      throw new Error(`E2E_UNEXPECTED_COMPANY_SELECTION_REDIRECT — navegação não permaneceu em /contentos/selecionar-cliente. url=${state.url}`);
+    case "DEMO_MODE":
+      throw new Error(`E2E_COMPANY_SELECTION_DEMO_MODE — página renderizou modo demonstração (Supabase não configurado ativo); isso não representa o fluxo autorizado real. ${state.diagnostic}`);
+    case "NO_COMPANIES":
+      throw new Error(
+        `E2E_NO_AUTHORIZED_COMPANY_AVAILABLE — nenhuma Company real e visível foi encontrada para o usuário de QA em /contentos/selecionar-cliente ` +
+          `(o ambiente de QA precisa ter ao menos um client real cadastrado e visível, OU a consulta/sessão falhou silenciosamente — page.tsx trata os dois casos da mesma forma). ${state.diagnostic}`,
+      );
+    case "UNEXPECTED_PAGE":
+      throw new Error(`E2E_UNEXPECTED_COMPANY_SELECTION_STATE — nenhum dos estados conhecidos (Companies/vazio/demo) apareceu em 12s. ${state.diagnostic}`);
+    case "COMPANIES_AVAILABLE":
+      break;
   }
 
   // Sprint CI Repair V2 — o <nextjs-portal> do indicador de dev do Next.js
-  // (só existe em `next dev`, nunca em produção) intercepta o hit-test de
-  // pointer que .click() exige, mesmo com o botão real visible/enabled/
-  // stable. Em vez de forçar o clique, usa-se ativação real por teclado:
-  // todo <button> nativo responde a Enter quando focado — comportamento do
-  // navegador, não um atalho de teste. Isso nunca depende de onde o portal
-  // está desenhado na tela. Escopo pelo container real dos cards (nenhum
-  // data-testid existe hoje nem nos cards nem no campo de busca).
-  const clientCardsContainer = page.locator("div.space-y-2.mb-6");
-  const firstClientCard = clientCardsContainer.locator("button").first();
-  await expect(firstClientCard, "deve existir ao menos um card de cliente real e focável").toBeVisible({ timeout: 10_000 });
+  // (só existe em `next dev`, nunca em produção) pode interceptar o
+  // hit-test de pointer que .click() exige, mesmo com o botão real
+  // visible/enabled/stable. Ativação real por teclado sidesteps isso
+  // inteiramente: todo <button> nativo responde a Enter quando focado —
+  // comportamento do navegador, não um atalho de teste.
+  const clientCardCandidates = page.getByRole("button").filter({ hasNotText: "Entrar na REC OS" });
+  const firstClientCard = clientCardCandidates.first();
   await firstClientCard.scrollIntoViewIfNeeded();
   await firstClientCard.focus();
   await expect(firstClientCard).toBeFocused();
