@@ -28,19 +28,30 @@ async function selectFirstAuthorizedCompanyAndGoto(page: Page, targetPath: strin
     );
   }
 
-  // Nenhum data-testid existe hoje nos cards de cliente nem no campo de
-  // busca (auditado em _client-content.tsx). O único botão com texto
-  // estável é "Entrar na REC OS", que é sempre o ÚLTIMO <button> da página —
-  // os cards de cliente vêm antes dele no DOM, e "Voltar ao Admin" é um
-  // <Link> (renderiza como <a>), nunca um <button>. Por isso o primeiro
-  // <button> da página é garantidamente o primeiro card de cliente real.
-  const firstClientCard = page.getByRole("button").first();
-  await expect(firstClientCard, "deve existir ao menos um card de cliente real e clicável").toBeVisible({ timeout: 10_000 });
-  await firstClientCard.click();
+  // Sprint CI Repair V2 — o <nextjs-portal> do indicador de dev do Next.js
+  // (só existe em `next dev`, nunca em produção) intercepta o hit-test de
+  // pointer que .click() exige, mesmo com o botão real visible/enabled/
+  // stable. Em vez de forçar o clique, usa-se ativação real por teclado:
+  // todo <button> nativo responde a Enter quando focado — comportamento do
+  // navegador, não um atalho de teste. Isso nunca depende de onde o portal
+  // está desenhado na tela. Escopo pelo container real dos cards (nenhum
+  // data-testid existe hoje nem nos cards nem no campo de busca).
+  const clientCardsContainer = page.locator("div.space-y-2.mb-6");
+  const firstClientCard = clientCardsContainer.locator("button").first();
+  await expect(firstClientCard, "deve existir ao menos um card de cliente real e focável").toBeVisible({ timeout: 10_000 });
+  await firstClientCard.scrollIntoViewIfNeeded();
+  await firstClientCard.focus();
+  await expect(firstClientCard).toBeFocused();
+  await firstClientCard.press("Enter");
 
   const enterButton = page.getByRole("button", { name: "Entrar na REC OS" });
+  // Confirma seleção real via evidência funcional do próprio produto: o
+  // botão de submissão só habilita quando `selectedId` está preenchido.
   await expect(enterButton).toBeEnabled();
-  await enterButton.click();
+  await enterButton.scrollIntoViewIfNeeded();
+  await enterButton.focus();
+  await expect(enterButton).toBeFocused();
+  await enterButton.press("Enter");
 
   await page.waitForURL(new RegExp(`${targetPath.replace(/\//g, "\\/")}\\?client=`), { timeout: 10_000 });
   const companyId = new URL(page.url()).searchParams.get("client");
