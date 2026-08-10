@@ -37,14 +37,29 @@ console.log("[test] 33 — workspace/cliente preservado quando presente na URL")
 assert(page.includes("params.client") && page.includes("clientId"), "clientId da URL é lido e repassado para a busca de dados");
 
 console.log("[test] 34/35/36/37 — isolamento por superfície (mesmo padrão já estabelecido)");
-assert(page.includes("requireAdminContentOSContext"), "reaproveita o mesmo gate de staff admin/super_admin já usado no resto do REC OS");
-assert(page.includes("AdminContentOSUnavailableState"), "falha de config/permissão nunca vira redirect para login (mesmo fix desta sprint)");
+// Sprint MVP Experience Completion V0.1 substituiu o gate antigo
+// (requireAdminContentOSContext/AdminContentOSUnavailableState) pelo
+// resolveCompanyContext/CompanyContextRequiredState compartilhado com
+// Company Central e Projetos -- atualizado aqui para checar a arquitetura
+// real, nunca a antiga.
+assert(page.includes("resolveCompanyContext"), "reaproveita o mesmo Company Context resolver já usado no resto do Spine (Company Central/Projetos)");
+assert(
+  page.includes('if (resolution.reason === "not_authenticated") redirect("/login");') && page.includes("CompanyContextRequiredState"),
+  "falha de config/permissão (ex.: company_required) nunca vira redirect para login -- só sessão realmente ausente redireciona; o resto renderiza o estado inline",
+);
 
 console.log("[test] 38/39 — estados vazios honestos, exatamente como especificado (Fase 18)");
 assert(client.includes("Nenhum compromisso encontrado para hoje."), "estado vazio de Hoje com o texto exato do brief");
 assert(client.includes("Não há atividades conectadas para esta semana."), "estado vazio de Semana com o texto exato do brief");
 assert(client.includes("Ainda não existem dados suficientes para montar o fechamento."), "estado vazio de fechamento do mês com o texto exato do brief");
-assert(client.includes("Este módulo ainda não fornece dados para Meu Escritório."), "módulos não integrados usam o texto exato do brief");
+// Sprint MVP Experience Completion V0.1 substituiu o bloco antigo
+// "office-not-integrated" pelo SourcesPanel colapsável -- mesma intenção
+// (módulos não integrados aparecem nomeados, nunca como zero fabricado),
+// checada contra o componente real atual.
+assert(
+  client.includes('data-testid="office-sources-panel"') && client.includes('data-testid="office-source-badge"') && client.includes('"Ainda não integrado"'),
+  "módulos não integrados aparecem nomeados no SourcesPanel real, nunca escondidos atrás de um zero fabricado",
+);
 
 console.log("[test] 40 — nenhum número fictício sem indicação (não há dado demonstrativo aqui, só real ou ausente)");
 assert(!client.includes("isDemo: true") && !/Math\.random/.test(client), "nenhum dado aleatório/fabricado no client component");
