@@ -40,11 +40,12 @@ console.log("[test] 4 — marketing_diagnostics é funil público de pré-venda,
 const marketingDiagSchema = read("docs/supabase/49-marketing-diagnostics.sql");
 assert(marketingDiagSchema.includes("company_name") && !marketingDiagSchema.includes("client_id  "), "marketing_diagnostics usa company_name texto livre, nunca um FK real para clients");
 
-console.log("[test] 5 — proposta de schema do Diagnóstico real existe, documentada, nunca executada (Fase 87)");
-assert(exists("docs/supabase/91-company-diagnostic-roadmap-PROPOSAL.sql"), "arquivo de proposta existe");
-const proposal = read("docs/supabase/91-company-diagnostic-roadmap-PROPOSAL.sql");
-assert(proposal.includes("MANUAL_WEB_ACTION_REQUIRED"), "marcado explicitamente como ação manual necessária, nunca executado automaticamente");
+console.log("[test] 5 — schema final do Diagnóstico real existe, documentado, nunca executado (Fase 87, revisado na Sprint MVP Core Closure V2)");
+assert(exists("docs/supabase/91-company-diagnostic-roadmap.sql"), "arquivo de schema final existe");
+const proposal = read("docs/supabase/91-company-diagnostic-roadmap.sql");
+assert(proposal.includes("SQL_READY_FOR_MANUAL_APPROVAL"), "marcado explicitamente como pronto para aprovação manual, nunca executado automaticamente");
 assert(proposal.includes("REFERENCES public.clients(id)"), "reaproveita clients como Company, nenhuma tabela de Company nova");
+assert(exists("docs/supabase/91-company-diagnostic-roadmap-rollback.sql"), "rollback seguro correspondente existe");
 
 console.log("[test] 6 — Meu Negócio já se declara honestamente como demonstração (Fase 8)");
 const activationPlaceholder = read("src/app/admin/meu-negocio/_activation-placeholder.tsx");

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight, AlertTriangle, FolderKanban, ClipboardList,
-  CheckSquare, Clock, CalendarClock,
+  CheckSquare, Clock, CalendarClock, ClipboardCheck,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -13,6 +13,7 @@ import { getProjectProjections } from "@/lib/project-projection/adapters";
 import { getWorkItemProjections } from "@/lib/work-item-projection/adapters";
 import { buildCompanyCentralView } from "@/lib/company-central/builder";
 import { SURFACE_LABELS } from "@/config/workspace-capabilities";
+import { getLatestCompanyDiagnostic, getCompanyFindings } from "@/lib/company-diagnostic/adapters";
 
 /**
  * Sprint MVP Dogfood Spine V0.1 (Bloco D) — Company Central mínima.
@@ -58,10 +59,17 @@ export default async function AdminEmpresaPage({
   }
 
   const adminDb = createSupabaseAdminClient();
-  const [projects, workItems] = await Promise.all([
+  const [projects, workItems, diagnosticResult] = await Promise.all([
     getProjectProjections(adminDb, context.companyId),
     getWorkItemProjections(adminDb, context.companyId),
+    getLatestCompanyDiagnostic(adminDb, context.companyId),
   ]);
+  // Fase 27/68 — só busca Findings quando já existe um diagnóstico real
+  // (evita uma segunda query condenada a "unavailable" quando o schema 91
+  // ainda não foi aplicado, ou quando a Company nunca iniciou um).
+  const findingsResult = diagnosticResult.status === "available" && diagnosticResult.data
+    ? await getCompanyFindings(adminDb, context.companyId)
+    : null;
 
   const view = buildCompanyCentralView(
     { companyId: context.companyId, companyName: context.companyName, surface: context.surface },
@@ -76,6 +84,34 @@ export default async function AdminEmpresaPage({
         title={view.identity.companyName ?? "Empresa"}
         description={`Painel da Empresa · ${SURFACE_LABELS[view.identity.surface]}${context.preview ? " · Visualização (somente leitura)" : ""}`}
       />
+
+      {/* Diagnóstico (Fase 26/27/68) — só renderiza quando o schema 91 já
+          foi aplicado (status "available"); enquanto "unavailable", omite
+          a seção inteira em vez de mostrar um botão que falharia. */}
+      {diagnosticResult.status === "available" && (
+        <section className="bg-white rounded-2xl border border-gray-100 p-4 mb-4" data-testid="company-panel-diagnostic">
+          <h2 className="text-xs font-black uppercase tracking-wide text-gray-500 mb-3">Diagnóstico</h2>
+          {!diagnosticResult.data ? (
+            <div className="flex items-center gap-2" data-testid="company-panel-start-diagnostic">
+              <ClipboardCheck className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <p className="text-sm text-gray-500">Esta empresa ainda não tem um diagnóstico. Iniciar diagnóstico chega em uma próxima versão.</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-sm text-gray-700">
+                Status: <span className="font-semibold">{diagnosticResult.data.status === "completed" ? "Concluído" : diagnosticResult.data.status === "archived" ? "Arquivado" : "Em andamento"}</span>
+              </p>
+              {findingsResult?.status === "available" && (
+                <p className="text-xs text-gray-500">
+                  {findingsResult.data.length > 0
+                    ? `${findingsResult.data.length} achado(s) em aberto.`
+                    : "Nenhum achado em aberto registrado."}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Precisa de atenção */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
