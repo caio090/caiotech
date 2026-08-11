@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { withCompanyContext, readCompanyContextParam } from "@/lib/company-context/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -148,26 +147,6 @@ export const configs: Record<SidebarVariant, {
 // Exports for icon re-use in operacional pages
 export { Palette, Video, ScrollText, MousePointerClick, UserCheck, ClipboardList };
 
-/**
- * Sprint MVP Dogfood Final — Company Context Transversal (Fase 10).
- * Rotas cuja navegação deve preservar a Company ativa (`?client=`). Nunca
- * inclui rotas que não são Company-scoped (Início, Clientes, Equipe,
- * Financeiro, Status, Super Admin, Integrações, Configurações, etc.).
- */
-const COMPANY_SCOPED_ROUTES = new Set([
-  "/admin/empresa",
-  "/admin/escritorio",
-  "/admin/projetos",
-  "/admin/calendario",
-  "/admin/contentos",
-  "/admin/relatorios",
-]);
-// Nota: /admin/leads é o funil de aquisição da própria LOKAT (waitlist/beta
-// -- name/email/phone/source), nunca dados de uma Company cliente. Não é
-// Company-scoped por natureza (confirmado lendo o page.tsx real antes de
-// incluir aqui -- ver commercial_leads/operacional/comercial para o CRM
-// real de clientes, auditado separadamente).
-
 interface AppSidebarProps {
   variant: SidebarVariant;
   userName?: string;
@@ -185,7 +164,6 @@ export function AppSidebar({
   variant, userName = "Usuário", userRole = "", onSignOut, badges, hideRoutes, transparent,
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const activeCompanyId = readCompanyContextParam(useSearchParams());
   const config   = configs[variant];
 
   const [expanded,      setExpanded]      = useState(false);
@@ -259,11 +237,10 @@ export function AppSidebar({
         {config.nav.filter(({ href }) => !hideRoutes?.includes(href)).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           const badge  = badges?.[href] ?? 0;
-          const resolvedHref = COMPANY_SCOPED_ROUTES.has(href) ? withCompanyContext(href, activeCompanyId) : href;
           return (
             <Link
               key={href}
-              href={resolvedHref}
+              href={href}
               aria-label={label}
               data-active={active ? "true" : "false"}
               className={cn(
