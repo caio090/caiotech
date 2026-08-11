@@ -10,6 +10,7 @@ import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { AdminSearchSheet } from "@/components/admin-search-sheet";
+import { CompanyContextBar } from "@/components/company-context-bar";
 import { JarvisPanel } from "@/components/jarvis/jarvis-panel";
 import { WorkspaceViewSwitcher } from "@/components/workspaces/workspace-view-switcher";
 import { WorkspaceExitButton } from "@/components/workspaces/workspace-exit-button";
@@ -367,7 +368,10 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
             ? "bg-black/20 backdrop-blur-md border-b border-white/10"
             : "bg-white border-b border-gray-100"
         )}>
-          <AdminSearchSheet dark={isInicioPage} />
+          <div className="flex items-center gap-3 min-w-0">
+            <AdminSearchSheet dark={isInicioPage} />
+            <CompanyContextBar />
+          </div>
 
           <div className="flex items-center gap-2 md:gap-3">
             {/* Admin notification bell — matches client pattern */}

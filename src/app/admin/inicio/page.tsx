@@ -7,6 +7,9 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { VideoBackground } from "@/components/video-background";
 import { SmartStartInput } from "@/components/smart-start-input";
+import { resolveCompanyContext } from "@/lib/company-context/resolve";
+import { withCompanyContext } from "@/lib/company-context/navigation";
+import { Building2, Briefcase, FolderKanban, Wand2 } from "lucide-react";
 
 const BASE_SHORTCUTS = [
   { href: "/admin/leads",               label: "CRM",              icon: Target },
@@ -33,7 +36,12 @@ function getGreeting(): string {
   return "Boa noite";
 }
 
-export default async function AdminInicioPage() {
+export default async function AdminInicioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string }>;
+}) {
+  const { client: clientParam } = await searchParams;
   let firstName = "";
   let role = "";
 
@@ -56,6 +64,14 @@ export default async function AdminInicioPage() {
 
   const isSuperAdmin = role === "super_admin";
   const isAdmin      = role === "admin" || role === "super_admin";
+
+  // Sprint MVP Dogfood Final (Fase 12/13) — entrada mínima e honesta: Início
+  // reaproveita o MESMO resolveCompanyContext() de todo o resto do Spine
+  // (nenhum segundo resolver). Sem Company ativa, mostra o convite para
+  // selecionar; com Company ativa, mostra atalhos company-scoped reais,
+  // sem forçar REC OS como significado de "selecionar empresa".
+  const companyResolution = isAdmin ? await resolveCompanyContext(clientParam ?? null) : null;
+  const activeCompany = companyResolution?.valid ? companyResolution.context : null;
 
   // Build shortcuts — add tool shortcuts for eligible roles
   const shortcuts = [...BASE_SHORTCUTS];
@@ -129,6 +145,43 @@ export default async function AdminInicioPage() {
                 );
               })}
             </div>
+
+            {isAdmin && (
+              <div className="mt-8 flex flex-col items-center gap-3" data-testid="inicio-company-entry">
+                {activeCompany ? (
+                  <>
+                    <p className="text-xs text-indigo-100/60">
+                      Trabalhando em <span className="font-bold text-white">{activeCompany.companyName ?? "empresa"}</span>
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {[
+                        { href: "/admin/empresa",    label: "Company Central", icon: Building2 },
+                        { href: "/admin/escritorio", label: "Meu Escritório",  icon: Briefcase },
+                        { href: "/admin/projetos",   label: "Projetos",        icon: FolderKanban },
+                      ].map(({ href, label, icon: Icon }) => (
+                        <Link
+                          key={href}
+                          href={withCompanyContext(href, activeCompany.companyId)}
+                          className="flex items-center gap-1.5 border text-white/90 text-xs font-medium px-3 py-2 rounded-xl transition-colors backdrop-blur-sm bg-purple-600/20 hover:bg-purple-600/35 border-purple-500/30"
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <Link
+                    href="/contentos/selecionar-cliente?next=%2Fadmin%2Finicio"
+                    data-testid="inicio-select-company-cta"
+                    className="flex items-center gap-2 border text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors bg-purple-600/80 hover:bg-purple-600 border-purple-500/40"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    Selecionar empresa para começar
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
