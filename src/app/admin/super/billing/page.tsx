@@ -325,11 +325,12 @@ export default function SuperBillingPage() {
     try {
       const supabase = createClient();
 
-      // MRR summary via view
-      const { data: mrrData, error: mrrErr } = await supabase
-        .from("v_billing_mrr_summary").select("*").maybeSingle();
-      if (mrrErr?.code === "42P01") { setSqlPending(true); setLoading(false); return; }
-      if (mrrData) setMrr(mrrData as MrrSummary);
+      // MRR summary via API route autorizada (Fase 8-11 -- a view não é
+      // mais consultável diretamente do browser; a autorização
+      // super_admin acontece no servidor antes da query privilegiada).
+      const mrrRes = await fetch("/api/admin/billing/mrr-summary").then((r) => r.json()).catch(() => null);
+      if (mrrRes?.reason === "sql_pending") { setSqlPending(true); setLoading(false); return; }
+      if (mrrRes?.ok && mrrRes.mrr) setMrr(mrrRes.mrr as MrrSummary);
 
       // Subscriptions with client names
       const { data: subs } = await supabase
