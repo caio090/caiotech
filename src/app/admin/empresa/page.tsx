@@ -74,7 +74,7 @@ export default async function AdminEmpresaPage({
     <>
       <PageHeader
         title={view.identity.companyName ?? "Empresa"}
-        description={`${SURFACE_LABELS[view.identity.surface]}${context.preview ? " · Visualização (somente leitura)" : ""}`}
+        description={`Painel da Empresa · ${SURFACE_LABELS[view.identity.surface]}${context.preview ? " · Visualização (somente leitura)" : ""}`}
       />
 
       {/* Precisa de atenção */}
