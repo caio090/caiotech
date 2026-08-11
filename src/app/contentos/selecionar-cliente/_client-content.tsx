@@ -105,6 +105,17 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive, 
               <p className="text-sm text-gray-400">
                 {search ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado."}
               </p>
+              {/* Sprint MVP Dogfood Final (adendo) — atalho para a ÚNICA
+                  autoridade real de criação de cliente (/admin/clientes),
+                  nunca um formulário duplicado aqui. */}
+              {!search && (userRole === "admin" || userRole === "super_admin") && (
+                <Link
+                  href="/admin/clientes"
+                  className="inline-block mt-3 text-xs font-bold text-purple-600 hover:text-purple-700 underline underline-offset-2"
+                >
+                  Cadastrar novo cliente
+                </Link>
+              )}
             </div>
           ) : (
             <div className="space-y-2 mb-6">
