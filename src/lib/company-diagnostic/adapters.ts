@@ -1,16 +1,37 @@
 /**
- * Sprint MVP Core Closure V2 (Fase 3/6) — leitura real do schema proposto
- * em docs/supabase/91-company-diagnostic-roadmap.sql. Nenhuma escrita
- * nesta sprint (o schema ainda não foi aplicado -- ver Fase 6 "schema
- * gate"): só as queries de leitura, que já funcionam corretamente nos
- * dois mundos (antes e depois da migration ser aplicada) sem precisar de
- * nenhuma mudança de código depois.
+ * Sprint SQL 91 Security Hardening V2 (Fase 41) — leitura real do schema
+ * definido em docs/supabase/91-company-diagnostic-roadmap.sql. Nenhuma
+ * escrita nesta sprint (o schema ainda não foi aplicado -- ver Fase 50
+ * "no database mutation"): só as queries de leitura, que já funcionam
+ * corretamente nos dois mundos (antes e depois da migration ser
+ * aplicada) sem precisar de nenhuma mudança de código depois.
+ *
+ * Zero drift com o SQL (Fase 41): `diagnostic_findings` não tem mais
+ * `client_id` próprio (P0.3 -- eliminava uma classe de inconsistência
+ * cross-company); a Company é sempre derivada via `diagnostic_id` →
+ * `company_diagnostics.client_id`, nunca uma coluna redundante.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CompanyDiagnostic, DiagnosticChecklistItem, DiagnosticFinding, DiagnosticRecommendation,
-  RoadmapItem, SourceFetchResult,
+  FindingPriority, RoadmapItem, SourceFetchReason, SourceFetchResult,
 } from "./types";
+
+/**
+ * Fase 38-39 — distingue "schema 91 ainda não aplicado" (código Postgres
+ * real 42P01 / PostgREST PGRST205, nunca um chute) de qualquer outra
+ * falha real. Nunca expõe a mensagem bruta do Postgres na UI (Fase 38) --
+ * só loga, sanitizada (tabela + código, nunca token/PII), quando a causa
+ * NÃO é a ausência esperada de schema (Fase 39).
+ */
+function classifyFetchError(table: string, err: unknown): SourceFetchReason {
+  const code = (err as { code?: string } | null | undefined)?.code;
+  const message = err instanceof Error ? err.message : ((err as { message?: string } | null | undefined)?.message ?? "");
+  const isSchemaMissing = code === "42P01" || code === "PGRST205" || /does not exist|schema cache/i.test(message);
+  if (isSchemaMissing) return "schema_not_applied";
+  console.error(`[company-diagnostic] internal_error on "${table}"${code ? ` (code=${code})` : ""}`);
+  return "internal_error";
+}
 
 interface CompanyDiagnosticRow {
   id: string; client_id: string; status: string;
@@ -29,10 +50,21 @@ function mapDiagnostic(row: CompanyDiagnosticRow): CompanyDiagnostic {
   };
 }
 
+/** Fase 19 — nunca ordenar prioridade alfabeticamente (TEXT ASC/DESC
+ * ordena "high" < "low" < "medium", errado). Ordem explícita real. */
+const PRIORITY_RANK: Record<FindingPriority, number> = { high: 0, medium: 1, low: 2 };
+function byPriorityThenCreatedDesc(a: { priority: FindingPriority; created_at: string }, b: { priority: FindingPriority; created_at: string }): number {
+  const rankDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  if (rankDiff !== 0) return rankDiff;
+  return a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+}
+
 /**
- * Fase 27 — o Painel da Empresa precisa saber, de forma honesta, se deve
- * mostrar "Iniciar diagnóstico" (available, null) ou um estado de
- * indisponibilidade real (unavailable) -- nunca zero fabricado.
+ * Fase 13/30 — "latest" precisa de um contrato determinístico: mais de
+ * um diagnostic pode ter o mesmo created_at em teoria (ex.: seed em
+ * lote) -- (created_at DESC, id DESC) sempre resolve para exatamente um
+ * vencedor, nunca uma ordem "que depende do dia". Espelha o índice
+ * idx_company_diagnostics_client_created do SQL 91.
  */
 export async function getLatestCompanyDiagnostic(
   adminDb: SupabaseClient,
@@ -44,12 +76,13 @@ export async function getLatestCompanyDiagnostic(
       .select("id, client_id, status, niche_category, niche_subcategory, operation_type, location_city, location_state, created_at, updated_at, completed_at")
       .eq("client_id", companyId)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) return { status: "unavailable" };
+    if (error) return { status: "unavailable", reason: classifyFetchError("company_diagnostics", error) };
     return { status: "available", data: data ? mapDiagnostic(data as CompanyDiagnosticRow) : null };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return { status: "unavailable", reason: classifyFetchError("company_diagnostics", err) };
   }
 }
 
@@ -60,21 +93,30 @@ export async function getDiagnosticChecklist(
   try {
     const { data, error } = await adminDb
       .from("diagnostic_checklist_items")
-      .select("id, diagnostic_id, category, label, status, notes, evidence_url")
+      .select("id, diagnostic_id, item_key, category, label, status, notes, evidence_url, updated_at")
       .eq("diagnostic_id", diagnosticId);
-    if (error) return { status: "unavailable" };
+    if (error) return { status: "unavailable", reason: classifyFetchError("diagnostic_checklist_items", error) };
     return {
       status: "available",
       data: (data ?? []).map((r) => ({
-        id: r.id, diagnosticId: r.diagnostic_id, category: r.category, label: r.label,
-        status: r.status, notes: r.notes, evidenceUrl: r.evidence_url,
+        id: r.id, diagnosticId: r.diagnostic_id, itemKey: r.item_key, category: r.category, label: r.label,
+        status: r.status, notes: r.notes, evidenceUrl: r.evidence_url, updatedAt: r.updated_at,
       })),
     };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return { status: "unavailable", reason: classifyFetchError("diagnostic_checklist_items", err) };
   }
 }
 
+/**
+ * Fase 7 (P0.3) — `diagnostic_findings` não tem `client_id` próprio no
+ * SQL corrigido. Filtra por Company através de um join real contra
+ * `company_diagnostics`, nunca confiando em uma coluna redundante que
+ * poderia divergir. `companyId` é atribuído no mapeamento a partir do
+ * PARÂMETRO já usado para filtrar -- nunca de uma coluna do banco --
+ * porque toda linha retornada já pertence, por construção da query, a
+ * esta Company.
+ */
 export async function getCompanyFindings(
   adminDb: SupabaseClient,
   companyId: string,
@@ -82,21 +124,21 @@ export async function getCompanyFindings(
   try {
     const { data, error } = await adminDb
       .from("diagnostic_findings")
-      .select("id, diagnostic_id, client_id, category, title, description, evidence_url, severity, priority, status, source")
-      .eq("client_id", companyId)
-      .neq("status", "ignored")
-      .order("priority", { ascending: false });
-    if (error) return { status: "unavailable" };
+      .select("id, diagnostic_id, category, title, description, evidence_url, severity, priority, status, source, created_at, company_diagnostics!inner(client_id)")
+      .eq("company_diagnostics.client_id", companyId)
+      .neq("status", "ignored");
+    if (error) return { status: "unavailable", reason: classifyFetchError("diagnostic_findings", error) };
+    const rows = [...(data ?? [])].sort(byPriorityThenCreatedDesc);
     return {
       status: "available",
-      data: (data ?? []).map((r) => ({
-        id: r.id, diagnosticId: r.diagnostic_id, companyId: r.client_id, category: r.category,
+      data: rows.map((r) => ({
+        id: r.id, diagnosticId: r.diagnostic_id, companyId, category: r.category,
         title: r.title, description: r.description, evidenceUrl: r.evidence_url,
         severity: r.severity, priority: r.priority, status: r.status, source: r.source,
       })),
     };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return { status: "unavailable", reason: classifyFetchError("diagnostic_findings", err) };
   }
 }
 
@@ -107,19 +149,22 @@ export async function getFindingRecommendations(
   try {
     const { data, error } = await adminDb
       .from("diagnostic_recommendations")
-      .select("id, finding_id, title, description, capability")
+      .select("id, finding_id, title, description, capability, status")
       .eq("finding_id", findingId);
-    if (error) return { status: "unavailable" };
+    if (error) return { status: "unavailable", reason: classifyFetchError("diagnostic_recommendations", error) };
     return {
       status: "available",
-      data: (data ?? []).map((r) => ({ id: r.id, findingId: r.finding_id, title: r.title, description: r.description, capability: r.capability })),
+      data: (data ?? []).map((r) => ({
+        id: r.id, findingId: r.finding_id, title: r.title, description: r.description,
+        capability: r.capability, status: r.status,
+      })),
     };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return { status: "unavailable", reason: classifyFetchError("diagnostic_recommendations", err) };
   }
 }
 
-/** Fase 19/20 — Roadmap real e Company-scoped, nunca lista demonstrativa. */
+/** Fase 19/25 — Roadmap real e Company-scoped, nunca lista demonstrativa. */
 export async function getCompanyRoadmap(
   adminDb: SupabaseClient,
   companyId: string,
@@ -127,19 +172,19 @@ export async function getCompanyRoadmap(
   try {
     const { data, error } = await adminDb
       .from("roadmap_items")
-      .select("id, client_id, source_type, source_id, title, priority, status, destination_capability, due_date, project_id")
-      .eq("client_id", companyId)
-      .order("priority", { ascending: false });
-    if (error) return { status: "unavailable" };
+      .select("id, client_id, source_type, source_id, title, description, priority, status, destination_capability, due_date, project_id, created_at")
+      .eq("client_id", companyId);
+    if (error) return { status: "unavailable", reason: classifyFetchError("roadmap_items", error) };
+    const rows = [...(data ?? [])].sort(byPriorityThenCreatedDesc);
     return {
       status: "available",
-      data: (data ?? []).map((r) => ({
+      data: rows.map((r) => ({
         id: r.id, companyId: r.client_id, sourceType: r.source_type, sourceId: r.source_id,
-        title: r.title, priority: r.priority, status: r.status,
+        title: r.title, description: r.description, priority: r.priority, status: r.status,
         destinationCapability: r.destination_capability, dueDate: r.due_date, projectId: r.project_id,
       })),
     };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return { status: "unavailable", reason: classifyFetchError("roadmap_items", err) };
   }
 }

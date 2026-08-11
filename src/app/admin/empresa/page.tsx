@@ -99,7 +99,12 @@ export default async function AdminEmpresaPage({
           ) : (
             <div className="space-y-1">
               <p className="text-sm text-gray-700">
-                Status: <span className="font-semibold">{diagnosticResult.data.status === "completed" ? "Concluído" : diagnosticResult.data.status === "archived" ? "Arquivado" : "Em andamento"}</span>
+                Status: <span className="font-semibold">{
+                  diagnosticResult.data.status === "completed" ? "Concluído"
+                  : diagnosticResult.data.status === "archived" ? "Arquivado"
+                  : diagnosticResult.data.status === "draft" ? "Rascunho"
+                  : "Em andamento"
+                }</span>
               </p>
               {findingsResult?.status === "available" && (
                 <p className="text-xs text-gray-500">
