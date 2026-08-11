@@ -1,16 +1,26 @@
 -- ============================================================
--- ROLLBACK — legacy-security-hardening-before-diagnostic.sql
+-- ROLLBACK — legacy-security-hardening-before-diagnostic.sql — V2
 -- AINDA NÃO EXECUTADO (só faz sentido executar depois da migration
 -- correspondente ter sido aplicada).
 --
 -- ⚠ AVISO DE SEGURANÇA (Fase 40): este rollback restaura o
 -- comportamento anterior à correção -- ou seja, restaura
 -- deliberadamente os P0/P1 confirmados ao vivo (anon podendo ler
--- views sensíveis, finance_mark_overdue() executável por qualquer
+-- views sensíveis, authenticated lendo agregados de billing
+-- diretamente, finance_mark_overdue() executável por qualquer
 -- visitante, create_client_on_signup() aceitando p_user_id arbitrário,
--- RPCs de Meta/OlaClick sem ownership real de Company). Isso é
+-- RPCs de Meta/OlaClick sem ownership real de Company, admin comum
+-- podendo arquivar/restaurar/apagar QUALQUER Company). Isso é
 -- tecnicamente esperado de um rollback, mas nunca deve ser executado
--- sem entender que reabre exatamente essas exposições.
+-- sem entender que reabre exatamente essas exposições -- incluindo o
+-- bug de NULL-bypass corrigido no V2 (ver seção 8 da migration).
+--
+-- Cada objeto é restaurado exatamente à definição/grants documentados
+-- nos arquivos históricos correspondentes (a única fonte real, já que
+-- o projeto Supabase não tem migration history rastreada e esta
+-- migration nunca foi aplicada -- não há um "estado V1 intermediário"
+-- vivo para reverter, só o estado original pré-existente nos SQLs
+-- numerados).
 --
 -- Não contém nenhum DROP destrutivo em ponto algum -- apenas restaura as
 -- definições/grants exatamente como estavam nos arquivos históricos
@@ -21,6 +31,193 @@
 -- ============================================================
 
 BEGIN;
+
+-- 8. Archive/Restore/Delete de clients → estado anterior (docs/supabase/
+--    52, 54, 55) -- reabre admin comum podendo administrar QUALQUER
+--    Company (sem ownership) e reabre o bug de NULL-bypass (role NULL
+--    de um chamador anônimo não dispara mais a exceção nestas 6
+--    funções).
+
+-- 8.6 admin_hard_delete_clients (bulk)
+CREATE OR REPLACE FUNCTION public.admin_hard_delete_clients(p_client_ids uuid[])
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role  text;
+  v_count integer;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role != 'super_admin' THEN
+    RAISE EXCEPTION 'permission_denied: apenas super_admin pode apagar clientes definitivamente';
+  END IF;
+
+  DELETE FROM public.clients WHERE id = ANY(p_client_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_clients(uuid[]) TO authenticated;
+
+-- 8.5 admin_hard_delete_client (single)
+CREATE OR REPLACE FUNCTION public.admin_hard_delete_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role != 'super_admin' THEN
+    RAISE EXCEPTION 'permission_denied: apenas super_admin pode apagar clientes definitivamente';
+  END IF;
+
+  DELETE FROM public.clients WHERE id = p_client_id;
+  RETURN FOUND;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_client(uuid) TO authenticated;
+
+-- 8.4 admin_delete_client (logical delete / lixeira)
+CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+  v_deleted_at timestamptz := now();
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode apagar clientes', v_role;
+  END IF;
+
+  BEGIN
+    UPDATE public.clients
+       SET deleted_at = v_deleted_at,
+           archived_at = v_deleted_at,
+           status = 'archived'
+     WHERE id = p_client_id;
+  EXCEPTION WHEN check_violation THEN
+    BEGIN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'inactive'
+       WHERE id = p_client_id;
+    EXCEPTION WHEN check_violation THEN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'pausado'
+       WHERE id = p_client_id;
+    END;
+  END;
+
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_delete_client(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_delete_client(uuid) TO authenticated;
+
+-- 8.3 admin_restore_client
+CREATE OR REPLACE FUNCTION public.admin_restore_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode restaurar clientes', v_role;
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'onboarding',
+    archived_at = NULL,
+    deleted_at  = NULL
+  WHERE id = p_client_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO authenticated;
+
+-- 8.2 admin_archive_clients (bulk)
+CREATE OR REPLACE FUNCTION public.admin_archive_clients(p_client_ids uuid[])
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role    text;
+  v_count   integer;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode arquivar clientes', v_role;
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'archived',
+    archived_at = now(),
+    deleted_at  = now()
+  WHERE id = ANY(p_client_ids);
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_archive_clients(uuid[]) TO authenticated;
+
+-- 8.1 admin_archive_client (single)
+CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode arquivar clientes', v_role;
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'archived',
+    archived_at = now(),
+    deleted_at  = now()
+  WHERE id = p_client_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_archive_client(uuid) TO authenticated;
 
 -- 7. get_request_owner_for_client → estado anterior (docs/supabase/45)
 --    sem auth check, sem search_path.
@@ -354,7 +551,7 @@ GRANT SELECT ON public.admin_signups_view TO authenticated, anon;
 ALTER VIEW public.v_orphan_client_invites RESET (security_invoker);
 GRANT SELECT ON public.v_orphan_client_invites TO authenticated, anon;
 
-GRANT SELECT ON public.v_billing_mrr_summary TO anon;
+GRANT SELECT ON public.v_billing_mrr_summary TO anon, authenticated;
 
 -- 2. current_user_role → estado anterior (docs/supabase/06/07, sem search_path)
 CREATE OR REPLACE FUNCTION current_user_role()

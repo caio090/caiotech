@@ -58,10 +58,25 @@ BEGIN;
 ROLLBACK;
 
 
--- ── 3. create_client_on_signup -- p_user_id arbitrário bloqueado ──
--- Simula: authenticated user A tentando criar client para o
--- <USER_B_ID> de outro usuário real (nunca o próprio auth.uid()).
--- Espera-se EXCEPTION 'unauthorized: ...'.
+-- ── 3. create_client_on_signup -- V2: sem caminho anônimo, sem janela
+-- temporal (Fase 35). p_user_id arbitrário bloqueado; anon não tem
+-- EXECUTE de forma nenhuma.
+--
+-- Ataque original (Fase 35): anon + UUID válido recém-criado de OUTRO
+-- usuário → DENIED. Na V2, isso é verdade estruturalmente: anon não
+-- tem EXECUTE na função, então nem chega a avaliar p_user_id. Espera-se
+-- ERRO "permission denied for function", não mais uma EXCEPTION
+-- aplicativa vinda de dentro da função.
+BEGIN;
+  SET LOCAL ROLE anon;
+  SELECT public.create_client_on_signup(
+    '<USER_B_ID>'::uuid, 'Empresa Forjada Anon', 'Teste', 'anon@example.com'
+  );  -- deve falhar com permission denied for function (EXECUTE revogado de anon)
+ROLLBACK;
+
+-- authenticated user A tentando criar client para o <USER_B_ID> de
+-- outro usuário real (nunca o próprio auth.uid()). Espera-se EXCEPTION
+-- 'unauthorized: ...'.
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<USER_A_ID>"}';
@@ -71,23 +86,16 @@ BEGIN;
 ROLLBACK;
 
 -- Caminho legítimo (deve continuar funcionando): authenticated user
--- criando client para o PRÓPRIO id.
+-- criando client para o PRÓPRIO id -- cobre tanto o caso "confirmação
+-- de e-mail desligada" (chamada em criar-conta, sessão já ativa)
+-- quanto "confirmação ligada" (chamada em onboarding/conclusao, depois
+-- do login pós-confirmação).
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<USER_A_ID>"}';
   SELECT public.create_client_on_signup(
     '<USER_A_ID>'::uuid, 'Empresa Legítima', 'Teste', 'legitimo@example.com'
   ) IS NOT NULL AS legitimate_signup_still_works;  -- deve retornar true
-ROLLBACK;
-
--- Caminho anon documentado (session ainda não confirmada, logo após
--- signUp): só funciona se <USER_B_ID> foi criado nos últimos 10
--- minutos. Contra um usuário antigo, deve falhar.
-BEGIN;
-  SET LOCAL ROLE anon;
-  SELECT public.create_client_on_signup(
-    '<OLD_EXISTING_USER_ID>'::uuid, 'Empresa Forjada Anon', 'Teste', 'anon@example.com'
-  );  -- deve levantar EXCEPTION unauthorized (conta não é recente)
 ROLLBACK;
 
 
@@ -160,13 +168,112 @@ BEGIN;
 ROLLBACK;
 
 
--- ── 7. Após aplicar: Advisor deve estar limpo para estes itens ──
+-- ── 8. Billing (Fase 36) -- authenticated não acessa a view direto ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<USER_A_ID>"}';
+  SELECT COUNT(*) FROM public.v_billing_mrr_summary;  -- deve falhar (permission denied)
+ROLLBACK;
+
+-- Caminho oficial (nível de aplicação, não SQL puro -- testar via
+-- HTTP): GET /api/admin/billing/mrr-summary
+--   • sem sessão                → 401 unauthenticated
+--   • authenticated não-super_admin → 403 forbidden
+--   • authenticated super_admin     → 200 ok, mrr presente/null
+
+
+-- ── 9. Meta: conexão explícita cross-context (Fase 37) ──────────
+-- Company A autorizado, mas informando um meta_connection_id que
+-- pertence a outro usuário/contexto (<OTHER_USER_CONNECTION_ID>) →
+-- DENIED, nunca silently resolve outra conexão.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<USER_A_ID>"}';
+  SELECT public.admin_link_meta_asset(
+    '<COMPANY_A_ID>'::uuid, 'facebook_page', 'fake-asset-id',
+    NULL, NULL, NULL, '<OTHER_USER_CONNECTION_ID>'::uuid, false
+  );  -- deve levantar EXCEPTION connection_not_found (P0006)
+ROLLBACK;
+
+
+-- ── 10. Service-role fallback guard order (Fase 38) ──────────────
+-- Nível de aplicação, não SQL puro -- testar via HTTP:
+--   POST /api/meta/assets/link      com client_id de Company B, sessão
+--     autorizada só para Company A → 403 forbidden ANTES de qualquer
+--     query/mutação privilegiada (nenhuma linha tocada em
+--     client_meta_assets para Company B).
+--   POST /api/olaclick/connect      mesmo teste, mesmo resultado
+--     esperado, para client_meta_assets/olaclick_connections.
+--   DELETE /api/meta/assets/link?id=<asset de Company B>  com sessão
+--     de Company A → 403 forbidden.
+--   DELETE /api/olaclick/connect?id=<conexão de Company B> com sessão
+--     de Company A → 403 forbidden.
+
+
+-- ── 11. Archive / Restore / Delete -- ownership real (Fase 39-41) ──
+-- Admin autorizado A: archive/restore/delete de Company A → PASS.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_archive_client('<COMPANY_A_ID>'::uuid) AS archive_own_company;  -- deve retornar true
+ROLLBACK;
+
+-- Admin A (autorizado só para Company A): archive de Company B → DENIED.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_archive_client('<COMPANY_B_ID>'::uuid);  -- deve levantar EXCEPTION permission_denied
+ROLLBACK;
+
+-- Bulk: um único id não autorizado aborta o lote inteiro (Fase 26/27
+-- -- fail closed, nunca resultado parcial).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_archive_clients(ARRAY['<COMPANY_A_ID>'::uuid, '<COMPANY_B_ID>'::uuid]);  -- deve levantar EXCEPTION, nenhuma linha alterada
+ROLLBACK;
+
+-- Restore: mesmo contrato de ownership do archive.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_restore_client('<COMPANY_B_ID>'::uuid);  -- deve levantar EXCEPTION permission_denied
+ROLLBACK;
+
+-- Logical delete: mesmo contrato de ownership.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_delete_client('<COMPANY_B_ID>'::uuid);  -- deve levantar EXCEPTION permission_denied
+ROLLBACK;
+
+-- Hard delete: super_admin-only, intencionalmente global (Fase 22) --
+-- admin comum autorizado para a própria Company A ainda assim é
+-- DENIED (hard delete nunca é delegado a admin comum).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_hard_delete_client('<COMPANY_A_ID>'::uuid);  -- deve levantar EXCEPTION (apenas super_admin)
+ROLLBACK;
+
+-- NULL-bypass fechado (achado adicional desta correção): anon não
+-- consegue mais nem executar (EXECUTE revogado), então o bug de
+-- "IF NULL" nunca é alcançável por um chamador anônimo.
+BEGIN;
+  SET LOCAL ROLE anon;
+  SELECT public.admin_hard_delete_client('<COMPANY_A_ID>'::uuid);  -- deve falhar com permission denied for function
+ROLLBACK;
+
+
+-- ── 12. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
 --   v_platform_accounts_overview, admin_signups_view,
---   v_orphan_client_invites, finance_mark_overdue,
---   create_client_on_signup, can_access_client,
+--   v_orphan_client_invites, v_billing_mrr_summary,
+--   finance_mark_overdue, create_client_on_signup, can_access_client,
 --   admin_link_meta_asset, admin_upsert_olaclick_connection,
 --   admin_list_olaclick_connections, get_client_meta_status,
---   get_request_owner_for_client.
+--   get_request_owner_for_client, admin_archive_client,
+--   admin_archive_clients, admin_restore_client, admin_delete_client,
+--   admin_hard_delete_client, admin_hard_delete_clients.
 -- ============================================================
