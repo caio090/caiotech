@@ -1,30 +1,64 @@
 -- ============================================================
--- LOKAT OS — LEGACY SECURITY HARDENING (BEFORE DIAGNOSTIC)
+-- LOKAT OS — LEGACY SECURITY HARDENING (BEFORE DIAGNOSTIC) — V2
 -- AINDA NÃO EXECUTADO.
 --
 -- Corrige, cirurgicamente, os P0/P1 confirmados AO VIVO pelo gate de
--- segurança do Supabase (verdict: LEGACY_P0_FIX_REQUIRED) sobre
--- objetos já existentes em produção -- NADA relacionado ao domínio
--- Diagnostic/Roadmap. docs/supabase/91-company-diagnostic-roadmap.sql
--- permanece congelado e NÃO é tocado por este arquivo.
+-- segurança do Supabase sobre objetos já existentes em produção --
+-- NADA relacionado ao domínio Diagnostic/Roadmap.
+-- docs/supabase/91-company-diagnostic-roadmap.sql permanece congelado
+-- e NÃO é tocado por este arquivo.
+--
+-- V2 (verdict anterior: LEGACY_PATCH_REJECTED_SECURITY) corrige o que
+-- restou da V1: remove por completo a janela temporal de
+-- create_client_on_signup (uma janela de tempo não prova identidade),
+-- fecha v_billing_mrr_summary também para authenticated (leitura passa
+-- por API route server-side com autorização explícita de super_admin,
+-- ver src/app/api/admin/billing/mrr-summary/route.ts), adiciona
+-- ownership real em Company às RPCs de archive/restore/delete de
+-- clients, e -- o achado mais importante desta rodada -- torna
+-- EXPLÍCITO todo REVOKE de PUBLIC/anon/authenticated em vez de confiar
+-- em "REVOKE ALL FROM PUBLIC" sozinho (que NÃO remove um grant direto
+-- e separado para anon, caso um tenha sido concedido manualmente algum
+-- dia via SQL Editor -- o projeto não tem migration history rastreada,
+-- então essa possibilidade é real e não pode ser presumida ausente).
 --
 -- Motivo do nome não-numérico: não existem migrations rastreadas no
 -- projeto Supabase (0 migrations); os 90 arquivos numerados em
 -- docs/supabase são histórico local, não a autoridade sobre o estado
--- vivo do banco. Inventar um número sequencial novo sugeriria uma
--- ordem/rastreamento que não existe de verdade. Ver rollback
--- correspondente em legacy-security-hardening-before-diagnostic-rollback.sql
--- e o plano de teste manual em legacy-security-hardening-live-test-plan.sql.
+-- vivo do banco. Ver rollback correspondente em
+-- legacy-security-hardening-before-diagnostic-rollback.sql e o plano
+-- de teste manual em legacy-security-hardening-live-test-plan.sql.
 --
 -- AUTORIDADE: o comportamento vivo relatado pelo gate de segurança
--- (CODEX WEB), não os arquivos históricos. Onde os dois divergem
--- (ex.: current_user_role() foi corrigido no SQL 03 mas redefinido sem
--- a correção nos SQLs 06/07), este arquivo restaura o comportamento
--- seguro -- nunca "restaura" a versão antiga só porque está em um
--- arquivo numerado.
+-- (CODEX WEB), não os arquivos históricos.
 --
 -- Execute no Supabase SQL Editor SOMENTE após revisão humana explícita
 -- e o veredito de aprovação formal do CODEX WEB.
+--
+-- ============================================================
+-- MATRIZ DE ACL (estado final pretendido após esta migration)
+-- ============================================================
+-- objeto                                | PUBLIC | anon | authenticated | service_role
+-- can_access_client(uuid)                | revoke | revoke | GRANT       | (bypassa RLS)
+-- current_user_role()                    | mantido como está (ver seção 2 -- justificativa)
+-- v_olaclick_connections_safe            | revoke | revoke | revoke      | (via admin client)
+-- v_platform_accounts_overview           | revoke | revoke | revoke      | (via admin client)
+-- admin_signups_view                     | revoke | revoke | revoke      | (via admin client)
+-- v_orphan_client_invites                | revoke | revoke | revoke      | (via admin client)
+-- v_billing_mrr_summary                  | revoke | revoke | revoke (V2) | (via admin client, atrás de API route super_admin-only)
+-- finance_mark_overdue()                 | revoke | revoke | revoke      | GRANT
+-- create_client_on_signup(...)           | revoke | revoke (V2) | GRANT | --
+-- admin_link_meta_asset(...)             | revoke | revoke (V2) | GRANT | --
+-- admin_upsert_olaclick_connection(...)  | revoke | revoke (V2) | GRANT | --
+-- admin_list_olaclick_connections()      | revoke | revoke (V2) | GRANT | --
+-- get_client_meta_status(uuid)           | revoke | revoke (V2) | GRANT | --
+-- get_request_owner_for_client(uuid)     | revoke | revoke (V2) | GRANT | --
+-- admin_archive_client(uuid)             | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_archive_clients(uuid[])          | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_restore_client(uuid)             | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_delete_client(uuid)              | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_hard_delete_client(uuid)         | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_hard_delete_clients(uuid[])      | revoke (V2) | revoke (V2) | GRANT | --
 -- ============================================================
 
 BEGIN;
@@ -32,36 +66,11 @@ BEGIN;
 -- ============================================================
 -- 1. can_access_client() — alinhar ao modelo canônico real (P1.2)
 -- ============================================================
--- USO REAL (Fase 4): usado em 5 policies de docs/supabase/40
--- (client_visual_assets, client_visual_profiles, ai_credits_wallet,
--- ai_credits_ledger, ai_generation_history), todas
--- "FOR SELECT TO authenticated" com o padrão:
---   policy "X: admin full access"  USING (is_admin_user())      -- já dá acesso total a admin/super_admin, INDEPENDENTE desta função
---   policy "X: staff full access"  USING (is_operational_staff()) -- já dá acesso total a staff, INDEPENDENTE desta função
---   policy "X: client reads own"   USING (can_access_client(client_id)) -- ESTA função
--- Como RLS combina policies permissivas com OR, o branch "admin"
--- desta função era puramente redundante com "X: admin full access"
--- (nenhuma mudança de comportamento real para admin/super_admin ao
--- remover o branch global daqui). O branch antigo só usava
--- clients.owner_id -- não cobria membros de Company vinculados via
--- client_user_access, um gap real que esta correção também fecha.
---
--- Contrato antigo (stale): admin/super_admin → global; cliente → só
--- clients.owner_id = auth.uid().
--- Contrato novo (canônico, espelha src/lib/company-context/resolve.ts):
---   super_admin       → global
---   demais            → profiles.client_id = target
---                        OU client_user_access ativo
---                        OU agency_workspaces.owner_user_id + agency_clients ativo
--- Fail closed em todos os ramos (Fase 22): sem sessão, Company
--- inexistente ou sem vínculo → false, nunca implícito.
---
--- Nota: NÃO delega para public.can_access_client_company() (a função
--- equivalente definida em SQL 91) porque SQL 91 continua congelado e
--- pode nunca ser aplicado nesta ordem -- esta função precisa ser
--- autossuficiente. Quando SQL 91 for aprovado e aplicado, unificar as
--- duas é um cleanup de acompanhamento natural, fora do escopo desta
--- correção (Fase 1: zero alterações no SQL 91 aqui).
+-- Inalterado desde a V1 (CODEX não reabriu este ponto). Único ajuste
+-- V2: REVOKE explícito de anon além de PUBLIC (Fase 28/29) -- a função
+-- usa auth.uid(), sempre NULL para anon, então não há ganho funcional
+-- para anon tê-la, mas o contrato explícito importa mais que a
+-- herança implícita.
 CREATE OR REPLACE FUNCTION public.can_access_client(target_client_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -94,6 +103,7 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.can_access_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.can_access_client(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.can_access_client(uuid) TO authenticated;
 
 COMMENT ON FUNCTION public.can_access_client(uuid) IS
@@ -105,25 +115,10 @@ COMMENT ON FUNCTION public.can_access_client(uuid) IS
 -- ============================================================
 -- 2. current_user_role() — restaurar search_path (P1.1)
 -- ============================================================
--- USO REAL: função foundational usada dentro de dezenas de RLS
--- policies em todo o histórico (não uma RPC chamada diretamente pelo
--- app -- nenhuma ocorrência de supabase.rpc("current_user_role") em
--- src/). SQL 03 já a havia corrigido com SET search_path = public,
--- mas SQL 06 e 07 a redefiniram sem essa cláusula -- se a ordem dos
--- arquivos reflete a ordem real de aplicação, essa correção foi
--- desfeita. Restaurada aqui.
---
--- Grants deliberadamente MANTIDOS como estão (Fase 20 exige "não
--- revogar sem verificar callers" -- verificado): esta função só
--- retorna o PRÓPRIO role do caller (nunca de terceiros) e é chamada de
--- dentro de policies em várias tabelas, algumas sem "TO authenticated"
--- explícito. Revogar EXECUTE de anon quebraria a AVALIAÇÃO dessas
--- policies para anon (erro "permission denied for function", não um
--- filtro silencioso) em qualquer superfície pública que dependa delas
--- (ex.: blog público, funil de waitlist) -- risco real sem benefício
--- de segurança real, já que o valor retornado para anon é NULL de
--- qualquer forma. Corrigido o que é o problema real (search_path);
--- grants deixados como estão, com esta justificativa explícita.
+-- Inalterado desde a V1 -- CODEX não reabriu este ponto. Grants
+-- deliberadamente mantidos como estão (mesma justificativa da V1:
+-- revogar de anon quebraria a AVALIAÇÃO de RLS policies anon-facing
+-- que a chamam, sem ganho real de segurança).
 CREATE OR REPLACE FUNCTION public.current_user_role()
 RETURNS text
 LANGUAGE sql
@@ -140,68 +135,41 @@ $$;
 --    tabela base sem necessidade real (Fase 5-11)
 -- ============================================================
 
--- 3.1 v_olaclick_connections_safe (P0.1)
--- USO REAL: NENHUM em src/ -- a própria SQL 67 documenta "a view não é
--- usada diretamente no código TypeScript, as queries acessam a tabela
--- diretamente". Classificação: LEGACY_UNUSED. Sem security_invoker,
--- roda com privilégio do dono (bypassa RLS de olaclick_connections)
--- para QUALQUER authenticated -- e o gate ao vivo confirma que também
--- para anon (grants padrão de schema, nunca revogados aqui). Como
--- nada no app depende dela, a correção mais segura é fechar por
--- completo em vez de tentar adivinhar quem "deveria" continuar tendo
--- acesso.
+-- 3.1-3.4: inalteradas desde a V1 -- CODEX não reabriu estes pontos.
 ALTER VIEW public.v_olaclick_connections_safe SET (security_invoker = true);
 REVOKE SELECT ON public.v_olaclick_connections_safe FROM anon;
 REVOKE SELECT ON public.v_olaclick_connections_safe FROM authenticated;
 
--- 3.2 v_platform_accounts_overview (P0.2)
--- USO REAL: NENHUM em src/. Contém email/role/subscription/coupon de
--- TODOS os perfis da plataforma -- superfície de maior risco desta
--- correção. Sem security_invoker e sem nenhum GRANT explícito em
--- nenhuma versão histórica (comentário do SQL 71 assume incorretamente
--- que views herdam permissão das tabelas base). Fechada por completo.
 ALTER VIEW public.v_platform_accounts_overview SET (security_invoker = true);
 REVOKE SELECT ON public.v_platform_accounts_overview FROM anon;
 REVOKE SELECT ON public.v_platform_accounts_overview FROM authenticated;
 
--- 3.3 admin_signups_view (P0.3)
--- USO REAL: src/app/api/admin/leads/route.ts -- SEMPRE via
--- createRequiredSupabaseAdminClient() (service role) atrás de um
--- authorizeAdmin() que exige role super_admin/admin na sessão. O app
--- nunca depende de anon/authenticated terem SELECT direto nesta view.
 ALTER VIEW public.admin_signups_view SET (security_invoker = true);
 REVOKE SELECT ON public.admin_signups_view FROM anon;
 REVOKE SELECT ON public.admin_signups_view FROM authenticated;
 
--- 3.4 v_orphan_client_invites (P0.4)
--- USO REAL: NENHUM em src/ -- superfície de manutenção operacional
--- (mesmo propósito de admin_cleanup_orphan_client_invites(), já
--- role-gated). Contém e-mail. Fechada por completo.
 ALTER VIEW public.v_orphan_client_invites SET (security_invoker = true);
 REVOKE SELECT ON public.v_orphan_client_invites FROM anon;
 REVOKE SELECT ON public.v_orphan_client_invites FROM authenticated;
 
--- 3.5 v_billing_mrr_summary (P1.8)
--- USO REAL: src/app/admin/super/billing/page.tsx -- Client Component
--- que consulta esta view DIRETAMENTE do browser com o client
--- authenticated (não via API route/service role). Diferente das 4
--- views acima: revogar de "authenticated" quebraria essa tela real.
--- Corrige só o que o brief pede explicitamente para este item
--- (Fase 11): fecha anon, mantém authenticated.
+-- 3.5 v_billing_mrr_summary (P1.8 → reaberto no V2)
+-- CODEX rejeitou a V1 (só revogava anon): "acessível a authenticated
+-- globalmente... proteção de rota no frontend não protege uma view
+-- consultável diretamente." Corrigido: authenticated também revogado.
+-- src/app/admin/super/billing/page.tsx foi migrado para consultar
+-- /api/admin/billing/mrr-summary (nova API route server-side que
+-- autentica, confirma role='super_admin' e SÓ ENTÃO cria um client
+-- privilegiado -- nunca o padrão "query com service role, depois
+-- confere usuário").
 REVOKE SELECT ON public.v_billing_mrr_summary FROM anon;
+REVOKE SELECT ON public.v_billing_mrr_summary FROM authenticated;
 
 
 -- ============================================================
 -- 4. finance_mark_overdue() — least privilege (P0.5)
 -- ============================================================
--- USO REAL: NENHUM em src/ -- nenhuma rota/página chama esta RPC.
--- É uma função de manutenção (marca cobranças vencidas), não uma ação
--- de usuário. Sem role check, sem auth.uid(), SECURITY DEFINER,
--- GRANT ... TO authenticated (e, confirmado ao vivo, também anon via
--- privilégio padrão de schema nunca revogado) -- qualquer visitante
--- não autenticado conseguia disparar um UPDATE global em
--- finance_charges. Corrigido para least privilege: só service_role
--- (uso pretendido: cron/job interno) pode executar.
+-- Inalterado desde a V1 -- já usava REVOKE explícito de PUBLIC, anon e
+-- authenticated, e GRANT só a service_role. CODEX não reabriu este ponto.
 REVOKE EXECUTE ON FUNCTION public.finance_mark_overdue() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.finance_mark_overdue() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.finance_mark_overdue() FROM authenticated;
@@ -209,29 +177,65 @@ GRANT EXECUTE ON FUNCTION public.finance_mark_overdue() TO service_role;
 
 
 -- ============================================================
--- 5. create_client_on_signup() — bloquear p_user_id arbitrário (P0.6)
+-- 5. create_client_on_signup() — reescrita completa (P0, V2)
 -- ============================================================
--- USO REAL (Fase 15): dois call sites em src/, ambos client-side,
--- ambos passando SEMPRE o id do PRÓPRIO usuário recém-autenticado:
---   src/app/(public)/criar-conta/page.tsx  -- logo após auth.signUp(),
---     userId = authData.user.id (o usuário que acabou de se cadastrar)
---   src/app/onboarding/conclusao/page.tsx  -- user.id de
---     auth.getUser() (sessão ativa do próprio usuário)
--- O comentário original explica por que "anon" precisa continuar
--- podendo chamar: com "Email Confirmation" ativado, a sessão pode
--- ainda não existir logo após signUp() (auth.uid() = null nesse
--- instante), então exigir auth.uid() = p_user_id sempre quebraria esse
--- fluxo real e documentado -- não é uma correção segura menor (Fase 17
--- proíbe redesenhar o onboarding).
+-- A V1 (auth.uid()=p_user_id quando autenticado; janela de 10 minutos
+-- para o caso anon) foi REJEITADA pelo CODEX: "uma janela temporal não
+-- prova identidade". Removida por completo -- sem exceção temporal,
+-- sem excecão de qualquer tipo baseada em dado fornecido pelo cliente.
 --
--- Correção mínima e segura (Fase 17, meio-termo entre as opções A/B):
---   • Se HÁ sessão (auth.uid() IS NOT NULL): exige p_user_id =
---     auth.uid() -- nunca mais cria Company para outro usuário.
---   • Se NÃO há sessão (o caso documentado de anon logo após signUp):
---     só permite quando a conta em auth.users foi criada há poucos
---     minutos -- fecha o abuso contra contas antigas/arbitrárias
---     (o único cenário real de exploração: usar um UUID de usuário já
---     existente há tempo) sem quebrar o fluxo real de signup.
+-- Fluxo real reauditado (Fase 3):
+--   src/app/(public)/criar-conta/page.tsx:
+--     1. supabase.auth.signUp() -- se "Email Confirmation" estiver
+--        DESLIGADO no projeto Supabase, o client já retorna uma sessão
+--        ativa nesse instante (auth.uid() resolve imediatamente).
+--     2. Chama create_client_on_signup(p_user_id: userId, ...)
+--        IMEDIATAMENTE em seguida, usando o MESMO client (que já tem
+--        a sessão recém-criada, se houver).
+--     3. Se signInWithPassword() falhar logo depois (confirmação de
+--        e-mail pendente), mostra "Confirme seu e-mail..." e NÃO
+--        navega para o onboarding -- já é o comportamento existente.
+--   src/app/onboarding/conclusao/page.tsx:
+--     1. auth.getUser() -- só prossegue "if (user)", ou seja, SÓ
+--        chega até aqui com uma sessão real e ativa.
+--     2. Se ainda não existe client_id (nem em localStorage, nem em
+--        public.clients por owner_id), chama create_client_on_signup
+--        com user.id resolvido da PRÓPRIA sessão ativa.
+--     3. Esta página só é alcançável depois que criar-conta navegou
+--        para /onboarding/tipo, o que só acontece quando HÁ sessão
+--        (signUp() imediato ou signInWithPassword() bem-sucedido
+--        após confirmação).
+--
+-- Conclusão da auditoria: os dois call sites reais JÁ operam
+-- exclusivamente sob uma das duas condições abaixo -- nenhum dos dois
+-- depende de um caminho anônimo/sem sessão para funcionar:
+--   (a) confirmação de e-mail DESLIGADA → signUp() já retorna sessão →
+--       a chamada em criar-conta acontece com auth.uid() = userId.
+--   (b) confirmação de e-mail LIGADA → a chamada em criar-conta ainda
+--       roda sem sessão e agora falha (unauthenticated) -- mas isso já
+--       era tolerado hoje (erro só logado via console.error, nunca
+--       bloqueia o cadastro); o client é criado depois, quando o
+--       usuário efetivamente tem uma sessão, em
+--       onboarding/conclusao -- ponto em que auth.uid() = user.id.
+-- Ou seja: Opção A da Fase 4 (RPC authenticated, auth.uid() como única
+-- autoridade, p_user_id mantido na assinatura só por compatibilidade
+-- com os dois call sites, mas sempre igual a auth.uid()) já é
+-- alcançável com a arquitetura/UX existentes, sem nenhuma mudança de
+-- fluxo visual e sem sacrificar autenticação (Fase 5/45).
+--
+-- Contrato novo: authenticated apenas; p_user_id OBRIGATORIAMENTE
+-- igual a auth.uid(); NENHUM caminho anônimo, nenhuma exceção por
+-- tempo, nenhum "UUID difícil de adivinhar" -- nenhuma prova de posse
+-- client-provided é aceita como autorização.
+--
+-- Observação para o produto (fora do escopo desta correção de
+-- segurança -- não é uma mudança de arquitetura, é uma nota para
+-- decisão futura): se um usuário confirma o e-mail e faz login sem
+-- nunca revisitar /onboarding/conclusao, o client não será criado
+-- automaticamente por este caminho. Isso já seria verdade mesmo com a
+-- janela temporal da V1 rejeitada (que só cobria os primeiros minutos
+-- pós-cadastro). Resolver isso é uma decisão de fluxo de login/roteamento
+-- de onboarding, não uma correção de segurança -- não tocado aqui.
 CREATE OR REPLACE FUNCTION public.create_client_on_signup(
   p_user_id        uuid,
   p_company_name   text,
@@ -246,17 +250,8 @@ AS $$
 DECLARE
   v_client_id uuid;
 BEGIN
-  IF auth.uid() IS NOT NULL AND auth.uid() <> p_user_id THEN
-    RAISE EXCEPTION 'unauthorized: caller can only create a client for their own account' USING ERRCODE = 'P0002';
-  END IF;
-
-  IF auth.uid() IS NULL THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM auth.users
-      WHERE id = p_user_id AND created_at > now() - interval '10 minutes'
-    ) THEN
-      RAISE EXCEPTION 'unauthorized: anonymous calls are only allowed immediately after signup' USING ERRCODE = 'P0002';
-    END IF;
+  IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN
+    RAISE EXCEPTION 'unauthorized: caller must be authenticated as the target user' USING ERRCODE = 'P0002';
   END IF;
 
   SELECT id INTO v_client_id
@@ -265,10 +260,6 @@ BEGIN
 
   IF v_client_id IS NOT NULL THEN
     RETURN v_client_id;
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
-    RAISE EXCEPTION 'user_not_found: usuário % não existe em auth.users', p_user_id;
   END IF;
 
   INSERT INTO public.clients (owner_id, company_name, responsible_name, email, status)
@@ -280,20 +271,29 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.create_client_on_signup(uuid, text, text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.create_client_on_signup(uuid, text, text, text) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.create_client_on_signup(uuid, text, text, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.create_client_on_signup(uuid, text, text, text) TO authenticated;
 
 
 -- ============================================================
--- 6. Meta/OlaClick RPCs — Company ownership real, não só role (P1.3-P1.6)
+-- 6. Meta/OlaClick RPCs — Company ownership real (P1.3-P1.6) +
+--    validação de conexão explícita (Fase 12-15, V2)
 -- ============================================================
 
--- 6.1 admin_link_meta_asset (P1.3) + meta_connection_id ownership (Fase 26)
--- USO REAL: src/app/api/meta/assets/link/route.ts (API route
--- server-side). Bug adicional encontrado ao auditar (Fase 26): quando
--- p_meta_connection_id não é informado, a versão antiga buscava "a
--- conexão ativa mais recente" SEM FILTRAR POR client_id -- podia
--- vincular a conexão Meta de uma Company completamente diferente ao
--- asset de p_client_id. Corrigido para filtrar por client_id.
+-- 6.1 admin_link_meta_asset (P1.3 + Fase 12-15 reaberta no V2)
+-- Já tinha can_access_client(p_client_id) desde a V1 e o fallback
+-- implícito já filtrava por client_id. O que CODEX apontou como
+-- restante: quando p_meta_connection_id vem EXPLÍCITO no payload, a
+-- função usava o valor direto sem validar que a conexão pertence a um
+-- contexto autorizado -- Company A podia vincular um asset informando
+-- o meta_connection_id de outra pessoa/contexto. Corrigido: se
+-- explícito, valida ownership da conexão (super_admin: qualquer;
+-- demais: precisa ter sido conectada pelo próprio caller) e REJEITA
+-- (nunca escolhe outra silenciosamente, Fase 15) se não bater.
+-- src/app/api/meta/assets/link/route.ts também foi corrigido em
+-- paralelo (mesmo contrato no fallback direto, e autorização de
+-- Company movida para ANTES de qualquer etapa -- RPC ou fallback,
+-- Fase 17-19).
 CREATE OR REPLACE FUNCTION public.admin_link_meta_asset(
   p_client_id                      uuid,
   p_asset_type                     text,
@@ -317,6 +317,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_caller_id     uuid;
+  v_is_super      boolean;
   v_conn_id       uuid;
   v_result_id     uuid;
 BEGIN
@@ -337,15 +338,31 @@ BEGIN
     RAISE EXCEPTION 'invalid_asset_type' USING ERRCODE = 'P0005';
   END IF;
 
+  SELECT (p.role = 'super_admin') INTO v_is_super FROM public.profiles p WHERE p.id = v_caller_id;
+
   v_conn_id := p_meta_connection_id;
 
-  IF v_conn_id IS NULL THEN
-    -- Fase 26: escopado por client_id -- nunca "qualquer conexão ativa
-    -- mais recente da plataforma".
+  IF v_conn_id IS NOT NULL THEN
+    -- Fase 12-15: conexão explícita precisa pertencer a um contexto
+    -- autorizado -- nunca aceita cegamente, nunca troca por outra em
+    -- silêncio.
+    IF NOT EXISTS (
+      SELECT 1 FROM public.meta_connections mc
+      WHERE mc.id = v_conn_id
+        AND mc.status = 'active'
+        AND (COALESCE(v_is_super, false) OR mc.connected_by = v_caller_id)
+    ) THEN
+      RAISE EXCEPTION 'connection_not_found' USING ERRCODE = 'P0006';
+    END IF;
+  ELSE
+    -- Fase 26 (herdado da V1): fallback implícito escopado -- nunca
+    -- "qualquer conexão ativa mais recente da plataforma". Sem FK real
+    -- de Company em meta_connections (Fase 14): escopa pelo caller
+    -- autenticado, exceto super_admin (alcance global já existente).
     SELECT id INTO v_conn_id
     FROM public.meta_connections
-    WHERE client_id = p_client_id
-      AND status = 'active'
+    WHERE status = 'active'
+      AND (COALESCE(v_is_super, false) OR connected_by = v_caller_id)
     ORDER BY created_at DESC
     LIMIT 1;
   END IF;
@@ -373,19 +390,19 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) TO authenticated;
 
 COMMENT ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) IS
   'Vincula ativo Meta a um cliente. SECURITY DEFINER: bypassa RLS. '
-  'Exige can_access_client(p_client_id) -- não é mais role-only (P1.3). '
-  'meta_connection_id implícito escopado por client_id (Fase 26).';
+  'Exige can_access_client(p_client_id). Conexão explícita ou implícita '
+  'sempre escopada por ownership real (super_admin ou connected_by), '
+  'nunca cross-context (P1.3, Fase 12-15).';
 
 
--- 6.2 admin_upsert_olaclick_connection (P1.4)
--- USO REAL: src/app/api/olaclick/connect/route.ts (API route
--- server-side). Removido o valor de role inexistente ("agência" nunca
--- é um valor real de profiles.role -- Fase 23) da checagem; adicionado
--- can_access_client(p_client_id) como a autorização real.
+-- 6.2 admin_upsert_olaclick_connection (P1.4) — inalterado desde V1;
+-- CODEX não reabriu este ponto especificamente (só o REVOKE explícito
+-- de anon, adicionado abaixo).
 CREATE OR REPLACE FUNCTION public.admin_upsert_olaclick_connection(
   p_client_id        uuid,
   p_connection_name  text,
@@ -467,6 +484,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) TO authenticated;
 
 COMMENT ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) IS
@@ -475,10 +493,7 @@ COMMENT ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, te
   'Nunca retorna access_token.';
 
 
--- 6.3 admin_list_olaclick_connections (P1.5)
--- USO REAL: nenhuma chamada direta encontrada em src/ (RPC de
--- diagnóstico/manutenção). Super Admin continua podendo listar tudo
--- (Fase 29); demais roles só veem conexões de Companies autorizadas.
+-- 6.3 admin_list_olaclick_connections (P1.5) — inalterado desde V1.
 CREATE OR REPLACE FUNCTION public.admin_list_olaclick_connections()
 RETURNS TABLE(
   id              uuid,
@@ -517,6 +532,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_list_olaclick_connections() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_list_olaclick_connections() FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_list_olaclick_connections() TO authenticated;
 
 COMMENT ON FUNCTION public.admin_list_olaclick_connections() IS
@@ -525,11 +541,7 @@ COMMENT ON FUNCTION public.admin_list_olaclick_connections() IS
   'Nunca retorna access_token completo.';
 
 
--- 6.4 get_client_meta_status (P1.6, Fase 27)
--- USO REAL: nenhuma chamada direta encontrada em src/ (RPC de
--- diagnóstico). Removidos valores de role inexistentes ("agência" e
--- "team" nunca são valores reais de profiles.role); read scoped por
--- Company real, não role-only.
+-- 6.4 get_client_meta_status (P1.6) — inalterado desde V1.
 CREATE OR REPLACE FUNCTION public.get_client_meta_status(p_client_id uuid)
 RETURNS TABLE(
   asset_type  text,
@@ -559,20 +571,14 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.get_client_meta_status(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_client_meta_status(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_client_meta_status(uuid) TO authenticated;
 
 
 -- ============================================================
--- 7. get_request_owner_for_client — authorization ausente (Fase 33)
+-- 7. get_request_owner_for_client — authorization ausente (Fase 33 V1) —
+--    inalterado desde V1.
 -- ============================================================
--- USO REAL: src/app/client/solicitacoes/page.tsx -- SEMPRE chamado
--- com o clientId do PRÓPRIO usuário (resolvido de profiles.client_id
--- momentos antes). A função em si, porém, não validava NADA sobre o
--- caller nem tinha search_path -- qualquer authenticated podia
--- consultar o responsável de QUALQUER client_id arbitrário (pequeno
--- vazamento de informação). Patch simples e seguro (Fase 33):
--- adiciona can_access_client(p_client_id), que já cobre exatamente o
--- caso de uso real (cliente consultando o dono da própria Company).
 CREATE OR REPLACE FUNCTION public.get_request_owner_for_client(p_client_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -604,7 +610,268 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.get_request_owner_for_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_request_owner_for_client(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_request_owner_for_client(uuid) TO authenticated;
+
+
+-- ============================================================
+-- 8. Archive / Restore / Logical Delete — Company ownership (P1, novo no V2)
+-- ============================================================
+-- CODEX (Fase 21-27): "admin comum não pode administrar qualquer
+-- client_id globalmente." Auditoria confirmou: admin_archive_client,
+-- admin_archive_clients, admin_restore_client e admin_delete_client
+-- checavam SOMENTE "role IN ('admin','super_admin')" -- qualquer admin
+-- podia arquivar/restaurar/apagar (soft) QUALQUER Company, sem vínculo
+-- real. admin_hard_delete_client(s) já eram super_admin-only -- mantido
+-- exatamente assim (Fase 22, "global intencional").
+--
+-- Decisão de helper (Fase 24): can_access_client(client_id), combinada
+-- com o role gate que já exclui 'cliente'/'operacional' antes de
+-- chegar ao teste de ownership. Avaliado explicitamente se um client
+-- user (role='cliente') poderia "passar" por can_access_client sozinho
+-- -- SIM teoricamente (profiles.client_id bate com a própria Company),
+-- mas o role gate anterior (IF v_role NOT IN ('admin','super_admin'))
+-- já barra esse caso antes mesmo de chegar no teste de ownership, então
+-- reutilizar can_access_client aqui é seguro; criar um segundo helper
+-- can_write_client_company redundante só duplicaria a mesma lógica sem
+-- reduzir risco real.
+--
+-- Bug crítico adicional encontrado ao reauditar estas 6 funções para
+-- esta correção (não estava na lista do CODEX, mas é da mesma classe
+-- P0 de autorização): o padrão "IF v_role NOT IN ('admin','super_admin')
+-- THEN RAISE EXCEPTION" e "IF v_role != 'super_admin' THEN RAISE
+-- EXCEPTION" comparam contra current_user_role(), que retorna NULL
+-- quando auth.uid() é NULL (chamador anônimo). Em PL/pgSQL,
+-- "NULL NOT IN (...)" e "NULL != ..." avaliam para NULL, e "IF NULL"
+-- é tratado como FALSO -- ou seja, a exceção NUNCA dispara para um
+-- chamador anônimo, e a função anônima continuaria até a mutação
+-- privilegiada (arquivar/restaurar/apagar QUALQUER client, incluindo
+-- hard delete) SE anon algum dia tivesse EXECUTE nestas funções --
+-- exatamente o cenário que este sprint inteiro existe para eliminar.
+-- Corrigido em todas as 6: checagem explícita "v_role IS NULL OR ..."
+-- antes de qualquer outra coisa.
+--
+-- admin_create_client() tem o MESMO padrão de bug (v_role NOT IN
+-- (...)) mas NÃO foi incluída no escopo desta correção pelo CODEX --
+-- registrado aqui como achado P0-classe NÃO corrigido nesta migration
+-- (ver RELATÓRIO FINAL, "Remaining P0" / "achado adicional").
+
+-- 8.1 admin_archive_client (single)
+CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode arquivar clientes', v_role;
+  END IF;
+  IF v_role <> 'super_admin' AND NOT public.can_access_client(p_client_id) THEN
+    RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'archived',
+    archived_at = now(),
+    deleted_at  = now()
+  WHERE id = p_client_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_archive_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_archive_client(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_archive_client(uuid) TO authenticated;
+
+-- 8.2 admin_archive_clients (bulk) — Fase 26/27: TODOS os ids validados
+-- antes de mutar QUALQUER um; aborta o lote inteiro se um só for
+-- não-autorizado (nunca resultado parcial).
+CREATE OR REPLACE FUNCTION public.admin_archive_clients(p_client_ids uuid[])
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role             text;
+  v_count            integer;
+  v_unauthorized_id  uuid;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode arquivar clientes', v_role;
+  END IF;
+
+  IF v_role <> 'super_admin' THEN
+    SELECT cid INTO v_unauthorized_id
+    FROM unnest(p_client_ids) AS cid
+    WHERE NOT public.can_access_client(cid)
+    LIMIT 1;
+    IF v_unauthorized_id IS NOT NULL THEN
+      RAISE EXCEPTION 'permission_denied: sem acesso a um ou mais client_ids do lote' USING ERRCODE = 'P0002';
+    END IF;
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'archived',
+    archived_at = now(),
+    deleted_at  = now()
+  WHERE id = ANY(p_client_ids);
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_archive_clients(uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_archive_clients(uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_archive_clients(uuid[]) TO authenticated;
+
+-- 8.3 admin_restore_client
+CREATE OR REPLACE FUNCTION public.admin_restore_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode restaurar clientes', v_role;
+  END IF;
+  IF v_role <> 'super_admin' AND NOT public.can_access_client(p_client_id) THEN
+    RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
+  END IF;
+
+  UPDATE public.clients
+  SET
+    status      = 'onboarding',
+    archived_at = NULL,
+    deleted_at  = NULL
+  WHERE id = p_client_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_restore_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_restore_client(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO authenticated;
+
+-- 8.4 admin_delete_client (logical delete / lixeira)
+CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role       text;
+  v_deleted_at timestamptz := now();
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode apagar clientes', v_role;
+  END IF;
+  IF v_role <> 'super_admin' AND NOT public.can_access_client(p_client_id) THEN
+    RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
+  END IF;
+
+  BEGIN
+    UPDATE public.clients
+       SET deleted_at = v_deleted_at,
+           archived_at = v_deleted_at,
+           status = 'archived'
+     WHERE id = p_client_id;
+  EXCEPTION WHEN check_violation THEN
+    BEGIN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'inactive'
+       WHERE id = p_client_id;
+    EXCEPTION WHEN check_violation THEN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'pausado'
+       WHERE id = p_client_id;
+    END;
+  END;
+
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_delete_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_delete_client(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_delete_client(uuid) TO authenticated;
+
+-- 8.5 admin_hard_delete_client (single, super_admin only — Fase 22:
+-- mantido global intencionalmente, SEM mudança de ownership). Só o
+-- bug de NULL-bypass e os grants explícitos são corrigidos aqui.
+CREATE OR REPLACE FUNCTION public.admin_hard_delete_client(p_client_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role != 'super_admin' THEN
+    RAISE EXCEPTION 'permission_denied: apenas super_admin pode apagar clientes definitivamente';
+  END IF;
+
+  DELETE FROM public.clients WHERE id = p_client_id;
+  RETURN FOUND;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_hard_delete_client(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_hard_delete_client(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_client(uuid) TO authenticated;
+
+-- 8.6 admin_hard_delete_clients (bulk, super_admin only — Fase 22:
+-- mantido global intencionalmente). Idem: só NULL-bypass e grants.
+CREATE OR REPLACE FUNCTION public.admin_hard_delete_clients(p_client_ids uuid[])
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role  text;
+  v_count integer;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role != 'super_admin' THEN
+    RAISE EXCEPTION 'permission_denied: apenas super_admin pode apagar clientes definitivamente';
+  END IF;
+
+  DELETE FROM public.clients WHERE id = ANY(p_client_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_hard_delete_clients(uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_hard_delete_clients(uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_clients(uuid[]) TO authenticated;
 
 
 COMMIT;
@@ -614,20 +881,21 @@ COMMIT;
 -- (aguardando o veredito de aprovação formal do CODEX WEB antes de
 -- qualquer execução)
 --
--- Objetos deliberadamente NÃO tocados nesta correção (fora de escopo,
--- não é P0 nem P1 de autorização/Company -- backlog Fase 35):
+-- Objetos deliberadamente NÃO tocados nesta correção (fora de escopo
+-- explícito do CODEX -- backlog):
 --   ~31 outras funções SECURITY DEFINER com search_path ausente;
---   admin_archive_client(s)/admin_delete_client/admin_hard_delete_client(s)/
---     admin_restore_client -- auditados (Fase 30-32), já corretamente
---     role-gated no próprio corpo, contrato mantido como está
---     (nunca tornar mais permissivo sem necessidade comprovada);
+--   admin_create_client() -- mesmo bug de NULL-bypass das funções da
+--     seção 8, mas não estava no escopo do CODEX nesta rodada;
+--     registrado explicitamente como achado pendente;
 --   docs/supabase/91-company-diagnostic-roadmap.sql -- congelado.
 --
 -- Próximos passos humanos, em ordem:
 --   1. CODEX WEB revisa esta migration + rollback estaticamente;
---   2. se aprovado, pedir autorização explícita do usuário para
---      aplicar no Supabase SQL Editor;
---   3. após aplicar, CODEX WEB roda o LIVE SECURITY RE-AUDIT;
+--   2. se aprovado (LEGACY_PATCH_APPROVED_FOR_APPLY), pedir
+--      autorização explícita do usuário para aplicar no Supabase SQL
+--      Editor;
+--   3. após aplicar, CODEX WEB roda o LIVE SECURITY RE-AUDIT usando
+--      legacy-security-hardening-live-test-plan.sql;
 --   4. só com P0 = 0 e P1 crítico = 0, voltar para o
 --      DIAGNOSTIC + ROADMAP SCHEMA FINAL GATE do SQL 91.
 -- ============================================================
