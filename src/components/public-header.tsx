@@ -6,11 +6,15 @@ import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 import { LAUNCH_MODE } from "@/lib/launch/config";
 
+// Sprint Final Product Experience Consolidation (Fase 41) — header
+// reduzido a 3 links informacionais + Entrar + 1 CTA primário. Blog e
+// REC OS continuam existindo como rotas reais (Fase 42: descer na
+// página, nunca deletar) -- REC OS já tem sua própria seção na Home
+// (#rec-os) e Blog fica acessível a partir dela/rodapé, não competindo
+// no primeiro olhar do header.
 const navLinks = [
   { href: "/plataforma",  label: "Plataforma" },
   { href: "/diagnostico", label: "Diagnóstico" },
-  { href: "/#rec-os",     label: "REC OS" },
-  { href: "/blog",        label: "Blog" },
   { href: "/planos",      label: "Planos" },
 ];
 
@@ -47,15 +51,6 @@ export function PublicHeader() {
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-4">
-          <Link
-            href="/rec"
-            className="text-[.65rem] uppercase tracking-[.14em] transition-colors"
-            style={{ fontFamily: "'Space Mono', monospace", color: "#c0392b", border: "1px solid #c0392b40", padding: ".22rem .55rem" }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#c0392b80")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#c0392b40")}
-          >
-            LOKAT.REC
-          </Link>
           <Link href="/login" className="text-[.72rem] uppercase tracking-[.1em] transition-colors text-[#555566] hover:text-[#e8e8e8]" style={{ fontFamily: "'Space Mono', monospace" }}>
             Entrar
           </Link>
@@ -99,9 +94,6 @@ export function PublicHeader() {
               </Link>
             ))}
             <div className="pt-3 space-y-2" style={{ borderTop: "1px solid #222230" }}>
-              <Link href="/rec" onClick={() => setOpen(false)} className="block text-[.68rem] uppercase tracking-[.14em] py-2 transition-colors" style={{ fontFamily: "'Space Mono', monospace", color: "#c0392b" }}>
-                LOKAT.REC
-              </Link>
               <Link href="/login" onClick={() => setOpen(false)} className="block text-[.72rem] uppercase tracking-[.1em] py-2 text-[#555566] hover:text-[#e8e8e8] transition-colors" style={{ fontFamily: "'Space Mono', monospace" }}>
                 Entrar
               </Link>
