@@ -1,12 +1,16 @@
 -- ============================================================
--- LOKAT OS — SQL 91 (PROPOSTA — NÃO EXECUTADA)
+-- LOKAT OS — SQL 91 (REVISADO — AINDA NÃO EXECUTADO)
 -- Company Diagnostic → Finding → Recommendation → Roadmap Item
 --
--- Sprint MVP Final Consolidation V1 (Fase 87) — este arquivo é uma
--- PROPOSTA de schema, escrita para revisão humana. NÃO foi rodada no
--- Supabase por Claude Code, conforme a regra absoluta desta sprint:
+-- Sprint MVP Core Closure V2 (Fase 2-4) — revisão da proposta original
+-- (sprint anterior) contra o schema real atual (clients, profiles,
+-- rec_projects, agency_workspaces/agency_clients). Nenhuma mudança
+-- estrutural fez sentido além da já proposta -- o modelo mínimo já
+-- reaproveitava tudo que existia. Renomeado de "-PROPOSAL" para o nome
+-- final porque a revisão terminou, mas o arquivo continua NÃO EXECUTADO:
 -- "NÃO executar SQL automaticamente. NÃO alterar Supabase schema
--- automaticamente."
+-- automaticamente." Ver docs/supabase/91-company-diagnostic-roadmap-rollback.sql
+-- para o rollback seguro correspondente.
 --
 -- POR QUÊ este schema é necessário:
 -- Auditoria completa (Fase 15) confirmou que NENHUM modelo existente é
@@ -243,7 +247,7 @@ CREATE POLICY "roadmap_items_client_select"
   );
 
 -- ============================================================
--- FIM DA PROPOSTA — status: MANUAL_WEB_ACTION_REQUIRED
+-- FIM DO SCHEMA FINAL — status: SQL_READY_FOR_MANUAL_APPROVAL
 -- Próximos passos humanos, em ordem:
 --   1. revisar os nomes/colunas/policies acima;
 --   2. rodar no Supabase SQL Editor (ambiente de escolha do usuário);
