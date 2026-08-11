@@ -166,7 +166,7 @@ export default function HomeClient() {
               className="hero-fade-up-d1"
               style={{ ...S.grotesk, fontSize: "clamp(2rem, 8vw, 6.2rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-.03em", color: S.text, marginBottom: "1.2rem", textWrap: "balance" } as React.CSSProperties}
             >
-              Sua empresa trabalhando como um sistema.
+              Sua empresa trabalhando como um <em style={{ fontStyle: "italic", color: S.accent }}>sistema</em>.
             </h1>
 
             <p className="hero-fade-up-d2 mx-auto lg:mx-0" style={{ ...S.grotesk, maxWidth: "500px", fontSize: "clamp(.85rem, 2.5vw, 1rem)", lineHeight: 1.7, color: S.muted, marginBottom: "2rem" }}>

@@ -80,8 +80,16 @@ assert(/Logo[\s\S]{0,80}<Link href="\/"/.test(header), "logo do header aponta pa
 assert(/href:\s*"\/planos",\s*label:\s*"Planos"/.test(header), "\"Planos\" continua um link específico e distinto no menu");
 
 console.log("[test] 13 — Hero da Home usa o H1 exato exigido");
-assert(homeClient.includes(">\n              Sua empresa trabalhando como um sistema.\n            </h1>") || homeClient.includes("Sua empresa trabalhando como um sistema."), "H1 exato exigido pelo brief");
-assert((homeClient.match(/<h1[\s\S]*?<\/h1>/g) ?? []).length === 1, "apenas um H1 na página (sem H1 concorrentes)");
+// Sprint Public Home Hero Visual Restoration — o destaque em <em> muda a
+// marcação (não o texto). Checa o CONTEÚDO RENDERIZADO (tags removidas),
+// nunca um substring de source frágil contra esse tipo de mudança legítima.
+const h1Blocks = homeClient.match(/<h1[\s\S]*?<\/h1>/g) ?? [];
+assert(h1Blocks.length === 1, "apenas um H1 na página (sem H1 concorrentes)");
+const h1RenderedText = (h1Blocks[0] ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+assert(h1RenderedText === "Sua empresa trabalhando como um sistema.", "H1 exato exigido pelo brief (texto renderizado, ignorando marcação de destaque)");
+
+console.log("[test] 13b — hierarquia visual do H1 restaurada (mesmo tratamento histórico: <em> + S.accent)");
+assert(/<em style=\{\{ fontStyle: "italic", color: S\.accent \}\}>sistema<\/em>/.test(h1Blocks[0] ?? ""), "palavra de destaque usa o mesmo tratamento (itálico + cor de accent) do H1 histórico aprovado (commit d06b5c1)");
 
 console.log("[test] 14 — CTA primário/secundário do hero conforme especificado");
 assert(homeClient.includes("Conhecer o LOKAT OS"), "CTA primário: Conhecer o LOKAT OS");
