@@ -111,7 +111,10 @@ export default async function AdminInicioPage({
               Central inteligente — Marketing, CRM e conteúdo em um só lugar.
             </p>
 
-            <SmartStartInput />
+            <SmartStartInput
+              activeCompanyId={activeCompany?.companyId ?? null}
+              activeCompanyName={activeCompany?.companyName ?? null}
+            />
 
             <div className="flex flex-wrap justify-center gap-2 mt-6">
               {shortcuts.map(({ href, label, icon: Icon }) => {

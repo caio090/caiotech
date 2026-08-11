@@ -2,6 +2,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, Mic, Loader2, ExternalLink, X } from "lucide-react";
 import Link from "next/link";
+import { openJarvis } from "@/lib/jarvis/open-jarvis";
+import { resolveCommandIntent, looksConversational, type CommandActionResult } from "@/lib/command-center/intents";
+import { CommandActionResultCard, CommandJarvisHandoffCard } from "@/components/command-center/action-result";
 
 interface SearchCard {
   title: string;
@@ -19,10 +22,29 @@ interface SearchResult {
   source?: "openai" | "keyword";
 }
 
-export function SmartStartInput() {
+/**
+ * Sprint Final Product Experience Consolidation (Parte A) — Command Bar
+ * de /admin/inicio. Nunca uma segunda conversa do Jarvis (Fase 3/10):
+ * 1) tenta resolver uma intenção conhecida localmente, sem rede
+ *    (src/lib/command-center/intents.ts) -- ação real, navegável, nunca
+ *    um parágrafo pedindo para "acessar outra rota" (Fase 6);
+ * 2) se parecer uma pergunta/raciocínio aberto, entrega ao Jarvis real
+ *    via openJarvis() (Fase 9) -- nunca tenta responder aqui;
+ * 3) senão, cai na busca informacional existente (dashboard-search),
+ *    preservada como estava.
+ */
+export function SmartStartInput({
+  activeCompanyId = null,
+  activeCompanyName = null,
+}: {
+  activeCompanyId?: string | null;
+  activeCompanyName?: string | null;
+}) {
   const [query, setQuery]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [result, setResult]         = useState<SearchResult | null>(null);
+  const [action, setAction]         = useState<CommandActionResult | null>(null);
+  const [conversational, setConversational] = useState<string | null>(null);
   const [showPanel, setShowPanel]   = useState(false);
   const containerRef                = useRef<HTMLDivElement>(null);
   const inputRef                    = useRef<HTMLInputElement>(null);
@@ -45,23 +67,38 @@ export function SmartStartInput() {
     setLoading(false);
   }, []);
 
+  const resolve = useCallback((q: string) => {
+    setResult(null);
+    setAction(null);
+    setConversational(null);
+
+    const intent = resolveCommandIntent(q);
+    if (intent) { setAction(intent); return; }
+
+    if (looksConversational(q)) { setConversational(q); return; }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(q), 500);
+  }, [search]);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (val.trim().length >= 2) {
       setShowPanel(true);
-      debounceRef.current = setTimeout(() => search(val.trim()), 500);
+      resolve(val.trim());
     } else {
       setResult(null);
+      setAction(null);
+      setConversational(null);
       setShowPanel(false);
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && query.trim().length >= 2) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      search(query.trim());
+      resolve(query.trim());
     }
     if (e.key === "Escape") { setShowPanel(false); inputRef.current?.blur(); }
   }
@@ -69,8 +106,16 @@ export function SmartStartInput() {
   function handleClear() {
     setQuery("");
     setResult(null);
+    setAction(null);
+    setConversational(null);
     setShowPanel(false);
     inputRef.current?.focus();
+  }
+
+  function handleJarvisHandoff() {
+    if (!conversational) return;
+    openJarvis({ prompt: conversational });
+    setShowPanel(false);
   }
 
   useEffect(() => {
@@ -98,7 +143,7 @@ export function SmartStartInput() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 2 && setShowPanel(true)}
-          placeholder="Pesquise ou peça para criar algo..."
+          placeholder="O que você quer fazer? Ex.: criar uma campanha..."
           className="flex-1 bg-transparent outline-none text-sm text-white placeholder-indigo-100/50"
           autoComplete="off"
         />
@@ -123,12 +168,22 @@ export function SmartStartInput() {
       </div>
 
       {/* Results panel */}
-      {showPanel && (result || loading) && (
+      {showPanel && (result || loading || action || conversational) && (
         <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-          {loading && !result && (
+          {action && (
+            <CommandActionResultCard
+              action={action}
+              activeCompanyId={activeCompanyId}
+              activeCompanyName={activeCompanyName}
+            />
+          )}
+          {conversational && (
+            <CommandJarvisHandoffCard query={conversational} onHandoff={handleJarvisHandoff} />
+          )}
+          {!action && !conversational && loading && !result && (
             <div className="p-4 text-sm text-indigo-200/60 text-center">Buscando...</div>
           )}
-          {result && (
+          {!action && !conversational && result && (
             <div className="p-4 space-y-3">
               <p className="text-sm text-white/80 leading-relaxed">{result.answer}</p>
               {result.cards.length > 0 && (
