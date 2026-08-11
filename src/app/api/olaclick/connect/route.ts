@@ -19,7 +19,11 @@ interface ConnectPayload {
   notes?: string;
 }
 
-const OLA_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+// Sprint Legacy Security Hardening V2 (Fase 23): o valor de role usado
+// anteriormente para "agência" nunca foi real em profiles.role -- removido.
+// can_access_client() abaixo é
+// quem realmente autoriza a Company, não o role sozinho (Fase 17).
+const OLA_MANAGER_ROLES = new Set(["admin", "super_admin"]);
 
 function isRpcUnavailable(err: { code?: string; message?: string } | null) {
   if (!err) return false;
@@ -68,6 +72,15 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
     }
 
     const cleanBaseUrl = api_base_url?.trim() || null;
+
+    // ── Autorização de Company ANTES de qualquer operação privilegiada
+    // (Fase 17/18) -- vale igualmente para o caminho RPC e para o
+    // fallback com service role (Fase 19/20): client_id do body nunca é
+    // autorização por si só.
+    const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: client_id });
+    if (!canAccess) {
+      return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
 
     // ── Etapa 1: RPC SECURITY DEFINER ──
     {
@@ -263,6 +276,15 @@ export const DELETE = withMutationProtection(async function DELETE(request: Next
 
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
+
+    // Fase 17/18: resolve a Company real da conexão antes de deletar --
+    // role sozinho não autoriza mutação numa Company arbitrária.
+    const { data: connRow } = await supabase
+      .from("olaclick_connections").select("client_id").eq("id", id).maybeSingle();
+    if (connRow?.client_id) {
+      const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: connRow.client_id });
+      if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
 
     let { error } = await supabase.from("olaclick_connections").delete().eq("id", id);
     if (error && hasSupabaseServiceRoleKey()) {

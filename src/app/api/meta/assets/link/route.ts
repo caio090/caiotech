@@ -13,7 +13,12 @@ interface LinkPayload {
   is_primary?:        boolean;
 }
 
-const META_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
+// Sprint Legacy Security Hardening V2 (Fase 23): o valor de role usado
+// anteriormente para "agência" nunca foi real em profiles.role -- removido.
+// Nenhum destes roles concede
+// acesso a uma Company específica por si só -- ver can_access_client()
+// logo abaixo, chamado ANTES de qualquer operação privilegiada (Fase 17).
+const META_MANAGER_ROLES = new Set(["admin", "super_admin"]);
 
 function isRpcUnavailable(err: { code?: string; message?: string } | null) {
   if (!err) return false;
@@ -61,7 +66,7 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   if (!userRole || !META_MANAGER_ROLES.has(userRole)) {
     return NextResponse.json({
       ok: false, reason: "forbidden",
-      message: "Apenas admin, super_admin e agency podem vincular ativos.",
+      message: "Apenas admin e super_admin podem vincular ativos.",
     }, { status: 403 });
   }
 
@@ -82,6 +87,17 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   if (!validTypes.includes(asset_type)) {
     return NextResponse.json({ ok: false, reason: "invalid_asset_type" }, { status: 400 });
   }
+
+  // ── Autorização de Company ANTES de qualquer operação privilegiada
+  // (Fase 17/18) -- vale para o caminho RPC e para o fallback direto por
+  // igual, então o fallback nunca fica mais permissivo que o caminho
+  // normal (Fase 19). client_id da query/body nunca é autorização por si
+  // só -- resolvido via o helper canônico real.
+  const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: client_id });
+  if (!canAccess) {
+    return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+  }
+  const isSuperAdmin = userRole === "super_admin";
 
   // ── Etapa 1: RPC SECURITY DEFINER (bypassa RLS, não precisa de service role) ──
   {
@@ -112,6 +128,13 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
       return NextResponse.json({ ok: false, reason: "client_not_found", message: "Cliente não encontrado." }, { status: 404 });
     } else if (rpcError.code === "P0005") {
       return NextResponse.json({ ok: false, reason: "invalid_asset_type" }, { status: 400 });
+    } else if (rpcError.code === "P0006") {
+      // Fase 15: conexão explícita cross-context -- rejeita direto,
+      // nunca cai no fallback para "adivinhar" outra conexão.
+      return NextResponse.json({
+        ok: false, reason: "connection_not_found",
+        message: "Conexão Meta não encontrada ou sem permissão de acesso.",
+      }, { status: 404 });
     } else {
       console.error("[api/meta/assets/link] erro inesperado na RPC", {
         stage: "rpc_admin_link_meta_asset",
@@ -124,11 +147,16 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
 
   // ── Etapa 2: Fallback direto ────────────────────────────────────────────────
   //
-  // Resolve e valida meta_connection_id:
-  //   - Se veio do body, valida server-side que o usuário tem acesso (Fase 8).
-  //   - Se não veio, busca a conexão Meta ativa mais recente no banco.
+  // meta_connections não tem FK de Company (é por usuário/workspace) --
+  // não fingimos uma (Fase 14). A autorização real já foi feita acima
+  // (can_access_client); aqui só resolvemos ownership da CONEXÃO em si:
+  //   - explícita (veio do body): precisa pertencer ao caller
+  //     (connected_by), ou o caller ser super_admin. Nunca cai
+  //     silenciosamente para outra conexão (Fase 15) -- rejeita.
+  //   - implícita (não veio): busca só entre as conexões do PRÓPRIO
+  //     caller, nunca "a mais recente da plataforma" -- exceto
+  //     super_admin, que mantém o alcance global já existente.
   let resolvedConnectionId: string | null = null;
-  const isBroadAccess = userRole === "super_admin" || userRole === "admin";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let connDb: any = supabase;
@@ -137,8 +165,7 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   }
 
   if (meta_connection_id) {
-    // Valida que o usuário tem acesso à conexão enviada pelo front (Fase 8)
-    const connQ = isBroadAccess
+    const connQ = isSuperAdmin
       ? connDb.from("meta_connections").select("id").eq("id", meta_connection_id).eq("status", "active").maybeSingle()
       : connDb.from("meta_connections").select("id").eq("id", meta_connection_id).eq("connected_by", userId).eq("status", "active").maybeSingle();
 
@@ -151,6 +178,7 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
       return NextResponse.json({ ok: false, reason: "sql_pending", message: "Rode o SQL 35 no Supabase." });
     }
     if (!connRow) {
+      // Fase 15: nunca corrige silently escolhendo outra conexão.
       return NextResponse.json({
         ok: false, reason: "connection_not_found",
         message: "Conexão Meta não encontrada ou sem permissão de acesso.",
@@ -160,13 +188,14 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   }
 
   if (!resolvedConnectionId) {
-    const { data: connRow, error: connLookupErr } = await connDb
-      .from("meta_connections")
-      .select("id")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connLookupQ = isSuperAdmin
+      ? connDb.from("meta_connections").select("id").eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle()
+      : connDb.from("meta_connections").select("id").eq("status", "active").eq("connected_by", userId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+    const { data: connRow, error: connLookupErr } = await connLookupQ as {
+      data: { id: string } | null;
+      error: { code?: string; message?: string } | null;
+    };
 
     if (connLookupErr?.code === "42P01") {
       return NextResponse.json({
@@ -283,6 +312,16 @@ export const DELETE = withMutationProtection(async function DELETE(request: Next
   const assetRecordId = new URL(request.url).searchParams.get("id");
   if (!assetRecordId) {
     return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
+  }
+
+  // Fase 17/18: resolve a Company real do registro antes de deletar --
+  // "está logado e tem o role certo" não é autorização para a Company
+  // dona deste vínculo específico.
+  const { data: assetRow } = await supabase
+    .from("client_meta_assets").select("client_id").eq("id", assetRecordId).maybeSingle();
+  if (assetRow?.client_id) {
+    const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: assetRow.client_id });
+    if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
   }
 
   let { error } = await supabase
