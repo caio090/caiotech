@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Building2, Search, Check, ArrowLeft, ArrowRight } from "lucide-react";
+import { Building2, Search, Check, ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { ACTIVE_CLIENT_KEY, ACTIVE_CLIENT_NAME_KEY } from "@/lib/active-client";
 
@@ -87,7 +87,7 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive, 
       ) : (
         <>
           {/* Search */}
-          <div className="relative mb-4">
+          <div className="relative mb-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -98,6 +98,22 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive, 
             />
           </div>
 
+          {/* Sprint Final Product Experience Consolidation (Fase 20/21) —
+              atalho discreto e sempre visível, não só no estado vazio.
+              Mesmo destino canônico de sempre (/admin/clientes) -- nunca
+              um segundo fluxo de criação. */}
+          {(userRole === "admin" || userRole === "super_admin") && (
+            <div className="mb-4 text-right">
+              <Link
+                href="/admin/clientes"
+                className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Novo cliente
+              </Link>
+            </div>
+          )}
+
           {/* Client list */}
           {filtered.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 mb-6">
@@ -105,17 +121,8 @@ export function SelecionarClienteContent({ clients, userRole, isSupabaseActive, 
               <p className="text-sm text-gray-400">
                 {search ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado."}
               </p>
-              {/* Sprint MVP Dogfood Final (adendo) — atalho para a ÚNICA
-                  autoridade real de criação de cliente (/admin/clientes),
-                  nunca um formulário duplicado aqui. */}
-              {!search && (userRole === "admin" || userRole === "super_admin") && (
-                <Link
-                  href="/admin/clientes"
-                  className="inline-block mt-3 text-xs font-bold text-purple-600 hover:text-purple-700 underline underline-offset-2"
-                >
-                  Cadastrar novo cliente
-                </Link>
-              )}
+              {/* O atalho de criação (Fase 18-21) agora é sempre visível
+                  acima da busca -- não duplicado aqui. */}
             </div>
           ) : (
             <div className="space-y-2 mb-6">
