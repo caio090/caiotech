@@ -81,3 +81,23 @@ export function buildJarvisContextText(input: JarvisContextInput): string {
   const text = lines.join("\n");
   return text.length > MAX_CONTEXT_CHARS ? `${text.slice(0, MAX_CONTEXT_CHARS)}\n[...contexto truncado]` : text;
 }
+
+/**
+ * Sprint Jarvis Global Intelligence — Jarvis é global; Company é contexto
+ * opcional. Quando nenhuma Company foi explicitamente selecionada
+ * (`resolveCompanyContext` retornou `company_required` sem que o usuário
+ * tivesse pedido uma company específica), o chat não deve mais 403ar --
+ * deve responder em modo global. Nunca busca ou agrega dado de nenhuma
+ * Company aqui (zero risco de vazamento cross-company): só instrui o
+ * modelo a ser honesto sobre o que não pode ver ainda.
+ */
+export function buildJarvisGlobalContextText(route: string): string {
+  return [
+    "Modo: GLOBAL (nenhuma empresa selecionada agora).",
+    `Página atual: ${route}`,
+    "",
+    "Você pode conversar normalmente e explicar como o LOKAT OS funciona.",
+    "Você NÃO tem acesso a tarefas, projetos, aprovações ou calendário de nenhuma empresa específica neste momento -- nunca invente números, status ou pendências de uma empresa sem ela estar selecionada.",
+    "Se a pergunta depender de uma empresa específica, diga isso com clareza e sugira selecionar uma empresa (botão no topo da tela) para responder com dados reais.",
+  ].join("\n");
+}

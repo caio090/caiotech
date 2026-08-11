@@ -160,7 +160,9 @@ export function JarvisPanel() {
             <p className="text-sm font-bold text-gray-900">Jarvis</p>
             <p className="text-[10px] text-gray-400 truncate flex items-center gap-1">
               <Building2 className="w-3 h-3 flex-shrink-0" />
-              {context?.companyName ?? "Empresa não identificada"}
+              {/* Jarvis Global Intelligence (Fase 2/6) — sem Company
+                  selecionada é um MODO real, nunca um estado de erro. */}
+              {context?.companyName ?? "Global"}
             </p>
           </div>
         </div>

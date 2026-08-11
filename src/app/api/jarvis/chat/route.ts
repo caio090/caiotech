@@ -8,7 +8,7 @@ import { buildCompanyCentralView } from "@/lib/company-central/builder";
 import { officeCalendarHealth } from "@/lib/business-office/source-health";
 import { getBusinessOfficeFeed } from "@/lib/business-office/data";
 import { isJarvisConfigured, streamJarvisChat } from "@/lib/jarvis/client";
-import { buildJarvisContextText } from "@/lib/jarvis/context-builder";
+import { buildJarvisContextText, buildJarvisGlobalContextText } from "@/lib/jarvis/context-builder";
 import { buildJarvisSystemInstructions } from "@/lib/jarvis/instructions";
 import { validateReportAttachment, validateReportAttachmentBuffer, buildReportContentParts } from "@/lib/jarvis/report";
 import { logJarvisRequest, sanitizeError } from "@/lib/jarvis/safety";
@@ -43,10 +43,23 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   if (message.length > MAX_MESSAGE_CHARS) return NextResponse.json({ error: "message_too_long" }, { status: 400 });
 
   const resolution = await resolveCompanyContext(body.companyId ?? null);
-  if (!resolution.valid || !resolution.context) {
+  // Jarvis Global Intelligence (Fase 1/11/40) — "nenhuma Company selecionada"
+  // NUNCA é um erro por si só. Só bloqueia quando a resolução falhou por um
+  // motivo real de autorização/autenticação (company_not_found = uma
+  // company foi pedida mas não validou; role_not_supported/not_authenticated
+  // = sessão inválida) -- resolveCompanyContext() continua a única
+  // autoridade, esta rota nunca reimplementa a decisão, só decide se
+  // "company_required" sem `?client=` vira modo global em vez de 403.
+  if (!resolution.valid && resolution.reason !== "company_required") {
     return NextResponse.json({ error: "company_required", reason: resolution.reason }, { status: 403 });
   }
-  const context = resolution.context;
+  if (!resolution.valid && body.companyId) {
+    // Um companyId FOI enviado mas não resolveu -- isso não é modo global,
+    // é uma tentativa real (ainda que talvez só desatualizada) de usar uma
+    // company específica. Nunca finge sucesso silenciosamente.
+    return NextResponse.json({ error: "company_required", reason: resolution.reason }, { status: 403 });
+  }
+  const context = resolution.valid ? resolution.context : null;
 
   if (!tryAcquireJarvisSlot(user.id)) {
     return NextResponse.json({ error: "request_in_progress" }, { status: 429 });
@@ -75,7 +88,12 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
 
   let contextText: string;
   try {
-    if (!hasSupabaseServiceRoleKey()) {
+    if (!context) {
+      // Modo global (Fase 2/3): zero query de dado de qualquer Company --
+      // nenhum risco de vazamento cross-company, porque nenhuma company é
+      // sequer consultada aqui.
+      contextText = buildJarvisGlobalContextText(body.route ?? "/admin");
+    } else if (!hasSupabaseServiceRoleKey()) {
       contextText = `Empresa atual: ${context.companyName ?? "não identificada"}\nNão foi possível carregar dados operacionais agora (fonte indisponível) -- responda com base só no que o usuário perguntar, deixando claro que não tem acesso aos números agora.`;
     } else {
       const adminDb = createSupabaseAdminClient();

@@ -249,5 +249,44 @@ console.log("[test] 24 — Jarvis herda o resolver de Company único (nenhum seg
   assert(offenders.length === 0, `toda rota de contexto do Jarvis chama resolveCompanyContext() -- nenhum resolver paralelo (offenders: ${offenders.join(", ") || "nenhum"})`);
 }
 
+console.log("[test] 25 — Jarvis Global Intelligence: ausência de Company nunca é erro (Fase 1/11/40)");
+{
+  const chatRoute = fs.readFileSync(
+    path.join(__dirname, "..", "..", "..", "app", "api", "jarvis", "chat", "route.ts"),
+    "utf8",
+  );
+  assert(
+    chatRoute.includes('resolution.reason !== "company_required"'),
+    "rota distingue company_required (modo global legítimo) de motivos reais de bloqueio (company_not_found/role_not_supported/not_authenticated)",
+  );
+  assert(
+    chatRoute.includes("buildJarvisGlobalContextText"),
+    "modo global usa um contexto próprio, honesto sobre não ter dado de nenhuma Company -- nunca reaproveita o texto de uma Company específica",
+  );
+  assert(
+    !/getBusinessOfficeFeed\(adminDb, \{ clientId: context\.companyId \}\)[\s\S]{0,50}if \(!context\)/.test(chatRoute),
+    "modo global nunca chama getBusinessOfficeFeed/getProjectProjections -- zero risco de vazamento cross-company porque nenhuma company é consultada",
+  );
+}
+
+console.log("[test] 26 — companyId explícito mas inválido continua sendo bloqueado (Fase 10/32: server-side continua autoridade)");
+{
+  const chatRoute = fs.readFileSync(
+    path.join(__dirname, "..", "..", "..", "app", "api", "jarvis", "chat", "route.ts"),
+    "utf8",
+  );
+  assert(
+    chatRoute.includes("!resolution.valid && body.companyId") && chatRoute.includes("status: 403"),
+    "um ?client=/companyId explicitamente enviado que não resolve continua 403, nunca vira modo global silenciosamente",
+  );
+}
+
+console.log("[test] 27 — painel nunca mostra \"Empresa não identificada\" como estado de erro (Fase 6)");
+{
+  const panel = fs.readFileSync(path.join(__dirname, "..", "..", "..", "components", "jarvis", "jarvis-panel.tsx"), "utf8");
+  assert(!panel.includes("Empresa não identificada"), "texto alarmante removido do painel real");
+  assert(panel.includes('?? "Global"'), "estado sem Company vira \"Global\", um modo real, não um erro");
+}
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
