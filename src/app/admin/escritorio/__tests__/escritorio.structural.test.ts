@@ -27,7 +27,12 @@ assert(client.includes('data-testid={`escritorio-view-${v.id}`}'), "cada visão 
 
 console.log("[test] 30 — mesma fonte alimenta as três visões");
 assert((client.match(/classifyBusinessOfficeItems\(items,/g) ?? []).length === 1, "uma única chamada de classificação sobre o mesmo array `items` — nenhuma segunda busca por visão");
-assert(page.includes("getBusinessOfficeFeed") && (page.match(/getBusinessOfficeFeed\(/g) ?? []).length === 1, "página busca os dados uma única vez e passa para o client");
+// Sprint Final Closure (Parte E) adicionou um SEGUNDO call site real:
+// o modo Global (clientId: null), usado só quando não há Company
+// selecionada -- os dois branches (Company-scoped e Global) são
+// mutuamente exclusivos em tempo de execução, cada um busca uma única
+// vez dentro do próprio branch.
+assert(page.includes("getBusinessOfficeFeed") && (page.match(/getBusinessOfficeFeed\(/g) ?? []).length === 2, "página busca os dados uma única vez por branch (Company-scoped e Global), nunca duas vezes no mesmo caminho");
 
 console.log("[test] 31/32 — itens têm origem e abrem módulos reais");
 assert(client.includes("item.sourceModule") && client.includes("item.href"), "cada linha do feed mostra o módulo de origem e usa o href real");
