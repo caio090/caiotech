@@ -249,7 +249,7 @@ console.log("[test] 24 — Jarvis herda o resolver de Company único (nenhum seg
   assert(offenders.length === 0, `toda rota de contexto do Jarvis chama resolveCompanyContext() -- nenhum resolver paralelo (offenders: ${offenders.join(", ") || "nenhum"})`);
 }
 
-console.log("[test] 25 — Jarvis Global Intelligence: ausência de Company nunca é erro (Fase 1/11/40)");
+console.log("[test] 25 — Jarvis Global Intelligence: ausência de Company nunca é erro (Fase 1/11/40); modo global agrega dado REAL, mas só de empresas autorizadas (Sprint Command Center + Jarvis Context V1, Problema 6)");
 {
   const chatRoute = fs.readFileSync(
     path.join(__dirname, "..", "..", "..", "app", "api", "jarvis", "chat", "route.ts"),
@@ -260,12 +260,20 @@ console.log("[test] 25 — Jarvis Global Intelligence: ausência de Company nunc
     "rota distingue company_required (modo global legítimo) de motivos reais de bloqueio (company_not_found/role_not_supported/not_authenticated)",
   );
   assert(
-    chatRoute.includes("buildJarvisGlobalContextText"),
-    "modo global usa um contexto próprio, honesto sobre não ter dado de nenhuma Company -- nunca reaproveita o texto de uma Company específica",
+    chatRoute.includes("buildJarvisGlobalContextText") && chatRoute.includes("buildJarvisGlobalSummary"),
+    "modo global monta um resumo agregado real (buildJarvisGlobalSummary) e o injeta no texto de contexto -- nunca mais um stub fixo de 'sem acesso'",
+  );
+  const globalAggregate = fs.readFileSync(
+    path.join(__dirname, "..", "global-aggregate.ts"),
+    "utf8",
   );
   assert(
-    !/getBusinessOfficeFeed\(adminDb, \{ clientId: context\.companyId \}\)[\s\S]{0,50}if \(!context\)/.test(chatRoute),
-    "modo global nunca chama getBusinessOfficeFeed/getProjectProjections -- zero risco de vazamento cross-company porque nenhuma company é consultada",
+    globalAggregate.includes("listAuthorizedCompanies"),
+    "a agregação global reaproveita o MESMO resolvedor de ownership do Office Global -- nunca um segundo critério de autorização",
+  );
+  assert(
+    globalAggregate.includes("authorizedIds.has(item.workspaceId)"),
+    "o resultado de getBusinessOfficeFeed(clientId: null) (todas as empresas do banco) é filtrado pelas IDs autorizadas ANTES de virar resumo -- zero risco de vazamento cross-company",
   );
 }
 
@@ -281,11 +289,14 @@ console.log("[test] 26 — companyId explícito mas inválido continua sendo blo
   );
 }
 
-console.log("[test] 27 — painel nunca mostra \"Empresa não identificada\" como estado de erro (Fase 6)");
+console.log("[test] 27 — painel nunca mostra \"Empresa não identificada\" como estado de erro (Fase 6); Jarvis Context (Global/Company) é um seletor real no header (Problema 7)");
 {
   const panel = fs.readFileSync(path.join(__dirname, "..", "..", "..", "components", "jarvis", "jarvis-panel.tsx"), "utf8");
   assert(!panel.includes("Empresa não identificada"), "texto alarmante removido do painel real");
-  assert(panel.includes('?? "Global"'), "estado sem Company vira \"Global\", um modo real, não um erro");
+  assert(panel.includes('"Global"'), "estado sem Company vira \"Global\", um modo real, não um erro");
+  assert(panel.includes("jarvis-context-switcher"), "existe um seletor de contexto real no header (pill), não só um texto estático");
+  assert(panel.includes("manualSelection") && panel.includes("pageCompanyId"), "o contexto exibido é estado local (Global/Company escolhido no painel), com o ?client= da página servindo só de semente inicial -- nunca a única fonte");
+  assert(!/router\.push[\s\S]{0,80}manualSelection/.test(panel) && !/setManualSelection[\s\S]{0,120}router\.(push|replace)/.test(panel), "trocar de contexto no painel nunca chama router.push/replace -- a URL da página não muda");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

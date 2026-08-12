@@ -9,6 +9,7 @@ import { officeCalendarHealth } from "@/lib/business-office/source-health";
 import { getBusinessOfficeFeed } from "@/lib/business-office/data";
 import { isJarvisConfigured, streamJarvisChat } from "@/lib/jarvis/client";
 import { buildJarvisContextText, buildJarvisGlobalContextText } from "@/lib/jarvis/context-builder";
+import { buildJarvisGlobalSummary } from "@/lib/jarvis/global-aggregate";
 import { buildJarvisSystemInstructions } from "@/lib/jarvis/instructions";
 import { validateReportAttachment, validateReportAttachmentBuffer, buildReportContentParts } from "@/lib/jarvis/report";
 import { logJarvisRequest, sanitizeError } from "@/lib/jarvis/safety";
@@ -89,10 +90,21 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
   let contextText: string;
   try {
     if (!context) {
-      // Modo global (Fase 2/3): zero query de dado de qualquer Company --
-      // nenhum risco de vazamento cross-company, porque nenhuma company é
-      // sequer consultada aqui.
-      contextText = buildJarvisGlobalContextText(body.route ?? "/admin");
+      // Modo global (Problema 6): agrega SÓ empresas que listAuthorizedCompanies()
+      // realmente autorizou para este usuário -- nunca um dump irrestrito.
+      if (!hasSupabaseServiceRoleKey()) {
+        contextText = [
+          "Modo: GLOBAL (visão agregada das empresas autorizadas).",
+          `Página atual: ${body.route ?? "/admin"}`,
+          "Não foi possível carregar o resumo agregado agora (fonte indisponível) -- nunca diga que não há pendências; diga que não conseguiu consultar agora.",
+        ].join("\n");
+      } else {
+        const adminDb = createSupabaseAdminClient();
+        const { data: profile } = await authClient.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        const role = (profile as { role?: string } | null)?.role ?? "";
+        const summary = await buildJarvisGlobalSummary(adminDb, user.id, role);
+        contextText = buildJarvisGlobalContextText(body.route ?? "/admin", summary);
+      }
     } else if (!hasSupabaseServiceRoleKey()) {
       contextText = `Empresa atual: ${context.companyName ?? "não identificada"}\nNão foi possível carregar dados operacionais agora (fonte indisponível) -- responda com base só no que o usuário perguntar, deixando claro que não tem acesso aos números agora.`;
     } else {

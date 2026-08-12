@@ -19,6 +19,7 @@
 import { resolveVisibilityPolicy } from "@/lib/neural-core/visibility";
 import type { ProjectProjection } from "@/lib/project-projection/types";
 import type { WorkItemProjection } from "@/lib/work-item-projection/types";
+import type { JarvisGlobalSummary } from "./global-aggregate";
 import { MAX_CONTEXT_CHARS } from "./cost-controls";
 
 export interface JarvisOfficeSummary {
@@ -83,21 +84,38 @@ export function buildJarvisContextText(input: JarvisContextInput): string {
 }
 
 /**
- * Sprint Jarvis Global Intelligence — Jarvis é global; Company é contexto
- * opcional. Quando nenhuma Company foi explicitamente selecionada
- * (`resolveCompanyContext` retornou `company_required` sem que o usuário
- * tivesse pedido uma company específica), o chat não deve mais 403ar --
- * deve responder em modo global. Nunca busca ou agrega dado de nenhuma
- * Company aqui (zero risco de vazamento cross-company): só instrui o
- * modelo a ser honesto sobre o que não pode ver ainda.
+ * Sprint Command Center + Jarvis Context V1 (Problema 6) — Jarvis é global;
+ * Company é contexto opcional. "Global" NUNCA significa "sem dados": significa
+ * visão agregada das empresas que o usuário já está autorizado a ver (via
+ * buildJarvisGlobalSummary(), que reaproveita listAuthorizedCompanies() +
+ * getBusinessOfficeFeed() -- ver src/lib/jarvis/global-aggregate.ts). Mesmo
+ * allowlist estrutural do modo Company: só company_id/nome, contagens
+ * agregadas e títulos de itens atrasados entram no texto -- nenhum outro
+ * campo de BusinessOfficeFeedItem/ProjectProjection é exposto aqui.
  */
-export function buildJarvisGlobalContextText(route: string): string {
-  return [
-    "Modo: GLOBAL (nenhuma empresa selecionada agora).",
-    `Página atual: ${route}`,
-    "",
-    "Você pode conversar normalmente e explicar como o LOKAT OS funciona.",
-    "Você NÃO tem acesso a tarefas, projetos, aprovações ou calendário de nenhuma empresa específica neste momento -- nunca invente números, status ou pendências de uma empresa sem ela estar selecionada.",
-    "Se a pergunta depender de uma empresa específica, diga isso com clareza e sugira selecionar uma empresa (botão no topo da tela) para responder com dados reais.",
-  ].join("\n");
+export function buildJarvisGlobalContextText(route: string, summary: JarvisGlobalSummary): string {
+  const lines: string[] = [];
+  lines.push("Modo: GLOBAL (visão agregada das empresas autorizadas para este usuário).");
+  lines.push(`Página atual: ${route}`);
+  lines.push("");
+
+  if (summary.authorizedCompanyCount === 0) {
+    lines.push("Este usuário não tem nenhuma empresa autorizada vinculada à conta ainda.");
+    lines.push("Nunca invente dados de nenhuma empresa neste caso -- explique isso com clareza.");
+  } else {
+    lines.push(`Empresas autorizadas para este usuário: ${summary.authorizedCompanyCount}.`);
+    if (!summary.calendarAvailable) lines.push("Agenda: não foi possível consultar agora para algumas empresas (indisponível, não é zero).");
+    lines.push("");
+    lines.push("Resumo por empresa -- SOMENTE as empresas listadas abaixo são autorizadas; nunca mencione dado de nenhuma empresa fora desta lista:");
+    for (const c of summary.companies) {
+      lines.push(`- ${c.companyName} (company_id: ${c.companyId}): hoje ${c.todayCount}, atrasados ${c.overdueCount}, aprovações pendentes ${c.approvalsPendingCount}, projetos ativos ${c.activeProjectsCount}`);
+      if (c.attentionTitles.length > 0) lines.push(`  atrasados: ${c.attentionTitles.join("; ")}`);
+    }
+    if (summary.omittedCompanyCount > 0) {
+      lines.push(`... e mais ${summary.omittedCompanyCount} empresa(s) autorizada(s) sem detalhe carregado agora nesta resposta -- se o usuário perguntar por uma delas especificamente, sugira selecioná-la para ver os dados completos.`);
+    }
+  }
+
+  const text = lines.join("\n");
+  return text.length > MAX_CONTEXT_CHARS ? `${text.slice(0, MAX_CONTEXT_CHARS)}\n[...contexto truncado]` : text;
 }
