@@ -265,6 +265,59 @@ BEGIN;
 ROLLBACK;
 
 
+-- ── 11b. admin_create_client -- Final Closure (Fase 11) ──────────
+BEGIN;
+  SET LOCAL ROLE anon;
+  SELECT public.admin_create_client('Empresa Forjada Anon');  -- deve falhar com permission denied for function
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SELECT public.admin_create_client('Empresa Sem Sessao');  -- sem request.jwt.claims -- deve levantar EXCEPTION permission_denied (role NULL)
+ROLLBACK;
+
+-- Admin comum tentando atribuir a criação a outro usuário/agência --
+-- nunca aceito, mesmo sendo admin de verdade.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_create_client(
+    'Empresa Atribuida a Outro', NULL, NULL, NULL, NULL, 'onboarding',
+    '<OTHER_USER_ID>'::uuid, NULL
+  );  -- deve levantar EXCEPTION unauthorized (p_created_by != caller)
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_create_client(
+    'Empresa Agencia Alheia', NULL, NULL, NULL, NULL, 'onboarding',
+    NULL, '<OTHER_AGENCY_USER_ID>'::uuid
+  );  -- deve levantar EXCEPTION unauthorized (p_agency_id != caller, role != super_admin)
+ROLLBACK;
+
+-- Caminho legítimo: super_admin cria client em nome de uma agência real.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<SUPER_ADMIN_USER_ID>"}';
+  SELECT public.admin_create_client(
+    'Empresa Legitima Super Admin', NULL, NULL, NULL, NULL, 'onboarding',
+    NULL, '<AGENCY_USER_ID>'::uuid
+  ) IS NOT NULL AS super_admin_can_attribute_to_any_agency;  -- deve retornar true
+ROLLBACK;
+
+-- Caminho legítimo real: admin cria client para o próprio workspace,
+-- exatamente como src/app/api/admin/clients/route.ts POST faz hoje.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_create_client(
+    'Empresa Legitima Admin A', NULL, NULL, NULL, NULL, 'onboarding',
+    '<ADMIN_A_USER_ID>'::uuid, '<ADMIN_A_USER_ID>'::uuid
+  ) IS NOT NULL AS legitimate_client_creation_still_works;  -- deve retornar true
+ROLLBACK;
+
+
 -- ── 12. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
@@ -275,5 +328,6 @@ ROLLBACK;
 --   admin_list_olaclick_connections, get_client_meta_status,
 --   get_request_owner_for_client, admin_archive_client,
 --   admin_archive_clients, admin_restore_client, admin_delete_client,
---   admin_hard_delete_client, admin_hard_delete_clients.
+--   admin_hard_delete_client, admin_hard_delete_clients,
+--   admin_create_client.
 -- ============================================================

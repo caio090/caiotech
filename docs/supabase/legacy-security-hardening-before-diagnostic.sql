@@ -59,6 +59,7 @@
 -- admin_delete_client(uuid)              | revoke (V2) | revoke (V2) | GRANT | --
 -- admin_hard_delete_client(uuid)         | revoke (V2) | revoke (V2) | GRANT | --
 -- admin_hard_delete_clients(uuid[])      | revoke (V2) | revoke (V2) | GRANT | --
+-- admin_create_client(...)               | revoke (Final) | revoke (Final) | GRANT | --
 -- ============================================================
 
 BEGIN;
@@ -651,10 +652,8 @@ GRANT EXECUTE ON FUNCTION public.get_request_owner_for_client(uuid) TO authentic
 -- Corrigido em todas as 6: checagem explícita "v_role IS NULL OR ..."
 -- antes de qualquer outra coisa.
 --
--- admin_create_client() tem o MESMO padrão de bug (v_role NOT IN
--- (...)) mas NÃO foi incluída no escopo desta correção pelo CODEX --
--- registrado aqui como achado P0-classe NÃO corrigido nesta migration
--- (ver RELATÓRIO FINAL, "Remaining P0" / "achado adicional").
+-- admin_create_client() tinha o MESMO padrão de bug (v_role NOT IN
+-- (...)) -- corrigida agora na seção 9, sprint Final Closure (Fase 3-8).
 
 -- 8.1 admin_archive_client (single)
 CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
@@ -874,19 +873,118 @@ REVOKE ALL ON FUNCTION public.admin_hard_delete_clients(uuid[]) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_hard_delete_clients(uuid[]) TO authenticated;
 
 
+-- ============================================================
+-- 9. admin_create_client() — NULL-bypass + identidade arbitrária (Final Closure)
+-- ============================================================
+-- USO REAL (Fase 3/5): único call site é
+-- src/app/api/admin/clients/route.ts POST -- já se comporta
+-- honestamente hoje (`p_created_by: profile.id`, `p_agency_id: role
+-- !== 'super_admin' ? profile.id : null`, ambos resolvidos no servidor
+-- a partir da sessão real, nunca de um campo do body). O problema é
+-- que a FUNÇÃO em si não impõe isso -- alguém chamando a RPC
+-- diretamente (fora desta rota) podia informar QUALQUER
+-- p_created_by/p_agency_id como um UUID arbitrário fornecido pelo
+-- chamador (Fase 6/7: "não aceitar UUID arbitrário fornecido pelo
+-- browser como autorização"), e tinha o MESMO bug de NULL-bypass das
+-- 6 funções da seção 8 (`v_role NOT IN (...)` nunca dispara quando
+-- v_role é NULL).
+--
+-- Contrato novo:
+--   • auth.uid() precisa existir e o role precisa ser admin/super_admin
+--     (checagem NULL-safe, igual à seção 8);
+--   • p_created_by, se informado, precisa ser exatamente auth.uid() --
+--     nunca atribui a criação a outro usuário; se omitido, usa
+--     auth.uid() (contrato antigo preservado para o call site real);
+--   • p_agency_id: admin comum só pode atribuir a SI MESMO (ou omitir)
+--     -- nunca a outro workspace/agência arbitrário. super_admin pode
+--     continuar informando explicitamente (contrato do produto: só o
+--     super_admin cria clients em nome de uma agência específica que
+--     não é ele mesmo, Fase 5).
+CREATE OR REPLACE FUNCTION public.admin_create_client(
+  p_company_name     text,
+  p_responsible_name text DEFAULT NULL,
+  p_email            text DEFAULT NULL,
+  p_phone            text DEFAULT NULL,
+  p_segment          text DEFAULT NULL,
+  p_status           text DEFAULT 'onboarding',
+  p_created_by       uuid DEFAULT NULL,
+  p_agency_id        uuid DEFAULT NULL
+)
+RETURNS TABLE (
+  id               uuid,
+  company_name     text,
+  responsible_name text,
+  email            text,
+  phone            text,
+  segment          text,
+  status           text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role         text;
+  v_client_id    uuid;
+  v_status       text;
+  v_created_by   uuid;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode criar clientes', v_role;
+  END IF;
+
+  IF p_created_by IS NOT NULL AND p_created_by <> auth.uid() THEN
+    RAISE EXCEPTION 'unauthorized: p_created_by must match the caller' USING ERRCODE = 'P0002';
+  END IF;
+  v_created_by := COALESCE(p_created_by, auth.uid());
+
+  IF v_role <> 'super_admin' AND p_agency_id IS NOT NULL AND p_agency_id <> auth.uid() THEN
+    RAISE EXCEPTION 'unauthorized: cannot attribute a new client to another workspace' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF p_status NOT IN ('active', 'onboarding') THEN
+    v_status := 'onboarding';
+  ELSE
+    v_status := p_status;
+  END IF;
+
+  INSERT INTO public.clients (
+    company_name, responsible_name, email, phone,
+    segment, status, created_by, agency_id
+  ) VALUES (
+    p_company_name, p_responsible_name, p_email, p_phone,
+    p_segment, v_status,
+    v_created_by,
+    p_agency_id
+  )
+  RETURNING public.clients.id INTO v_client_id;
+
+  RETURN QUERY
+    SELECT c.id, c.company_name, c.responsible_name,
+           c.email, c.phone, c.segment, c.status
+    FROM public.clients c
+    WHERE c.id = v_client_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) TO authenticated;
+
+
 COMMIT;
 
 -- ============================================================
 -- FIM DA CORREÇÃO — status: SQL_READY_FOR_MANUAL_APPROVAL
 -- (aguardando o veredito de aprovação formal do CODEX WEB antes de
--- qualquer execução)
+-- qualquer execução -- versão final para este regate, sprint Final
+-- Closure)
 --
 -- Objetos deliberadamente NÃO tocados nesta correção (fora de escopo
 -- explícito do CODEX -- backlog):
---   ~31 outras funções SECURITY DEFINER com search_path ausente;
---   admin_create_client() -- mesmo bug de NULL-bypass das funções da
---     seção 8, mas não estava no escopo do CODEX nesta rodada;
---     registrado explicitamente como achado pendente;
+--   ~31 outras funções SECURITY DEFINER com search_path ausente,
+--     nenhuma delas relacionada a autorização de Company/workspace;
 --   docs/supabase/91-company-diagnostic-roadmap.sql -- congelado.
 --
 -- Próximos passos humanos, em ordem:

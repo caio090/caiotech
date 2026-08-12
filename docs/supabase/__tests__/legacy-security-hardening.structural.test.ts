@@ -197,6 +197,17 @@ console.log("[test] 11c — Fase 21-27 (novo no V2): archive/restore/logical-del
   }
 }
 
+console.log("[test] 11d — Final Closure (Fase 3-8): admin_create_client fail-closed, sem identidade arbitrária");
+{
+  const body = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_create_client\([\s\S]*?\$\$;/)?.[0] ?? "";
+  assert(body.length > 0, "admin_create_client redefinida nesta migration");
+  assert(/v_role IS NULL OR v_role NOT IN/.test(body), "checagem NULL-safe -- mesmo bug de NULL-bypass das funções da seção 8, agora corrigido aqui também");
+  assert(/p_created_by IS NOT NULL AND p_created_by <> auth\.uid\(\)/.test(body), "p_created_by, quando informado, precisa ser exatamente o caller -- nunca atribui a criação a outro usuário (Fase 6/7)");
+  assert(/v_role <> 'super_admin' AND p_agency_id IS NOT NULL AND p_agency_id <> auth\.uid\(\)/.test(body), "admin comum não pode atribuir o novo client a outro workspace/agência arbitrário -- só super_admin mantém esse alcance (Fase 5)");
+  assert(sql.includes("REVOKE ALL ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) FROM anon"), "EXECUTE revogado de anon explicitamente");
+  assert(!sql.includes("achado P0-classe NÃO corrigido"), "achado anterior não fica mais registrado como pendente -- foi corrigido nesta sprint");
+}
+
 console.log("[test] 12 — transação e rollback seguros (Fase 34/39/40)");
 {
   assert(sql.includes("BEGIN;") && sql.includes("COMMIT;"), "migration envolvida em transação");

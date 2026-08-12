@@ -32,6 +32,71 @@
 
 BEGIN;
 
+-- 9. admin_create_client → estado anterior (docs/supabase/54)
+--    ⚠ reabre o bug de NULL-bypass e volta a aceitar p_created_by/
+--    p_agency_id arbitrários informados pelo chamador.
+CREATE OR REPLACE FUNCTION public.admin_create_client(
+  p_company_name     text,
+  p_responsible_name text DEFAULT NULL,
+  p_email            text DEFAULT NULL,
+  p_phone            text DEFAULT NULL,
+  p_segment          text DEFAULT NULL,
+  p_status           text DEFAULT 'onboarding',
+  p_created_by       uuid DEFAULT NULL,
+  p_agency_id        uuid DEFAULT NULL
+)
+RETURNS TABLE (
+  id               uuid,
+  company_name     text,
+  responsible_name text,
+  email            text,
+  phone            text,
+  segment          text,
+  status           text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role      text;
+  v_client_id uuid;
+  v_status    text;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role NOT IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission_denied: role % nao pode criar clientes', v_role;
+  END IF;
+
+  IF p_status NOT IN ('active', 'onboarding') THEN
+    v_status := 'onboarding';
+  ELSE
+    v_status := p_status;
+  END IF;
+
+  INSERT INTO public.clients (
+    company_name, responsible_name, email, phone,
+    segment, status, created_by, agency_id
+  ) VALUES (
+    p_company_name, p_responsible_name, p_email, p_phone,
+    p_segment, v_status,
+    COALESCE(p_created_by, auth.uid()),
+    p_agency_id
+  )
+  RETURNING public.clients.id INTO v_client_id;
+
+  RETURN QUERY
+    SELECT c.id, c.company_name, c.responsible_name,
+           c.email, c.phone, c.segment, c.status
+    FROM public.clients c
+    WHERE c.id = v_client_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_create_client(
+  text, text, text, text, text, text, uuid, uuid
+) TO authenticated;
+
 -- 8. Archive/Restore/Delete de clients → estado anterior (docs/supabase/
 --    52, 54, 55) -- reabre admin comum podendo administrar QUALQUER
 --    Company (sem ownership) e reabre o bug de NULL-bypass (role NULL
