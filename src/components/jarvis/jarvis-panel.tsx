@@ -4,11 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Zap, X, Send, Mic, Paperclip, Wand2, Copy, RotateCcw, Square,
-  Volume2, Check, AlertTriangle, Loader2, Building2,
+  Volume2, Check, AlertTriangle, Loader2, Building2, ChevronDown, Globe2,
 } from "lucide-react";
 import { JARVIS_OPEN_EVENT, type JarvisOpenDetail } from "@/lib/jarvis/open-jarvis";
+import { useAuthorizedCompanies } from "@/components/command-center/inline-company-picker";
 import { useJarvisChat } from "./use-jarvis-chat";
 import { useJarvisVoice } from "./use-jarvis-voice";
+import { JarvisGotaAvatar } from "./gota-avatar";
+import { resolveJarvisGotaState } from "./gota-state";
 
 /**
  * Sprint MVP Experience Completion V0.1 (Parte C/D/E) — Jarvis.
@@ -48,28 +51,57 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 interface JarvisContextSummary {
+  mode?: "global" | "company";
+  companyId?: string | null;
   companyName: string | null;
   surface: string;
   office: { todayCount: number; overdueCount: number; approvalsCount: number; calendarStatus: string } | null;
   activeProjectsCount: number;
 }
 
+/**
+ * Sprint Command Center + Jarvis Context V1 (Problema 7) — o "Jarvis
+ * Context" (Global ou uma Company específica) é independente do `?client=`
+ * da página: a URL só serve de SEMENTE inicial (`manualSelection === null`
+ * segue a página); depois que o usuário troca pelo seletor no cabeçalho, a
+ * escolha manual passa a valer mesmo que a página mude -- nunca um
+ * `router.push`/mudança de URL acontece aqui.
+ */
+type JarvisManualContext = { kind: "global" } | { kind: "company"; id: string; name: string | null } | null;
+
 export function JarvisPanel() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const companyId = searchParams.get("client");
+  const pageCompanyId = searchParams.get("client");
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [context, setContext] = useState<JarvisContextSummary | null>(null);
+  const [manualSelection, setManualSelection] = useState<JarvisManualContext>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [attachment, setAttachment] = useState<{ name: string; type: string; size: number; dataBase64: string } | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const switcherRef = useRef<HTMLDivElement>(null);
 
-  const chat = useJarvisChat({ companyId, route: pathname });
+  const activeCompanyId = manualSelection
+    ? (manualSelection.kind === "company" ? manualSelection.id : null)
+    : pageCompanyId;
+
+  const { companies: authorizedCompanies } = useAuthorizedCompanies();
+
+  const chat = useJarvisChat({ companyId: activeCompanyId, route: pathname });
   const voice = useJarvisVoice();
+
+  function switchContext(next: JarvisManualContext) {
+    setManualSelection(next);
+    setSwitcherOpen(false);
+    // Trocar de empresa/Global é uma troca de contexto real -- nunca mistura
+    // o histórico em memória de um contexto com o resumo/dados de outro.
+    chat.reset();
+  }
 
   /* eslint-disable-next-line react-hooks/set-state-in-effect */
   useEffect(() => setMounted(true), []);
@@ -79,15 +111,24 @@ export function JarvisPanel() {
   }, []);
 
   const loadContext = useCallback(() => {
-    const qs = companyId ? `?client=${encodeURIComponent(companyId)}` : "";
+    const qs = activeCompanyId ? `?client=${encodeURIComponent(activeCompanyId)}` : "";
     fetch(`/api/jarvis/context${qs}`).then((r) => r.json()).then((data) => {
       if (data.ok) setContext(data);
     }).catch(() => {});
-  }, [companyId]);
+  }, [activeCompanyId]);
 
   useEffect(() => {
     if (open) loadContext();
   }, [open, loadContext]);
+
+  useEffect(() => {
+    if (!switcherOpen) return;
+    function onOutside(e: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) setSwitcherOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [switcherOpen]);
 
   // Fase C4/B7 — outras páginas (ex.: Meu Escritório) abrem o painel via openJarvis().
   useEffect(() => {
@@ -148,22 +189,54 @@ export function JarvisPanel() {
 
   if (!mounted) return null;
 
+  const gotaState = resolveJarvisGotaState(chat.status, voice.status);
+
   const panelBody = (
     <div className="flex h-full flex-col bg-white" data-testid="jarvis-panel-body">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
-          <div className="min-w-0">
+          <JarvisGotaAvatar state={gotaState} size={28} />
+          <div className="min-w-0 relative" ref={switcherRef}>
             <p className="text-sm font-bold text-gray-900">Jarvis</p>
-            <p className="text-[10px] text-gray-400 truncate flex items-center gap-1">
-              <Building2 className="w-3 h-3 flex-shrink-0" />
-              {/* Jarvis Global Intelligence (Fase 2/6) — sem Company
-                  selecionada é um MODO real, nunca um estado de erro. */}
-              {context?.companyName ?? "Global"}
-            </p>
+            {/* Jarvis Context (Problema 7) — Global ou uma Company específica,
+                independente do ?client= da página; a URL nunca muda aqui. */}
+            <button
+              type="button"
+              onClick={() => setSwitcherOpen((v) => !v)}
+              data-testid="jarvis-context-switcher"
+              className="text-[10px] text-gray-400 hover:text-gray-600 truncate flex items-center gap-1"
+            >
+              {context?.mode === "company" ? <Building2 className="w-3 h-3 flex-shrink-0" /> : <Globe2 className="w-3 h-3 flex-shrink-0" />}
+              <span className="truncate">{context?.mode === "company" ? (context.companyName ?? "Empresa") : "Global"}</span>
+              <ChevronDown className="w-3 h-3 flex-shrink-0" />
+            </button>
+            {switcherOpen && (
+              <div
+                data-testid="jarvis-context-switcher-menu"
+                className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-10 py-1 max-h-64 overflow-y-auto"
+              >
+                <button
+                  type="button"
+                  onClick={() => switchContext({ kind: "global" })}
+                  data-testid="jarvis-context-option-global"
+                  className="w-full flex items-center gap-2 text-left text-xs text-gray-700 hover:bg-gray-50 px-3 py-2"
+                >
+                  <Globe2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /> Global
+                </button>
+                {(authorizedCompanies ?? []).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => switchContext({ kind: "company", id: c.id, name: c.name })}
+                    data-testid="jarvis-context-option-company"
+                    className="w-full flex items-center gap-2 text-left text-xs text-gray-700 hover:bg-gray-50 px-3 py-2 truncate"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /> {c.name ?? "Empresa"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <button onClick={() => setOpen(false)} aria-label="Fechar Jarvis" className="text-gray-400 hover:text-gray-700">

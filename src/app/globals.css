@@ -204,6 +204,17 @@ body {
   will-change: transform;
 }
 
+/* Sprint Command Center + Jarvis Context V1 — mesma Gota do Home (identidade
+   preservada: gradiente/formato inalterados), só reação de escala/opacidade
+   por estado no avatar do painel do Jarvis. Nunca GIF, nunca lib nova. */
+@keyframes lokat-gota-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.88; }
+  50%       { transform: scale(1.12); opacity: 1; }
+}
+.jarvis-gota-thinking  { animation: lokat-gota-pulse 2.4s ease-in-out infinite; }
+.jarvis-gota-listening { animation: lokat-gota-pulse 1.6s ease-in-out infinite; }
+.jarvis-gota-speaking  { animation: lokat-gota-pulse 0.9s ease-in-out infinite; }
+
 @keyframes robot-blink {
   0%, 91%, 100% { transform: scaleY(0); opacity: 0; }
   94%           { transform: scaleY(1); opacity: 1; }
@@ -281,6 +292,11 @@ body {
   .orbit-signal { animation: none; }
   .lk-ticker-track,
   .lk-scroll-track {
+    animation: none;
+  }
+  .jarvis-gota-thinking,
+  .jarvis-gota-listening,
+  .jarvis-gota-speaking {
     animation: none;
   }
 }
