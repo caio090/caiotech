@@ -73,12 +73,12 @@ console.log("\n[test] 7/8. server resolves the role and the shell is initialized
   assert(layoutSource.includes('import { resolveEffectiveUserRole } from "@/lib/access-control"'), "7a. layout.tsx imports the canonical resolveEffectiveUserRole");
   assert(/const\s+supabase\s*=\s*await\s+createServerSupabaseClient\(\)/.test(layoutSource), "7b. layout.tsx uses the real server-side Supabase client, not a client-side one");
   assert(/initialUserRole\s*=\s*resolveEffectiveUserRole\(\{/.test(layoutSource), "7c. layout.tsx computes initialUserRole via the canonical resolver");
-  assert(/<AdminLayoutShell\s+previewContext=\{previewContext\}\s+initialUserRole=\{initialUserRole\}>/.test(layoutSource), "7d. layout.tsx passes initialUserRole as a prop to AdminLayoutShell");
+  assert(/<AdminLayoutShell\s+previewContext=\{previewContext\}\s+initialUserRole=\{initialUserRole\}\s+initialAccountType=\{initialAccountType\}>/.test(layoutSource), "7d. layout.tsx passes initialUserRole (and, since Final Closure, initialAccountType) as props to AdminLayoutShell");
 
   // 8. The shell's Props type declares it, and userRole's useState is
   // initialized directly from the prop — not from null + a later effect.
   assert(/initialUserRole:\s*string \| null;/.test(shellSource), "8a. AdminLayoutShell's Props declares initialUserRole: string | null");
-  assert(/export function AdminLayoutShell\(\{ children, previewContext, initialUserRole \}: Props\)/.test(shellSource), "8b. the component destructures initialUserRole from props");
+  assert(/export function AdminLayoutShell\(\{ children, previewContext, initialUserRole, initialAccountType = null \}: Props\)/.test(shellSource), "8b. the component destructures initialUserRole (and initialAccountType) from props");
   assert(/const userRole = initialUserRole;/.test(shellSource), "8c. userRole is derived directly from the prop (not useState + a later setter) — the FIRST render (server and client) already reflects the resolved role, with no useEffect in between and nothing that could ever reassign it afterward");
   assert(!/setUserRole/.test(shellSource), "8d. no setUserRole exists anywhere in the file — role truly cannot change after the server resolves it for this render");
 }
@@ -118,7 +118,11 @@ console.log("\n[test] 17. no token/cookie/secret is ever passed as a prop");
   const jsxCallMatch = layoutSource.match(/<AdminLayoutShell\s+([^>]*)>/);
   assert(!!jsxCallMatch, "17a. found the <AdminLayoutShell> JSX call");
   const propsPassed = jsxCallMatch?.[1] ?? "";
-  assert(propsPassed === 'previewContext={previewContext} initialUserRole={initialUserRole}', "17b. the ONLY props passed are previewContext and initialUserRole — nothing else, so no token/cookie/user/profile object can leak through");
+  // Sprint Final Closure added initialAccountType — same category as
+  // initialUserRole (a coarse enum string resolved server-side, e.g.
+  // 'agencia'/'empresa', used only to label the sidebar's own-organization
+  // item), never a token/cookie/full profile object.
+  assert(propsPassed === 'previewContext={previewContext} initialUserRole={initialUserRole} initialAccountType={initialAccountType}', "17b. the ONLY props passed are previewContext, initialUserRole and initialAccountType — nothing else, so no token/cookie/user/profile object can leak through");
   assert(!/\buser\}|profile\}|access_token|refresh_token/.test(propsPassed), "17c. no raw user/profile object or token field appears in the props passed");
 }
 

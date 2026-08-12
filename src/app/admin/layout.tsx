@@ -22,17 +22,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   let initialUserRole: string | null = null;
+  let initialAccountType: string | null = null;
   if (user) {
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const { data: profile } = await supabase.from("profiles").select("role, account_type").eq("id", user.id).maybeSingle();
     initialUserRole = resolveEffectiveUserRole({
       profileRole: profile?.role as string | undefined,
       userMetadataRole: user.user_metadata?.role as string | undefined,
       appMetadataRole: user.app_metadata?.role as string | undefined,
     });
+    // Fase 57 (Final Closure) — mesma query, mesmo request: só mais uma
+    // coluna para o rótulo dinâmico Minha Agência/Meu Negócio na sidebar.
+    initialAccountType = (profile?.account_type as string | undefined) ?? null;
   }
 
   return (
-    <AdminLayoutShell previewContext={previewContext} initialUserRole={initialUserRole}>
+    <AdminLayoutShell previewContext={previewContext} initialUserRole={initialUserRole} initialAccountType={initialAccountType}>
       {children}
     </AdminLayoutShell>
   );

@@ -78,9 +78,11 @@ interface Props {
    * full user/profile object.
    */
   initialUserRole: string | null;
+  /** Fase 57 (Final Closure) — rótulo dinâmico Minha Agência/Meu Negócio na sidebar. */
+  initialAccountType?: string | null;
 }
 
-export function AdminLayoutShell({ children, previewContext, initialUserRole }: Props) {
+export function AdminLayoutShell({ children, previewContext, initialUserRole, initialAccountType = null }: Props) {
   const [userName,         setUserName]         = useState("Admin");
   const [initials,         setInitials]         = useState("A");
   // No setter: role comes exclusively from the server-resolved prop and
@@ -356,6 +358,7 @@ export function AdminLayoutShell({ children, previewContext, initialUserRole }: 
           variant="admin"
           userName={userName}
           userRole={userRole === "super_admin" ? "Super Admin" : userRole === "admin" ? "Admin" : "Usuário"}
+          accountType={initialAccountType}
           onSignOut={handleSignOut}
           badges={badges}
           transparent={isInicioPage}

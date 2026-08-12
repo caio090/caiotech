@@ -38,7 +38,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/empresa",           label: "Empresa",          icon: Building2 },
       { href: "/admin/escritorio",        label: "Meu Escritório",   icon: Briefcase },
       { href: "/admin/projetos",          label: "Projetos",         icon: FolderKanban },
-      { href: "/admin/meu-negocio",       label: "Meu Negócio",      icon: Sparkles },
+      { href: "/admin/organizacao",       label: "Meu Negócio",      icon: Sparkles },
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/contentos/aprovacoes", label: "Aprovações",    icon: CheckSquare },
@@ -172,6 +172,8 @@ interface AppSidebarProps {
   variant: SidebarVariant;
   userName?: string;
   userRole?: string;
+  /** Fase 57 (Final Closure) — rotula "/admin/organizacao" como Minha Agência quando account_type = 'agencia', senão Meu Negócio. */
+  accountType?: string | null;
   onSignOut?: () => void;
   badges?: Record<string, number>;
   hideRoutes?: string[];
@@ -182,7 +184,7 @@ const SIDEBAR_W_CLOSED = 64;
 const SIDEBAR_W_OPEN   = 248;
 
 export function AppSidebar({
-  variant, userName = "Usuário", userRole = "", onSignOut, badges, hideRoutes, transparent,
+  variant, userName = "Usuário", userRole = "", accountType = null, onSignOut, badges, hideRoutes, transparent,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const activeCompanyId = readCompanyContextParam(useSearchParams());
@@ -256,10 +258,11 @@ export function AppSidebar({
         aria-label="Menu"
         className="flex-1 overflow-y-auto scrollbar-thin py-2 flex flex-col gap-0.5 w-full px-2"
       >
-        {config.nav.filter(({ href }) => !hideRoutes?.includes(href)).map(({ href, label, icon: Icon }) => {
+        {config.nav.filter(({ href }) => !hideRoutes?.includes(href)).map(({ href, label: baseLabel, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           const badge  = badges?.[href] ?? 0;
           const resolvedHref = COMPANY_SCOPED_ROUTES.has(href) ? withCompanyContext(href, activeCompanyId) : href;
+          const label = href === "/admin/organizacao" && accountType === "agencia" ? "Minha Agência" : baseLabel;
           return (
             <Link
               key={href}
