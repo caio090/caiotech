@@ -35,7 +35,13 @@ console.log("[test] 3 — Action Result é um contêiner genérico reaproveitáv
 {
   const cmp = read("src/components/command-center/action-result.tsx");
   assert(cmp.includes("CommandActionResultCard") && cmp.includes("CommandJarvisHandoffCard"), "os dois estados reais (ação executável / handoff ao Jarvis) existem como componentes distintos e pequenos");
-  assert(cmp.includes("Selecionar empresa") && cmp.includes("Novo cliente"), "Company-required oferece as duas saídas reais: selecionar ou criar (Fase 5/18-20)");
+  // Sprint Command Center + Jarvis Context V1 (Problema 2) — Company-required
+  // resolve INLINE via InlineCompanyPicker (nunca mais um link cru para
+  // /contentos/selecionar-cliente); "selecionar" e "criar" continuam sendo as
+  // duas saídas reais, só que a primeira agora é a lista real de empresas
+  // autorizadas e a segunda é o onNewClient repassado ao picker.
+  assert(cmp.includes("InlineCompanyPicker") && cmp.includes("onNewClient"), "Company-required oferece as duas saídas reais: selecionar (picker inline com empresas autorizadas) ou criar (onNewClient) -- nunca mais um redirect para /contentos/selecionar-cliente");
+  assert(!cmp.includes("/contentos/selecionar-cliente"), "nunca redireciona para o seletor do ContentOS a partir do Command Center (Problema 2)");
   assert(cmp.includes("withCompanyContext"), "reaproveita o helper canônico de navegação com Company (não constrói querystring à mão)");
 }
 

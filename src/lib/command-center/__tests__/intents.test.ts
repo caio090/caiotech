@@ -8,7 +8,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { resolveCommandIntent, looksConversational } from "../intents";
+import { resolveCommandIntent, resolveCommandFlow, looksConversational } from "../intents";
 
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
@@ -69,6 +69,43 @@ console.log("[test] 5 — comando desconhecido não resolve (cai para busca info
 {
   const r = resolveCommandIntent("xpto inexistente 12345");
   assert(r === null, "sem intenção conhecida, resolver retorna null -- não inventa uma ação");
+}
+
+console.log("[test] 6 — Sprint Command Center + Jarvis Context V1 (Problema 2/3): \"criar\"/\"iniciar\" projeto NUNCA resolve para open_projects");
+{
+  const creationPhrases = [
+    "quero iniciar um projeto", "criar projeto", "novo projeto", "iniciar projeto",
+    "começar projeto", "quero criar um projeto",
+  ];
+  for (const phrase of creationPhrases) {
+    const flow = resolveCommandFlow(phrase);
+    assert(flow?.kind === "create_project", `"${phrase}" resolve para o flow create_project (recebido: ${flow?.kind ?? "null"})`);
+  }
+}
+
+console.log("[test] 7 — \"abrir/ver/meus/listar projetos\" continua resolvendo para navigate/open_projects (Company-required), nunca para o wizard de criação");
+{
+  const consultPhrases = ["abrir projetos", "ver projetos", "meus projetos", "listar projetos"];
+  for (const phrase of consultPhrases) {
+    const flow = resolveCommandFlow(phrase);
+    assert(flow?.kind === "navigate" && flow.intentId === "open_projects", `"${phrase}" resolve para navigate/open_projects (recebido: ${flow?.kind ?? "null"})`);
+  }
+}
+
+console.log("[test] 8 — \"criar cliente\"/variações resolvem para o flow create_client (wizard inline, nunca link cru para /admin/clientes)");
+{
+  const phrases = ["criar cliente", "novo cliente", "cadastrar cliente", "adicionar cliente"];
+  for (const phrase of phrases) {
+    const flow = resolveCommandFlow(phrase);
+    assert(flow?.kind === "create_client", `"${phrase}" resolve para o flow create_client (recebido: ${flow?.kind ?? "null"})`);
+  }
+}
+
+console.log("[test] 9 — resolveCommandIntent (compat) só devolve o subconjunto navigate -- create_client/create_project não vazam para o formato antigo");
+{
+  assert(resolveCommandIntent("criar projeto") === null, "resolveCommandIntent nunca devolve um flow create_project como se fosse navigate");
+  assert(resolveCommandIntent("criar cliente") === null, "resolveCommandIntent nunca devolve um flow create_client como se fosse navigate");
+  assert(resolveCommandIntent("abrir projetos")?.intentId === "open_projects", "navigate continua funcionando normalmente via resolveCommandIntent");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
