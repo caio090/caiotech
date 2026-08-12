@@ -302,10 +302,6 @@ export default function HomeClient() {
           </div>
         ))}
 
-        <div className="hero-fade-up" style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".2em", textTransform: "uppercase", color: S.accent, border: `1px solid ${S.accent}30`, background: `${S.accent}10`, padding: ".25rem .8rem", marginBottom: "2rem", display: "inline-block" }}>
-          Sistema operacional para empresas, agências e equipes
-        </div>
-
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 w-full">
           {/* Text column */}
           <div className="flex-1 text-center lg:text-left">
@@ -320,47 +316,32 @@ export default function HomeClient() {
               Centralize projetos, clientes, conteúdo, calendário e operação. Trabalhe com o Jarvis conectado ao contexto da sua empresa.
             </p>
 
-            {/* CTA primário + secundário (Fase 4) */}
+            {/* CTA primário + secundário — Final Home CTA Refinement.
+                Beta é o CTA dominante do Hero (destino/label canônicos,
+                mesmos já usados mais abaixo na página); demonstração é a
+                alternativa de baixo contraste, reaproveitando o mesmo
+                modal já existente (openModal/LeadConversationModal).
+                "Entrar" some daqui -- já vive no header, não precisa
+                competir de novo no hero. */}
             <div className="hero-fade-up-d3 flex flex-col sm:flex-row gap-3">
-              <a
-                href="#o-que-e-lokat-os"
+              <Link
+                href={betaHref}
                 className="w-full sm:w-auto text-center"
                 style={{ background: S.accent, color: "#fff", padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700, transition: "background .2s, box-shadow .2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#8f84f8"; e.currentTarget.style.boxShadow = `0 0 28px ${S.accent}55`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = S.accent; e.currentTarget.style.boxShadow = "none"; }}
               >
-                ■ Conhecer o LOKAT OS
-              </a>
-              <Link
-                href="/login"
+                ■ {betaLabel}
+              </Link>
+              <button
+                type="button"
+                onClick={openModal}
                 className="w-full sm:w-auto text-center"
-                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", textDecoration: "none", display: "inline-block", fontWeight: 700, transition: "border-color .2s, color .2s" }}
+                style={{ background: "transparent", color: S.text, border: `1px solid ${S.border}`, padding: ".85rem 2rem", ...S.mono, fontSize: ".7rem", letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", display: "inline-block", fontWeight: 700, transition: "border-color .2s, color .2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#44445a"; e.currentTarget.style.color = "#fff"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = S.border; e.currentTarget.style.color = S.text; }}
               >
-                Entrar
-              </Link>
-            </div>
-
-            {/* Links auxiliares discretos (Fase 8: Planos não é a única ação) */}
-            <div className="hero-fade-up-d3 mt-4 flex flex-wrap items-center justify-center lg:justify-start gap-4">
-              <Link
-                href="/planos"
-                style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px" }}
-              >
-                Ver planos →
-              </Link>
-              <Link
-                href="/diagnostico"
-                style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px" }}
-              >
-                Diagnóstico gratuito →
-              </Link>
-              <button
-                onClick={openModal}
-                style={{ ...S.mono, fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.muted, textDecoration: "underline", textUnderlineOffset: "3px", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-              >
-                Agendar demonstração →
+                Agendar demonstração
               </button>
             </div>
 
@@ -496,7 +477,10 @@ export default function HomeClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* flex + wrap (em vez de grid) para a última linha incompleta
+              (5 cards em 3 colunas) ficar centralizada, nunca colada à
+              esquerda com um vão vazio à direita. */}
+          <div className="flex flex-wrap justify-center gap-5">
             {[
               { headline: "Os dados estão em 4 lugares diferentes", sub: "Cardápio, Instagram, planilha do mês passado e anotação no bloco." },
               { headline: "Aprovação de conteúdo pelo WhatsApp", sub: "\"Você aprovou aquela arte?\" → \"Qual arte?\" → volta ao início." },
@@ -506,7 +490,7 @@ export default function HomeClient() {
             ].map((p) => (
               <div
                 key={p.headline}
-                className="lk-card-hover"
+                className="lk-card-hover w-full md:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.834rem)]"
                 style={{ border: "1px solid #e8e8f0", padding: "1.5rem", background: "#fafafe" }}
               >
                 <p style={{ ...S.grotesk, fontSize: ".95rem", fontWeight: 700, color: "#111", marginBottom: ".5rem", lineHeight: 1.3 }}>

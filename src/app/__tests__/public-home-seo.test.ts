@@ -91,10 +91,40 @@ assert(h1RenderedText === "Sua empresa trabalhando como um sistema.", "H1 exato 
 console.log("[test] 13b — hierarquia visual do H1 restaurada (mesmo tratamento histórico: <em> + S.accent)");
 assert(/<em style=\{\{ fontStyle: "italic", color: S\.accent \}\}>sistema<\/em>/.test(h1Blocks[0] ?? ""), "palavra de destaque usa o mesmo tratamento (itálico + cor de accent) do H1 histórico aprovado (commit d06b5c1)");
 
-console.log("[test] 14 — CTA primário/secundário do hero conforme especificado");
-assert(homeClient.includes("Conhecer o LOKAT OS"), "CTA primário: Conhecer o LOKAT OS");
-assert(homeClient.includes('href="/login"') && homeClient.includes(">\n                Entrar\n              </Link>"), "CTA secundário: Entrar, para a rota real de login");
-assert(homeClient.includes('href="/planos"') && homeClient.includes("Ver planos"), "CTA para Planos existe, mas não é a única ação (mantém Entrar/Diagnóstico/Demonstração)");
+console.log("[test] 14 — CTA primário/secundário do hero — Final Home CTA Refinement");
+{
+  const heroCtaBlock = homeClient.slice(
+    homeClient.indexOf('className="hero-fade-up-d3 flex flex-col sm:flex-row gap-3"'),
+    homeClient.indexOf('className="hero-fade-up-d3 flex flex-wrap items-center justify-center lg:justify-start gap-3 mt-6'),
+  );
+  assert(heroCtaBlock.includes("href={betaHref}") && heroCtaBlock.includes("{betaLabel}"), "CTA primário do hero usa o destino/label canônicos de beta (betaHref/betaLabel), o mesmo já usado no resto da página");
+  assert(heroCtaBlock.includes("onClick={openModal}") && heroCtaBlock.includes("Agendar demonstração"), "CTA secundário do hero abre o modal real de demonstração (mesmo componente já usado alhures)");
+  assert(!heroCtaBlock.includes('href="/login"'), "hero não tem mais um \"Entrar\" próprio -- já existe no header, não compete de novo aqui");
+}
+
+console.log("[test] 14b — linha de sublinks (Ver planos/Diagnóstico/Demonstração) removida do hero");
+{
+  assert(!homeClient.includes("Ver planos →"), "sublink 'Ver planos →' removido do hero (Planos já está no header)");
+  assert(!homeClient.includes("Diagnóstico gratuito →"), "sublink 'Diagnóstico gratuito →' removido do hero (Diagnóstico já é o CTA do header)");
+  assert(!homeClient.includes("Agendar demonstração →"), "sublink antigo com seta removido -- demonstração agora é o CTA secundário do hero, sem seta");
+}
+
+console.log("[test] 14c — badge 'Sistema operacional...' removida do hero a pedido do usuário");
+assert(!homeClient.includes("Sistema operacional para empresas, agências e equipes"), "badge eyebrow removida do hero");
+
+console.log("[test] 14d — header: Entrar + Fazer diagnóstico, LOKAT.REC restaurado");
+{
+  const header = read("src/components/public-header.tsx");
+  assert(header.includes('href="/login"') && header.includes(">\n            Entrar\n          </Link>"), "header mantém Entrar para login");
+  assert(header.includes('href="/diagnostico"') && header.includes("Fazer diagnóstico"), "CTA primário do header agora é Fazer diagnóstico, para a rota real /diagnostico");
+  assert(!header.includes("Entrar no beta") && !header.includes('"■ Começar"'), "texto antigo do CTA do header (beta/Começar) não sobra no header -- beta virou CTA do hero");
+  assert(header.includes("LOKAT.REC"), "badge LOKAT.REC restaurada no header a pedido explícito do usuário");
+}
+
+console.log("[test] 14e — cards de 'O Problema' usam flex centralizado (última linha não fica colada à esquerda)");
+{
+  assert(homeClient.includes("flex flex-wrap justify-center gap-5") && homeClient.includes("Os dados estão em 4 lugares diferentes"), "grid de 5 cards virou flex-wrap centralizado (a última linha de 2 cards fica centralizada, não colada à esquerda)");
+}
 
 console.log("[test] 15 — módulos representados na Home são todos reais/implementados");
 for (const route of ["/admin/empresa", "/admin/escritorio", "/admin/projetos", "/admin/crm", "/admin/contentos", "/admin/calendario"]) {

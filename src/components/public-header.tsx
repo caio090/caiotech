@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
-import { LAUNCH_MODE } from "@/lib/launch/config";
 
 // Sprint Final Product Experience Consolidation (Fase 41) — header
 // reduzido a 3 links informacionais + Entrar + 1 CTA primário. Blog e
@@ -51,26 +50,39 @@ export function PublicHeader() {
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-4">
+          <Link
+            href="/rec"
+            className="text-[.65rem] uppercase tracking-[.14em] transition-colors"
+            style={{ fontFamily: "'Space Mono', monospace", color: "#c0392b", border: "1px solid #c0392b40", padding: ".22rem .55rem" }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#c0392b80")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#c0392b40")}
+          >
+            LOKAT.REC
+          </Link>
           <Link href="/login" className="text-[.72rem] uppercase tracking-[.1em] transition-colors text-[#555566] hover:text-[#e8e8e8]" style={{ fontFamily: "'Space Mono', monospace" }}>
             Entrar
           </Link>
+          {/* Sprint Final Home CTA Refinement — header CTA passa a ser
+              Diagnóstico (rota real já usada em navLinks acima); Beta vira
+              o CTA primário do Hero, evitando "Entrar" duplicado entre
+              header e hero e dois CTAs de beta competindo. */}
           <Link
-            href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+            href="/diagnostico"
             className="text-[.7rem] uppercase tracking-[.12em] font-bold px-4 py-[.35rem] hover:opacity-90 active:scale-95 transition-all"
             style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}
           >
-            {LAUNCH_MODE.publicSignupMode === "waitlist" ? "■ Entrar no beta" : "■ Começar"}
+            ■ Fazer diagnóstico
           </Link>
         </div>
 
         {/* Mobile */}
         <div className="flex md:hidden items-center gap-2">
           <Link
-            href={LAUNCH_MODE.publicSignupMode === "waitlist" ? "/pre-acesso" : "/criar-conta"}
+            href="/diagnostico"
             className="text-[.65rem] uppercase tracking-[.1em] font-bold px-3 py-1.5 active:scale-95 transition-all"
             style={{ background: "#7b6ef6", color: "#fff", fontFamily: "'Space Mono', monospace" }}
           >
-            {LAUNCH_MODE.publicSignupMode === "waitlist" ? "Beta" : "Começar"}
+            Diagnóstico
           </Link>
           <button onClick={() => setOpen((v) => !v)} className="p-2 transition-colors" style={{ color: "#555566" }} aria-label={open ? "Fechar" : "Menu"}>
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -94,6 +106,9 @@ export function PublicHeader() {
               </Link>
             ))}
             <div className="pt-3 space-y-2" style={{ borderTop: "1px solid #222230" }}>
+              <Link href="/rec" onClick={() => setOpen(false)} className="block text-[.68rem] uppercase tracking-[.14em] py-2 transition-colors" style={{ fontFamily: "'Space Mono', monospace", color: "#c0392b" }}>
+                LOKAT.REC
+              </Link>
               <Link href="/login" onClick={() => setOpen(false)} className="block text-[.72rem] uppercase tracking-[.1em] py-2 text-[#555566] hover:text-[#e8e8e8] transition-colors" style={{ fontFamily: "'Space Mono', monospace" }}>
                 Entrar
               </Link>

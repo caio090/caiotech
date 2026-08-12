@@ -45,7 +45,9 @@ console.log("[test] 4 — header público reduzido: no máximo 3 links informaci
   const navLinksMatch = header.match(/const navLinks = \[([\s\S]*?)\];/);
   const linkCount = (navLinksMatch?.[1].match(/href:/g) ?? []).length;
   assert(linkCount <= 3, `navLinks tem ${linkCount} itens (meta: no máximo 3, Fase 41)`);
-  assert(!header.includes("LOKAT.REC"), "badge LOKAT.REC removido do header primário -- não compete mais com Entrar/CTA no primeiro olhar");
+  // Restaurado a pedido explícito do usuário na sprint Final Home CTA
+  // Refinement -- volta a existir no header, como estava antes.
+  assert(header.includes("LOKAT.REC"), "badge LOKAT.REC presente no header (restaurado a pedido do usuário)");
   assert(header.includes('href="/login"') && header.includes("Entrar"), "Entrar continua presente");
   assert(/background: "#7b6ef6"/.test(header), "1 CTA primário continua presente (cor de accent)");
 }
