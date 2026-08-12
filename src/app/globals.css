@@ -185,6 +185,16 @@ body {
 .orbit-rev       { animation: lokat-orbit-rev 35s linear infinite; transform-origin: center; transform-box: view-box; will-change: transform; }
 .eye-blink       { animation: lokat-eye-blink 5s 2.5s ease-in-out infinite; }
 
+/* Sprint Final Closure (Parte G, Fase 44) — sinal sutil viajando pela
+   órbita da Gota (os pequenos círculos no fim de cada elipse). CSS puro,
+   sem nova dependência -- as elipses já giram via .orbit-slow/.orbit-rev,
+   isto só faz o ponto "respirar" enquanto viaja. */
+@keyframes lokat-signal-pulse {
+  0%, 100% { opacity: 0.45; r: 3; }
+  50%      { opacity: 1;    r: 4.5; }
+}
+.orbit-signal { animation: lokat-signal-pulse 2.6s ease-in-out infinite; transform-box: fill-box; }
+
 @keyframes lk-drop-float {
   0%, 100% { transform: translateY(8px); }
   50%       { transform: translateY(-12px); }
@@ -268,6 +278,7 @@ body {
   .eye-blink  { animation: none; }
   .orbit-slow { animation-duration: 120s; }
   .orbit-rev  { animation-duration: 180s; }
+  .orbit-signal { animation: none; }
   .lk-ticker-track,
   .lk-scroll-track {
     animation: none;

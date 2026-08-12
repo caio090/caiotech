@@ -90,6 +90,153 @@ function EcosystemCycle() {
   );
 }
 
+// ── Product Demo (Fase 47-49) ─────────────────────────────────
+// Sequência controlada de estados (Empresa → Jarvis → Projetos →
+// Calendário), reaproveitando o mesmo painel escuro/fake-browser-bar já
+// usado no restante da Home. Sempre rotulado como simulação (Fase 26) --
+// nunca finge ser dado real. CSS/estado local apenas, sem nova dependência.
+const DEMO_TABS = [
+  { id: "empresa",    label: "Empresa" },
+  { id: "jarvis",     label: "Jarvis" },
+  { id: "projetos",   label: "Projetos" },
+  { id: "calendario", label: "Calendário" },
+] as const;
+type DemoTabId = typeof DEMO_TABS[number]["id"];
+
+function DemoPanelShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ background: "#0f0f1c", border: "1px solid #1e1e30", borderRadius: 10, padding: "1rem", minHeight: 220 }}>
+      {children}
+    </div>
+  );
+}
+
+function DemoEmpresaPanel() {
+  return (
+    <DemoPanelShell>
+      <div className="flex items-center gap-3 mb-4">
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "#7b6ef622", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Building2 size={16} style={{ color: "#7b6ef6" }} />
+        </div>
+        <div>
+          <p style={{ ...S.grotesk, fontSize: ".82rem", fontWeight: 700, color: "#e8e8e8" }}>Empresa selecionada</p>
+          <p style={{ ...S.mono, fontSize: ".58rem", color: "#55556a" }}>Contexto ativo em todo o sistema</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: "Projetos ativos", value: "3" },
+          { label: "Pendências", value: "5" },
+        ].map((m) => (
+          <div key={m.label} style={{ background: "#16161f", border: "1px solid #22222f", borderRadius: 8, padding: ".65rem" }}>
+            <p style={{ ...S.mono, fontSize: ".48rem", letterSpacing: ".08em", textTransform: "uppercase", color: "#44445a" }}>{m.label}</p>
+            <p style={{ ...S.grotesk, fontSize: "1rem", fontWeight: 700, color: "#c4baff" }}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+    </DemoPanelShell>
+  );
+}
+
+function DemoJarvisPanel() {
+  return (
+    <DemoPanelShell>
+      <div className="flex items-center gap-2 mb-3">
+        <Wand2 size={14} style={{ color: S.accent }} />
+        <span style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.accent }}>Jarvis</span>
+      </div>
+      <div style={{ background: "#16161f", border: "1px solid #22222f", borderRadius: 8, padding: ".75rem", marginBottom: ".5rem" }}>
+        <p style={{ ...S.grotesk, fontSize: ".72rem", color: "#888899" }}>&ldquo;organiza minha semana&rdquo;</p>
+      </div>
+      <div style={{ background: "#7b6ef612", border: "1px solid #7b6ef630", borderRadius: 8, padding: ".75rem" }}>
+        <p style={{ ...S.grotesk, fontSize: ".72rem", color: "#d8d4ff", lineHeight: 1.6 }}>
+          Hoje: 2 aprovações pendentes. Amanhã: gravação agendada. Prioridade da semana: fechar roteiro da campanha.
+        </p>
+      </div>
+    </DemoPanelShell>
+  );
+}
+
+function DemoProjetosPanel() {
+  return (
+    <DemoPanelShell>
+      {[
+        { title: "Campanha de lançamento", status: "Em andamento", color: "#7b6ef6" },
+        { title: "Reels institucional", status: "Revisão", color: "#f59e0b" },
+        { title: "Cardápio digital v2", status: "Planejamento", color: "#3b82f6" },
+      ].map((p) => (
+        <div key={p.title} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".6rem 0", borderBottom: "1px solid #1e1e30" }}>
+          <span style={{ ...S.grotesk, fontSize: ".76rem", color: "#c8c8d4" }}>{p.title}</span>
+          <span style={{ ...S.mono, fontSize: ".5rem", letterSpacing: ".06em", color: p.color, background: `${p.color}18`, padding: ".15rem .5rem", borderRadius: 4 }}>{p.status}</span>
+        </div>
+      ))}
+    </DemoPanelShell>
+  );
+}
+
+function DemoCalendarioPanel() {
+  return (
+    <DemoPanelShell>
+      <div style={{ display: "flex", flexDirection: "column", gap: ".5rem" }}>
+        {["Post carrossel — marca X", "Reels produto novo", "Story promoção sexta"].map((item, i) => (
+          <div key={item} style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: ["#7b6ef6","#10b981","#f59e0b"][i], flexShrink: 0 }} />
+            <span style={{ ...S.grotesk, fontSize: ".76rem", color: "#888899" }}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </DemoPanelShell>
+  );
+}
+
+const DEMO_PANELS: Record<DemoTabId, React.ComponentType> = {
+  empresa: DemoEmpresaPanel, jarvis: DemoJarvisPanel, projetos: DemoProjetosPanel, calendario: DemoCalendarioPanel,
+};
+
+function HomeProductDemo() {
+  const [tab, setTab] = useState<DemoTabId>("empresa");
+  const Panel = DEMO_PANELS[tab];
+  return (
+    <div style={{ background: "#1a1a28", border: "1px solid #2a2a40", borderRadius: 14, padding: "1.5rem", overflow: "hidden" }}>
+      {/* Fake browser bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: ".5rem", marginBottom: "1.25rem", paddingBottom: ".75rem", borderBottom: "1px solid #2a2a40" }}>
+        {["#ff5f57","#febc2e","#28c840"].map((c) => <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />)}
+        <div style={{ flex: 1, background: "#0f0f1c", borderRadius: 6, height: 22, marginLeft: ".5rem", display: "flex", alignItems: "center", paddingLeft: ".75rem" }}>
+          <span style={{ ...S.mono, fontSize: ".55rem", color: "#44445a", letterSpacing: ".06em" }}>app.lokat.io</span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Prévia da plataforma">
+        {DEMO_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              ...S.mono, fontSize: ".6rem", letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 700,
+              padding: ".4rem .8rem", borderRadius: 8, border: `1px solid ${tab === t.id ? S.accent : "#2a2a40"}`,
+              background: tab === t.id ? `${S.accent}18` : "transparent",
+              color: tab === t.id ? "#c4baff" : "#55556a",
+              cursor: "pointer", transition: "all .18s ease",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <Panel />
+
+      <p style={{ ...S.mono, fontSize: ".55rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#44445a", marginTop: "1rem", textAlign: "center" }}>
+        Simulação — dados ilustrativos
+      </p>
+    </div>
+  );
+}
+
 type LkIcon = React.ComponentType<{ size?: number; strokeWidth?: number }>;
 type ProfileCardProps = {
   label: string; cta: string; desc: string; q: string; Icon: LkIcon;
@@ -237,13 +384,13 @@ export default function HomeClient() {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <svg width="370" height="220" viewBox="0 0 370 220" fill="none" className="orbit-slow" style={{ opacity: 0.2 }}>
                 <ellipse cx="185" cy="110" rx="170" ry="62" stroke="#7b6ef6" strokeWidth="1" strokeDasharray="5 9" />
-                <circle cx="355" cy="110" r="4" fill="#7b6ef6" />
+                <circle cx="355" cy="110" r="4" fill="#7b6ef6" className="orbit-signal" />
               </svg>
             </div>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ transform: "rotate(58deg)" }}>
               <svg width="290" height="290" viewBox="0 0 290 290" fill="none" className="orbit-rev" style={{ opacity: 0.13 }}>
                 <ellipse cx="145" cy="145" rx="128" ry="46" stroke="#a855f7" strokeWidth="0.8" strokeDasharray="3 11" />
-                <circle cx="17" cy="145" r="3" fill="#a855f7" />
+                <circle cx="17" cy="145" r="3" fill="#a855f7" className="orbit-signal" />
               </svg>
             </div>
             <div className="relative z-10 lk-drop-float" style={{ width: "120px", height: "158px" }}>
@@ -573,51 +720,7 @@ export default function HomeClient() {
                 Simulação — interface em desenvolvimento
               </p>
             </div>
-            <div style={{ background: "#1a1a28", border: "1px solid #2a2a40", borderRadius: 14, padding: "1.5rem", overflow: "hidden" }}>
-              {/* Fake browser bar */}
-              <div style={{ display: "flex", alignItems: "center", gap: ".5rem", marginBottom: "1.25rem", paddingBottom: ".75rem", borderBottom: "1px solid #2a2a40" }}>
-                {["#ff5f57","#febc2e","#28c840"].map((c) => <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />)}
-                <div style={{ flex: 1, background: "#0f0f1c", borderRadius: 6, height: 22, marginLeft: ".5rem", display: "flex", alignItems: "center", paddingLeft: ".75rem" }}>
-                  <span style={{ ...S.mono, fontSize: ".55rem", color: "#44445a", letterSpacing: ".06em" }}>app.lokat.io/dashboard</span>
-                </div>
-              </div>
-              {/* Fake dashboard layout */}
-              <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                {[
-                  { label: "Faturamento mensal", value: "R$ 18.450", color: "#10b981" },
-                  { label: "Conteúdos planejados", value: "24",       color: "#7b6ef6" },
-                  { label: "Aprovações pendentes", value: "3",        color: "#f59e0b" },
-                  { label: "Alcance Meta (7d)",    value: "12.8K",    color: "#3b82f6" },
-                ].map((m) => (
-                  <div key={m.label} style={{ background: "#0f0f1c", border: "1px solid #1e1e30", borderRadius: 10, padding: ".85rem" }}>
-                    <p style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#44445a", marginBottom: ".4rem" }}>{m.label}</p>
-                    <p style={{ ...S.grotesk, fontSize: "1.2rem", fontWeight: 700, color: m.color }}>{m.value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                <div style={{ background: "#0f0f1c", border: "1px solid #1e1e30", borderRadius: 10, padding: "1rem" }}>
-                  <p style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#44445a", marginBottom: ".75rem" }}>Calendário editorial</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: ".4rem" }}>
-                    {["Post carrossel — marca X", "Reels produto novo", "Story promoção sexta"].map((item, i) => (
-                      <div key={item} style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: ["#7b6ef6","#10b981","#f59e0b"][i], flexShrink: 0 }} />
-                        <span style={{ ...S.grotesk, fontSize: ".72rem", color: "#888899" }}>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background: "#0f0f1c", border: "1px solid #1e1e30", borderRadius: 10, padding: "1rem" }}>
-                  <p style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#44445a", marginBottom: ".75rem" }}>Aprovações recentes</p>
-                  {[["Arte lançamento produto", "aprovado"], ["Vídeo institucional", "aguardando"], ["Post patrocinado", "aprovado"]].map(([t, s]) => (
-                    <div key={t} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ".4rem" }}>
-                      <span style={{ ...S.grotesk, fontSize: ".72rem", color: "#888899" }}>{t}</span>
-                      <span style={{ ...S.mono, fontSize: ".52rem", letterSpacing: ".08em", color: s === "aprovado" ? "#10b981" : "#f59e0b", background: s === "aprovado" ? "#10b98112" : "#f59e0b12", padding: ".1rem .4rem" }}>{s}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <HomeProductDemo />
           </div>
         </section>
 
