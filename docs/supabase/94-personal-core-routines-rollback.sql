@@ -1,5 +1,5 @@
 -- ============================================================
--- LOKAT OS — SQL 94 ROLLBACK (Personal Strategy OS — Fase 1A.2)
+-- LOKAT OS — SQL 94 ROLLBACK (Personal Strategy OS — Fase 1A.3)
 -- Reverte docs/supabase/94-personal-core-routines.sql
 -- ============================================================
 

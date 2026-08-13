@@ -1,5 +1,5 @@
 -- ============================================================
--- LOKAT OS — SQL 93 ROLLBACK (Personal Strategy OS — Fase 1A.2)
+-- LOKAT OS — SQL 93 ROLLBACK (Personal Strategy OS — Fase 1A.3)
 -- Reverte docs/supabase/93-personal-core-tasks.sql
 --
 -- IMPORTANTE: este domínio NUNCA cria/redefine public.set_updated_at()
