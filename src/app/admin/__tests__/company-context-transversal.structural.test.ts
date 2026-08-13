@@ -20,7 +20,11 @@ assert(exists("src/components/company-context-bar.tsx"), "CompanyContextBar exis
 const bar = read("src/components/company-context-bar.tsx");
 assert(bar.includes("/api/company-context"), "busca o nome da Company via wrapper existente, nunca inventa um segundo resolver client-side");
 assert(bar.includes("COMPANY_CONTEXT_QUERY_KEY"), "usa a chave canônica compartilhada");
-assert(bar.includes("selecionar-cliente"), "reutiliza o picker real para trocar de empresa, nunca um segundo picker");
+// LOKAT OS — Company Context Selector + Local Preview Audit: o header não
+// navega mais para /contentos/selecionar-cliente (rota do ContentOS) --
+// abre o mesmo InlineCompanyPicker inline (Company Context Selector V2).
+assert(bar.includes("InlineCompanyPicker"), "reutiliza o picker inline real (InlineCompanyPicker) para trocar de empresa, nunca um segundo picker");
+assert(!bar.includes("selecionar-cliente"), "não depende mais do redirect do ContentOS para trocar de empresa");
 
 console.log("[test] 2 — API wrapper reaproveita resolveCompanyContext(), nunca duplica lógica");
 const apiWrapper = read("src/app/api/company-context/route.ts");
