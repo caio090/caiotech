@@ -10,11 +10,14 @@ import { withCompanyContext } from "@/lib/company-context/navigation";
  * LOKAT OS — Company Selector Final UX. A página permanece na própria rota
  * (nunca navega para /contentos/selecionar-cliente) e mostra um estado de
  * fundo simples ("Selecione uma empresa"); a escolha real acontece no
- * CompanySelectorDialog (modal), aberto automaticamente e reabrível pelo
- * botão. Ao selecionar, router.replace troca só o `?client=` via
- * withCompanyContext (preserva os demais params) -- mesma página, mesmo
- * componente, contexto atualizado. "+ Novo cliente" aponta para a única
- * autoridade real de criação (/admin/clientes).
+ * CompanySelectorDialog (modal), que nasce FECHADO -- entrar no módulo sem
+ * ?client= nunca é, por si só, uma intenção de abrir o seletor. O modal só
+ * abre por ação explícita do usuário no botão "Selecionar empresa" (ou pelo
+ * seletor do header, que já controla seu próprio estado). Ao selecionar,
+ * router.replace troca só o `?client=` via withCompanyContext (preserva os
+ * demais params) -- mesma página, mesmo componente, contexto atualizado.
+ * "+ Novo cliente" aponta para a única autoridade real de criação
+ * (/admin/clientes).
  */
 export function CompanyContextRequiredState({
   reason, nextPath,
@@ -23,7 +26,7 @@ export function CompanyContextRequiredState({
   nextPath: string;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const isNotFound = reason === "company_not_found";
 
   function handleSelect(companyId: string) {

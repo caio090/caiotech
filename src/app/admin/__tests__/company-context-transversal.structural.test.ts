@@ -65,5 +65,19 @@ const picker = read("src/app/contentos/selecionar-cliente/_client-content.tsx");
 assert(picker.includes("/admin/clientes"), "estado vazio do picker aponta para a autoridade real de criação");
 assert(!picker.includes("useState") || !/name=.*email=.*phone=/.test(picker), "picker não reimplementa um formulário de criação — só linka para o real");
 
+console.log("[test] 9 — Company Selector nasce fechado (Codex Web: entrar no módulo não abre o modal)");
+const requiredState = read("src/components/company-context-required-state.tsx");
+assert(/const \[open, setOpen\] = useState\(false\)/.test(requiredState), "A/B — selector inicia fechado (useState(false)), nunca aberto por padrão em /admin/empresa nem /admin/escritorio (mesmo componente compartilhado)");
+assert(!/useState\(true\)/.test(requiredState), "não existe nenhum useState(true) residual neste componente");
+assert(!/useEffect\(/.test(requiredState), "E — nenhum useEffect sincroniza 'ausência de client' com abertura do modal — ausência de client não é intenção de abrir o seletor");
+assert(/onClick=\{\(\) => setOpen\(true\)\}/.test(requiredState) && requiredState.includes('data-testid="company-context-open-selector"'), "C — só o clique explícito em \"Selecionar empresa\" abre o modal");
+assert(/onClose=\{\(\) => setOpen\(false\)\}/.test(requiredState), "D — fechar o modal (X/onClose) só seta false, sem nenhum caminho de reabertura automática");
+assert(read("src/app/admin/empresa/page.tsx").includes("CompanyContextRequiredState"), "/admin/empresa usa o mesmo componente compartilhado (nunca uma cópia local do estado)");
+assert(read("src/app/admin/escritorio/page.tsx").includes("CompanyContextRequiredState"), "/admin/escritorio usa o mesmo componente compartilhado (nunca uma cópia local do estado)");
+
+console.log("[test] 10 — header preserva seu próprio estado de abertura (F — não deve quebrar com a correção acima)");
+const headerBar = read("src/components/company-context-bar.tsx");
+assert(/const \[open, setOpen\] = useState\(false\)/.test(headerBar), "CompanyContextBar controla seu próprio 'open' independente do CompanyContextRequiredState — sem estado compartilhado entre os dois seletores");
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
