@@ -9,12 +9,13 @@ import {
   Database, GitCommit, Calendar, TrendingUp, Server
 } from "lucide-react";
 import {
-  PROJECT_AREAS, SQL_BLOCKERS, V1_HISTORY, EFFORT_ESTIMATE,
+  PROJECT_AREAS, SQL_BLOCKERS, EFFORT_ESTIMATE,
   calcV1Readiness,
   type ProjectAreaStatus, type AreaReadiness,
 } from "@/config/project-status";
 import { V1_PROGRESS, V2_PROGRESS, getDaysRemainingV1 } from "@/lib/project-status";
 import type { DeploymentInfo } from "@/lib/deployment-info";
+import type { LktActivityEvent, LktEventKind, LktEventStatus } from "@/lib/lkt-activity/types";
 
 // ── Constantes de UI ─────────────────────────────────────────
 const READINESS_COLORS: Record<AreaReadiness, string> = {
@@ -73,6 +74,62 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "admin",       label: "Admin" },
   { key: "conteudo",    label: "Conteúdo" },
 ];
+
+// ── LKT Activity Log — vocabulário de UI ────────────────────
+const LKT_KIND_LABEL: Record<LktEventKind, string> = {
+  FEATURE: "Feature",
+  FIX: "Fix",
+  QA: "QA",
+  RELEASE: "Release",
+  ARCHITECTURE: "Arquitetura",
+  BLOCKER: "Bloqueio",
+  STATUS_CHANGE: "Mudança de status",
+  MIGRATION: "Migração",
+  INTEGRATION: "Integração",
+};
+
+const LKT_STATUS_LABEL: Record<LktEventStatus, string> = {
+  REAL: "Real",
+  PARTIAL: "Parcial",
+  DEMO: "Demo",
+  COMING_SOON: "Em breve",
+  NOT_IMPLEMENTED: "Não implementado",
+  LEGACY: "Legado",
+  BLOCKED: "Bloqueado",
+};
+
+const LKT_STATUS_BADGE: Record<LktEventStatus, string> = {
+  REAL: "bg-emerald-50 border-emerald-200 text-emerald-700",
+  PARTIAL: "bg-yellow-50 border-yellow-200 text-yellow-700",
+  DEMO: "bg-orange-50 border-orange-200 text-orange-700",
+  COMING_SOON: "bg-indigo-50 border-indigo-200 text-indigo-600",
+  NOT_IMPLEMENTED: "bg-slate-50 border-slate-200 text-slate-400",
+  LEGACY: "bg-slate-100 border-slate-200 text-slate-500",
+  BLOCKED: "bg-red-50 border-red-200 text-red-700",
+};
+
+type LktHistoryFilter = "ALL" | "RELEASE" | "FEATURE" | "FIX" | "QA" | "BLOCKER";
+const LKT_HISTORY_FILTERS: { key: LktHistoryFilter; label: string }[] = [
+  { key: "ALL",     label: "Todos" },
+  { key: "RELEASE", label: "Release" },
+  { key: "FEATURE", label: "Feature" },
+  { key: "FIX",     label: "Fix" },
+  { key: "QA",      label: "QA" },
+  { key: "BLOCKER", label: "Bloqueio" },
+];
+
+/** Último evento cujo status ainda não é um estado terminal saudável -- honesto: "em andamento" nunca é inventado, é derivado do próprio evento mais recente. */
+function getInProgressMovement(activity: LktActivityEvent[]): LktActivityEvent | null {
+  const latest = activity[0];
+  if (!latest) return null;
+  const terminalOk = latest.status === "REAL" && latest.build !== "FAIL";
+  return terminalOk ? null : latest;
+}
+
+/** Bloqueio ativo mais recente -- evento BLOCKER ou qualquer evento com `blocker` preenchido, o mais recente primeiro (activity já vem ordenada desc). */
+function getActiveBlocker(activity: LktActivityEvent[]): LktActivityEvent | null {
+  return activity.find(e => e.kind === "BLOCKER" || Boolean(e.blocker)) ?? null;
+}
 
 function filterAreas(areas: ProjectAreaStatus[], key: FilterKey): ProjectAreaStatus[] {
   switch (key) {
@@ -521,29 +578,171 @@ function EffortSection() {
   );
 }
 
-// ── Linha do tempo ────────────────────────────────────────────
-function HistorySection() {
+// ── Histórico recente (LKT Activity Log) ────────────────────
+function LktHistoryItem({ event }: { event: LktActivityEvent }) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = Boolean(
+    event.description || event.tests?.length || event.environment ||
+    event.references?.length || event.nextAction || event.blocker || event.devUrl
+  );
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center">
+        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${event.kind === "BLOCKER" ? "bg-red-400" : "bg-slate-300"}`} />
+        <div className="w-px flex-1 bg-slate-100 mt-1" />
+      </div>
+      <div className="pb-3 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => hasDetail && setOpen(o => !o)}
+          className={`text-left w-full ${hasDetail ? "cursor-pointer" : "cursor-default"}`}
+        >
+          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+            <span className="text-xs text-slate-400">{new Date(event.timestamp).toLocaleString("pt-BR")}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-slate-500 font-medium">
+              {LKT_KIND_LABEL[event.kind]}
+            </span>
+            {event.status && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${LKT_STATUS_BADGE[event.status]}`}>
+                {LKT_STATUS_LABEL[event.status]}
+              </span>
+            )}
+            {hasDetail && (open ? <ChevronUp size={12} className="text-slate-400" /> : <ChevronDown size={12} className="text-slate-400" />)}
+          </div>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            <span className="font-medium text-slate-800">{event.module}</span> — {event.title}
+          </p>
+        </button>
+        {open && hasDetail && (
+          <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-1.5">
+            {event.description && <p className="text-xs text-slate-600">{event.description}</p>}
+            {event.environment && (
+              <p className="text-xs text-slate-500">Ambiente: <span className="font-medium">{event.environment}</span></p>
+            )}
+            {event.build && (
+              <p className="text-xs text-slate-500">Build: <span className="font-medium">{event.build}</span></p>
+            )}
+            {event.tests && event.tests.length > 0 && (
+              <div className="text-xs text-slate-500">
+                Testes: {event.tests.map((t, i) => (
+                  <span key={i} className="font-mono">{i > 0 && ", "}{t.suite} {t.passed}/{t.passed + t.failed}</span>
+                ))}
+              </div>
+            )}
+            {event.blocker && <p className="text-xs text-red-600">Bloqueio: {event.blocker}</p>}
+            {event.nextAction && <p className="text-xs text-slate-500">Próxima ação: {event.nextAction}</p>}
+            {event.devUrl && <p className="text-xs text-slate-500 font-mono">{event.devUrl}</p>}
+            {event.references?.map((r, i) => (
+              <p key={i} className="text-xs font-mono text-slate-400">{r.commit ?? r.url ?? r.label}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LktHistorySection({ activity }: { activity: LktActivityEvent[] }) {
+  const [filter, setFilter] = useState<LktHistoryFilter>("ALL");
+  const filtered = filter === "ALL" ? activity : activity.filter(e => e.kind === filter);
+
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-5">
-      <h2 className="text-sm font-semibold text-slate-700 mb-4">Histórico de eventos</h2>
-      <div className="space-y-3">
-        {V1_HISTORY.map((entry, i) => (
-          <div key={i} className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div className="w-2 h-2 rounded-full bg-slate-300 mt-1.5 shrink-0" />
-              {i < V1_HISTORY.length - 1 && (
-                <div className="w-px flex-1 bg-slate-100 mt-1" />
-              )}
-            </div>
-            <div className="pb-3">
-              <p className="text-xs text-slate-400 mb-0.5">{entry.date}</p>
-              <p className="text-sm text-slate-700 leading-relaxed">{entry.event}</p>
-              {entry.commit && (
-                <p className="text-xs font-mono text-slate-400 mt-0.5">{entry.commit}</p>
-              )}
-            </div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="text-sm font-semibold text-slate-700">Histórico recente</h2>
+        <div className="flex gap-1.5 flex-wrap">
+          {LKT_HISTORY_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                filter === f.key
+                  ? "bg-indigo-600 border-indigo-600 text-white"
+                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-6">Nenhum evento registrado neste filtro.</p>
+      ) : (
+        <div className="space-y-0">
+          {filtered.map(event => <LktHistoryItem key={event.id} event={event} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── STATUS GERAL — camada B (LKT History) sobre a camada A (Live State) ──
+// Padrão LKT DEV: Playwright/E2E autenticado são hoje uma capacidade real do
+// projeto, mas o auth local depende de fixture indisponível fora de CI --
+// nunca reportar PASS aqui sem uma execução real.
+const LKT_DEV_STANDARD = {
+  playwright: "AVAILABLE" as const,
+  authenticatedE2E: "BLOCKED_BY_LOCAL_FIXTURE" as const,
+};
+
+function StatusGeralSection({ activity, latestMovement }: { activity: LktActivityEvent[]; latestMovement: LktActivityEvent | null }) {
+  const inProgress = getInProgressMovement(activity);
+  const blocker = getActiveBlocker(activity);
+
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-slate-700">Status geral</h2>
+
+      <div>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Última movimentação</p>
+        {latestMovement ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm text-slate-700">
+              <span className="font-medium text-slate-800">{latestMovement.module}</span> — {latestMovement.title}
+            </span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-slate-500 font-medium">
+              {LKT_KIND_LABEL[latestMovement.kind]}
+            </span>
+            {latestMovement.status && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${LKT_STATUS_BADGE[latestMovement.status]}`}>
+                {LKT_STATUS_LABEL[latestMovement.status]}
+              </span>
+            )}
           </div>
-        ))}
+        ) : (
+          <p className="text-sm text-slate-400">Nenhum evento registrado ainda.</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Em andamento</p>
+          <p className="text-sm text-slate-600">
+            {inProgress ? `${inProgress.module} — ${inProgress.title}` : "Nada em andamento registrado."}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Bloqueios</p>
+          {blocker ? (
+            <p className="text-sm text-red-600">{blocker.blocker ?? blocker.title}</p>
+          ) : (
+            <p className="text-sm text-emerald-600">Nenhum bloqueio registrado.</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Próxima ação</p>
+          <p className="text-sm text-slate-600">{latestMovement?.nextAction ?? "Não informado no último evento."}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-3 border-t border-slate-100 text-xs text-slate-500">
+        {latestMovement?.devUrl && (
+          <span>Ambiente local: <code className="font-mono">{latestMovement.devUrl}</code></span>
+        )}
+        <span>Playwright: <span className="font-medium">{LKT_DEV_STANDARD.playwright}</span></span>
+        <span>E2E autenticado: <span className="font-medium">{LKT_DEV_STANDARD.authenticatedE2E}</span></span>
       </div>
     </div>
   );
@@ -600,7 +799,11 @@ function DeploymentBanner({ deploymentInfo, lastUpdated }: { deploymentInfo: Dep
 }
 
 // ── Página principal ──────────────────────────────────────────
-export default function StatusPage({ deploymentInfo }: { deploymentInfo: DeploymentInfo }) {
+export default function StatusPage({ deploymentInfo, activity, latestMovement }: {
+  deploymentInfo: DeploymentInfo;
+  activity: LktActivityEvent[];
+  latestMovement: LktActivityEvent | null;
+}) {
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [selectedArea, setSelectedArea] = useState<ProjectAreaStatus | null>(null);
   const [viewMode, setViewMode] = useState<"resumo" | "tecnico">("resumo");
@@ -642,6 +845,9 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
       </PageHeader>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+        {/* ── Status geral (LKT Activity Log) ───────────────── */}
+        <StatusGeralSection activity={activity} latestMovement={latestMovement} />
 
         {/* ── Ambiente / commit / deployment ────────────────── */}
         <DeploymentBanner deploymentInfo={deploymentInfo} lastUpdated={lastUpdated} />
@@ -860,8 +1066,8 @@ export default function StatusPage({ deploymentInfo }: { deploymentInfo: Deploym
         {/* ── Cotação de esforço ────────────────────────── */}
         <EffortSection />
 
-        {/* ── Histórico ─────────────────────────────────── */}
-        <HistorySection />
+        {/* ── Histórico recente ─────────────────────────── */}
+        <LktHistorySection activity={activity} />
 
         <footer className="text-center text-xs text-slate-300 pb-4">
           Última atualização: {lastUpdated ?? "—"} · Área reservada à equipe técnica

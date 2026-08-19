@@ -41,3 +41,45 @@ test.describe("Status e Arquitetura da Plataforma", () => {
     await expect(readinessBadges.first()).toBeVisible();
   });
 });
+
+/**
+ * STATUS LIVE ACTIVITY V1 — camada B (LKT History) sobre a camada A (Live
+ * State). Se o auth local seguir bloqueado (fixture ausente, ver
+ * auth.setup.ts), estes testes falham exatamente como os demais deste
+ * arquivo já falham hoje sob a mesma causa — nunca reportar PASS sem
+ * execução real; o estado correto a comunicar é
+ * AUTHENTICATED_PLAYWRIGHT_QA_BLOCKED.
+ */
+test.describe("Status — LKT Activity Log (Status geral / Histórico recente)", () => {
+  test("/admin/status mostra a Última movimentação real (não um placeholder vazio)", async ({ page }) => {
+    await page.goto("/admin/status");
+    await expect(page.getByText("Última movimentação", { exact: false })).toBeVisible();
+    await expect(page.getByText("REC OS Context Foundation V1", { exact: false })).toBeVisible();
+  });
+
+  test("/admin/status continua mostrando a faixa de deployment ao vivo (Live State)", async ({ page }) => {
+    await page.goto("/admin/status");
+    await expect(page.getByText("Ambiente:", { exact: false })).toBeVisible();
+  });
+
+  test("/admin/status mostra o Histórico recente com pelo menos um evento", async ({ page }) => {
+    await page.goto("/admin/status");
+    await expect(page.getByText("Histórico recente", { exact: false })).toBeVisible();
+    await expect(page.getByText("Security Debug Fix", { exact: false })).toBeVisible();
+  });
+
+  test("/admin/status mostra os módulos (grade de áreas) já existente", async ({ page }) => {
+    await page.goto("/admin/status");
+    await expect(page.locator("text=/Validado|QA pendente|Planejado|Bloqueado/").first()).toBeVisible();
+  });
+
+  test("/admin/status/arquitetura registra Influence OS como planejado (nunca esquecido do roadmap)", async ({ page }) => {
+    await page.goto("/admin/status/arquitetura");
+    await expect(page.getByText("Influence OS", { exact: false })).toBeVisible();
+  });
+
+  test("/admin/status/arquitetura registra REC OS Paid Traffic Planner como próxima frente", async ({ page }) => {
+    await page.goto("/admin/status/arquitetura");
+    await expect(page.getByText("Paid Traffic Planner", { exact: false })).toBeVisible();
+  });
+});

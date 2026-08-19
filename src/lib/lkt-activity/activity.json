@@ -1,0 +1,173 @@
+[
+  {
+    "id": "evt-001",
+    "timestamp": "2026-08-19T08:09:54-03:00",
+    "module": "Platform / Security",
+    "title": "Security Debug Fix — protect internal debug endpoints",
+    "description": "GET /api/debug/env-check e /api/debug/admin-client-test ficaram públicos sem gate de auth (herança de um período de diagnóstico manual de produção). Corrigido com o mesmo padrão de admin/super_admin já usado por /api/admin/debug-client-link, sem alterar o mecanismo interno de service role (o problema era acesso público ao endpoint, não a existência do admin client no servidor).",
+    "kind": "FIX",
+    "status": "REAL",
+    "environment": "production",
+    "tests": [
+      {
+        "suite": "require-admin.test.ts",
+        "passed": 20,
+        "failed": 0
+      },
+      {
+        "suite": "company-context.test.ts",
+        "passed": 35,
+        "failed": 0
+      },
+      {
+        "suite": "authorized-companies.test.ts",
+        "passed": 4,
+        "failed": 0
+      }
+    ],
+    "build": "PASS",
+    "nextAction": "Release do fix de navegação/branding do Audiovisual",
+    "references": [
+      {
+        "commit": "8f5272d1d9e4048e407fa8af990c41df74d142f8"
+      }
+    ]
+  },
+  {
+    "id": "evt-002",
+    "timestamp": "2026-08-19T13:17:19-03:00",
+    "module": "Audiovisual",
+    "title": "Audiovisual Route Separation — separate canonical route from REC OS naming",
+    "description": "/admin/recos (projetos de vídeo, rec_projects) colidia de nome com REC OS (rota /admin/contentos). Implementação movida para /admin/audiovisual (mesmos componentes, sem lógica duplicada); /admin/recos + /admin/recos/criar + /admin/recos/[id] viraram redirects de compatibilidade preservando query params e IDs, mesmo padrão já usado por /admin/crm -> /admin/leads.",
+    "kind": "ARCHITECTURE",
+    "status": "REAL",
+    "environment": "production",
+    "tests": [
+      {
+        "suite": "full regression (7 suítes)",
+        "passed": 205,
+        "failed": 0
+      }
+    ],
+    "build": "PASS",
+    "deployment": "dpl_CtZY4jxUZ6MT3ffqHNmhdSjCsAo5",
+    "nextAction": "Restaurar acesso ao módulo Meu Negócio (sidebar apontava para o conceito errado)",
+    "references": [
+      {
+        "commit": "b091b0e1cbb0001aa8fcd5457b761666b110e3b5"
+      }
+    ]
+  },
+  {
+    "id": "evt-003",
+    "timestamp": "2026-08-19T14:20:00-03:00",
+    "module": "Meu Negócio",
+    "title": "Meu Negócio Access Restore — restore Meu Negócio module access",
+    "description": "O item \"Meu Negócio\" da sidebar (desktop e bottom nav mobile) apontava para /admin/organizacao, um conceito institucional diferente (account_type-based), deixando contas sem organização própria (ex.: super_admin) num beco sem saída e escondendo o módulo operacional real (estoque, fichas técnicas, CMV, relatórios, ainda em memória/demo). Corrigido para /admin/meu-negocio em ambos os lugares, mesma convenção já usada por admin-routes.ts/quick-action-menu.tsx/platform-modules.ts. /admin/organizacao preservado, intocado.",
+    "kind": "FIX",
+    "status": "PARTIAL",
+    "environment": "production",
+    "tests": [
+      {
+        "suite": "full regression (9 suítes)",
+        "passed": 298,
+        "failed": 0
+      }
+    ],
+    "build": "PASS",
+    "deployment": "dpl_6iFyPx1mnG2VGzNFuExnxXTHgBXQ",
+    "nextAction": "REC OS Context Foundation V1 (Company Context canônico + Calendário/Conexões contextuais)",
+    "references": [
+      {
+        "commit": "09aaaf0cf0a335ce9540d1365a072a6c7b89501e"
+      }
+    ]
+  },
+  {
+    "id": "evt-004",
+    "timestamp": "2026-08-19T17:07:21-03:00",
+    "module": "REC OS",
+    "title": "REC OS Context Foundation V1 — embed company calendar and connections context",
+    "description": "REC OS tinha três problemas de Company Context: hub lia clients diretamente em vez de listAuthorizedCompanies(); \"Calendário\" saía do módulo para /admin/calendario perdendo contexto; \"Conexões\" saía para /admin/conexoes descartando ?client=. Corrigido: hub migrado para listAuthorizedCompanies(); /admin/contentos/calendario virou view contextual real (mesma normalização de global-calendar.ts, mesmo componente GlobalCalendarContent com basePath opcional); nova /admin/contentos/conexoes espelha status Meta/OlaClick via as mesmas APIs que /admin/conexoes já usa, sem duplicar credencial/tabela.",
+    "kind": "FEATURE",
+    "status": "REAL",
+    "environment": "production",
+    "tests": [
+      {
+        "suite": "full regression (11 suítes)",
+        "passed": 295,
+        "failed": 0
+      }
+    ],
+    "build": "PASS",
+    "deployment": "dpl_8YE512AeRgdsXWwQvDZu7BUsrFxR",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "REC OS Paid Traffic Planner V1",
+    "references": [
+      {
+        "commit": "e718dbe76adcc1cf163f460d28f083e585b9060b"
+      }
+    ]
+  },
+  {
+    "id": "evt-005",
+    "timestamp": "2026-08-19T21:55:23.058Z",
+    "module": "Status / LKT Activity",
+    "title": "STATUS LIVE ACTIVITY V1 — LKT Development History Foundation",
+    "kind": "FEATURE",
+    "description": "Status deixou de ser majoritariamente estatico: nova camada src/lib/lkt-activity/ (types/store/activity.json) separa Live State (getDeploymentInfo, ja real) de LKT History (log de eventos versionado em Git, sem Supabase/SQL). CLI npm run lkt:record grava eventos append-only, valida campos, detecta branch via git, nunca aceita secret/token/senha. /admin/status ganhou secao Status Geral (ultima movimentacao/em andamento/bloqueios/proxima acao) e Historico Recente (filtro por kind, item expansivel). platform-modules.ts registrou Influence OS/Creator DNA/Branding/Radar/Calendar/Partnerships/Analytics (not_implemented) e REC OS Paid Traffic Planner/Paid Traffic Persistence/Meta Publish/Google Ads, garantindo que o roadmap nunca seja esquecido pelo registry.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "REC OS Paid Traffic Planner V1",
+    "tests": [
+      {
+        "suite": "lkt-activity unit",
+        "passed": 27,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity-status structural",
+        "passed": 33,
+        "failed": 0
+      },
+      {
+        "suite": "ecosystem-status structural (regressao)",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "suite": "rec-os-context-foundation structural (regressao)",
+        "passed": 29,
+        "failed": 0
+      },
+      {
+        "suite": "navigation-auth structural (regressao)",
+        "passed": 43,
+        "failed": 0
+      },
+      {
+        "suite": "final-closure structural (regressao)",
+        "passed": 25,
+        "failed": 0
+      },
+      {
+        "suite": "company-context-transversal structural (regressao)",
+        "passed": 37,
+        "failed": 0
+      },
+      {
+        "suite": "company-context navigation unit (regressao)",
+        "passed": 9,
+        "failed": 0
+      },
+      {
+        "suite": "company-context unit (regressao)",
+        "passed": 35,
+        "failed": 0
+      }
+    ]
+  }
+]

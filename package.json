@@ -12,7 +12,8 @@
     "start:qa": "node scripts/qa-dev-launcher.ts --mode production --port 3200",
     "qa:info": "node scripts/qa-info.ts",
     "qa:smoke": "node scripts/qa-smoke.ts",
-    "qa:doctor": "node scripts/qa-doctor.ts"
+    "qa:doctor": "node scripts/qa-doctor.ts",
+    "lkt:record": "node scripts/lkt-record.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

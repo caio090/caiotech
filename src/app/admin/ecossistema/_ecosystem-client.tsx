@@ -29,11 +29,13 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
 
 const MATURITY_LABELS: Record<PlatformModuleMaturity, string> = {
   production: "Em produção", qa_pending: "Aguardando QA", preview: "Prévia/demo", planned: "Planejado", blocked: "Bloqueado", experimental: "Experimental",
+  not_implemented: "Não implementado", coming_soon: "Em breve",
 };
 
 const MATURITY_TONE: Record<PlatformModuleMaturity, string> = {
   production: "bg-emerald-100 text-emerald-700", qa_pending: "bg-amber-100 text-amber-700", preview: "bg-sky-100 text-sky-700",
   planned: "bg-slate-100 text-slate-600", blocked: "bg-rose-100 text-rose-700", experimental: "bg-violet-100 text-violet-700",
+  not_implemented: "bg-slate-50 text-slate-400", coming_soon: "bg-indigo-50 text-indigo-600",
 };
 
 const SURFACES: ModuleSurface[] = ["super_admin", "agency", "agency_client", "direct_business", "operational_user"];
