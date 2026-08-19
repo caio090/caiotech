@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
+import { requireDebugAdmin } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+    const denied = await requireDebugAdmin();
+    if (denied) return denied;
+
     const serviceRoleConfigured = hasSupabaseServiceRoleKey();
 
     if (!serviceRoleConfigured) {
