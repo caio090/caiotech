@@ -3,6 +3,10 @@
 const registry = require("../platform-modules.ts") as typeof import("../platform-modules");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const capabilities = require("../workspace-capabilities.ts") as typeof import("../workspace-capabilities");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require("fs") as typeof import("fs");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const path = require("path") as typeof import("path");
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
 
@@ -110,6 +114,31 @@ console.log("\n[test 9] REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION -- Grow
     assert(!!recOsMod?.description.includes(globalId), `${recOsId} referencia ${globalId} explicitamente na descrição (evita confusão de escopo)`);
     assert(!!globalMod?.notes?.includes(recOsId), `${globalId} referencia ${recOsId} de volta nas notes (cross-reference nos dois sentidos)`);
   }
+}
+
+console.log("\n[test 10] LKT Operating Standard + Module Lifecycle Registry V1 -- módulos pedidos registrados, docs existem, nenhuma rota nova real criada");
+{
+  for (const id of ["meu_escritorio", "minha_organizacao", "empresa_central"]) {
+    const mod = registry.findModuleById(id);
+    assert(mod !== undefined, `${id} está registrado (gap pré-existente confirmado e corrigido nesta missão)`);
+    assert((mod?.routes.length ?? 0) === 1 && (mod?.routes[0].startsWith("/admin/") ?? false), `${id} referencia exatamente a rota real já existente, nenhuma rota nova`);
+  }
+
+  const orchestrationDoc = fs.readFileSync(path.join(process.cwd(), "docs/architecture/lkt-orchestration-framework-v1.md"), "utf8");
+  assert(orchestrationDoc.includes("LKT Deploy Standard v1"), "doc de orquestração documenta o LKT Deploy Standard");
+  assert(orchestrationDoc.includes("Preview") && orchestrationDoc.includes("Production") && orchestrationDoc.includes("Desenvolvimento"), "doc distingue Desenvolvimento/Preview/Production explicitamente");
+  assert(orchestrationDoc.includes("nenhum recurso é considerado entregue enquanto não existir Production Deploy") || orchestrationDoc.toLowerCase().includes("production deploy"), "regra 'nada é entregue sem Production Deploy' está documentada");
+  assert(orchestrationDoc.includes("Merge --ff-only em main"), "fluxo de deploy documenta merge --ff-only (nunca merge commit)");
+  assert(orchestrationDoc.includes("LKT Release Record Standard v1"), "doc documenta o padrão de Release Record");
+  assert(orchestrationDoc.includes("LKT Navigation Standard v1"), "doc documenta o padrão de navegação contextual");
+  assert(orchestrationDoc.includes("LKT Status Activity Standard v1"), "doc documenta o padrão de Status Activity");
+
+  const lifecycleDoc = fs.readFileSync(path.join(process.cwd(), "docs/architecture/module-lifecycle-registry-v1.md"), "utf8");
+  for (const moduleName of ["## REC OS", "## REC OS Growth", "## Meu Negócio", "## Meu Escritório", "## Minha Empresa"]) {
+    assert(lifecycleDoc.includes(moduleName), `Module Lifecycle Registry documenta ${moduleName.replace("## ", "")}`);
+  }
+  assert(lifecycleDoc.includes("growth_os") && lifecycleDoc.includes("rec_os_growth"), "doc mantém GrowthOS e REC OS Growth explicitamente separados");
+  assert(!/CREATE TABLE|ALTER TABLE|supabase\.from\(/i.test(lifecycleDoc) && !/CREATE TABLE|ALTER TABLE/i.test(orchestrationDoc), "nenhum dos dois documentos contém SQL/schema -- fundação é só documentação e registry");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;

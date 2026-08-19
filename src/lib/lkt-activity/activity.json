@@ -254,5 +254,41 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-009",
+    "timestamp": "2026-08-19T23:48:12.980Z",
+    "module": "LKT Operating Standard",
+    "title": "LKT Operating Standard + Module Lifecycle Registry V1",
+    "kind": "ARCHITECTURE",
+    "description": "Formalizado em docs/architecture/lkt-orchestration-framework-v1.md (secao nova, distinta do loop de produto CONTEXT-LEARNING ja existente no mesmo arquivo): LKT Deploy Standard (Dev/Preview/Production, regra 'nada e entregue sem Production Deploy', fluxo Feature Branch ate Smoke Test), LKT Release Record Standard (11 campos mapeados 1:1 para o LktActivityEvent ja existente, sem schema novo), LKT Navigation Standard (contexto preservado, exemplo REC OS Calendario ja real) e LKT Status Activity Standard (Movimento/Estado/Proxima Acao = leitura direta do LKT Activity Log ja construido, sem mecanismo novo). Criado docs/architecture/module-lifecycle-registry-v1.md com template + 5 modulos documentados (REC OS, REC OS Growth, Meu Negocio, Meu Escritorio, Minha Empresa), vocabulario de 5 estados explicitamente mapeado sobre PlatformModuleMaturity (nunca uma 4a taxonomia paralela -- ja existem 3: AreaReadiness/PlatformModuleMaturity/LktEventStatus). Registrados em platform-modules.ts 3 gaps reais confirmados em codigo mas ausentes do registry: meu_escritorio (/admin/escritorio), minha_organizacao (/admin/organizacao) e empresa_central (/admin/empresa) -- as tres rotas ja existiam, nenhuma rota nova criada. Achado documentado (nao corrigido, fora de escopo): /admin/organizacao exibe titulo 'Meu Negocio' para contas direct_business, colidindo com o titulo do modulo operacional real /admin/meu-negocio -- registrado como pendencia para futura missao de UI.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Missao de correcao de UI: resolver colisao de titulo 'Meu Negocio' entre /admin/organizacao (direct_business) e /admin/meu-negocio; depois, implementacao real do REC OS Growth Planner V1",
+    "tests": [
+      {
+        "suite": "platform-modules registry integrity (inclui test 10 novo)",
+        "passed": 68,
+        "failed": 0
+      },
+      {
+        "suite": "ecosystem-status structural (regressao)",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity-status structural (regressao)",
+        "passed": 33,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity unit (regressao)",
+        "passed": 27,
+        "failed": 0
+      }
+    ]
   }
 ]
