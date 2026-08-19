@@ -53,9 +53,12 @@ assert(calendarPage.includes("sanitizeCalendarReturnTo") && calendarPage.include
 assert(calendarPage.includes("splitCombinedMonth"), "month preservado (YYYY-MM combinado traduzido)");
 assert(calendarPage.includes("params.client")===false || calendarPage.includes("requestedClientId"), "client tratado explicitamente");
 
-console.log("[test] 13 — alias antigo preserva parâmetros");
-const contentosCalendarioAlias = read("src/app/admin/contentos/calendario/page.tsx");
-assert(contentosCalendarioAlias.includes("query.append") || contentosCalendarioAlias.includes("query.set"), "alias /admin/contentos/calendario preserva todos os parâmetros ao redirecionar");
+console.log("[test] 13 — /admin/contentos/calendario deixou de ser alias: agora é view contextual real (REC OS Context Foundation V1)");
+const contentosCalendarioPage = read("src/app/admin/contentos/calendario/page.tsx");
+assert(!/redirect\(qs \? `\/admin\/calendario/.test(contentosCalendarioPage), "não redireciona mais incondicionalmente para /admin/calendario");
+assert(contentosCalendarioPage.includes("resolveCompanyContext") && contentosCalendarioPage.includes("CompanyContextRequiredState"), "usa a mesma autoridade canônica de Company Context do resto do produto, nunca uma segunda");
+assert(contentosCalendarioPage.includes("normalizeContentItems") && contentosCalendarioPage.includes("normalizeOperationalTasks") && contentosCalendarioPage.includes("normalizeApprovals"), "reaproveita as mesmas funções puras de global-calendar.ts, nenhuma normalização duplicada");
+assert(contentosCalendarioPage.includes("GlobalCalendarContent"), "reaproveita o mesmo componente de apresentação do Calendário Global, nunca uma segunda UI de calendário");
 const crmAlias = read("src/app/admin/crm/page.tsx");
 assert(crmAlias.includes("query.append") || crmAlias.includes("query.set"), "alias /admin/crm preserva parâmetros ao redirecionar para /admin/leads");
 

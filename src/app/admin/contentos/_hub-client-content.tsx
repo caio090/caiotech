@@ -205,7 +205,7 @@ export function RecOSHubContent({
   const quickAccess = [
     { label: "Criar conteúdo", icon: Plus,   href: activeClientId ? `/admin/contentos/criar?client=${activeClientId}` : "/admin/contentos/criar" },
     { label: "Abrir EditorOS", icon: Wand2,  href: activeClientId ? `/admin/contentos/editor-os?client=${activeClientId}` : "/admin/contentos/editor-os" },
-    { label: "Conectar canal", icon: Cable,  href: "/admin/conexoes" },
+    { label: "Conectar canal", icon: Cable,  href: activeClientId ? `/admin/contentos/conexoes?client=${activeClientId}` : "/admin/contentos/conexoes" },
   ];
 
   return (

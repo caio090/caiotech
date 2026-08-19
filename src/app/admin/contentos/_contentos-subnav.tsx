@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { buildCalendarNavigationUrl } from "@/lib/rec-os-workflow/types";
 
 interface NavLink {
   href: string;
@@ -15,6 +14,14 @@ interface NavLink {
 // 5-item subnav (which still had "Campanhas" as a top-level item and no
 // Radar/Produção/Aprovações/Conexões) so pages like Aprovações stop showing
 // a competing menu next to the unified one.
+//
+// REC OS Context Foundation V1 — "Calendário" e "Conexões" passam a apontar
+// para views contextuais DENTRO do REC OS (/admin/contentos/calendario,
+// /admin/contentos/conexoes) em vez de saltar para /admin/calendario e
+// /admin/conexoes -- espelhar, não duplicar (ambas reaproveitam a mesma
+// fonte/API real, só renderizam dentro do módulo). Company Central e o
+// Calendário/Central de Integrações globais continuam existindo e
+// alcançáveis por CTA secundário dentro de cada view.
 const BASE_LINKS: NavLink[] = [
   { href: "/admin/contentos",            label: "Visão Geral", acceptsClient: true },
   { href: "/admin/contentos/radar",      label: "Radar",       acceptsClient: true },
@@ -23,9 +30,9 @@ const BASE_LINKS: NavLink[] = [
   { href: "/admin/contentos/aprovacoes", label: "Aprovações",  acceptsClient: true },
   { href: "/admin/contentos/roadmap",    label: "Roadmap",     acceptsClient: true },
   { href: "/admin/contentos/mapa-cliente", label: "Mapa do Cliente", acceptsClient: true },
-  { href: "/admin/calendario",           label: "Calendário",  acceptsClient: true },
+  { href: "/admin/contentos/calendario", label: "Calendário",  acceptsClient: true },
   { href: "/admin/contentos/resultados", label: "Resultados",  acceptsClient: true },
-  { href: "/admin/conexoes",             label: "Conexões",    acceptsClient: false },
+  { href: "/admin/contentos/conexoes",   label: "Conexões",    acceptsClient: true },
 ];
 
 export function ContentosSubNav({ initialClientId }: { initialClientId?: string }) {
@@ -51,18 +58,16 @@ export function ContentosSubNav({ initialClientId }: { initialClientId?: string 
     return pathname.startsWith(href);
   }
 
-  // Fase 13 — o link de Calendário do REC OS passa a usar o helper
-  // canônico (preserva cliente + returnRoute), em vez de só `?client=`.
-  const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
-  const calendarHref = buildCalendarNavigationUrl("/admin/calendario", {
-    workspaceId: clientId || "global", clientId: clientId || null, campaignId: null, contentId: null,
-    month: null, filters: {}, returnRoute: currentUrl,
-  });
-
   return (
     <nav ref={navRef} className="flex items-center gap-1 mb-6 bg-purple-50 border border-purple-100 rounded-xl p-1 overflow-x-auto w-full max-w-full scrollbar-none">
       {BASE_LINKS.map(({ href, label, acceptsClient }) => {
-        const dest   = href === "/admin/calendario" ? calendarHref : acceptsClient && clientId ? `${href}?client=${clientId}` : href;
+        // REC OS Context Foundation V1 — Calendário e Conexões agora vivem
+        // dentro do próprio REC OS (/admin/contentos/*), então seguem o
+        // mesmo `?client=` de qualquer outro item da nav. O helper que
+        // construía a navegação de saída para a rota global antiga não é
+        // mais necessário aqui (continua em uso por quem de fato sai do
+        // módulo, ex. Roadmap/Mapa do Cliente).
+        const dest = acceptsClient && clientId ? `${href}?client=${clientId}` : href;
         const active = isActive(href);
         return (
           <Link

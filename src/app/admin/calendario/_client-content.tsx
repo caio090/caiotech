@@ -174,11 +174,22 @@ interface Props {
   timezone: string;
   /** Fase 13 — presente quando a navegação veio de um botão contextual do REC OS (buildCalendarNavigationUrl). */
   returnTo?: string | null;
+  /**
+   * REC OS Context Foundation V1 — quando esta MESMA visão é renderizada
+   * dentro de uma projeção contextual (ex.: /admin/contentos/calendario),
+   * mês anterior/próximo/hoje e os selects de cliente/fonte devem continuar
+   * navegando dentro daquela rota, nunca pular para /admin/calendario.
+   * Default preserva o comportamento existente do Calendário Global.
+   */
+  basePath?: string;
+  headerTitle?: string;
+  headerDescription?: string;
 }
 
 export function GlobalCalendarContent({
   initialEvents, initialYear, initialMonth, initialSelectedDay, initialFilterClient, initialFilterSource,
   clients, sourceErrors, serverToday, timezone, returnTo,
+  basePath, headerTitle, headerDescription,
 }: Props) {
   // Purely operational — never holds year/month/client/source, only whether a
   // full-page navigation was just kicked off, so the selects can disable
@@ -232,10 +243,10 @@ export function GlobalCalendarContent({
   const [todayYear, todayMonth] = serverToday.split("-").map(Number);
   const isCurrentMonth = initialYear === todayYear && initialMonth === todayMonth;
 
-  const previousMonthHref = buildGlobalCalendarHref({ year: previous.year, month: previous.month, client: filterClient, source: filterSource });
-  const nextMonthHref = buildGlobalCalendarHref({ year: next.year, month: next.month, client: filterClient, source: filterSource });
-  const todayHref = buildGlobalCalendarHref({ year: todayYear, month: todayMonth, client: filterClient, source: filterSource });
-  const currentHref = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: filterSource });
+  const previousMonthHref = buildGlobalCalendarHref({ year: previous.year, month: previous.month, client: filterClient, source: filterSource, basePath });
+  const nextMonthHref = buildGlobalCalendarHref({ year: next.year, month: next.month, client: filterClient, source: filterSource, basePath });
+  const todayHref = buildGlobalCalendarHref({ year: todayYear, month: todayMonth, client: filterClient, source: filterSource, basePath });
+  const currentHref = buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: filterSource, basePath });
 
   // A single, exclusive navigation path for the two <select> controls (they
   // can't be plain <a> links). Native full-page navigation — no router.push,
@@ -248,11 +259,11 @@ export function GlobalCalendarContent({
   }
 
   function onClientChange(value: string) {
-    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: value, source: filterSource }));
+    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: value, source: filterSource, basePath }));
   }
 
   function onSourceChange(value: string) {
-    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: value as "all" | CalendarEventSource }));
+    navigateToCalendarHref(buildGlobalCalendarHref({ year: initialYear, month: initialMonth, client: filterClient, source: value as "all" | CalendarEventSource, basePath }));
   }
 
   const totalCount = countsBySource.content_item + countsBySource.operational_task + countsBySource.approval;
@@ -264,8 +275,8 @@ export function GlobalCalendarContent({
           <CalendarDays className="w-4.5 h-4.5 text-indigo-600" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-gray-900">Calendário Global</h1>
-          <p className="text-xs text-gray-400">Conteúdos, produção e aprovações de todos os clientes — somente leitura</p>
+          <h1 className="text-lg font-bold text-gray-900">{headerTitle ?? "Calendário Global"}</h1>
+          <p className="text-xs text-gray-400">{headerDescription ?? "Conteúdos, produção e aprovações de todos os clientes — somente leitura"}</p>
         </div>
       </div>
 

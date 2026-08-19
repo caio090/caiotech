@@ -18,12 +18,17 @@ const calendarPage = read("src/app/admin/calendario/page.tsx");
 const calendarClient = read("src/app/admin/calendario/_client-content.tsx");
 
 console.log("[test] 44 — pelo menos um botão real do REC OS conectado ao helper canônico");
-assert(subnav.includes("buildCalendarNavigationUrl"), "subnav do REC OS usa buildCalendarNavigationUrl()");
+// REC OS Context Foundation V1 — o item "Calendário" do subnav passou a
+// apontar para a view CONTEXTUAL dentro do próprio REC OS
+// (/admin/contentos/calendario), então não precisa mais construir uma URL
+// de saída para /admin/calendario -- esse helper continua sendo a
+// autoridade real para quem de fato sai do módulo (Roadmap/Mapa do Cliente).
+assert(!subnav.includes("buildCalendarNavigationUrl"), "subnav do REC OS não usa mais buildCalendarNavigationUrl() -- Calendário ficou contextual, nunca sai do módulo");
 assert(roadmapClient.includes("buildCalendarNavigationUrl"), "Roadmap usa buildCalendarNavigationUrl()");
 assert(mapaCliente.includes("buildCalendarNavigationUrl"), "Mapa do Cliente usa buildCalendarNavigationUrl()");
 
 console.log("[test] 45/46/47/48 — clientId/campaignId/contentId/month preservados na construção da URL");
-assert(subnav.includes("clientId: clientId || null") && subnav.includes("returnRoute: currentUrl"), "subnav preserva clientId e a rota de retorno");
+assert(subnav.includes("acceptsClient && clientId"), "subnav preserva clientId via ?client= para toda rota contextual do REC OS, incluindo Calendário e Conexões");
 assert(roadmapClient.includes("clientId,") && roadmapClient.includes("month,"), "Roadmap preserva clientId e month");
 
 console.log("[test] 49 — returnRoute preservada e sanitizada no destino");

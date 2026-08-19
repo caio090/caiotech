@@ -36,22 +36,31 @@ export interface GlobalCalendarHrefParams {
   month: number;
   client: string; // client id, or "all" for no filter
   source: CalendarEventSource | "all";
+  /**
+   * REC OS Context Foundation V1 — a contextual projection of this same
+   * calendar (ex.: /admin/contentos/calendario) reuses this exact builder to
+   * stay on its own base path for month/client/source navigation, instead of
+   * hopping out to the global page. Defaults to /admin/calendario (the only
+   * base every existing caller used before this option existed).
+   */
+  basePath?: string;
 }
 
 /**
- * The single canonical builder for /admin/calendario URLs. Always creates a
- * fresh URLSearchParams (never mutates/reuses one across calls), always
- * includes year/month, and only includes client/source when they aren't the
- * "no filter" value — so the URL itself is the one source of truth for
- * month, day-of-view and filters, instead of parallel component state.
+ * The single canonical builder for /admin/calendario (and its contextual
+ * projections) URLs. Always creates a fresh URLSearchParams (never
+ * mutates/reuses one across calls), always includes year/month, and only
+ * includes client/source when they aren't the "no filter" value — so the
+ * URL itself is the one source of truth for month, day-of-view and filters,
+ * instead of parallel component state.
  */
-export function buildGlobalCalendarHref({ year, month, client, source }: GlobalCalendarHrefParams): string {
+export function buildGlobalCalendarHref({ year, month, client, source, basePath }: GlobalCalendarHrefParams): string {
   const params = new URLSearchParams();
   params.set("year", String(year));
   params.set("month", String(month));
   if (client && client !== "all") params.set("client", client);
   if (source && source !== "all") params.set("source", source);
-  return `/admin/calendario?${params.toString()}`;
+  return `${basePath ?? "/admin/calendario"}?${params.toString()}`;
 }
 
 export interface GlobalCalendarEvent {

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdminContentOSContext } from "@/lib/admin-contentos-api";
-import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn, isVisibleClientRecord } from "@/lib/client-visibility";
+import { listAuthorizedCompanies } from "@/lib/office-global/authorized-companies";
 import type { ContentItemRow, ApprovalRow, ClientNameLookup } from "@/lib/global-calendar";
 import {
   computeHubCounts,
@@ -31,36 +31,23 @@ export default async function AdminContentosPage({
     const retryQs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]).toString();
     return <AdminContentOSUnavailableState status={ctx.status} retryHref={`/admin/contentos${retryQs ? `?${retryQs}` : ""}`} />;
   }
-  const { adminDb } = ctx;
+  const { adminDb, user, role } = ctx;
 
-  // Fase 3/4 — full authorized client list, independent of who has content
-  // this month, so a client with zero pendências still shows up in the
-  // selector (same approach as /admin/calendario, Sprint 3.1A).
-  let clientsResult = await adminDb
-    .from("clients")
-    .select("id, company_name, status, deleted_at, archived_at")
-    .in("status", CLIENT_VISIBLE_STATUSES)
-    .order("company_name");
-
-  if (clientsResult.error && isMissingClientVisibilityColumn(clientsResult.error)) {
-    clientsResult = await adminDb
-      .from("clients")
-      .select("id, company_name, status")
-      .in("status", CLIENT_VISIBLE_STATUSES)
-      .order("company_name") as typeof clientsResult;
-  }
-
-  type ClientRow = { id: string; company_name: string | null; status?: string | null; deleted_at?: string | null; archived_at?: string | null };
-  const visibleClients = ((clientsResult.data ?? []) as ClientRow[]).filter(isVisibleClientRecord);
+  // REC OS Context Foundation V1 — antes esta lista vinha de uma query
+  // direta em `clients` (só filtrada por status/visibilidade, nunca por
+  // autorização real), podendo divergir da lista que o resto do produto usa
+  // (Company Central/Escritório/header, todos via listAuthorizedCompanies()).
+  // Mesma autoridade canônica agora, nenhuma auth paralela.
+  const authorizedCompanies = await listAuthorizedCompanies(adminDb, user.id, role);
 
   const clientNames: ClientNameLookup = new Map();
-  for (const c of visibleClients) {
-    if (c.company_name) clientNames.set(c.id, c.company_name);
+  for (const c of authorizedCompanies) {
+    if (c.companyName) clientNames.set(c.id, c.companyName);
   }
 
-  const clientOptions = visibleClients
-    .filter((c) => !!c.company_name)
-    .map((c) => ({ id: c.id, name: c.company_name as string }))
+  const clientOptions = authorizedCompanies
+    .filter((c) => !!c.companyName)
+    .map((c) => ({ id: c.id, name: c.companyName as string }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   // Fase 3 — client from the URL is the only source of truth; an unknown id
