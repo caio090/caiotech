@@ -56,6 +56,23 @@ export type PlatformModuleMaturity =
   | "not_implemented"
   | "coming_soon";
 
+/**
+ * REC OS ARCHITECTURE ALIGNMENT V1 — modelo conceitual de evolução de um
+ * módulo, usado para ORGANIZAR o roadmap (REC OS é o primeiro caso real
+ * aplicado). Não é um campo formal do registry, não altera `maturity` (que
+ * continua sendo o único eixo real de "o que existe hoje") -- é só uma
+ * lente para descrever, na `notes`/`description` de um módulo, em qual
+ * estágio conceitual ele está:
+ * - V1 — Operacional: o módulo EXECUTA (ex.: REC OS hoje -- projetos,
+ *   produção, calendário, aprovações).
+ * - V2 — Inteligência: o módulo ANALISA (ex.: Growth -- simulações,
+ *   recomendações, benchmarks, planejamento antes da execução).
+ * - V3 — Automação: o módulo EXECUTA SOZINHO (ex.: publicação assistida em
+ *   Meta Ads/Google Ads, automações, recomendações via Jarvis).
+ * Um módulo `not_implemented`/`planned` já pode ser rotulado com o V
+ * correspondente na sua própria nota -- isso não promete prazo, só
+ * classifica a NATUREZA do trabalho quando ele existir.
+ */
 export type ModuleSurfaceAccess =
   | "full_access"
   | "own_data_only"
@@ -74,7 +91,13 @@ export interface PlatformModuleDefinition {
   name: string;
   description: string;
   category: PlatformModuleCategory;
-  /** Rotas reais de src/app/admin, confirmadas na auditoria desta sprint. */
+  /**
+   * Rotas reais confirmadas na auditoria de origem, normalmente sob
+   * src/app/admin. REC OS ARCHITECTURE ALIGNMENT V1: um módulo pode viver
+   * fora de /admin quando essa é a raiz real do produto (ex.: growth_os,
+   * src/app/growth/**) -- nunca fabricar um prefixo /admin que o código não
+   * usa.
+   */
   routes: string[];
   surfaces: ModuleSurfaceAvailability[];
   /** WorkspaceCapability(s) de src/config/workspace-capabilities.ts que este módulo consulta, quando aplicável. */
@@ -187,7 +210,30 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "production",
     nicheSupport: false,
     owner: "commercial",
-    notes: "AMBIGUIDADE DE NOME confirmada em auditoria anterior (docs/DECISIONS.md): 'REC OS' (este módulo, rota /admin/contentos) é diferente de /admin/audiovisual (Audiovisual, tabela rec_projects, rota canônica desde a missão AUDIOVISUAL ROUTE SEPARATION -- /admin/recos preservado só como redirect legado) e de /admin/rec + /admin/rec/videos (plataforma de vídeo 'Lokat.rec', não tocada nesta missão).",
+    notes: "AMBIGUIDADE DE NOME confirmada em auditoria anterior (docs/DECISIONS.md): 'REC OS' (este módulo, rota /admin/contentos) é diferente de /admin/audiovisual (Audiovisual, tabela rec_projects, rota canônica desde a missão AUDIOVISUAL ROUTE SEPARATION -- /admin/recos preservado só como redirect legado) e de /admin/rec + /admin/rec/videos (plataforma de vídeo 'Lokat.rec', não tocada nesta missão). REC OS ARCHITECTURE ALIGNMENT V1: este módulo (produção/aprovações/calendário/conexões contextuais) é o V1 — Operacional do REC OS (ver doc do modelo de evolução acima de ModuleSurfaceAccess); rec_os_growth é o V2 — Inteligência planejado para cima dele.",
+  },
+  {
+    id: "rec_os_growth",
+    name: "REC OS — Growth",
+    description: "Submódulo de crescimento/marketing por cliente dentro do REC OS -- estratégia, campanhas, criativos, públicos, orçamento, simulações e métricas. Umbrella conceitual registrada em REC OS ARCHITECTURE ALIGNMENT V1 (auditoria anterior: REC OS GROWTH FOUNDATION V1); nenhuma rota criada nesta missão -- a página /admin/contentos/campanhas (tabs campanhas/estrategia/trafego) já existe hoje como rascunho de UI sem contrato real e é a candidata a ser absorvida por este submódulo quando ele for implementado, nunca duplicada ao lado dele.",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os"],
+    integrations: [],
+    maturity: "not_implemented",
+    nicheSupport: false,
+    owner: "product",
+    notes: "V2 — Inteligência (planeja/simula antes de executar), distinto de growth_os (agência inteira, diagnóstico/funil/metas, rota /growth/*, não deste módulo) -- mesmo nome, escopos diferentes: este é por cliente, dentro do REC OS. rec_os_paid_traffic_planner passa a depender deste id em vez de depender de rec_os diretamente, pois Paid Traffic é uma peça de Growth, não um par dele.",
   },
   {
     id: "recos_audiovisual",
@@ -660,12 +706,12 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     capabilities: [],
     consumes: [],
     produces: [],
-    dependsOn: ["rec_os"],
+    dependsOn: ["rec_os_growth"],
     integrations: ["meta", "google_ads"],
     maturity: "planned",
     nicheSupport: false,
     owner: "product",
-    notes: "NEXT_FRONT confirmado em REC OS Context Foundation V1 e Meu Negócio Access Restore.",
+    notes: "NEXT_FRONT confirmado em REC OS Context Foundation V1 e Meu Negócio Access Restore. REC OS ARCHITECTURE ALIGNMENT V1: reclassificado como filho de rec_os_growth (V2 — Inteligência: objetivo/estratégia/simulação com classificação verde/amarelo/vermelho, nunca promete resultado), não mais filho direto de rec_os.",
   },
   {
     id: "paid_traffic_persistence",
@@ -710,6 +756,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "coming_soon",
     nicheSupport: false,
     owner: "product",
+    notes: "V3 — Automação (o módulo executa sozinho, ver modelo de evolução acima de ModuleSurfaceAccess).",
   },
   {
     id: "google_ads",
@@ -732,6 +779,29 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "coming_soon",
     nicheSupport: false,
     owner: "product",
+  },
+  {
+    id: "growth_os",
+    name: "GrowthOS",
+    description: "Diagnóstico e estratégia da agência inteira: diagnósticos, plano de ação, funil de vendas, ofertas, concorrentes, metas. Rota própria fora de /admin (src/app/growth/**, layout dedicado 'GrowthOS — Diagnóstico e Estratégia'), não registrado neste mapa até a auditoria REC OS ARCHITECTURE ALIGNMENT V1. NÃO confundir com rec_os_growth (Growth por cliente, dentro do REC OS, ainda not_implemented) -- mesmo nome de produto, escopos e dados completamente diferentes; nunca a mesma rota, nunca a mesma tabela.",
+    category: "intelligence",
+    routes: ["/growth/diagnosticos", "/growth/plano-de-acao", "/growth/funil", "/growth/ofertas", "/growth/concorrentes", "/growth/metas"],
+    surfaces: [
+      { surface: "super_admin", access: "full_access" },
+      { surface: "agency", access: "full_access" },
+      { surface: "agency_client", access: "conditional", notes: "Sem gate de role dedicado confirmado em src/proxy.ts para estas rotas -- nenhum dos branches de role (admin/super_admin, cliente, aluno, operacional) bloqueia /growth explicitamente, então hoje o acesso real não é tecnicamente restrito a agency-only, mesmo sendo essa a intenção de produto." },
+      { surface: "direct_business", access: "conditional", notes: "Mesmo gap de gate acima." },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: [],
+    integrations: [],
+    maturity: "preview",
+    nicheSupport: false,
+    owner: "management",
+    notes: "Todas as páginas confirmadas 100% em memória (arrays hardcoded, ex.: src/app/growth/metas/page.tsx `const goals = [...]`), sem Supabase -- por isso 'preview', nunca 'production'. V2 — Inteligência no modelo de evolução (diagnóstico/simulação/benchmark antes de agir), mas apontado aqui como um módulo à parte de REC OS -- não uma dependência dele.",
   },
 ];
 

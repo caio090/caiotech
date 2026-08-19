@@ -6,7 +6,7 @@ const capabilities = require("../workspace-capabilities.ts") as typeof import(".
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
 
-const MATURITIES = new Set(["production", "qa_pending", "preview", "planned", "blocked", "experimental"]);
+const MATURITIES = new Set(["production", "qa_pending", "preview", "planned", "blocked", "experimental", "not_implemented", "coming_soon"]);
 const SURFACES = new Set(["super_admin", "agency", "agency_client", "direct_business", "operational_user"]);
 const KNOWN_CAPABILITIES = new Set(Object.keys(capabilities.SURFACE_LABELS).flatMap((surface) => capabilities.resolveCapabilities(surface as never)));
 
@@ -16,11 +16,16 @@ console.log("\n[test 1] Registry sem IDs duplicados");
   assert(new Set(ids).size === ids.length, `${ids.length} módulos, todos com id único`);
 }
 
-console.log("\n[test 2] Rotas válidas (começam com /admin)");
+console.log("\n[test 2] Rotas válidas (raiz conhecida)");
 {
-  const invalid = registry.PLATFORM_MODULES.flatMap((m) => m.routes).filter((route) => !route.startsWith("/admin"));
-  assert(invalid.length === 0, `todas as rotas começam com /admin (inválidas: ${invalid.join(", ") || "nenhuma"})`);
-  assert(registry.PLATFORM_MODULES.every((m) => m.routes.length > 0), "todo módulo declara ao menos uma rota");
+  // REC OS ARCHITECTURE ALIGNMENT V1: /admin é a raiz esperada da grande
+  // maioria dos módulos, mas growth_os vive de propósito fora dela
+  // (src/app/growth/**, confirmado em auditoria) -- allowlist explícita em
+  // vez de aceitar qualquer prefixo, para continuar pegando um typo real.
+  const KNOWN_ROOTS = ["/admin", "/growth"];
+  const invalid = registry.PLATFORM_MODULES.flatMap((m) => m.routes).filter((route) => !KNOWN_ROOTS.some((root) => route.startsWith(root)));
+  assert(invalid.length === 0, `todas as rotas começam com uma raiz conhecida (${KNOWN_ROOTS.join(" ou ")}) (inválidas: ${invalid.join(", ") || "nenhuma"})`);
+  assert(registry.PLATFORM_MODULES.filter((m) => m.maturity !== "not_implemented" && m.maturity !== "coming_soon" && m.maturity !== "planned").every((m) => m.routes.length > 0), "todo módulo com maturidade real (não planned/coming_soon/not_implemented) declara ao menos uma rota");
 }
 
 console.log("\n[test 3] Dependências existentes");

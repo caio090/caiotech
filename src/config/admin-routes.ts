@@ -40,12 +40,23 @@ export const ADMIN_ROUTES: AdminRouteDef[] = [
   { id: "rec_os_criar",      label: "Criar conteúdo",       href: "/admin/contentos/criar",                module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "client_required" },
   { id: "rec_os_producao",   label: "Produção",              href: "/admin/contentos/producao",             module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported", statusAreaId: "rec_os_global_production" },
   { id: "rec_os_aprovacoes", label: "Aprovações",            href: "/admin/contentos/aprovacoes",           module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported", statusAreaId: "rec_os_global_approvals" },
-  { id: "rec_os_calendario", label: "Calendário",            href: "/admin/calendario",                     module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
-  { id: "rec_os_calendario_alias", label: "Calendário (alias legado)", href: "/admin/contentos/calendario", module: "rec_os",      preserveClient: true,  visibility: "secondary", contextMode: "alias" },
+  // REC OS Context Foundation V1 corrigiu isto: /admin/contentos/calendario
+  // não é mais um alias/redirect, é a view contextual real e canônica
+  // dentro do módulo (reusa a normalização de global-calendar.ts, mesmo
+  // componente de /admin/calendario, sem duplicar dado). /admin/calendario
+  // continua existindo como o Calendário Global de verdade, agora modelado
+  // como um link secundário explícito de saída do módulo (nunca um alias
+  // -- as duas rotas renderizam conteúdo real, nenhuma redireciona).
+  { id: "rec_os_calendario", label: "Calendário",            href: "/admin/contentos/calendario",           module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
+  { id: "rec_os_calendario_global", label: "Calendário Global (fora do REC OS)", href: "/admin/calendario", module: "rec_os",      preserveClient: true,  visibility: "secondary", contextMode: "global_supported" },
   { id: "rec_os_resultados", label: "Resultados",            href: "/admin/contentos/resultados",           module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
-  // Canônica real é /admin/conexoes (confirmado em _contentos-subnav.tsx);
-  // não existe /admin/contentos/conexoes — não foi criada uma rota nova.
-  { id: "rec_os_conexoes",   label: "Conexões",              href: "/admin/conexoes",                       module: "integracoes", preserveClient: false, visibility: "primary",   contextMode: "global_supported" },
+  // REC OS Context Foundation V1 também criou /admin/contentos/conexoes:
+  // view contextual real que espelha status Meta/OlaClick via as mesmas
+  // APIs de /admin/conexoes (/api/meta/hub-assets, /api/olaclick/status),
+  // sem duplicar credencial/tabela. A central global /admin/conexoes
+  // continua existindo e vira link secundário de saída do módulo.
+  { id: "rec_os_conexoes",   label: "Conexões",              href: "/admin/contentos/conexoes",             module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
+  { id: "rec_os_conexoes_global", label: "Conexões (central global, fora do REC OS)", href: "/admin/conexoes", module: "integracoes", preserveClient: false, visibility: "secondary", contextMode: "global_supported" },
   { id: "editor_os",         label: "EditorOS",              href: "/admin/contentos/editor-os",            module: "editor_os",   preserveClient: true,  visibility: "secondary", contextMode: "content_required" },
   { id: "rec_os_selecionar_cliente", label: "Selecionar cliente (alias)", href: "/admin/contentos/selecionar-cliente", module: "rec_os", preserveClient: true, visibility: "secondary", contextMode: "alias" },
   { id: "meu_negocio",       label: "Meu Negócio",           href: "/admin/meu-negocio",                    module: "meu_negocio", preserveClient: false, visibility: "primary",   contextMode: "global_supported", statusAreaId: "business_os_preview" },
