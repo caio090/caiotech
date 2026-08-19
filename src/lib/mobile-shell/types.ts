@@ -68,7 +68,7 @@ export const SURFACE_BOTTOM_NAV_ITEMS: Record<WorkspaceSurface, SurfaceBottomNav
   ],
   direct_business: [
     { id: "inicio", label: "Início", route: "/admin/dashboard", requiredCapability: "dashboard.view", activeMatch: "exact", priority: 1 },
-    { id: "meu_negocio", label: "Meu Negócio", route: "/admin/organizacao", requiredCapability: "business.view", activeMatch: "prefix", priority: 2 },
+    { id: "meu_negocio", label: "Meu Negócio", route: "/admin/meu-negocio", requiredCapability: "business.view", activeMatch: "prefix", priority: 2 },
     { id: "crm", label: "CRM", route: "/admin/leads", requiredCapability: "crm.view", activeMatch: "prefix", priority: 3 },
     { id: "calendario", label: "Calendário", route: "/admin/calendario", requiredCapability: "calendar.view", activeMatch: "prefix", priority: 4 },
   ],

@@ -38,7 +38,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/empresa",           label: "Empresa",          icon: Building2 },
       { href: "/admin/escritorio",        label: "Meu Escritório",   icon: Briefcase },
       { href: "/admin/projetos",          label: "Projetos",         icon: FolderKanban },
-      { href: "/admin/organizacao",       label: "Meu Negócio",      icon: Sparkles },
+      { href: "/admin/meu-negocio",       label: "Meu Negócio",      icon: Sparkles },
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/contentos/aprovacoes", label: "Aprovações",    icon: CheckSquare },
@@ -184,7 +184,7 @@ const SIDEBAR_W_CLOSED = 64;
 const SIDEBAR_W_OPEN   = 248;
 
 export function AppSidebar({
-  variant, userName = "Usuário", userRole = "", accountType = null, onSignOut, badges, hideRoutes, transparent,
+  variant, userName = "Usuário", userRole = "", onSignOut, badges, hideRoutes, transparent,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const activeCompanyId = readCompanyContextParam(useSearchParams());
@@ -262,7 +262,7 @@ export function AppSidebar({
           const active = pathname === href || pathname.startsWith(href + "/");
           const badge  = badges?.[href] ?? 0;
           const resolvedHref = COMPANY_SCOPED_ROUTES.has(href) ? withCompanyContext(href, activeCompanyId) : href;
-          const label = href === "/admin/organizacao" && accountType === "agencia" ? "Minha Agência" : baseLabel;
+          const label = baseLabel;
           return (
             <Link
               key={href}

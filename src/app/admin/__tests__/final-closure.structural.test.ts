@@ -17,14 +17,13 @@ const exists = (p: string) => fs.existsSync(path.join(root, p));
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
 
-console.log("[test] 1 — Fase 22-28: sidebar aponta para a organização própria real, não mais o demo Company-scoped");
+console.log("[test] 1 — Meu Negócio (módulo operacional) e Minha Organização (institucional) são conceitos separados, nunca alias um do outro");
 {
   const sidebar = read("src/components/app-sidebar.tsx");
-  assert(sidebar.includes('href: "/admin/organizacao"'), "item de nav aponta para a nova rota real de organização própria");
-  assert(!sidebar.includes('href: "/admin/meu-negocio"'), "não aponta mais para o demo Company-scoped -- ele sai da navegação canônica (Fase 28), continua existindo só por URL direta");
-  assert(sidebar.includes('accountType === "agencia" ? "Minha Agência" : baseLabel'), "rótulo dinâmico real conforme account_type (Fase 57)");
-  assert(exists("src/app/admin/meu-negocio/page.tsx"), "rota antiga preservada em disco -- nada deletado, só saiu do menu");
-  assert(exists("src/app/admin/organizacao/page.tsx"), "nova rota real existe");
+  assert(sidebar.includes('href: "/admin/meu-negocio",       label: "Meu Negócio"'), "item 'Meu Negócio' da sidebar aponta para a rota real do módulo operacional (correção: antes apontava para /admin/organizacao, um conceito diferente)");
+  assert(!/href:\s*"\/admin\/organizacao"/.test(sidebar), "sidebar principal não referencia mais /admin/organizacao -- preservada como rota de deep link, sem item redundante adicionado sem antes verificar a arquitetura existente");
+  assert(exists("src/app/admin/meu-negocio/page.tsx"), "módulo operacional (Estoque/Fichas técnicas/CMV/Relatórios) continua existindo em disco, agora de novo alcançável pela sidebar");
+  assert(exists("src/app/admin/organizacao/page.tsx"), "rota institucional (Minha Organização/Minha Agência) preservada, intocada, acessível por URL direta");
 }
 
 console.log("[test] 2 — Fase 24/27: organização própria é uma raiz só, nunca dois sistemas");
