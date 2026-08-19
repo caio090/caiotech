@@ -73,5 +73,44 @@ console.log("\n[test extra] findModulesBySurface / findModulesByCategory / findM
   assert(registry.findModulesByCategory("core").some((m) => m.id === "workspaces_core"), "findModulesByCategory('core') inclui workspaces_core");
 }
 
+console.log("\n[test 9] REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION -- GrowthOS e REC OS Growth separados, árvore de 6 filhos registrada, nenhuma rota criada");
+{
+  const growthOs = registry.findModuleById("growth_os");
+  const recOsGrowth = registry.findModuleById("rec_os_growth");
+  assert(growthOs !== undefined && recOsGrowth !== undefined, "growth_os (agência) e rec_os_growth (por cliente) coexistem como entradas distintas");
+  assert(growthOs?.routes.every((r) => r.startsWith("/growth")) ?? false, "growth_os só referencia rotas reais /growth/** (agência inteira)");
+  assert(recOsGrowth?.routes.length === 0, "rec_os_growth não declara nenhuma rota -- nenhuma UI criada nesta fundação");
+
+  const GROWTH_CHILDREN = [
+    "rec_os_growth_planner",
+    "rec_os_paid_traffic_planner",
+    "rec_os_content_planner",
+    "rec_os_creator_dna",
+    "rec_os_influencer_radar",
+    "rec_os_growth_analytics",
+  ];
+  for (const id of GROWTH_CHILDREN) {
+    const mod = registry.findModuleById(id);
+    assert(mod !== undefined, `${id} está registrado`);
+    assert(mod?.dependsOn.includes("rec_os_growth") ?? false, `${id} depende de rec_os_growth`);
+    assert((mod?.routes.length ?? -1) === 0, `${id} não declara nenhuma rota -- nenhuma UI criada nesta fundação`);
+    assert(mod?.maturity === "planned" || mod?.maturity === "not_implemented", `${id} tem maturidade honesta (planned ou not_implemented, nunca production/preview)`);
+  }
+
+  // Cada par "REC OS X" / "X" agência-inteira precisa se referenciar mutuamente,
+  // nunca um schema compartilhado silencioso.
+  const CROSS_REF_PAIRS: [string, string][] = [
+    ["rec_os_creator_dna", "creator_dna"],
+    ["rec_os_influencer_radar", "creator_radar"],
+    ["rec_os_growth_analytics", "creator_analytics"],
+  ];
+  for (const [recOsId, globalId] of CROSS_REF_PAIRS) {
+    const recOsMod = registry.findModuleById(recOsId);
+    const globalMod = registry.findModuleById(globalId);
+    assert(!!recOsMod?.description.includes(globalId), `${recOsId} referencia ${globalId} explicitamente na descrição (evita confusão de escopo)`);
+    assert(!!globalMod?.notes?.includes(recOsId), `${globalId} referencia ${recOsId} de volta nas notes (cross-reference nos dois sentidos)`);
+  }
+}
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();

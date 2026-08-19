@@ -212,10 +212,44 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     owner: "commercial",
     notes: "AMBIGUIDADE DE NOME confirmada em auditoria anterior (docs/DECISIONS.md): 'REC OS' (este módulo, rota /admin/contentos) é diferente de /admin/audiovisual (Audiovisual, tabela rec_projects, rota canônica desde a missão AUDIOVISUAL ROUTE SEPARATION -- /admin/recos preservado só como redirect legado) e de /admin/rec + /admin/rec/videos (plataforma de vídeo 'Lokat.rec', não tocada nesta missão). REC OS ARCHITECTURE ALIGNMENT V1: este módulo (produção/aprovações/calendário/conexões contextuais) é o V1 — Operacional do REC OS (ver doc do modelo de evolução acima de ModuleSurfaceAccess); rec_os_growth é o V2 — Inteligência planejado para cima dele.",
   },
+  /**
+   * REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION — árvore conceitual
+   * registrada nesta missão, nenhuma rota criada:
+   *
+   *   REC OS
+   *   ├── Operação         (rec_os -- produção, aprovações, calendário/
+   *   │                      conexões contextuais -- já REAL, V1 Operacional)
+   *   └── Growth            (rec_os_growth -- por cliente, V2 Inteligência)
+   *       ├── Growth Planner        (rec_os_growth_planner)
+   *       ├── Paid Traffic Planner  (rec_os_paid_traffic_planner)
+   *       ├── Content Planner       (rec_os_content_planner)
+   *       ├── Creator DNA           (rec_os_creator_dna)
+   *       ├── Influencer Radar      (rec_os_influencer_radar)
+   *       └── Analytics             (rec_os_growth_analytics)
+   *
+   * Roadmap específico deste cluster (todo ele hoje not_implemented/
+   * planned, sem exceção -- "planned" aqui nunca significa "em progresso",
+   * só "decisão arquitetural tomada"):
+   * - V1 Planejamento: usuário define objetivo, público, cidade, orçamento,
+   *   tipo de criativo, canal -- só planejamento, nenhuma chamada externa.
+   *   Alvo desta fundação: rec_os_growth_planner passa a "planned".
+   * - V2 Integrações: Meta Ads API, métricas, sincronização de campanhas --
+   *   ainda não iniciado.
+   * - V3 Execução: criar campanhas, publicar anúncios, otimização
+   *   automática -- corresponde ao V3 — Automação do modelo geral de
+   *   evolução (ver doc acima de ModuleSurfaceAccess).
+   *
+   * Cada nó "REC OS <Algo>" abaixo tem um par de nome igual ou parecido já
+   * existente sob influence_os (agência inteira, identidade do criador
+   * como pessoa pública) -- são deliberadamente entradas DIFERENTES, nunca
+   * a mesma funcionalidade duplicada: o par aqui é sempre por-cliente,
+   * dentro do REC OS, focado em growth/aquisição, não em identidade de
+   * criador. Ver a nota de cada entrada para o cross-reference exato.
+   */
   {
     id: "rec_os_growth",
     name: "REC OS — Growth",
-    description: "Submódulo de crescimento/marketing por cliente dentro do REC OS -- estratégia, campanhas, criativos, públicos, orçamento, simulações e métricas. Umbrella conceitual registrada em REC OS ARCHITECTURE ALIGNMENT V1 (auditoria anterior: REC OS GROWTH FOUNDATION V1); nenhuma rota criada nesta missão -- a página /admin/contentos/campanhas (tabs campanhas/estrategia/trafego) já existe hoje como rascunho de UI sem contrato real e é a candidata a ser absorvida por este submódulo quando ele for implementado, nunca duplicada ao lado dele.",
+    description: "Submódulo de crescimento/marketing por cliente dentro do REC OS -- estratégia, campanhas, criativos, públicos, orçamento, simulações e métricas. Umbrella conceitual registrada em REC OS ARCHITECTURE ALIGNMENT V1 (auditoria anterior: REC OS GROWTH FOUNDATION V1), agora detalhada em 6 sub-nós por REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION (ver doc acima); nenhuma rota criada nesta missão -- a página /admin/contentos/campanhas (tabs campanhas/estrategia/trafego) já existe hoje como rascunho de UI sem contrato real e é a candidata a ser absorvida por este submódulo quando ele for implementado, nunca duplicada ao lado dele.",
     category: "commercial",
     routes: [],
     surfaces: [
@@ -233,7 +267,119 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "not_implemented",
     nicheSupport: false,
     owner: "product",
-    notes: "V2 — Inteligência (planeja/simula antes de executar), distinto de growth_os (agência inteira, diagnóstico/funil/metas, rota /growth/*, não deste módulo) -- mesmo nome, escopos diferentes: este é por cliente, dentro do REC OS. rec_os_paid_traffic_planner passa a depender deste id em vez de depender de rec_os diretamente, pois Paid Traffic é uma peça de Growth, não um par dele.",
+    notes: "V2 — Inteligência (planeja/simula antes de executar), distinto de growth_os (agência inteira, diagnóstico/funil/metas, rota /growth/*, não deste módulo) -- mesmo nome, escopos diferentes: este é por cliente, dentro do REC OS. rec_os_paid_traffic_planner e os 4 novos sub-módulos (growth_planner/content_planner/creator_dna/influencer_radar/growth_analytics) dependem deste id em vez de rec_os diretamente, pois cada um é uma peça de Growth, não um par dele.",
+  },
+  {
+    id: "rec_os_growth_planner",
+    name: "REC OS — Growth Planner",
+    description: "Núcleo de planejamento estratégico de crescimento por cliente: objetivo, público, cidade, orçamento, tipo de criativo e canal -- só planejamento/simulação, nenhuma integração externa, nenhuma criação real de campanha. É o nó V1 desta fundação (ver doc REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION acima).",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os_growth"],
+    integrations: [],
+    maturity: "planned",
+    nicheSupport: false,
+    owner: "product",
+    notes: "Próxima frente recomendada após esta fundação de arquitetura. Nunca promete resultado -- quando implementado, classificação de viabilidade (verde/amarelo/vermelho) é sempre uma estimativa, nunca uma garantia.",
+  },
+  {
+    id: "rec_os_content_planner",
+    name: "REC OS — Content Planner",
+    description: "Planejamento de pauta/estratégia de conteúdo por cliente dentro do Growth -- distinto de /admin/contentos/criar (que já existe e cria o item de conteúdo em si, produção real). Content Planner decide O QUE e PARA QUÊ antes de chegar ao wizard de criação.",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os_growth"],
+    integrations: [],
+    maturity: "not_implemented",
+    nicheSupport: false,
+    owner: "product",
+  },
+  {
+    id: "rec_os_creator_dna",
+    name: "REC OS — Creator DNA",
+    description: "Identidade de marca/criador de UM cliente do REC OS, usada para orientar Growth Planner/Content Planner -- NÃO confundir com creator_dna (Influence OS, identidade estratégica de um criador como pessoa pública, agência inteira, escopo totalmente diferente). Mesmo nome de conceito, dois módulos distintos, nunca a mesma tabela quando implementados.",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os_growth"],
+    integrations: [],
+    maturity: "not_implemented",
+    nicheSupport: false,
+    owner: "product",
+    notes: "Cross-reference: creator_dna (id diferente, dependsOn influence_os) é o par agência-inteira. Se algum dia fizer sentido unificar os dois, é uma decisão de produto explícita futura, nunca um merge silencioso de schema.",
+  },
+  {
+    id: "rec_os_influencer_radar",
+    name: "REC OS — Influencer Radar",
+    description: "Descoberta/avaliação de influenciadores e parceiros de marca PARA um cliente do REC OS contratar -- NÃO confundir com creator_radar (Influence OS, radar de tendências de conteúdo PARA um criador publicar, agência inteira). Direção inversa: aqui o cliente procura criadores; lá o criador procura tendências.",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os_growth"],
+    integrations: [],
+    maturity: "not_implemented",
+    nicheSupport: false,
+    owner: "product",
+  },
+  {
+    id: "rec_os_growth_analytics",
+    name: "REC OS — Growth Analytics",
+    description: "Métricas de performance de crescimento por cliente (campanha/criativo/canal) dentro do Growth -- distinto de rec_os (Resultados/Insights Meta hoje é só nível de conta, nunca por campanha/criativo) e de creator_analytics (Influence OS, performance de um criador como pessoa pública, agência inteira).",
+    category: "commercial",
+    routes: [],
+    surfaces: [
+      { surface: "super_admin", access: "not_applicable" },
+      { surface: "agency", access: "not_applicable" },
+      { surface: "agency_client", access: "not_applicable" },
+      { surface: "direct_business", access: "not_applicable" },
+      { surface: "operational_user", access: "not_applicable" },
+    ],
+    capabilities: [],
+    consumes: [],
+    produces: [],
+    dependsOn: ["rec_os_growth"],
+    integrations: [],
+    maturity: "not_implemented",
+    nicheSupport: false,
+    owner: "product",
   },
   {
     id: "recos_audiovisual",
@@ -579,6 +725,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "not_implemented",
     nicheSupport: false,
     owner: "product",
+    notes: "Cross-reference (REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION): rec_os_creator_dna é o par por-cliente dentro do REC OS -- este aqui é agência inteira, identidade do criador como pessoa pública.",
   },
   {
     id: "creator_branding",
@@ -623,6 +770,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "not_implemented",
     nicheSupport: false,
     owner: "product",
+    notes: "Cross-reference (REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION): rec_os_influencer_radar é o par por-cliente dentro do REC OS, direção inversa (cliente procurando criador, não criador procurando tendência).",
   },
   {
     id: "creator_calendar",
@@ -689,6 +837,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "not_implemented",
     nicheSupport: false,
     owner: "product",
+    notes: "Cross-reference (REC OS GROWTH PLANNER V1 ARCHITECTURE FOUNDATION): rec_os_growth_analytics é o par por-cliente dentro do REC OS Growth.",
   },
   {
     id: "rec_os_paid_traffic_planner",
