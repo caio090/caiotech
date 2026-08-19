@@ -124,7 +124,7 @@ export function RecosDashboardContent({ projects: initialProjects }: Props) {
           <p className="text-sm text-gray-500">Projetos, roteiros, decupagem, gravações e entregas de vídeo.</p>
         </div>
         <Link
-          href="/admin/recos/criar"
+          href="/admin/audiovisual/criar"
           className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white text-sm font-bold rounded-xl hover:bg-rose-700 transition-colors flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -202,7 +202,7 @@ export function RecosDashboardContent({ projects: initialProjects }: Props) {
           </p>
           {filter === "todos" && (
             <Link
-              href="/admin/recos/criar"
+              href="/admin/audiovisual/criar"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 text-white text-sm font-bold rounded-xl hover:bg-rose-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -241,7 +241,7 @@ function ProjectCard({ project, onDelete }: { project: DbRecProject; onDelete: (
 
   return (
     <Link
-      href={`/admin/recos/${project.id}`}
+      href={`/admin/audiovisual/${project.id}`}
       className="group bg-white rounded-2xl border border-gray-100 hover:border-rose-200 hover:shadow-sm transition-all overflow-hidden"
     >
       {/* Color bar */}

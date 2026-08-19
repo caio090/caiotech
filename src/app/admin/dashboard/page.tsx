@@ -201,7 +201,7 @@ export default async function AdminDashboardPage() {
           {[
             { href: "/admin/dashboard",     icon: BarChart2,  label: "Dashboard",    color: "indigo" },
             { href: "/admin/contentos",     icon: Sparkles,   label: "REC OS",       color: "red"    },
-            { href: "/admin/recos",         icon: Video,      label: "RecOS",        color: "red"    },
+            { href: "/admin/audiovisual",   icon: Video,      label: "Audiovisual",  color: "red"    },
             { href: "/admin/leads",         icon: Target,     label: "GrowthOS",     color: "emerald"},
             { href: "/admin/financeiro",    icon: DollarSign, label: "FinanceOS",    color: "teal"   },
             { href: "/admin/conexoes",      icon: Link2,      label: "Conexoes",     color: "blue"   },

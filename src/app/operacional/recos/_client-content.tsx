@@ -97,7 +97,7 @@ function OperacionalProjectCard({ project }: { project: DbRecProject }) {
 
   return (
     <Link
-      href={`/admin/recos/${project.id}`}
+      href={`/admin/audiovisual/${project.id}`}
       className="group bg-white rounded-2xl border border-gray-100 hover:border-rose-200 hover:shadow-sm transition-all p-4 flex items-center gap-4"
     >
       {/* Icon */}

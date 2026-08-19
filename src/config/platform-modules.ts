@@ -179,14 +179,14 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "production",
     nicheSupport: false,
     owner: "commercial",
-    notes: "AMBIGUIDADE DE NOME confirmada nesta auditoria (docs/DECISIONS.md): 'REC OS' (este módulo, rota /contentos) é diferente de /admin/recos (Audiovisual, tabela rec_projects) e de /admin/rec + /admin/rec/videos (plataforma de vídeo 'Lokat.rec'). Nenhum dos três foi renomeado nesta sprint — só documentado.",
+    notes: "AMBIGUIDADE DE NOME confirmada em auditoria anterior (docs/DECISIONS.md): 'REC OS' (este módulo, rota /admin/contentos) é diferente de /admin/audiovisual (Audiovisual, tabela rec_projects, rota canônica desde a missão AUDIOVISUAL ROUTE SEPARATION -- /admin/recos preservado só como redirect legado) e de /admin/rec + /admin/rec/videos (plataforma de vídeo 'Lokat.rec', não tocada nesta missão).",
   },
   {
     id: "recos_audiovisual",
-    name: "REC (Audiovisual)",
-    description: "Dashboard de projetos de vídeo, tabela rec_projects — módulo distinto de REC OS apesar do nome parecido.",
+    name: "Audiovisual",
+    description: "Dashboard de projetos de vídeo, tabela rec_projects — módulo distinto de REC OS. Rota canônica: /admin/audiovisual (/admin/recos preservado como redirect legado).",
     category: "commercial",
-    routes: ["/admin/recos"],
+    routes: ["/admin/audiovisual"],
     surfaces: [
       { surface: "super_admin", access: "full_access" },
       { surface: "agency", access: "conditional" },

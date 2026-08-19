@@ -178,7 +178,7 @@ export function RecosProjectContent({ project: initialProject, script: initialSc
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Link
-            href="/admin/recos"
+            href="/admin/audiovisual"
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700 flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -42,7 +42,7 @@ export const configs: Record<SidebarVariant, {
       { href: "/admin/calendario",        label: "Calendário Global", icon: CalendarDays },
       { href: "/admin/contentos",         label: "REC OS",           icon: RecDropIcon },
       { href: "/admin/contentos/aprovacoes", label: "Aprovações",    icon: CheckSquare },
-      { href: "/admin/recos",             label: "Audiovisual",      icon: Clapperboard },
+      { href: "/admin/audiovisual",       label: "Audiovisual",      icon: Clapperboard },
       { href: "/admin/operacional",       label: "Operacional",      icon: KanbanSquare },
       { href: "/admin/leads",             label: "CRM",              icon: Target },
       { href: "/admin/clientes",          label: "Clientes",         icon: Users },

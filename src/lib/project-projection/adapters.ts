@@ -23,7 +23,7 @@ export function projectFromRecProject(row: DbRecProject): ProjectProjection {
     sourceModule: "rec_projects",
     sourceEntityType: "rec_project",
     sourceEntityId: row.id,
-    sourceUrl: `/admin/recos/${row.id}`,
+    sourceUrl: `/admin/audiovisual/${row.id}`,
     metrics: null,
     workSummary: null,
     updatedAt: row.updated_at,

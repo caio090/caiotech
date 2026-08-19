@@ -27,7 +27,7 @@ console.log("[test] 1 — real source -> projection");
   assert(p.sourceModule === "rec_projects", "sourceModule correto");
   assert(p.sourceEntityType === "rec_project", "sourceEntityType correto");
   assert(p.sourceEntityId === "rp-1", "sourceEntityId aponta para a linha real");
-  assert(p.sourceUrl === "/admin/recos/rp-1", "sourceUrl aponta para a rota real de detalhe");
+  assert(p.sourceUrl === "/admin/audiovisual/rp-1", "sourceUrl aponta para a rota real de detalhe");
 }
 
 console.log("[test] 2 — project without due date");
@@ -45,7 +45,7 @@ console.log("[test] 3 — project without work (team null) => owner null, nunca 
 console.log("[test] 4 — project source URL sempre aponta para a source real");
 {
   const p = projectFromRecProject(baseRow({ id: "rp-42" }));
-  assert(p.sourceUrl === "/admin/recos/rp-42", "URL derivada do id real, nunca hardcoded");
+  assert(p.sourceUrl === "/admin/audiovisual/rp-42", "URL derivada do id real, nunca hardcoded");
 }
 
 console.log("[test] 5 — planningLevel nunca inventado quando a source não carrega essa informação");

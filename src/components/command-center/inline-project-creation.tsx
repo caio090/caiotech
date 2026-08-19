@@ -8,7 +8,7 @@ import { InlineCompanyPicker } from "./inline-company-picker";
  * Sprint Command Center + Jarvis Context V1 (Problema 4) — "criar projeto"
  * nunca inventa uma segunda tabela de projetos. As únicas autoridades reais
  * hoje são: projeto audiovisual (INSERT direto em rec_projects via
- * /admin/recos/criar) e campanha (/admin/contentos/campanhas). Não existe
+ * /admin/audiovisual/criar) e campanha (/admin/contentos/campanhas). Não existe
  * autoridade real para "outro tipo de projeto" -- omitido honestamente em
  * vez de fingir uma ação (Fase "Botão sem ação real: PROIBIDO").
  */
@@ -36,7 +36,7 @@ export function InlineProjectCreation({
       <p className="text-sm font-bold text-white">O que você quer criar{companyName ? ` para ${companyName}` : ""}?</p>
       <div className="flex flex-col gap-2">
         <Link
-          href={`/admin/recos/criar?client=${companyId}`}
+          href={`/admin/audiovisual/criar?client=${companyId}`}
           data-testid="inline-project-creation-audiovisual"
           className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-colors"
         >

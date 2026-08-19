@@ -345,7 +345,7 @@ export default function AdminRecVideosPage() {
 
       {/* Module nav */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 w-fit">
-        <Link href="/admin/recos"
+        <Link href="/admin/audiovisual"
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors">
           <Clapperboard className="w-3.5 h-3.5" /> Projetos
         </Link>
