@@ -12,6 +12,7 @@ import { evaluateTelegramWebhookSecret } from "../webhook-security";
 import { decideTelegramReply } from "../decide-reply";
 import { isTelegramBotTokenConfigured, sendTelegramMessage } from "../client";
 import { TelegramChannelAdapter } from "@/lib/conversation/adapters/telegram";
+import { InMemoryIdentityLinkStore } from "@/lib/conversation/identity-link-store";
 import type { TelegramUpdate } from "../types";
 
 let passed = 0; let failed = 0;
@@ -114,17 +115,18 @@ async function main() {
   console.log("[test] Ausência de Identity Link — nenhuma leitura privada é decidida sem vínculo");
   {
     const baseMsg = { channel: "telegram" as const, externalUserId: "1", externalConversationId: "1", metadata: { messageId: "1", updateId: "1" } };
-    assert(decideTelegramReply({ ...baseMsg, text: "/start" }, { kind: "start", payload: null }).includes("sendo preparada"), "/start responde honestamente que a integração está sendo preparada");
-    assert(decideTelegramReply({ ...baseMsg, text: "/start abc" }, { kind: "start", payload: "abc" }).toLowerCase().includes("código"), "/start <payload> confirma recebimento do código, nunca finge vínculo completo");
-    assert(decideTelegramReply({ ...baseMsg, text: "/help" }, { kind: "help" }).includes("campanhas"), "/help lista capacidades");
+    const store = new InMemoryIdentityLinkStore();
+    assert(decideTelegramReply({ ...baseMsg, text: "/start" }, { kind: "start", payload: null }, store).includes("sendo preparada"), "/start sem token explica honestamente como conectar");
+    assert(decideTelegramReply({ ...baseMsg, text: "/start abc" }, { kind: "start", payload: "abc" }, store).toLowerCase().includes("código"), "/start <token inválido> rejeita honestamente, nunca finge vínculo completo");
+    assert(decideTelegramReply({ ...baseMsg, text: "/help" }, { kind: "help" }, store).includes("campanhas"), "/help lista capacidades");
 
-    const growthReply = decideTelegramReply({ ...baseMsg, text: "quero vender mais" }, { kind: "text" });
+    const growthReply = decideTelegramReply({ ...baseMsg, text: "quero vender mais" }, { kind: "text" }, store);
     assert(growthReply.toLowerCase().includes("vinculada"), "intenção de domínio (growth) nunca lê dado -- sempre exige conta vinculada");
 
-    const meuNegocioReply = decideTelegramReply({ ...baseMsg, text: "qual o cmv" }, { kind: "text" });
+    const meuNegocioReply = decideTelegramReply({ ...baseMsg, text: "qual o cmv" }, { kind: "text" }, store);
     assert(meuNegocioReply.toLowerCase().includes("vinculada"), "intenção meu_negocio também nunca lê dado sem vínculo");
 
-    const unknownReply = decideTelegramReply({ ...baseMsg, text: "blablabla" }, { kind: "text" });
+    const unknownReply = decideTelegramReply({ ...baseMsg, text: "blablabla" }, { kind: "text" }, store);
     assert(unknownReply.includes("/help"), "mensagem sem intenção reconhecida sugere /help, nunca inventa resposta");
   }
 

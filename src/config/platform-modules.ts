@@ -1070,7 +1070,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
   {
     id: "telegram_identity_link",
     name: "Telegram Identity Link",
-    description: "Vínculo persistido telegram_user_id <-> profile_id via token temporário gerado no Web (/start <token>) -- contrato de tipos já existe (IdentityLinkRequest/IdentityLinkRecord em src/lib/conversation/types.ts), nenhuma persistência real ainda. Enquanto not_implemented, nenhuma mensagem de domínio (growth/content/status/etc.) pode ler dado privado -- sempre responde exigindo vínculo.",
+    description: "Vínculo entre telegram_user_id e profile_id via token temporário HMAC-assinado (mesmo padrão de src/lib/workspaces/preview-session.ts). /start <token> hoje já valida token real (assinatura/expiração/reuso/já-vinculado) e cria o vínculo de ponta a ponta -- mas via InMemoryIdentityLinkStore (src/lib/conversation/identity-link-store.ts), nunca uma tabela real. Migration proposta e não aplicada em docs/supabase/93-identity-links.sql.",
     category: "communication",
     routes: [],
     surfaces: [
@@ -1085,9 +1085,10 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     produces: [],
     dependsOn: ["telegram_adapter"],
     integrations: [],
-    maturity: "not_implemented",
+    maturity: "planned",
     nicheSupport: false,
     owner: "product",
+    notes: "TELEGRAM IDENTITY LINK V1 FOUNDATION: lógica completa e testada (28 testes unitários + 26 estruturais, cobrindo os 11 cenários da missão -- token válido/expirado/inválido/reusado, usuário já vinculado, secret nunca exposto, username nunca usado como identidade, Company Context intocado, Conversation Core recebe o usuário identificado). 'planned', nunca 'production'/'qa_pending': sem persistência durável (SQL não aplicado por decisão explícita da missão), o vínculo não sobrevive a um cold start real em Production. Geração do token pelo painel Web (ETAPA 1-2 do fluxo) também não foi construída nesta missão -- generateIdentityLinkToken() existe e está pronta para uma rota autenticada futura chamá-la.",
   },
   {
     id: "telegram_domain_actions",

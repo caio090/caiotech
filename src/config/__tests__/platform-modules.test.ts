@@ -155,7 +155,7 @@ console.log("\n[test 11] TELEGRAM ADAPTER V1 -- Conversational Layer registrada 
   const EXPECTED: Record<string, string> = {
     conversation_core: "qa_pending",
     telegram_adapter: "qa_pending",
-    telegram_identity_link: "not_implemented",
+    telegram_identity_link: "planned",
     telegram_domain_actions: "not_implemented",
     telegram_voice: "coming_soon",
     telegram_approvals: "coming_soon",

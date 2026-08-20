@@ -474,5 +474,61 @@
         "commit": "505fce8cc05a8e77cc801123fed537b456b474be"
       }
     ]
+  },
+  {
+    "id": "evt-015",
+    "timestamp": "2026-08-20T15:17:24.415Z",
+    "module": "Conversational Layer / Telegram",
+    "title": "Telegram Identity Link V1 Foundation",
+    "kind": "INTEGRATION",
+    "description": "Fundacao de identidade entre Telegram e usuario LOKAT, sem autorizacao paralela (reusa resolveCompanyContext/listAuthorizedCompanies/isCompanyAuthorizedForAdmin, nunca duplicados). Auditoria confirmou: usuario real = profiles (id = auth.users.id), empresa = clients, FK correta para o vinculo = profile_id (convencao confirmada em 6+ migrations reais, ex. 86-provider-foundation.sql). Token de vinculo HMAC-assinado e stateless (src/lib/conversation/identity-link-token.ts), mesmo padrao criptografico ja usado em src/lib/workspaces/preview-session.ts (crypto.randomBytes/createHmac/timingSafeEqual/hkdfSync), env dedicada canal-agnostica CONVERSATION_IDENTITY_LINK_SECRET (fail-closed em Production real sem ela, nunca WhatsApp-exclusiva). identity-link-store.ts (IdentityLinkStore + InMemoryIdentityLinkStore, mesmo padrao de ConversationSessionStore) e identity-link.ts (orquestrador completeIdentityLinkFromToken, reusa completeIdentityLink() de session.ts) cobrem os 11 cenarios pedidos: token valido/expirado/invalido/reusado, usuario ja vinculado, secret nunca exposto, username nunca usado como identidade, Company Context intocado, Conversation Core recebe usuario identificado. /start TOKEN agora valida de verdade (decide-reply.ts); usuario ja vinculado pedindo acao de dominio recebe confirmacao honesta de identidade reconhecida, nunca uma leitura real (telegram_domain_actions continua NOT_IMPLEMENTED). Migration proposta e NAO aplicada em docs/supabase/93-identity-links.sql (profile_id FK, RLS, idempotente, seguindo convencao real de 86/91). Nenhuma tabela criada, nenhum SQL executado, nenhuma rota Web de geracao de token construida (fora de escopo desta fundacao, generateIdentityLinkToken ja pronta para uma rota autenticada futura chamar).",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Rota Web autenticada para gerar o token (Conectar Telegram) + implementacao real da tabela identity_links (docs/supabase/93-identity-links.sql) + Telegram Domain Actions V1",
+    "tests": [
+      {
+        "suite": "identity-link unit (novo, 11 cenarios da missao)",
+        "passed": 28,
+        "failed": 0
+      },
+      {
+        "suite": "identity-link structural (novo)",
+        "passed": 26,
+        "failed": 0
+      },
+      {
+        "suite": "telegram-adapter unit (regressao, atualizado)",
+        "passed": 42,
+        "failed": 0
+      },
+      {
+        "suite": "telegram-webhook-route structural (regressao)",
+        "passed": 29,
+        "failed": 0
+      },
+      {
+        "suite": "conversation-core unit+structural (regressao)",
+        "passed": 71,
+        "failed": 0
+      },
+      {
+        "suite": "platform-modules registry integrity (regressao)",
+        "passed": 85,
+        "failed": 0
+      },
+      {
+        "suite": "company-context unit (regressao)",
+        "passed": 35,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity unit (regressao)",
+        "passed": 27,
+        "failed": 0
+      }
+    ]
   }
 ]

@@ -4,6 +4,7 @@ import { normalizeTelegramUpdate } from "@/lib/telegram/normalize-update";
 import { decideTelegramReply } from "@/lib/telegram/decide-reply";
 import { isTelegramBotTokenConfigured, sendTelegramMessage } from "@/lib/telegram/client";
 import type { TelegramUpdate } from "@/lib/telegram/types";
+import { InMemoryIdentityLinkStore } from "@/lib/conversation/identity-link-store";
 
 /**
  * TELEGRAM ADAPTER V1 — webhook receiver. Responsabilidade estritamente
@@ -17,11 +18,23 @@ import type { TelegramUpdate } from "@/lib/telegram/types";
  *
  * Idempotência: Telegram pode reenviar o mesmo update -- como esta V1
  * ainda não executa nenhuma mutação de domínio (só decide texto e
- * responde), não há side effect duplicável ainda. Antes de qualquer
- * mutation real ser adicionada aqui, será necessário deduplicar por
- * `update_id` de forma persistida -- não implementado nesta missão
- * (nenhuma tabela nova).
+ * responde), não há side effect duplicável ainda além do próprio Identity
+ * Link, que já é protegido contra reuso via isTokenConsumed(). Antes de
+ * qualquer mutation de domínio real ser adicionada aqui, será necessário
+ * deduplicar update_id de forma persistida também -- não implementado
+ * nesta missão (nenhuma tabela nova).
+ *
+ * TELEGRAM IDENTITY LINK V1 FOUNDATION — identityLinkStore é um singleton
+ * de módulo (InMemoryIdentityLinkStore, nunca uma tabela). Isto persiste
+ * entre requests DENTRO de uma mesma instância serverless "quente", mas
+ * NUNCA de forma durável entre cold starts/múltiplas instâncias -- é a
+ * fundação testável pedida pela missão (SQL: NÃO APLICAR), não uma
+ * garantia de produção. Uma implementação real (Supabase) deve
+ * implementar a mesma interface IdentityLinkStore, trocada aqui sem
+ * alterar nenhuma outra função desta rota.
  */
+const identityLinkStore = new InMemoryIdentityLinkStore();
+
 export async function POST(req: NextRequest) {
   const secretDecision = evaluateTelegramWebhookSecret(
     req.headers.get("x-telegram-bot-api-secret-token"),
@@ -55,7 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ignored: true, reason: normalized.reason }, { status: 200 });
   }
 
-  const replyText = decideTelegramReply(normalized.message, normalized.command);
+  const replyText = decideTelegramReply(normalized.message, normalized.command, identityLinkStore);
 
   if (isTelegramBotTokenConfigured()) {
     // Chat privado -- chat.id == from.id, então externalUserId já é o chatId correto.

@@ -94,6 +94,7 @@ export function completeIdentityLink(
     externalUserId,
     lokatUserId: request.lokatUserId,
     linkedAt: now.toISOString(),
+    status: "verified",
   };
 }
 
