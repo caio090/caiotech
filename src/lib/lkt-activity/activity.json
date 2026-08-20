@@ -326,5 +326,65 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-011",
+    "timestamp": "2026-08-20T03:18:01.440Z",
+    "module": "Conversational Layer",
+    "title": "LOKAT OS Conversational Layer / Telegram First Audit",
+    "kind": "ARCHITECTURE",
+    "description": "Auditoria read-only confirmou: zero codigo Telegram existe hoje (nem Bot API, nem webhook, nem env var) -- as 4 unicas mencoes ao termo no repo sao documentacao sobre Chatwoot (produto terceiro nao provisionado) e um item de roadmap no proprio LKT Activity. Typebot e webhook inbound Typebot->LOKAT OS apenas (POST /api/leads/typebot), lead-capture puro, sem relacao com conversa/inbox. src/lib/providers/customer-inbox/index.ts define CustomerInboxProvider (abstracao real, unico provider e ChatwootDisabledProvider stub, Conversation.channel nao inclui telegram) -- interface CRM-inbox client-scoped, formato diferente do objetivo da missao (front conversacional geral). Jarvis (streamJarvisChat/buildJarvisContextText/resolveCompanyContext) reutilizavel como building blocks, mas /api/jarvis/chat esta acoplado a sessao Supabase+SSE, nao a um adapter de canal externo. Nenhum Conversation/session model multi-turn existe hoje -- precisa ser criado do zero, generico o bastante para WhatsApp reusar depois. Nenhuma decisao de webhook tomada, nenhum bot criado, nenhum SQL aplicado.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "NOT_RUN",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "SAFE_TO_IMPLEMENT_TELEGRAM_V1 = SIM (green field, sem bot/webhook Telegram pre-existente para migrar) -- proxima missao: desenhar Conversation Core (session store + identity-link flow /start token) como fundacao, antes de qualquer webhook real"
+  },
+  {
+    "id": "evt-012",
+    "timestamp": "2026-08-20T03:42:17.532Z",
+    "module": "Conversational Layer",
+    "title": "LOKAT OS Conversation Core Foundation V1",
+    "kind": "ARCHITECTURE",
+    "description": "Criado src/lib/conversation/ (types/channels/intents/session/context/router + adapters/types.ts) apos auditoria de Jarvis (streamJarvisChat/buildJarvisContextText reutilizaveis, /api/jarvis/chat acoplado a SSE+sessao web, nao reusado diretamente), Company Context (resolveCompanyContext/listAuthorizedCompanies confirmados e reutilizados sem reimplementar autorizacao), Command Center (padrao de catalogo keyword-matched replicado architecturalmente, catalogo de intents proprio e distinto -- nunca importado/duplicado) e Providers (customer-inbox e messaging/types.ts confirmados como abstracoes paralelas nao relacionadas, nenhuma reutilizada por nao servirem o formato de front conversacional geral pedido). ConversationChannel = web/telegram/whatsapp (telegram/whatsapp honestamente not_connected). 6 intents V1 (status/projects/growth/content/influence/meu_negocio) roteando para ids reais de platform-modules.ts, com honestNotice sempre que a maturidade real nao for production -- nunca finge dado. Identity Link Foundation (token temporario, nunca username como identidade) e ConversationSession (ciclo de vida puro, imutavel) sao so tipos/funcoes -- nenhuma tabela aplicada. InMemoryConversationSessionStore existe só como referencia de teste, nunca conectada a canal real. Nenhum adapter concreto (Telegram/WhatsApp) criado, nenhuma rota/webhook criada, nenhum SQL aplicado.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Telegram Adapter V1: implementar o primeiro ChannelAdapter concreto (webhook real, secret_token, fluxo /start) sobre esta fundacao, sem tocar Typebot (endpoint isolado, sem relacao)",
+    "tests": [
+      {
+        "suite": "conversation-core structural (novo)",
+        "passed": 37,
+        "failed": 0
+      },
+      {
+        "suite": "conversation-core unit (novo)",
+        "passed": 33,
+        "failed": 0
+      },
+      {
+        "suite": "platform-modules registry integrity (regressao)",
+        "passed": 68,
+        "failed": 0
+      },
+      {
+        "suite": "ecosystem-status structural (regressao)",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "suite": "meu-negocio-access-restore structural (regressao)",
+        "passed": 23,
+        "failed": 0
+      },
+      {
+        "suite": "company-context unit (regressao)",
+        "passed": 35,
+        "failed": 0
+      }
+    ]
   }
 ]
