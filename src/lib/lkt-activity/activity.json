@@ -557,5 +557,36 @@
         "commit": "0953741477797d7fa993b95ce2d1d71ea62fea60"
       }
     ]
+  },
+  {
+    "id": "evt-017",
+    "timestamp": "2026-08-20T22:22:39.312Z",
+    "module": "Platform Architecture",
+    "title": "Module Lifecycle Registry V2 Foundation",
+    "kind": "ARCHITECTURE",
+    "description": "Auditoria confirmou 3 gaps reais (codigo existente, sem entrada no registry): Command Center (src/lib/command-center/intents.ts + smart-start-input.tsx, usado em /admin/inicio), Jarvis (5 rotas reais /api/jarvis/*) e Projetos (/admin/projetos, getProjectProjections real). Todos registrados como production. Adicionados 3 novos filhos de roadmap honestos: rec_os_campaign_planner e rec_os_projection_engine (Growth, not_implemented) e creator_trends (Influence, not_implemented, distinto de creator_radar -- Radar descobre tendencia, Trends cataloga formato). Nenhum campo novo adicionado a PlatformModuleDefinition (type/version) -- MODULE/TYPE/MATURITY/VERSION/DEPENDENCIES/OWNER pedidos pela missao sao uma lente de leitura documentada sobre category/maturity/dependsOn reais, nunca uma 5a taxonomia paralela (ja existem 4: AreaReadiness/PlatformModuleMaturity/LktEventStatus/Module Lifecycle v1). Criado docs/architecture/module-lifecycle-registry-v2.md: mapa oficial completo da plataforma nas 7 secoes pedidas (CORE/BUSINESS/OPERATION/CONTENT/GROWTH/INFLUENCE/CONVERSATIONAL), tabela de mapeamento MATURITY (5 estados <- 8 valores reais de PlatformModuleMaturity) e TYPE (CORE MODULE/SUBMODULE/TOOL/INTEGRATION/INTELLIGENCE <- category + posicao na arvore). v1 preservado intocado, so ganhou um pointer para v2. Reforcada em rec_os.notes a regra 'REC OS nao controla Influence OS' (item 7 da missao). GrowthOS/REC OS Growth reconfirmados sem nenhuma dependencia cruzada. Radar (creator_radar) reforcado: nunca deve existir como dado falso, depende de integracao real futura. Nenhuma UI/API/SQL/integracao externa criada -- somente arquitetura.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "REC OS Growth Planner V1 (implementacao real, primeira UI do cluster Growth)",
+    "tests": [
+      {
+        "suite": "platform-modules registry integrity (inclui test 12 novo, 125 total)",
+        "passed": 125,
+        "failed": 0
+      },
+      {
+        "suite": "conversation-core structural (regressao)",
+        "passed": 37,
+        "failed": 0
+      },
+      {
+        "suite": "ecosystem-status structural (regressao)",
+        "passed": 11,
+        "failed": 0
+      }
+    ]
   }
 ]

@@ -171,5 +171,57 @@ console.log("\n[test 11] TELEGRAM ADAPTER V1 -- Conversational Layer registrada 
   assert(registry.findModuleById("whatsapp_adapter")?.dependsOn.includes("conversation_core") ?? false, "whatsapp_adapter já depende do Conversation Core -- arquitetura preparada para reuso, sem trabalho iniciado");
 }
 
+console.log("\n[test 12] MODULE LIFECYCLE REGISTRY V2 FOUNDATION -- gaps preenchidos, Growth/Influence separados, REC OS preservado, mapa oficial existe");
+{
+  const NEW_MODULES = ["command_center", "jarvis", "projetos", "rec_os_campaign_planner", "rec_os_projection_engine", "creator_trends"];
+  for (const id of NEW_MODULES) {
+    const mod = registry.findModuleById(id);
+    assert(mod !== undefined, `${id} está registrado (gap real confirmado por auditoria, preenchido nesta missão)`);
+  }
+
+  console.log("  -- filhos possuem pai (dependsOn resolve para um módulo real do registry)");
+  for (const id of NEW_MODULES) {
+    const mod = registry.findModuleById(id);
+    const missing = (mod?.dependsOn ?? []).filter((dep) => !registry.findModuleById(dep));
+    assert(missing.length === 0, `${id}: todo dependsOn resolve para um módulo real (órfãos: ${missing.join(", ") || "nenhum"})`);
+  }
+
+  console.log("  -- módulos planejados/futuros nunca têm status REAL (production)");
+  // command_center/jarvis/projetos são gaps de registry para código JÁ REAL (confirmado por
+  // auditoria) -- deliberadamente EXCLUÍDOS desta checagem, que é sobre módulos ainda não construídos.
+  const FUTURE_MODULES = ["rec_os_campaign_planner", "rec_os_projection_engine", "creator_trends", "rec_os_growth", "influence_os", "telegram_domain_actions", "whatsapp_adapter"];
+  for (const id of FUTURE_MODULES) {
+    const mod = registry.findModuleById(id);
+    assert(mod?.maturity !== "production", `${id} (maturity real: '${mod?.maturity}') nunca aparece como production`);
+  }
+  for (const id of ["command_center", "jarvis", "projetos"]) {
+    const mod = registry.findModuleById(id);
+    assert(mod?.maturity === "production", `${id} é código real e já existente (não um gap de roadmap) -- registrado como production`);
+  }
+
+  console.log("  -- Growth (REC OS, por cliente) e Influence (agência) permanecem separados, nunca fundidos");
+  assert(registry.findModuleById("rec_os_growth")?.dependsOn.includes("rec_os") ?? false, "rec_os_growth depende de rec_os (dentro da árvore REC OS)");
+  assert(!registry.findModuleById("influence_os")?.dependsOn.length, "influence_os não depende de rec_os -- módulo raiz próprio, nunca controlado por REC OS");
+  assert(registry.findModuleById("rec_os_creator_dna")?.description.includes("creator_dna") ?? false, "rec_os_creator_dna referencia seu par agência-inteira explicitamente (nunca confundidos silenciosamente)");
+  assert(registry.findModuleById("growth_os")?.dependsOn.length === 0 && !registry.findModuleById("rec_os_growth")?.dependsOn.includes("growth_os"), "growth_os (agência) e rec_os_growth (por cliente) continuam sem nenhuma relação de dependência entre si");
+
+  console.log("  -- REC OS preservado (identidade intocada por esta missão)");
+  const recOs = registry.findModuleById("rec_os");
+  assert((recOs?.routes.includes("/admin/contentos") && recOs?.maturity === "production" && recOs?.category === "commercial") ?? false, "rec_os mantém rota/maturidade/categoria reais, nenhuma regressão");
+  assert(recOs?.notes?.includes("REC OS não controla Influence OS") ?? false, "nota explícita reforçando a regra de separação (item 7 da missão) foi adicionada, sem reescrever o resto");
+
+  console.log("  -- Mapa oficial (module-lifecycle-registry-v2.md) existe e cobre as 7 seções pedidas");
+  const v2Doc = fs.readFileSync(path.join(process.cwd(), "docs/architecture/module-lifecycle-registry-v2.md"), "utf8");
+  for (const section of ["## CORE", "## BUSINESS", "## OPERATION", "## CONTENT", "## GROWTH", "## INFLUENCE", "## CONVERSATIONAL"]) {
+    assert(v2Doc.includes(section), `mapa v2 tem a seção ${section}`);
+  }
+  assert(v2Doc.includes("MODULE:") && v2Doc.includes("TYPE:") && v2Doc.includes("MATURITY:") && v2Doc.includes("VERSION:") && v2Doc.includes("DEPENDENCIES:") && v2Doc.includes("OWNER:"), "cada entrada do mapa responde aos 6 campos pedidos pela missão");
+  assert(v2Doc.includes("REC OS não controla Influence OS"), "regra de separação REC OS/Influence documentada no mapa");
+  assert(v2Doc.includes("growth_os") && v2Doc.includes("rec_os_growth") && v2Doc.includes("NUNCA"), "GrowthOS e REC OS Growth documentados como explicitamente separados no mapa");
+  assert(!/CREATE TABLE|ALTER TABLE/i.test(v2Doc), "mapa v2 não contém SQL -- somente arquitetura, conforme a missão");
+  const v1Doc = fs.readFileSync(path.join(process.cwd(), "docs/architecture/module-lifecycle-registry-v1.md"), "utf8");
+  assert(v1Doc.includes("module-lifecycle-registry-v2.md"), "v1 aponta para v2 (não substituído, só complementado)");
+}
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;
 })();

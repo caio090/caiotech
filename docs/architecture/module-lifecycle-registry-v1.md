@@ -2,6 +2,7 @@
 
 **Missão:** LKT MISSION CARD — LKT Operating Standard + Module Lifecycle Registry (V1 Foundation)
 **Natureza:** documento (não código) — template + entradas preenchidas para os módulos pedidos nesta missão. Ver `docs/architecture/lkt-orchestration-framework-v1.md` para o padrão de Deploy/Release/Navegação/Status Activity que acompanha este registro.
+**Ver também:** `docs/architecture/module-lifecycle-registry-v2.md` — mapa completo de TODOS os módulos da plataforma (MODULE/TYPE/MATURITY/VERSION/DEPENDENCIES/OWNER), superset deste documento. Este V1 continua válido como o detalhamento em prosa longa dos 5 módulos originais; o V2 é o mapa oficial de referência rápida.
 
 ## Por que este documento existe e não um 4º tipo TypeScript
 
