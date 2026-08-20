@@ -530,5 +530,32 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-016",
+    "timestamp": "2026-08-20T15:27:30.685Z",
+    "module": "Conversational Layer / Telegram",
+    "title": "PRODUCTION RELEASE — Telegram Identity Link V1 Foundation",
+    "kind": "RELEASE",
+    "description": "Release de 2 commits acumulados (b6a2fe3, 0953741, ambos ja auditados nesta mesma sessao). Merge --ff-only em main (505fce8 -> 0953741), typecheck+build limpos no worktree de release, push origin main, deploy automatico Vercel confirmado target=production, commit=0953741, readyState=READY, alias inclui www.lokat.com.br, aliasError=null. Smoke test real contra producao: /=200, /login=200, /admin/inicio sem sessao=307->/login, webhook Telegram sem secret=503 fail-closed (mesmo comportamento honesto de antes -- TELEGRAM_WEBHOOK_SECRET continua ausente em Production). Nenhum setWebhook chamado. Nenhum SQL aplicado (migration 93-identity-links.sql permanece proposta, nao executada).",
+    "status": "REAL",
+    "environment": "production",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "deployment": "dpl_22ZsvhWeXeugWmD6kyBaD9cRVsNT",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Rota Web autenticada para gerar token de vinculo (Conectar Telegram) + aplicar docs/supabase/93-identity-links.sql (apos aprovacao) + Telegram Domain Actions V1",
+    "tests": [
+      {
+        "suite": "smoke test producao (raiz/login/admin/webhook)",
+        "passed": 4,
+        "failed": 0
+      }
+    ],
+    "references": [
+      {
+        "commit": "0953741477797d7fa993b95ce2d1d71ea62fea60"
+      }
+    ]
   }
 ]
