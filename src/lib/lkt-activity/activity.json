@@ -447,5 +447,32 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-014",
+    "timestamp": "2026-08-20T12:53:42.091Z",
+    "module": "Conversational Layer / Telegram",
+    "title": "PRODUCTION RELEASE — Telegram Adapter V1",
+    "kind": "RELEASE",
+    "description": "Release de 7 commits acumulados (e43dd03..505fce8, todos ja auditados e revisados nesta mesma sessao: Status Live Activity V1, REC OS route registry + GrowthOS, REC OS Growth Planner registry, LKT Deploy/Release/Navigation standard docs, organizacao naming fix, Conversation Core Foundation V1, Telegram Adapter V1). Merge --ff-only em main (e718dbe -> 505fce8), typecheck+build limpos no worktree de release, push origin main, deploy automatico Vercel confirmado target=production, commit=505fce8, readyState=READY, alias inclui www.lokat.com.br, aliasError=null. Smoke test real contra producao: /=200, /login=200, /admin/inicio sem sessao=307->/login, webhook Telegram sem secret=503 fail-closed (confirma ao vivo que TELEGRAM_WEBHOOK_SECRET esta ausente em Production -- nenhum token/secret vazado na resposta). Nenhum setWebhook chamado. Nenhum SQL aplicado.",
+    "status": "REAL",
+    "environment": "production",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "deployment": "dpl_CYEz54TuA7AKX4HzXspN7wC7wvTq",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Configurar TELEGRAM_BOT_TOKEN e TELEGRAM_WEBHOOK_SECRET em Production, depois implementar Telegram Identity Link V1 (persistencia real do vinculo)",
+    "tests": [
+      {
+        "suite": "smoke test producao (raiz/login/admin/webhook)",
+        "passed": 4,
+        "failed": 0
+      }
+    ],
+    "references": [
+      {
+        "commit": "505fce8cc05a8e77cc801123fed537b456b474be"
+      }
+    ]
   }
 ]
