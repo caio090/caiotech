@@ -100,7 +100,10 @@ console.log("[test] Canais — registry e type guard");
   assert(isConversationChannel("telegram") && isConversationChannel("whatsapp") && isConversationChannel("web"), "os 3 canais válidos passam no type guard");
   assert(!isConversationChannel("discord"), "canal não registrado é rejeitado pelo type guard");
   assert(CHANNEL_REGISTRY.web.status === "implemented", "web é o único canal implemented hoje");
-  assert(CHANNEL_REGISTRY.telegram.status === "not_connected" && CHANNEL_REGISTRY.whatsapp.status === "not_connected", "telegram/whatsapp honestamente not_connected");
+  // TELEGRAM ADAPTER V1: adapter/webhook/sender reais e testados, mas
+  // setWebhook nunca foi chamado -- code_ready, não implemented ainda.
+  assert(CHANNEL_REGISTRY.telegram.status === "code_ready", "telegram honestamente code_ready (código real e testado, sem tráfego real ainda)");
+  assert(CHANNEL_REGISTRY.whatsapp.status === "not_connected", "whatsapp honestamente not_connected");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

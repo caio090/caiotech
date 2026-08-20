@@ -386,5 +386,66 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-013",
+    "timestamp": "2026-08-20T12:37:27.984Z",
+    "module": "Conversational Layer / Telegram",
+    "title": "Telegram Adapter V1",
+    "kind": "INTEGRATION",
+    "description": "Primeiro adapter real da Conversational Layer: src/lib/telegram/ (types/webhook-security/normalize-update/client/reply-copy/decide-reply) + src/lib/conversation/adapters/telegram.ts (implementa ChannelAdapter puro, delega tudo a lib/telegram) + src/app/api/integrations/telegram/webhook/route.ts. Webhook fail-closed sem TELEGRAM_WEBHOOK_SECRET (503, diferente do fallback dev do Typebot, deliberado), 401 em secret invalido, comparacao em tempo constante. Normalizacao suporta PRIVATE TEXT MESSAGE V1; grupo/canal/foto/voice/document/callback_query/edited_message retornam unsupported (200, nunca 500, nunca crash). Comandos /start (honesto: integracao sendo preparada), /start payload (recebido, nao persistido -- Identity Link continua NOT_IMPLEMENTED) e /help implementados. Mensagens de dominio (growth/content/status/projects/influence/meu_negocio) roteadas via routeConversationMessage() real do Conversation Core, mas SEMPRE respondem ACCOUNT_LINK_REQUIRED -- nenhuma leitura privada acontece sem Identity Link. sendTelegramMessage via fetch puro, token nunca aparece em erro/log/resposta (confirmado por teste). proxy.ts e check-workspace-mutation-coverage.ts atualizados (entrada publica + allowlist), mesmo padrao ja usado pelo Typebot -- Typebot em si intocado, confirmado por teste. Testado localmente end-to-end contra o servidor real: POST sem secret retornou 503 de verdade. Nenhum setWebhook chamado, nenhuma tabela, nenhum SQL.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Telegram Identity Link V1 + configuracao real do bot (TELEGRAM_BOT_TOKEN/TELEGRAM_WEBHOOK_SECRET em Production + setWebhook real)",
+    "tests": [
+      {
+        "suite": "telegram-adapter unit (novo)",
+        "passed": 42,
+        "failed": 0
+      },
+      {
+        "suite": "telegram-webhook-route structural (novo)",
+        "passed": 29,
+        "failed": 0
+      },
+      {
+        "suite": "conversation-core structural (atualizado)",
+        "passed": 37,
+        "failed": 0
+      },
+      {
+        "suite": "conversation-core unit (atualizado)",
+        "passed": 34,
+        "failed": 0
+      },
+      {
+        "suite": "company-context unit (regressao)",
+        "passed": 35,
+        "failed": 0
+      },
+      {
+        "suite": "authorized-companies unit (regressao)",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity unit (regressao)",
+        "passed": 27,
+        "failed": 0
+      },
+      {
+        "suite": "lkt-activity-status structural (regressao)",
+        "passed": 33,
+        "failed": 0
+      },
+      {
+        "suite": "platform-modules registry integrity (regressao)",
+        "passed": 68,
+        "failed": 0
+      }
+    ]
   }
 ]

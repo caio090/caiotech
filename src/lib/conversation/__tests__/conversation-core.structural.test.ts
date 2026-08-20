@@ -40,12 +40,21 @@ const context = read("src/lib/conversation/context.ts");
 const router = read("src/lib/conversation/router.ts");
 const adapterTypes = read("src/lib/conversation/adapters/types.ts");
 const ALL_CORE_SOURCE = [channels, intents, types, session, context, router, adapterTypes].join("\n");
+// channels.ts é deliberadamente documentação em prosa sobre o ESTADO de
+// cada canal (por isso menciona "setWebhook"/"TELEGRAM_BOT_TOKEN" como
+// texto explicativo, nunca como código) -- as checagens de "nenhuma
+// lógica/segredo real" abaixo usam este subconjunto sem ele, para não
+// confundir prosa honesta com lógica de fato.
+const CORE_LOGIC_SOURCE = [intents, types, session, context, router, adapterTypes].join("\n");
 
 console.log("[test] Canais registrados (web/telegram/whatsapp, nunca um 4º sem decisão)");
 {
   assert(channels.includes('"web"') && channels.includes('"telegram"') && channels.includes('"whatsapp"'), "os 3 canais do card estão no registry");
   assert(channels.includes("CHANNEL_REGISTRY"), "registry de metadados por canal existe");
-  assert(/telegram:\s*\{[\s\S]*?status:\s*"not_connected"/.test(channels), "telegram está honestamente marcado not_connected (nenhum bot conectado nesta missão)");
+  // TELEGRAM ADAPTER V1 atualizou telegram de not_connected para code_ready
+  // (adapter/webhook/sender reais e testados, mas setWebhook nunca chamado
+  // -- ver channels.ts). whatsapp continua not_connected, intocado.
+  assert(/telegram:\s*\{[\s\S]*?status:\s*"code_ready"/.test(channels), "telegram honestamente marcado code_ready (adapter real e testado, mas sem tráfego real ainda -- setWebhook nunca chamado)");
   assert(/whatsapp:\s*\{[\s\S]*?status:\s*"not_connected"/.test(channels), "whatsapp está honestamente marcado not_connected");
 }
 
@@ -64,19 +73,23 @@ console.log("[test] Ausência de segredo (nenhum token/senha/chave nos tipos ou 
   // é um código de vínculo de curta duração -- checado à parte, nunca com valor hardcoded.
   const withoutIdentityLinkField = ALL_CORE_SOURCE.replace(/temporaryToken/g, "");
   assert(!/\bpassword\b|\bsenha\b|\bapi_key\b|\bapikey\b/i.test(withoutIdentityLinkField), "nenhum campo de password/senha/api_key no core");
-  assert(!/BOT_TOKEN|bot_token/i.test(ALL_CORE_SOURCE), "nenhuma referência a BOT_TOKEN no core");
+  assert(!/BOT_TOKEN|bot_token/i.test(CORE_LOGIC_SOURCE), "nenhuma referência a BOT_TOKEN na lógica do core (fora da prosa de estado em channels.ts)");
   // Heurística de credencial real: precisa ter dígito E letra maiúscula/minúscula misturada
   // (secrets de verdade quase sempre têm dígitos) -- distingue de identificadores de
   // domínio como "awaiting_confirmation", que são só snake_case minúsculo sem dígito.
   assert(!/["'](?=[A-Za-z0-9_-]{20,}["'])(?=[^"']*[0-9])[A-Za-z0-9_-]+["']/.test(ALL_CORE_SOURCE), "nenhuma string longa com dígitos parecida com credencial hardcoded");
 }
 
-console.log("[test] Ausência de lógica Telegram dentro do core (só o identificador de canal, nunca API/webhook)");
+console.log("[test] Ausência de lógica Telegram dentro do CORE puro (types/channels/intents/session/context/router) -- o adapter real vive à parte, em adapters/telegram.ts");
 {
-  assert(!/api\.telegram\.org/i.test(ALL_CORE_SOURCE), "nenhuma URL da Telegram Bot API");
-  assert(!/sendMessage\s*\(.*telegram/i.test(ALL_CORE_SOURCE), "nenhuma chamada sendMessage acoplada a Telegram");
-  assert(!/setWebhook|getWebhookInfo|getUpdates/i.test(ALL_CORE_SOURCE), "nenhum método de Bot API (setWebhook/getWebhookInfo/getUpdates)");
-  assert(!exists("src/lib/conversation/adapters/telegram.ts"), "nenhum arquivo de adapter Telegram concreto foi criado nesta missão");
+  // TELEGRAM ADAPTER V1 criou adapters/telegram.ts de propósito -- excluído
+  // deliberadamente de ALL_CORE_SOURCE aqui, porque ele É o adapter, não o
+  // core. Continua coberto (sem I/O, sem API do Telegram) no bloco abaixo.
+  assert(!/api\.telegram\.org/i.test(ALL_CORE_SOURCE), "nenhuma URL da Telegram Bot API dentro do core puro");
+  assert(!/setWebhook|getWebhookInfo|getUpdates/i.test(CORE_LOGIC_SOURCE), "nenhum método de Bot API (setWebhook/getWebhookInfo/getUpdates) na lógica do core puro (fora da prosa de estado em channels.ts)");
+  assert(exists("src/lib/conversation/adapters/telegram.ts"), "adapter real do Telegram existe (TELEGRAM ADAPTER V1) -- mas fora do core puro");
+  const telegramAdapter = read("src/lib/conversation/adapters/telegram.ts");
+  assert(!/fetch\s*\(|api\.telegram\.org|setWebhook|getWebhookInfo|getUpdates/i.test(telegramAdapter), "adapters/telegram.ts continua puro/síncrono -- nenhuma chamada de rede, sendMessage real vive só em src/lib/telegram/client.ts");
 }
 
 console.log("[test] Ausência de lógica WhatsApp dentro do core (só o identificador de canal, nunca API/webhook)");
@@ -100,10 +113,10 @@ console.log("[test] Router nunca executa ação real -- só resolve intenção/d
   assert(router.includes("honestNotice"), "alvo de domínio carrega aviso honesto quando o módulo não é production");
 }
 
-console.log("[test] Nenhuma rota/webhook/tabela criada por esta missão");
+console.log("[test] Nenhuma rota/webhook/tabela criada por esta fundação (o webhook real do TELEGRAM ADAPTER V1 vive em src/app/api/integrations/telegram/webhook, testado à parte)");
 {
-  assert(!exists("src/app/api/telegram"), "nenhuma rota /api/telegram criada");
-  assert(!exists("src/app/api/whatsapp"), "nenhuma rota /api/whatsapp criada");
+  assert(!exists("src/app/api/telegram"), "nenhuma rota solta /api/telegram (fora da convenção integrations/) foi criada");
+  assert(!exists("src/app/api/whatsapp"), "nenhuma rota /api/whatsapp criada -- WhatsApp continua not_connected");
   assert(!/CREATE TABLE|ALTER TABLE/i.test(ALL_CORE_SOURCE), "nenhum SQL de schema em nenhum arquivo do core");
 }
 

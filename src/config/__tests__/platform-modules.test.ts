@@ -26,10 +26,19 @@ console.log("\n[test 2] Rotas válidas (raiz conhecida)");
   // maioria dos módulos, mas growth_os vive de propósito fora dela
   // (src/app/growth/**, confirmado em auditoria) -- allowlist explícita em
   // vez de aceitar qualquer prefixo, para continuar pegando um typo real.
-  const KNOWN_ROOTS = ["/admin", "/growth"];
+  // TELEGRAM ADAPTER V1 acrescentou /api como raiz legítima (webhook em
+  // src/app/api/integrations/telegram/webhook, confirmado no build).
+  const KNOWN_ROOTS = ["/admin", "/growth", "/api"];
   const invalid = registry.PLATFORM_MODULES.flatMap((m) => m.routes).filter((route) => !KNOWN_ROOTS.some((root) => route.startsWith(root)));
   assert(invalid.length === 0, `todas as rotas começam com uma raiz conhecida (${KNOWN_ROOTS.join(" ou ")}) (inválidas: ${invalid.join(", ") || "nenhuma"})`);
-  assert(registry.PLATFORM_MODULES.filter((m) => m.maturity !== "not_implemented" && m.maturity !== "coming_soon" && m.maturity !== "planned").every((m) => m.routes.length > 0), "todo módulo com maturidade real (não planned/coming_soon/not_implemented) declara ao menos uma rota");
+  // conversation_core é uma biblioteca compartilhada consumida pelos
+  // adapters de canal (Telegram/futuro WhatsApp), nunca uma superfície
+  // HTTP própria -- exceção nomeada e documentada, não um enfraquecimento
+  // silencioso da regra para toda maturidade "real".
+  const ROUTELESS_BY_DESIGN = new Set(["conversation_core"]);
+  const modulesRequiringRoute = registry.PLATFORM_MODULES.filter((m) =>
+    m.maturity !== "not_implemented" && m.maturity !== "coming_soon" && m.maturity !== "planned" && !ROUTELESS_BY_DESIGN.has(m.id));
+  assert(modulesRequiringRoute.every((m) => m.routes.length > 0), "todo módulo com maturidade real (não planned/coming_soon/not_implemented, exceto exceções nomeadas roteless-by-design) declara ao menos uma rota");
 }
 
 console.log("\n[test 3] Dependências existentes");
@@ -139,6 +148,27 @@ console.log("\n[test 10] LKT Operating Standard + Module Lifecycle Registry V1 -
   }
   assert(lifecycleDoc.includes("growth_os") && lifecycleDoc.includes("rec_os_growth"), "doc mantém GrowthOS e REC OS Growth explicitamente separados");
   assert(!/CREATE TABLE|ALTER TABLE|supabase\.from\(/i.test(lifecycleDoc) && !/CREATE TABLE|ALTER TABLE/i.test(orchestrationDoc), "nenhum dos dois documentos contém SQL/schema -- fundação é só documentação e registry");
+}
+
+console.log("\n[test 11] TELEGRAM ADAPTER V1 -- Conversational Layer registrada honestamente (Status não pode mentir)");
+{
+  const EXPECTED: Record<string, string> = {
+    conversation_core: "qa_pending",
+    telegram_adapter: "qa_pending",
+    telegram_identity_link: "not_implemented",
+    telegram_domain_actions: "not_implemented",
+    telegram_voice: "coming_soon",
+    telegram_approvals: "coming_soon",
+    whatsapp_adapter: "planned",
+  };
+  for (const [id, expectedMaturity] of Object.entries(EXPECTED)) {
+    const mod = registry.findModuleById(id);
+    assert(mod !== undefined, `${id} está registrado`);
+    assert(mod?.maturity === expectedMaturity, `${id} tem maturidade honesta '${expectedMaturity}' (real: '${mod?.maturity}')`);
+  }
+  assert(registry.findModuleById("telegram_adapter")?.routes.includes("/api/integrations/telegram/webhook") ?? false, "telegram_adapter aponta para a rota real do webhook");
+  assert(registry.findModuleById("telegram_identity_link")?.maturity !== "production" && registry.findModuleById("telegram_identity_link")?.maturity !== "qa_pending", "Identity Link nunca aparece como pronto -- nenhuma persistência existe");
+  assert(registry.findModuleById("whatsapp_adapter")?.dependsOn.includes("conversation_core") ?? false, "whatsapp_adapter já depende do Conversation Core -- arquitetura preparada para reuso, sem trabalho iniciado");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`); if (failed) process.exitCode = 1;

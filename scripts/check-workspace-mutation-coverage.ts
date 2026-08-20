@@ -79,6 +79,7 @@ const ALLOWLIST: Record<string, { classification: Classification; note: string }
   "admin/workspaces/preview/route.ts": { classification: "excluded_with_reason", note: "É o próprio ponto de entrada/saída do preview" },
   "admin/workspaces/preview/exit/route.ts": { classification: "excluded_with_reason", note: "Hotfix 1.0.10 — saída atômica do preview (Set-Cookie + 303 na mesma resposta); mesma natureza de admin/workspaces/preview/route.ts, não uma mutação de dado de negócio. ATENÇÃO: esta classificação é só análise estática — não exime a rota do guard EM RUNTIME do proxy (src/proxy.ts). O hotfix 1.0.11 encontrou exatamente essa lacuna (classificada aqui, mas ainda bloqueada em produção); a allowlist real é isWorkspacePreviewControlMutation() em src/lib/workspaces/mutation-guard-runtime.ts — ver a tabela dedicada em docs/workspace-mutation-inventory.md." },
   "leads/typebot/route.ts": { classification: "excluded_with_reason", note: "Webhook inbound do Typebot" },
+  "integrations/telegram/webhook/route.ts": { classification: "excluded_with_reason", note: "Webhook inbound do Telegram — fail-closed sem TELEGRAM_WEBHOOK_SECRET, nenhuma mutação de domínio nesta V1 (só decide e envia texto)" },
   "webhooks/billing/[provider]/route.ts": { classification: "excluded_with_reason", note: "Webhook inbound" },
   "webhooks/payments/asaas/route.ts": { classification: "excluded_with_reason", note: "Webhook inbound" },
   "webhooks/payments/route.ts": { classification: "excluded_with_reason", note: "Webhook inbound" },

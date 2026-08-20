@@ -41,6 +41,7 @@ const PUBLIC_PATH_PREFIXES = [
     "/pre-acesso", "/api/launch/",
     "/api/meta/status", "/api/meta/callback", "/api/debug/",
     "/api/leads/typebot", // public webhook — auth via LOKAT_TYPEBOT_WEBHOOK_SECRET header
+    "/api/integrations/telegram/webhook", // public webhook — auth via X-Telegram-Bot-Api-Secret-Token header (TELEGRAM_WEBHOOK_SECRET), fail-closed inside the route itself
   ];
 
 function isPublic(pathname: string): boolean {
