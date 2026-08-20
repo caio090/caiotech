@@ -214,8 +214,8 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
   },
   {
     id: "minha_organizacao",
-    name: "Minha Organização (Minha Agência / Meu Negócio institucional)",
-    description: "Identidade institucional do próprio workspace do usuário -- 'Minha Agência' (account_type agência: identidade, carteira de clientes) ou a apresentação institucional da própria empresa (account_type direct_business). Distinto de meu_negocio (módulo operacional real, estoque/CMV/fichas) -- este é institucional/estrutural, não operacional. Decisão de produto já fixada em missão anterior (RESTORE MEU NEGÓCIO ROUTE / SEPARATE ORGANIZAÇÃO): os dois nunca são alias um do outro.",
+    name: "Minha Organização (Minha Agência / Minha Organização institucional)",
+    description: "Identidade institucional do próprio workspace do usuário -- 'Minha Agência' (account_type agência: identidade, carteira de clientes) ou 'Minha Organização' (account_type direct_business). Distinto de meu_negocio (módulo operacional real, estoque/CMV/fichas) -- este é institucional/estrutural, não operacional. Decisão de produto já fixada em missão anterior (RESTORE MEU NEGÓCIO ROUTE / SEPARATE ORGANIZAÇÃO): os dois nunca são alias um do outro.",
     category: "management",
     routes: ["/admin/organizacao"],
     surfaces: [
@@ -233,7 +233,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "production",
     nicheSupport: false,
     owner: "management",
-    notes: "ACHADO desta missão (documentado, não corrigido -- fora de escopo): quando account_type é direct_business, esta página exibe o título 'Meu Negócio' (src/app/admin/organizacao/page.tsx, PageHeader), o MESMO texto do módulo operacional real meu_negocio (/admin/meu-negocio) -- duas telas reais com o mesmo título, por rotas diferentes. Recorrência do padrão de ambiguidade de nome já corrigido em outros pontos (Audiovisual/Meu Negócio Access Restore); registrado como pendência para uma futura missão de correção de UI. Existe também empresa_central (/admin/empresa, Company Central) como um terceiro conceito adjacente -- ver seu próprio registro.",
+    notes: "CORRIGIDO em Deployment Production Flow + Organization Naming Separation V1: quando account_type é direct_business, esta página exibia o título 'Meu Negócio' (src/app/admin/organizacao/page.tsx, PageHeader), o MESMO texto do módulo operacional real meu_negocio (/admin/meu-negocio) -- duas telas reais com o mesmo título, por rotas diferentes. Renomeada para 'Minha Organização' (decisão do usuário, reaproveitando o texto já usado nos estados de loading/erro da própria página). Existe também empresa_central (/admin/empresa, Company Central) como um terceiro conceito adjacente -- ver seu próprio registro.",
   },
   {
     id: "empresa_central",

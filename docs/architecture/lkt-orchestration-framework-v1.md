@@ -143,6 +143,25 @@ de uma missão de release. Este fluxo já é o que toda missão
 "PRODUCTION RELEASE" desta sessão vem seguindo; esta seção só o torna
 canônico e citável em vez de implícito.
 
+### Auditoria de alinhamento (Deployment Production Flow + Organization Naming Separation V1)
+
+Confirmado via Vercel MCP (`get_project`/`list_deployments`/
+`get_deployment`, projeto `prj_DjSreQY8WOm1UweAAI7OvnRLrKas`) que o
+fluxo acima já é exatamente o que a Vercel executa hoje, sem
+misalinhamento e sem necessidade de alterar configuração:
+
+- Todo deployment com `githubCommitRef: "main"` tem `target: "production"`
+  e recebe o alias `www.lokat.com.br` (verificado no deployment de
+  produção atual, `dpl_8YE512AeRgdsXWwQvDZu7BUsrFxR`, commit `e718dbe`,
+  `readyState: "READY"`, `aliasError: null`).
+- Todo deployment de qualquer outra branch (`feat/mvp-final-
+  consolidation-v1`, `feat/personal-strategy-os`) tem `target: null`
+  (Preview) e nunca recebe o alias de produção (verificado no deployment
+  mais recente da feature branch, `dpl_AXWah4tufrtPYwyZVigbdX2iDRjY`,
+  commit `3632a30`, alias só `*-git-feat-mvp-final-consolidation-v1-*.vercel.app`).
+- Nenhuma configuração da Vercel foi alterada nesta missão — auditoria
+  confirmou alinhamento, não achou nada para corrigir.
+
 ## LKT Release Record Standard v1
 
 Todo release deve registrar, no LKT Activity Log

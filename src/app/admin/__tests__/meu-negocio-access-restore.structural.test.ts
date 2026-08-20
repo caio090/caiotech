@@ -80,5 +80,16 @@ console.log("[test] H — módulo Meu Negócio continua honestamente rotulado co
   assert(!entry.includes("createServerSupabaseClient") && !entry.includes("createSupabaseAdminClient"), "_entry.tsx não faz nenhuma consulta real ao Supabase -- 100% em memória, como já documentado");
 }
 
+console.log("[test] I — Deployment Production Flow + Organization Naming Separation V1: /admin/organizacao (business) não usa mais o título 'Meu Negócio'");
+{
+  const orgPage = read("src/app/admin/organizacao/page.tsx");
+  assert(!orgPage.includes('title="Meu Negócio"'), "PageHeader não usa mais o título 'Meu Negócio' (comentário histórico explicando a correção é esperado, JSX real não)");
+  assert(!/label\s*=.*"Meu Negócio"/.test(orgPage), "variável de label não atribui mais 'Meu Negócio'");
+  assert(orgPage.includes('title="Minha Organização"'), "PageHeader da apresentação business usa 'Minha Organização'");
+  assert(orgPage.includes('kind === "agency" ? "Minha Agência" : "Minha Organização"'), "label do fallback (sem service role) também usa 'Minha Organização' para business");
+  const meuNegocioEntry = read("src/app/admin/meu-negocio/_entry.tsx");
+  assert(meuNegocioEntry.includes("Estoque, fichas técnicas, CMV e relatórios"), "módulo operacional real (/admin/meu-negocio) continua com seu próprio título/conteúdo, intocado por esta correção");
+}
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

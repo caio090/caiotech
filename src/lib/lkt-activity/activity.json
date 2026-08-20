@@ -290,5 +290,41 @@
         "failed": 0
       }
     ]
+  },
+  {
+    "id": "evt-010",
+    "timestamp": "2026-08-20T03:13:06.245Z",
+    "module": "LKT Operating Standard",
+    "title": "Deployment Production Flow + Organization Naming Separation V1",
+    "kind": "ARCHITECTURE",
+    "description": "Parte 1 (auditoria Vercel via MCP, get_project/list_deployments/get_deployment): confirmado que o fluxo Preview/Production ja esta corretamente alinhado -- todo deployment de main tem target production e alias www.lokat.com.br (verificado no deployment de producao atual dpl_8YE512AeRgdsXWwQvDZu7BUsrFxR, READY, aliasError null); todo deployment de outra branch tem target null (Preview) e nunca recebe o alias de producao (verificado em dpl_AXWah4tufrtPYwyZVigbdX2iDRjY, feature branch). Nenhuma configuracao alterada -- nada para corrigir. Achado documentado como addendum datado em lkt-orchestration-framework-v1.md. Parte 2: resolvida a colisao de nome 'Meu Negocio' entre /admin/organizacao (conta direct_business) e o modulo operacional real /admin/meu-negocio -- renomeado para 'Minha Organizacao' (decisao explicita do usuario via AskUserQuestion, reaproveitando texto ja usado nos estados de loading/erro da propria pagina). platform-modules.ts (minha_organizacao) e module-lifecycle-registry-v1.md atualizados de 'achado nao corrigido' para 'corrigido'. Novo teste estrutural (test I, 5 assertions) prova que o titulo antigo nao aparece mais em JSX/label real.",
+    "status": "REAL",
+    "environment": "local",
+    "branch": "feat/mvp-final-consolidation-v1",
+    "build": "PASS",
+    "devUrl": "http://localhost:3124",
+    "nextAction": "Auditoria de nomenclatura dedicada para o terceiro conceito adjacente (/admin/empresa, Company Central) mencionado no Module Lifecycle Registry; depois, LOKAT Conversational Layer / Telegram First Audit",
+    "tests": [
+      {
+        "suite": "meu-negocio-access-restore structural (inclui test I novo)",
+        "passed": 23,
+        "failed": 0
+      },
+      {
+        "suite": "final-closure structural (regressao)",
+        "passed": 25,
+        "failed": 0
+      },
+      {
+        "suite": "platform-modules registry integrity (regressao)",
+        "passed": 68,
+        "failed": 0
+      },
+      {
+        "suite": "ecosystem-status structural (regressao)",
+        "passed": 11,
+        "failed": 0
+      }
+    ]
   }
 ]

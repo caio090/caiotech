@@ -7,7 +7,7 @@ import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServi
 import { getOwnOrganizationSummary, resolveOwnOrganizationKind } from "@/lib/own-organization/adapters";
 
 /**
- * Sprint Final Closure (Parte D) — "Minha Agência" / "Meu Negócio": a
+ * Sprint Final Closure (Parte D) — "Minha Agência" / "Minha Organização": a
  * organização do PRÓPRIO usuário/workspace, nunca um Company picker e
  * nunca uma segunda entrada para REC OS (Fase 22/24/28). Uma raiz de
  * dados só (account_type + agency_workspaces/agency_clients/
@@ -17,6 +17,14 @@ import { getOwnOrganizationSummary, resolveOwnOrganizationKind } from "@/lib/own
  * outro propósito -- simulação de operação por Company selecionada) e
  * deliberadamente sai da navegação canônica (Fase 28): o item de
  * sidebar passa a apontar para cá.
+ *
+ * LKT MISSION CARD — Deployment Production Flow + Organization Naming
+ * Separation: a apresentação "business" desta página usava o título
+ * "Meu Negócio", colidindo com o módulo operacional real em
+ * /admin/meu-negocio (estoque/fichas técnicas/CMV/relatórios) -- duas
+ * telas reais, mesmo título. Renomeada para "Minha Organização" (mesmo
+ * texto já usado nos estados de loading/erro desta própria página, ver
+ * abaixo), nunca alias uma da outra.
  */
 export default async function OwnOrganizationPage() {
   const supabase = await createServerSupabaseClient().catch(() => null);
@@ -45,7 +53,7 @@ export default async function OwnOrganizationPage() {
   if (role === "cliente") redirect("/client/home");
 
   const kind = resolveOwnOrganizationKind(accountType);
-  const label = kind === "agency" ? "Minha Agência" : "Meu Negócio";
+  const label = kind === "agency" ? "Minha Agência" : "Minha Organização";
 
   if (kind === "not_applicable") {
     return (
@@ -151,7 +159,7 @@ export default async function OwnOrganizationPage() {
   const { companyId, companyName, companyStatus } = result.data;
   return (
     <>
-      <PageHeader title="Meu Negócio" description="A organização da sua própria empresa." />
+      <PageHeader title="Minha Organização" description="A organização da sua própria empresa." />
       <section className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
         {companyId ? (
           <div className="flex items-center gap-3">

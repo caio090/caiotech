@@ -151,21 +151,24 @@ nos dois sentidos em `platform-modules.ts`.
 **Usuário:** Agência e empresa direta (nunca papel `cliente`, redirecionado para `/client/home`).
 **Dependências:** `workspaces_core`.
 
-### ⚠ Achado desta missão (não corrigido — fora de escopo, só documentado)
-Quando `account_type` é `direct_business`, `/admin/organizacao` renderiza
-o título **"Meu Negócio"** (`src/app/admin/organizacao/page.tsx:154`) —
-o mesmo texto que o módulo operacional real em `/admin/meu-negocio` já
-usa. São duas telas reais, ambas tituladas "Meu Negócio", por rotas
-diferentes. Isto é uma recorrência do mesmo tipo de ambiguidade de nome
-que missões anteriores (Audiovisual Route Separation, Meu Negócio
-Access Restore) já corrigiram em outros pontos do produto — registrado
-aqui como pendência explícita para uma futura missão de correção de UI
-(fora do escopo desta, que é só fundação/documentação). Existe ainda um
-terceiro candidato próximo, `/admin/empresa` ("Company Central",
-cockpit por-empresa-selecionada, também sem entrada no registry antes
-desta missão) — três telas institucionais/de-empresa distintas
-(`/admin/organizacao`, `/admin/empresa`, `/admin/meu-negocio`) que
-merecem uma auditoria de nomenclatura dedicada antes de crescerem mais.
+### ✅ Colisão de nome corrigida (Deployment Production Flow + Organization Naming Separation V1)
+Quando `account_type` era `direct_business`, `/admin/organizacao`
+renderizava o título **"Meu Negócio"** (`src/app/admin/organizacao/
+page.tsx`) — o mesmo texto que o módulo operacional real em
+`/admin/meu-negocio` já usa. Eram duas telas reais, ambas tituladas
+"Meu Negócio", por rotas diferentes — recorrência do mesmo tipo de
+ambiguidade que missões anteriores (Audiovisual Route Separation, Meu
+Negócio Access Restore) já haviam corrigido em outros pontos do
+produto. **Renomeado para "Minha Organização"** (decisão explícita do
+usuário — reaproveita o texto já usado nos estados de loading/erro da
+própria página, nenhum texto novo inventado). `label`/`PageHeader`
+corrigidos em `src/app/admin/organizacao/page.tsx`; `/admin/meu-negocio`
+não foi tocado. Existe ainda um terceiro candidato próximo,
+`/admin/empresa` ("Company Central", cockpit por-empresa-selecionada,
+registrado como `empresa_central` nesta mesma leva) — três telas
+institucionais/de-empresa distintas (`/admin/organizacao`,
+`/admin/empresa`, `/admin/meu-negocio`), agora todas nomeadas sem
+colisão entre si.
 
 ### Estado atual
 **REAL** — dado real via `getOwnOrganizationSummary()` (Supabase), sem fixture. **Registrado em `platform-modules.ts` nesta missão.**
