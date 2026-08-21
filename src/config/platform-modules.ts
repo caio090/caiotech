@@ -1020,7 +1020,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "planned",
     nicheSupport: false,
     owner: "product",
-    notes: "NEXT_FRONT confirmado em REC OS Context Foundation V1 e Meu Negócio Access Restore. REC OS ARCHITECTURE ALIGNMENT V1: reclassificado como filho de rec_os_growth (V2 — Inteligência: objetivo/estratégia/simulação com classificação verde/amarelo/vermelho, nunca promete resultado), não mais filho direto de rec_os.",
+    notes: "NEXT_FRONT confirmado em REC OS Context Foundation V1 e Meu Negócio Access Restore. REC OS ARCHITECTURE ALIGNMENT V1: reclassificado como filho de rec_os_growth (V2 — Inteligência: objetivo/estratégia/simulação com classificação verde/amarelo/vermelho, nunca promete resultado), não mais filho direto de rec_os. REC OS PAID TRAFFIC PLANNER V1 FOUNDATION: tipos/contratos reais e testados em src/lib/rec-os-paid-traffic/ (types.ts/channels.ts/budget.ts/conversion.ts/planner.ts, 45 testes) -- ainda 'planned', não 'qa_pending': plano recebe objective/context do Growth Plan real (buildPaidTrafficPlanFromGrowthPlan, nunca recria estratégia própria), catálogo fechado de canais (META_ADS/GOOGLE_ADS/ORGANIC_SUPPORT) e eventos de conversão, orçamento apenas descritivo (nenhum cálculo de ROI). Nenhuma integração com Meta Ads/Google Ads real, nenhuma publicação, nenhuma persistência, nenhuma UI.",
   },
   {
     id: "rec_os_campaign_planner",
