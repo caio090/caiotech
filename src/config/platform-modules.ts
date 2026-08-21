@@ -359,7 +359,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "planned",
     nicheSupport: false,
     owner: "product",
-    notes: "Próxima frente recomendada após esta fundação de arquitetura. Nunca promete resultado -- quando implementado, classificação de viabilidade (verde/amarelo/vermelho) é sempre uma estimativa, nunca uma garantia.",
+    notes: "Próxima frente recomendada após esta fundação de arquitetura. Nunca promete resultado -- quando implementado, classificação de viabilidade (verde/amarelo/vermelho) é sempre uma estimativa, nunca uma garantia. REC OS GROWTH PLANNER V1 FOUNDATION: tipos/contratos reais e testados em src/lib/rec-os-growth/ (types.ts/diagnostic.ts/projection-engine-contract.ts, 43 testes) -- ainda 'planned', não 'qa_pending': só diagnóstico + placeholder honesto existem, nenhum motor de recomendação real, nenhuma persistência, nenhuma UI.",
   },
   {
     id: "rec_os_content_planner",
@@ -1066,6 +1066,7 @@ export const PLATFORM_MODULES: PlatformModuleDefinition[] = [
     maturity: "not_implemented",
     nicheSupport: false,
     owner: "product",
+    notes: "REC OS GROWTH PLANNER V1 FOUNDATION: contrato real em src/lib/rec-os-growth/projection-engine-contract.ts (ProjectionEngineInput/Output, estimateProjection()) -- sempre retorna status not_implemented, nenhum cálculo real ainda. Continua not_implemented (não 'planned'): só a forma do contrato existe, nenhuma decisão de fórmula foi tomada.",
   },
   {
     id: "paid_traffic_persistence",
