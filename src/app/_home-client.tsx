@@ -344,19 +344,6 @@ export default function HomeClient() {
                 Agendar demonstração
               </button>
             </div>
-
-            <div className="hero-fade-up-d3 flex flex-wrap items-center justify-center lg:justify-start gap-3 mt-6 pt-6" style={{ borderTop: `1px solid ${S.border}` }}>
-              <span style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".15em", textTransform: "uppercase", color: S.muted }}>Para</span>
-              {["Empresas", "Agências", "Autônomos"].map((l) => (
-                <span key={l} style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: S.text, border: `1px solid ${S.border}`, padding: ".15rem .6rem" }}>{l}</span>
-              ))}
-              <span style={{ ...S.mono, fontSize: ".5rem", color: S.muted }}>·</span>
-              <a href="/rec" style={{ ...S.mono, fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: S.red, textDecoration: "none", border: `1px solid ${S.red}30`, padding: ".15rem .5rem" }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${S.red}60`)}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = `${S.red}30`)}
-              >Lokat.rec</a>
-              <span style={{ ...S.grotesk, fontSize: ".6rem", color: S.muted, fontStyle: "italic" }}>um ecossistema Lokat</span>
-            </div>
           </div>
 
           {/* Drop visual */}
