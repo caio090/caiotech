@@ -431,12 +431,16 @@ ROLLBACK;
 -- ── 25. Signup idempotente: repetição não duplica Company (Fase 16) ────
 -- Chamar duas vezes com o mesmo p_user_id deve retornar o MESMO client_id
 -- (create_client_on_signup já faz lookup por owner_id antes de inserir).
--- ⚠ NEEDS_READ_ONLY_LIVE_CAPTURE: não existe unique constraint em
--- clients.owner_id (não adicionada nesta correção -- exigiria confirmar
--- ao vivo que não há owner_id duplicado hoje antes de aplicar, o que
--- está fora do escopo read-only desta missão). Este teste cobre o
--- comportamento sequencial (não uma corrida real de duas conexões
--- simultâneas, que a ausência do constraint ainda não impede em teoria).
+-- FATOS capturados por consulta read-only em 28/08/2026 (sem mutação):
+--   clients.owner_id duplicatas (owner_id IS NOT NULL, GROUP BY ... HAVING
+--   count(*) > 1): NONE. Unique constraint/index sobre owner_id: NONE --
+--   só existe idx_clients_owner (índice comum, não único) e a FK
+--   clients_owner_id_fkey → profiles(id). Classificação:
+--   IDEMPOTENCY_SEQUENTIAL_ONLY -- sem duplicata hoje, mas sem proteção
+--   estrutural contra uma corrida real entre duas conexões simultâneas.
+-- NÃO adicionar unique constraint/index nesta correção -- exige validação
+-- semântica separada (não presumir cardinalidade 1 owner = 1 client).
+-- Este teste cobre o comportamento sequencial, não uma corrida real.
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<USER_B_ID>"}';

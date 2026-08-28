@@ -379,8 +379,25 @@ console.log("[test] 23 — PROMPT 04A: rollback ganha as novas seções com pari
   assert(!/can_access_client/.test(rollback.slice(rollback.indexOf('CREATE POLICY "client_meta_assets_select"'), rollback.indexOf('CREATE POLICY "client_meta_assets_delete"'))), "rollback das policies de client_meta_assets NÃO inclui can_access_client -- reabre exatamente o P0-A");
   assert(rollback.includes('CREATE POLICY "admin_all_olaclick"'), "rollback restaura admin_all_olaclick (FOR ALL, role-only) removendo as 4 policies novas");
   assert(rollback.includes('DROP POLICY IF EXISTS "olaclick_connections_select"'), "rollback remove explicitamente as 4 policies novas de olaclick_connections antes de recriar a antiga");
-  assert(rollback.includes("NEEDS_READ_ONLY_LIVE_CAPTURE"), "rollback marca explicitamente o gap de v_olaclick_connections_safe (grants mutantes) em vez de adivinhar o estado anterior");
-  assert(!/GRANT (INSERT|UPDATE|DELETE) ON public\.v_olaclick_connections_safe/.test(rollback), "rollback nunca fabrica um GRANT de INSERT/UPDATE/DELETE não documentado para a view");
+}
+
+console.log("[test] 27 — PROMPT 04C: rollback restaura o ACL exato pré-patch de v_olaclick_connections_safe (captura live 28/08/2026)");
+{
+  assert(!rollback.includes("NEEDS_READ_ONLY_LIVE_CAPTURE"), "gap documental resolvido -- captura live já feita, marcador não permanece nesta seção");
+  const grantBlock = rollback.slice(
+    rollback.indexOf("-- 12. v_olaclick_connections_safe"),
+    rollback.indexOf("-- 11. olaclick_connections policies"),
+  );
+  assert(grantBlock.length > 0, "seção 12 (view) encontrada, antes da seção 11 (ordem reversa do rollback)");
+  for (const priv of ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+    assert(new RegExp(`\\b${priv}\\b`).test(grantBlock), `rollback restaura ${priv} na view (ACL live pré-patch confirmado)`);
+  }
+  const grantStatement = grantBlock.match(/GRANT [\s\S]*?;/)?.[0] ?? "";
+  assert(grantStatement.length > 0, "statement GRANT real encontrado (não só o comentário)");
+  assert(!/\bMAINTAIN\b/.test(grantStatement), "MAINTAIN não é restaurado -- não estava presente no ACL live capturado, nunca inventar privilégio extra");
+  assert(/TO anon, authenticated;/.test(grantStatement), "GRANT restrito a anon e authenticated -- exatamente os grantees que o patch revoga");
+  assert(!/service_role/.test(grantStatement) && !/\bpostgres\b/.test(grantStatement), "o GRANT em si não inclui service_role/postgres -- o patch nunca os revoga, então o rollback não precisa (nem deve) recriá-los");
+  assert(rollback.includes("client_read_own_olaclick"), "rollback documenta a policy adicional client_read_own_olaclick (achado factual da captura live) sem alterá-la");
 }
 
 console.log("[test] 24 — PROMPT 04A/Fase 17: aviso de emergência do rollback reforçado");

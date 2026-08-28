@@ -43,25 +43,34 @@
 
 BEGIN;
 
--- 12. v_olaclick_connections_safe (mutating grants) → NEEDS_READ_ONLY_LIVE_CAPTURE
---     A ACL exata de INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/
---     MAINTAIN herdada dos default privileges do schema no momento da
---     criação da view (docs/supabase/67) nunca foi capturada
---     explicitamente por nenhuma auditoria live -- CODEX só confirmou
---     is_updatable=YES / is_insertable_into=YES (estrutural), não a
---     lista real de grantees/privilégios (information_schema.
---     table_privileges). Não adivinhado aqui: restaurar isso de verdade
---     exige uma auditoria live read-only específica desta view antes.
---     Sem essa captura, este bloco intencionalmente NÃO restaura nenhum
---     GRANT nesta view -- rodar esta consulta antes de finalizar o
---     rollback caso a restauração exata seja necessária:
---       SELECT grantee, privilege_type FROM information_schema.table_privileges
---       WHERE table_name = 'v_olaclick_connections_safe';
+-- 12. v_olaclick_connections_safe (mutating grants) → estado anterior
+--     ACL pré-patch capturado por consulta read-only em 28/08/2026
+--     (information_schema.table_privileges, sem mutação): anon e
+--     authenticated tinham os 7 privilégios relacionais aplicáveis à view
+--     (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER),
+--     herdados dos default privileges do schema no momento da criação da
+--     view (docs/supabase/67) -- nunca concedidos explicitamente por
+--     nenhum arquivo numerado. MAINTAIN não estava presente para nenhum
+--     grantee -- não incluído aqui de propósito (não inventar privilégio
+--     que não existia). service_role e postgres não são tocados: o patch
+--     (seção 12) só revoga de PUBLIC/anon/authenticated, então o rollback
+--     só precisa restaurar exatamente esses dois.
+--     ⚠ reabre P0-B cont.: authenticated volta a poder mutar OlaClick
+--     através da view (não só ler), exatamente como estava ao vivo.
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+  ON public.v_olaclick_connections_safe
+  TO anon, authenticated;
 
 -- 11. olaclick_connections policies → estado anterior (docs/supabase/61)
 --     ⚠ reabre P0-B: admin_all_olaclick volta a ser role-only, sem
 --     Company ownership -- qualquer admin/agency/operacional lê, e
 --     admin/agency escreve conexões de QUALQUER Company.
+--     NOTA FACTUAL (captura read-only em 28/08/2026): existe, ao vivo,
+--     uma policy adicional "client_read_own_olaclick" (FOR SELECT TO
+--     authenticated USING (client_id IN (SELECT id FROM clients WHERE
+--     owner_id = auth.uid()))) -- acesso legítimo do portal do cliente à
+--     própria conexão. Nem o patch nem este rollback tocam nela -- ela
+--     permanece intacta nos dois lados, não precisa ser restaurada aqui.
 DROP POLICY IF EXISTS "olaclick_connections_select" ON public.olaclick_connections;
 DROP POLICY IF EXISTS "olaclick_connections_insert" ON public.olaclick_connections;
 DROP POLICY IF EXISTS "olaclick_connections_update" ON public.olaclick_connections;
