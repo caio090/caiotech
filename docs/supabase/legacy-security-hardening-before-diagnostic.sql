@@ -22,10 +22,21 @@
 -- dia via SQL Editor -- o projeto não tem migration history rastreada,
 -- então essa possibilidade é real e não pode ser presumida ausente).
 --
--- Motivo do nome não-numérico: não existem migrations rastreadas no
--- projeto Supabase (0 migrations); os 90 arquivos numerados em
--- docs/supabase são histórico local, não a autoridade sobre o estado
--- vivo do banco. Ver rollback correspondente em
+-- Motivo do nome não-numérico: os 90+ arquivos numerados em
+-- docs/supabase são histórico local de execução manual via SQL Editor,
+-- não o ledger formal de migrations do Supabase, e não equivalem
+-- automaticamente a terem sido aplicados ao vivo -- não presuma que
+-- todo SQL histórico numerado foi de fato executado no banco.
+--
+-- Estado do ledger formal (Supabase Migrations), auditado ao vivo em
+-- 27/08/2026: 4 migrations rastreadas -- 20260813200621_personal_core_tasks,
+-- 20260813200750_personal_core_routines,
+-- 20260813200856_personal_core_gratitude,
+-- 20260813200949_personal_core_events. Nenhuma delas relacionada a este
+-- domínio de segurança (Company/RPCs/views); a autoridade sobre o
+-- estado vivo dos objetos tratados aqui continua sendo o gate de
+-- segurança (CODEX WEB), não o ledger nem os arquivos numerados. Ver
+-- rollback correspondente em
 -- legacy-security-hardening-before-diagnostic-rollback.sql e o plano
 -- de teste manual em legacy-security-hardening-live-test-plan.sql.
 --

@@ -228,5 +228,77 @@ console.log("[test] 14 — status de aprovação: nunca auto-aprovado por este s
   assert(!sql.includes("SQL_APPROVED_FOR_APPLY") && !sql.includes("LEGACY_P0_FIX_APPROVED"), "nenhum veredito de aprovação é auto-atribuído por este arquivo");
 }
 
+console.log("[test] 15 — Rollback (Fase 4-9, PROMPT 02B): matriz de ACL restaurada com EXACT_PRE_PATCH_PARITY");
+{
+  // Fase 4: grupo PUBLIC + anon (6 funções) -- rollback precisa restaurar
+  // EXECUTE explícito para PUBLIC e anon, além de authenticated.
+  const publicAndAnonGroup: Array<[string, RegExp]> = [
+    ["can_access_client(uuid)", /GRANT EXECUTE ON FUNCTION public\.can_access_client\(uuid\) TO PUBLIC, anon, authenticated;/],
+    ["get_request_owner_for_client(uuid)", /GRANT EXECUTE ON FUNCTION public\.get_request_owner_for_client\(uuid\) TO PUBLIC, anon, authenticated;/],
+    ["admin_archive_client(uuid)", /GRANT EXECUTE ON FUNCTION public\.admin_archive_client\(uuid\) TO PUBLIC, anon, authenticated;/],
+    ["admin_restore_client(uuid)", /GRANT EXECUTE ON FUNCTION public\.admin_restore_client\(uuid\) TO PUBLIC, anon, authenticated;/],
+    ["admin_hard_delete_client(uuid)", /GRANT EXECUTE ON FUNCTION public\.admin_hard_delete_client\(uuid\) TO PUBLIC, anon, authenticated;/],
+    ["admin_create_client(...)", /GRANT EXECUTE ON FUNCTION public\.admin_create_client\(\s*text, text, text, text, text, text, uuid, uuid\s*\) TO PUBLIC, anon, authenticated;/],
+  ];
+  for (const [name, re] of publicAndAnonGroup) {
+    assert(re.test(rollback), `${name}: rollback restaura EXECUTE explícito para PUBLIC e anon (Fase 4) -- ACL viva pré-patch auditada, signature exata`);
+  }
+
+  // Fase 5: grupo PUBLIC-only -- anon/authenticated já restaurados antes
+  // desta correção; só falta adicionar PUBLIC explicitamente.
+  assert(/GRANT EXECUTE ON FUNCTION public\.finance_mark_overdue\(\) TO PUBLIC, authenticated, anon;/.test(rollback), "finance_mark_overdue(): rollback adiciona PUBLIC explicitamente (Fase 5), preservando anon/authenticated já restaurados");
+  assert(/GRANT EXECUTE ON FUNCTION public\.create_client_on_signup\(uuid, text, text, text\)\s*TO PUBLIC, anon, authenticated;/.test(rollback), "create_client_on_signup(uuid, text, text, text): rollback adiciona PUBLIC explicitamente (Fase 5)");
+
+  // Fase 6: grupo anon-only (7 funções) -- rollback adiciona anon
+  // explicitamente, mas o REVOKE ALL FROM PUBLIC precisa permanecer --
+  // estado vivo pré-patch confirmou PUBLIC = NONE para este grupo.
+  const anonOnlyGroup = [
+    "admin_link_meta_asset\\(uuid, text, text, text, text, text, uuid, boolean\\)",
+    "admin_upsert_olaclick_connection\\(uuid, text, text, text, text\\)",
+    "admin_list_olaclick_connections\\(\\)",
+    "get_client_meta_status\\(uuid\\)",
+    "admin_archive_clients\\(uuid\\[\\]\\)",
+    "admin_delete_client\\(uuid\\)",
+    "admin_hard_delete_clients\\(uuid\\[\\]\\)",
+  ];
+  for (const sig of anonOnlyGroup) {
+    const pairRe = new RegExp(`REVOKE ALL ON FUNCTION public\\.${sig} FROM PUBLIC;\\s+GRANT EXECUTE ON FUNCTION public\\.${sig} TO authenticated, anon;`);
+    assert(pairRe.test(rollback), `${sig.replace(/\\\\?/g, "")}: rollback restaura anon explicitamente (Fase 6) mantendo REVOKE ALL FROM PUBLIC logo acima -- nunca introduz PUBLIC neste grupo`);
+  }
+
+  // Ausência explícita de PUBLIC nas linhas de GRANT deste grupo (nenhuma
+  // das 7 pode ganhar PUBLIC -- estado vivo pré-patch: PUBLIC = NONE).
+  for (const sig of anonOnlyGroup) {
+    const grantLineRe = new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${sig} TO [^;]*;`);
+    const grantLine = rollback.match(grantLineRe)?.[0] ?? "";
+    assert(grantLine.length > 0 && !/\bPUBLIC\b/.test(grantLine), `${sig.replace(/\\\\?/g, "")}: GRANT não inclui PUBLIC -- grupo anon-only nunca ganha PUBLIC (Fase 6, IMPORTANTE)`);
+  }
+
+  // Fase 3/8: as 5 views e current_user_role() já tinham paridade
+  // confirmada -- o rollback NÃO pode ter sido reescrito nestas seções.
+  assert(rollback.includes("ALTER VIEW public.v_olaclick_connections_safe RESET (security_invoker);"), "views P0: seção de rollback das 5 views permanece com a mesma definição (paridade já confirmada, Fase 8 -- não reescrita)");
+  assert(rollback.includes("GRANT SELECT ON public.v_billing_mrr_summary TO anon, authenticated;"), "v_billing_mrr_summary: grant de rollback inalterado (Fase 8)");
+  const currentUserRoleBlock = rollback.slice(
+    rollback.indexOf("-- 2. current_user_role"),
+    rollback.indexOf("-- 1. can_access_client"),
+  );
+  assert(currentUserRoleBlock.length > 0 && !/GRANT|REVOKE/.test(currentUserRoleBlock), "current_user_role(): rollback não introduz nenhum GRANT/REVOKE nesta seção -- ACL desta função nunca foi tocada, nem pelo patch nem pelo rollback (Fase 3)");
+}
+
+console.log("[test] 16 — Fase 10: ledger de migrations documentado factualmente, distinto dos arquivos históricos numerados");
+{
+  assert(!sql.includes("0 migrations"), "afirmação obsoleta de '0 migrations' removida do arquivo principal");
+  const migrationIds = [
+    "20260813200621_personal_core_tasks",
+    "20260813200750_personal_core_routines",
+    "20260813200856_personal_core_gratitude",
+    "20260813200949_personal_core_events",
+  ];
+  for (const id of migrationIds) {
+    assert(sql.includes(id), `ledger documenta a migration rastreada ${id} (estado vivo auditado em 27/08/2026)`);
+  }
+  assert(/não equivalem automaticamente a terem sido aplicados|não presuma que\s*\n?-- todo SQL histórico/.test(sql), "documentação deixa explícito que os arquivos históricos numerados não equivalem ao ledger formal do Supabase nem provam execução ao vivo");
+}
+
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -95,7 +95,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_create_client(
   text, text, text, text, text, text, uuid, uuid
-) TO authenticated;
+) TO PUBLIC, anon, authenticated;
 
 -- 8. Archive/Restore/Delete de clients → estado anterior (docs/supabase/
 --    52, 54, 55) -- reabre admin comum podendo administrar QUALQUER
@@ -125,7 +125,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.admin_hard_delete_clients(uuid[]) TO authenticated;
+REVOKE ALL ON FUNCTION public.admin_hard_delete_clients(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_clients(uuid[]) TO authenticated, anon;
 
 -- 8.5 admin_hard_delete_client (single)
 CREATE OR REPLACE FUNCTION public.admin_hard_delete_client(p_client_id uuid)
@@ -147,7 +148,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.admin_hard_delete_client(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_hard_delete_client(uuid) TO PUBLIC, anon, authenticated;
 
 -- 8.4 admin_delete_client (logical delete / lixeira)
 CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
@@ -196,7 +197,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_delete_client(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_delete_client(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_client(uuid) TO authenticated, anon;
 
 -- 8.3 admin_restore_client
 CREATE OR REPLACE FUNCTION public.admin_restore_client(p_client_id uuid)
@@ -224,7 +225,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO PUBLIC, anon, authenticated;
 
 -- 8.2 admin_archive_clients (bulk)
 CREATE OR REPLACE FUNCTION public.admin_archive_clients(p_client_ids uuid[])
@@ -254,7 +255,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.admin_archive_clients(uuid[]) TO authenticated;
+REVOKE ALL ON FUNCTION public.admin_archive_clients(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_archive_clients(uuid[]) TO authenticated, anon;
 
 -- 8.1 admin_archive_client (single)
 CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
@@ -282,7 +284,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.admin_archive_client(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_archive_client(uuid) TO PUBLIC, anon, authenticated;
 
 -- 7. get_request_owner_for_client → estado anterior (docs/supabase/45)
 --    sem auth check, sem search_path.
@@ -303,6 +305,8 @@ BEGIN
   RETURN v_super_id;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.get_request_owner_for_client(uuid) TO PUBLIC, anon, authenticated;
 
 -- 6.4 get_client_meta_status → estado anterior (docs/supabase/61)
 --     role-only, aceitava valores de role inexistentes.
@@ -340,7 +344,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.get_client_meta_status(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_client_meta_status(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_client_meta_status(uuid) TO authenticated, anon;
 
 -- 6.3 admin_list_olaclick_connections → estado anterior (docs/supabase/61)
 --     role-only, cross-company.
@@ -384,7 +388,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_list_olaclick_connections() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_list_olaclick_connections() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_list_olaclick_connections() TO authenticated, anon;
 
 -- 6.2 admin_upsert_olaclick_connection → estado anterior (docs/supabase/67)
 CREATE OR REPLACE FUNCTION public.admin_upsert_olaclick_connection(
@@ -473,7 +477,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_olaclick_connection(uuid, text, text, text, text) TO authenticated, anon;
 
 -- 6.1 admin_link_meta_asset → estado anterior (docs/supabase/60)
 CREATE OR REPLACE FUNCTION public.admin_link_meta_asset(
@@ -557,7 +561,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) TO authenticated, anon;
 
 -- 5. create_client_on_signup → estado anterior (docs/supabase/02)
 --    ⚠ reabre P0.6: aceita p_user_id arbitrário.
@@ -596,11 +600,11 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.create_client_on_signup(uuid, text, text, text)
-  TO anon, authenticated;
+  TO PUBLIC, anon, authenticated;
 
 -- 4. finance_mark_overdue → estado anterior (docs/supabase/33)
 --    ⚠ reabre P0.5: executável por anon e authenticated.
-GRANT EXECUTE ON FUNCTION public.finance_mark_overdue() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.finance_mark_overdue() TO PUBLIC, authenticated, anon;
 
 -- 3. Views P0 → estado anterior (security_invoker padrão + grants amplos)
 --    ⚠ reabre P0.1-P0.4 e P1.8: anon volta a poder ler estas views.
@@ -650,6 +654,8 @@ AS $$
         AND owner_id = auth.uid()
     );
 $$;
+
+GRANT EXECUTE ON FUNCTION public.can_access_client(uuid) TO PUBLIC, anon, authenticated;
 
 COMMIT;
 
