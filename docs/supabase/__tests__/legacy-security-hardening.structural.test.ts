@@ -24,6 +24,11 @@ const metaRoute = fs.readFileSync(path.join(root, "src/app/api/meta/assets/link/
 const olaRoute = fs.readFileSync(path.join(root, "src/app/api/olaclick/connect/route.ts"), "utf8");
 const billingPage = fs.readFileSync(path.join(root, "src/app/admin/super/billing/page.tsx"), "utf8");
 const mrrRoute = fs.readFileSync(path.join(root, "src/app/api/admin/billing/mrr-summary/route.ts"), "utf8");
+const liveTestPlan = fs.readFileSync(path.join(root, "docs/supabase/legacy-security-hardening-live-test-plan.sql"), "utf8");
+const authGuard = fs.readFileSync(path.join(root, "src/lib/supabase/authorization-guard.ts"), "utf8");
+const archiveRoute = fs.readFileSync(path.join(root, "src/app/api/admin/clients/[id]/route.ts"), "utf8");
+const restoreRoute = fs.readFileSync(path.join(root, "src/app/api/admin/clients/[id]/restore/route.ts"), "utf8");
+const resolveClient = fs.readFileSync(path.join(root, "src/lib/client/resolve-client.ts"), "utf8");
 
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
@@ -298,6 +303,113 @@ console.log("[test] 16 — Fase 10: ledger de migrations documentado factualment
     assert(sql.includes(id), `ledger documenta a migration rastreada ${id} (estado vivo auditado em 27/08/2026)`);
   }
   assert(/não equivalem automaticamente a terem sido aplicados|não presuma que\s*\n?-- todo SQL histórico/.test(sql), "documentação deixa explícito que os arquivos históricos numerados não equivalem ao ledger formal do Supabase nem provam execução ao vivo");
+}
+
+console.log("[test] 17 — PROMPT 04A/P0-A: client_meta_assets fecha bypass direto via Data API");
+{
+  const policies = ["client_meta_assets_select", "client_meta_assets_insert", "client_meta_assets_update", "client_meta_assets_delete"];
+  for (const p of policies) {
+    const block = sql.match(new RegExp(`DROP POLICY IF EXISTS "${p}"[\\s\\S]*?CREATE POLICY "${p}"[\\s\\S]*?;`))?.[0] ?? "";
+    assert(block.length > 0, `${p}: redefinida nesta migration`);
+    assert(/can_access_client\(client_id\)/.test(block), `${p}: exige can_access_client(client_id) -- role sozinho não basta mais (P0-A)`);
+    assert(/role IN \(/.test(block), `${p}: mantém o gate de role já existente (semântica de role preservada, ownership adicionada)`);
+  }
+  assert(!sql.includes('DROP POLICY IF EXISTS "client_meta_assets_select" ON public.client_meta_assets;\nCREATE POLICY "client_meta_assets_select"\n  ON public.client_meta_assets FOR SELECT\n  USING (\n    EXISTS (\n      SELECT 1 FROM public.profiles p\n      WHERE p.id = auth.uid()\n        AND p.role IN (\'super_admin\', \'admin\', \'agency\', \'team\', \'operacional\')\n    )\n  );'), "client_meta_assets_select: versão role-only antiga (sem ownership) não sobrevive na migration atual");
+}
+
+console.log("[test] 18 — PROMPT 04A/P0-B: olaclick_connections fecha bypass direto via Data API");
+{
+  assert(sql.includes('DROP POLICY IF EXISTS "admin_all_olaclick" ON public.olaclick_connections;'), "admin_all_olaclick (role-only, FOR ALL) é removida nesta migration");
+  const policies = ["olaclick_connections_select", "olaclick_connections_insert", "olaclick_connections_update", "olaclick_connections_delete"];
+  for (const p of policies) {
+    const block = sql.match(new RegExp(`CREATE POLICY "${p}"[\\s\\S]*?;`))?.[0] ?? "";
+    assert(block.length > 0, `${p}: criada nesta migration`);
+    assert(/can_access_client\(client_id\)/.test(block), `${p}: exige can_access_client(client_id) -- fecha o bypass global de admin_all_olaclick (P0-B)`);
+  }
+}
+
+console.log("[test] 19 — PROMPT 04A/P0-B cont.: v_olaclick_connections_safe sem privilégios mutantes");
+{
+  assert(/REVOKE ALL ON public\.v_olaclick_connections_safe FROM PUBLIC;/.test(sql), "REVOKE ALL de PUBLIC na view (fecha INSERT/UPDATE/DELETE herdados dos default privileges, não só SELECT)");
+  assert(/REVOKE ALL ON public\.v_olaclick_connections_safe FROM anon;/.test(sql), "REVOKE ALL de anon na view");
+  assert(/REVOKE ALL ON public\.v_olaclick_connections_safe FROM authenticated;/.test(sql), "REVOKE ALL de authenticated na view -- CODEX confirmou is_updatable=YES/is_insertable_into=YES antes desta correção");
+}
+
+console.log("[test] 20 — PROMPT 04A/P0-C: authorization denial de RPC é FINAL, nunca dispara fallback service_role");
+{
+  assert(/isAuthorizationDeniedError/.test(authGuard), "helper isAuthorizationDeniedError existe em src/lib/supabase/authorization-guard.ts");
+  assert(/canAccessClientIndependently/.test(authGuard), "helper canAccessClientIndependently existe -- revalidação independente antes de qualquer fallback service_role");
+
+  for (const [name, route] of [["archive/delete route", archiveRoute], ["restore route", restoreRoute]] as const) {
+    assert(/isAuthorizationDeniedError/.test(route), `${name}: importa/usa isAuthorizationDeniedError`);
+    assert(/canAccessClientIndependently/.test(route), `${name}: revalida autorização independentemente antes do fallback service_role (Fase 9-11)`);
+    const authIdx = route.indexOf("isAuthorizationDeniedError(");
+    const fallbackIdx = Math.max(route.lastIndexOf("createSupabaseAdminClient()"), route.lastIndexOf("createRequiredSupabaseAdminClient()"));
+    assert(authIdx > -1 && fallbackIdx > -1 && authIdx < fallbackIdx, `${name}: checagem de authorization denial vem ANTES do client admin/service_role no código`);
+  }
+}
+
+console.log("[test] 21 — PROMPT 04A/Fase 12-13: Meta/OlaClick DELETE fail-closed quando lookup não resolve ownership");
+{
+  for (const [name, fullRoute] of [["Meta assets link DELETE", metaRoute], ["OlaClick connect DELETE", olaRoute]] as const) {
+    const deleteIdx = fullRoute.indexOf("export const DELETE");
+    assert(deleteIdx > -1, `${name}: handler DELETE encontrado`);
+    const block = fullRoute.slice(deleteIdx);
+    assert(/lookupError/.test(block), `${name}: distingue erro de lookup de "não encontrado"`);
+    assert(/reason: "not_found"[\s\S]{0,40}status: 404/.test(block), `${name}: registro inexistente retorna 404, nunca prossegue para delete`);
+    assert(/reason: "forbidden"[\s\S]{0,40}status: 403/.test(block), `${name}: client_id ausente ou can_access_client negado retorna 403, nunca prossegue`);
+    assert(!/if \(error && hasSupabaseServiceRoleKey/.test(block), `${name}: dentro do handler DELETE não existe mais "tenta com sessão, cai pro admin em qualquer erro" -- delete só roda depois de autorização já confirmada`);
+    assert(/const deleteDb = hasSupabaseServiceRoleKey\(\) \? createSupabaseAdminClient\(\) : supabase;/.test(block), `${name}: usa service_role para a mutação SÓ depois de can_access_client já ter confirmado true`);
+  }
+}
+
+console.log("[test] 22 — PROMPT 04A/Fase 15-16: signup bootstrap idempotente para usuário sem client vinculado");
+{
+  assert(/signup_bootstrap/.test(resolveClient), "resolveCurrentClient() ganha a fonte signup_bootstrap (Fase 15)");
+  assert(/create_client_on_signup/.test(resolveClient), "bootstrap reutiliza a MESMA RPC canônica -- nunca um sistema paralelo de criação de Company (Fase 15)");
+  assert(/sessionClient\.rpc/.test(resolveClient), "bootstrap chama a RPC via sessionClient (JWT real) -- nunca via admin client, pois auth.uid() precisa resolver dentro da função");
+  const bootstrapIdx = resolveClient.indexOf("signup_bootstrap");
+  const notFoundIdx = resolveClient.lastIndexOf('"not_found"');
+  assert(bootstrapIdx > -1 && notFoundIdx > -1 && bootstrapIdx < notFoundIdx, "bootstrap é tentado ANTES do retorno not_found final -- é a última fonte, não substitui as 5 anteriores");
+}
+
+console.log("[test] 23 — PROMPT 04A: rollback ganha as novas seções com paridade de ACL, e permanece transacional");
+{
+  assert(rollback.includes('CREATE POLICY "client_meta_assets_select"') && /role IN \('super_admin', 'admin', 'agency', 'team', 'operacional'\)/.test(rollback.slice(rollback.indexOf('CREATE POLICY "client_meta_assets_select"'), rollback.indexOf('CREATE POLICY "client_meta_assets_select"') + 400)), "rollback restaura client_meta_assets_select ao estado role-only exato (docs/supabase/62)");
+  assert(!/can_access_client/.test(rollback.slice(rollback.indexOf('CREATE POLICY "client_meta_assets_select"'), rollback.indexOf('CREATE POLICY "client_meta_assets_delete"'))), "rollback das policies de client_meta_assets NÃO inclui can_access_client -- reabre exatamente o P0-A");
+  assert(rollback.includes('CREATE POLICY "admin_all_olaclick"'), "rollback restaura admin_all_olaclick (FOR ALL, role-only) removendo as 4 policies novas");
+  assert(rollback.includes('DROP POLICY IF EXISTS "olaclick_connections_select"'), "rollback remove explicitamente as 4 policies novas de olaclick_connections antes de recriar a antiga");
+  assert(rollback.includes("NEEDS_READ_ONLY_LIVE_CAPTURE"), "rollback marca explicitamente o gap de v_olaclick_connections_safe (grants mutantes) em vez de adivinhar o estado anterior");
+  assert(!/GRANT (INSERT|UPDATE|DELETE) ON public\.v_olaclick_connections_safe/.test(rollback), "rollback nunca fabrica um GRANT de INSERT/UPDATE/DELETE não documentado para a view");
+}
+
+console.log("[test] 24 — PROMPT 04A/Fase 17: aviso de emergência do rollback reforçado");
+{
+  assert(/MECANISMO ESTRITAMENTE EMERGENCIAL/.test(rollback), "rollback declara explicitamente ser mecanismo emergencial");
+  assert(/NUNCA É ADEQUADO PARA OPERAÇÃO NORMAL/.test(rollback), "rollback declara explicitamente que o estado restaurado não é adequado para operação normal");
+  assert(/HARDENING PRECISA SER REAPLICADO/.test(rollback), "rollback instrui reaplicar o hardening (ou plano equivalente) imediatamente após execução");
+  assert(/P0-A\/P0-B/.test(rollback), "rollback documenta os novos P0-A/P0-B (client_meta_assets/olaclick_connections) na lista de exposições reabertas");
+}
+
+console.log("[test] 25 — PROMPT 04A/Fase 13: ledger de migrations também corrigido no arquivo de rollback");
+{
+  assert(!rollback.includes("não tem migration history rastreada"), "rollback não repete mais a afirmação obsoleta sobre ausência de migration history");
+  assert(rollback.includes("4 migrations rastreadas") || rollback.includes("ledger formal de migrations do Supabase"), "rollback referencia o ledger formal corretamente, sem contradizer o arquivo principal");
+}
+
+console.log("[test] 26 — PROMPT 04A/Fase 18-19: live-test-plan cobre os novos casos, todos transacionais");
+{
+  const newCases = [
+    "client_meta_assets", "olaclick_connections", "v_olaclick_connections_safe",
+    "signup_bootstrap", "late_bootstrap_still_works", "idempotent",
+  ];
+  for (const c of newCases) {
+    assert(liveTestPlan.includes(c), `live-test-plan cobre um caso referenciando "${c}"`);
+  }
+  const beginCount = (liveTestPlan.match(/\bBEGIN;/g) ?? []).length;
+  const rollbackCount = (liveTestPlan.match(/\bROLLBACK;/g) ?? []).length;
+  assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; tem um ROLLBACK; correspondente (${beginCount} pares) -- nenhum COMMIT; em todo o arquivo`);
+  assert(!/\bCOMMIT;/.test(liveTestPlan), "live-test-plan nunca usa COMMIT -- nenhuma mutação de teste persiste de verdade");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

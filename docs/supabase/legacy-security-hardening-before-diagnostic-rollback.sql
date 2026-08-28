@@ -3,24 +3,35 @@
 -- AINDA NÃO EXECUTADO (só faz sentido executar depois da migration
 -- correspondente ter sido aplicada).
 --
--- ⚠ AVISO DE SEGURANÇA (Fase 40): este rollback restaura o
--- comportamento anterior à correção -- ou seja, restaura
--- deliberadamente os P0/P1 confirmados ao vivo (anon podendo ler
--- views sensíveis, authenticated lendo agregados de billing
--- diretamente, finance_mark_overdue() executável por qualquer
--- visitante, create_client_on_signup() aceitando p_user_id arbitrário,
--- RPCs de Meta/OlaClick sem ownership real de Company, admin comum
--- podendo arquivar/restaurar/apagar QUALQUER Company). Isso é
--- tecnicamente esperado de um rollback, mas nunca deve ser executado
--- sem entender que reabre exatamente essas exposições -- incluindo o
--- bug de NULL-bypass corrigido no V2 (ver seção 8 da migration).
+-- ⚠ AVISO DE SEGURANÇA (Fase 40, reforçado no PROMPT 04A):
+--
+-- ESTE ROLLBACK É UM MECANISMO ESTRITAMENTE EMERGENCIAL.
+-- EXECUTÁ-LO REABRE DELIBERADAMENTE OS P0/P1 CONFIRMADOS AO VIVO.
+-- O ESTADO RESTAURADO NUNCA É ADEQUADO PARA OPERAÇÃO NORMAL --
+-- SE ESTE ROLLBACK FOR EXECUTADO, O HARDENING PRECISA SER REAPLICADO
+-- (OU UM PLANO DE CORREÇÃO EQUIVALENTE) IMEDIATAMENTE EM SEGUIDA.
+--
+-- Reabre especificamente: anon podendo ler views sensíveis,
+-- authenticated lendo agregados de billing diretamente,
+-- finance_mark_overdue() executável por qualquer visitante,
+-- create_client_on_signup() aceitando p_user_id arbitrário, RPCs de
+-- Meta/OlaClick sem ownership real de Company, admin comum podendo
+-- arquivar/restaurar/apagar QUALQUER Company, e (PROMPT 04A) acesso
+-- direto via Data API a client_meta_assets/olaclick_connections
+-- role-only sem Company ownership (P0-A/P0-B). Isso é tecnicamente
+-- esperado de um rollback, mas nunca deve ser executado sem entender
+-- que reabre exatamente essas exposições -- incluindo o bug de
+-- NULL-bypass corrigido no V2 (ver seção 8 da migration).
 --
 -- Cada objeto é restaurado exatamente à definição/grants documentados
--- nos arquivos históricos correspondentes (a única fonte real, já que
--- o projeto Supabase não tem migration history rastreada e esta
--- migration nunca foi aplicada -- não há um "estado V1 intermediário"
--- vivo para reverter, só o estado original pré-existente nos SQLs
--- numerados).
+-- nos arquivos históricos correspondentes e/ou confirmados por auditoria
+-- live (CODEX WEB) -- esta migration em si nunca foi aplicada, não há um
+-- "estado V1 intermediário" vivo para reverter, só o estado original
+-- pré-existente. O ledger formal de migrations do Supabase (4 migrations
+-- rastreadas, nenhuma relacionada a este domínio de segurança) é
+-- independente dos arquivos numerados em docs/supabase, que são
+-- histórico local de execução manual, não o ledger formal -- ver nota
+-- completa em legacy-security-hardening-before-diagnostic.sql.
 --
 -- Não contém nenhum DROP destrutivo em ponto algum -- apenas restaura as
 -- definições/grants exatamente como estavam nos arquivos históricos
@@ -31,6 +42,97 @@
 -- ============================================================
 
 BEGIN;
+
+-- 12. v_olaclick_connections_safe (mutating grants) → NEEDS_READ_ONLY_LIVE_CAPTURE
+--     A ACL exata de INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/
+--     MAINTAIN herdada dos default privileges do schema no momento da
+--     criação da view (docs/supabase/67) nunca foi capturada
+--     explicitamente por nenhuma auditoria live -- CODEX só confirmou
+--     is_updatable=YES / is_insertable_into=YES (estrutural), não a
+--     lista real de grantees/privilégios (information_schema.
+--     table_privileges). Não adivinhado aqui: restaurar isso de verdade
+--     exige uma auditoria live read-only específica desta view antes.
+--     Sem essa captura, este bloco intencionalmente NÃO restaura nenhum
+--     GRANT nesta view -- rodar esta consulta antes de finalizar o
+--     rollback caso a restauração exata seja necessária:
+--       SELECT grantee, privilege_type FROM information_schema.table_privileges
+--       WHERE table_name = 'v_olaclick_connections_safe';
+
+-- 11. olaclick_connections policies → estado anterior (docs/supabase/61)
+--     ⚠ reabre P0-B: admin_all_olaclick volta a ser role-only, sem
+--     Company ownership -- qualquer admin/agency/operacional lê, e
+--     admin/agency escreve conexões de QUALQUER Company.
+DROP POLICY IF EXISTS "olaclick_connections_select" ON public.olaclick_connections;
+DROP POLICY IF EXISTS "olaclick_connections_insert" ON public.olaclick_connections;
+DROP POLICY IF EXISTS "olaclick_connections_update" ON public.olaclick_connections;
+DROP POLICY IF EXISTS "olaclick_connections_delete" ON public.olaclick_connections;
+
+CREATE POLICY "admin_all_olaclick"
+  ON public.olaclick_connections
+  FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency', 'operacional')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+  );
+
+-- 10. client_meta_assets policies → estado anterior (docs/supabase/62)
+--     ⚠ reabre P0-A: role-only, sem Company ownership -- qualquer
+--     admin/agency/team/operacional lê, admin/agency escreve, admin
+--     apaga ativos Meta de QUALQUER Company via Data API direto.
+DROP POLICY IF EXISTS "client_meta_assets_select" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_select"
+  ON public.client_meta_assets FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency', 'team', 'operacional')
+    )
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_insert" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_insert"
+  ON public.client_meta_assets FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_update" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_update"
+  ON public.client_meta_assets FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_delete" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_delete"
+  ON public.client_meta_assets FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin')
+    )
+  );
 
 -- 9. admin_create_client → estado anterior (docs/supabase/54)
 --    ⚠ reabre o bug de NULL-bypass e volta a aceitar p_created_by/

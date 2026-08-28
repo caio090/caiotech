@@ -5,6 +5,7 @@ import {
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
 import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
+import { isAuthorizationDeniedError, canAccessClientIndependently } from "@/lib/supabase/authorization-guard";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -39,8 +40,19 @@ export const POST = withMutationProtection(async function POST(_req: NextRequest
     if (!rpcResult.error) {
       return NextResponse.json({ restored: true });
     }
+    if (isAuthorizationDeniedError(rpcResult.error)) {
+      // Uma negação de autorização da RPC é FINAL -- nunca dispara fallback privilegiado.
+      return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+    }
 
-    // Fallback: service role
+    // A RPC falhou por motivo técnico (não autorização) -- só agora um
+    // fallback privilegiado pode ser considerado, e só depois de revalidar
+    // autorização de forma independente (service_role disponível nunca
+    // significa autorização concedida).
+    if (!(await canAccessClientIndependently(supabase, clientId))) {
+      return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+    }
+
     if (hasSupabaseServiceRoleKey()) {
       const { error } = await createRequiredSupabaseAdminClient()
         .from("clients")

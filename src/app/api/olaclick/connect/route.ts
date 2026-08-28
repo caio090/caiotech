@@ -277,22 +277,28 @@ export const DELETE = withMutationProtection(async function DELETE(request: Next
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
 
-    // Fase 17/18: resolve a Company real da conexão antes de deletar --
-    // role sozinho não autoriza mutação numa Company arbitrária.
-    const { data: connRow } = await supabase
+    // Fase 17/18 + Fase 13 (PROMPT 04A): resolve a Company real da conexão
+    // antes de deletar -- role sozinho não autoriza mutação numa Company
+    // arbitrária. Lookup que não resolve ownership NUNCA é interpretado
+    // como autorização implícita -- fail closed em cada ramo.
+    const { data: connRow, error: lookupError } = await supabase
       .from("olaclick_connections").select("client_id").eq("id", id).maybeSingle();
-    if (connRow?.client_id) {
-      const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: connRow.client_id });
-      if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    if (lookupError) {
+      return NextResponse.json({ ok: false, reason: "lookup_failed" }, { status: 500 });
     }
+    if (!connRow) {
+      return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
+    }
+    if (!connRow.client_id) {
+      return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
+    const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: connRow.client_id });
+    if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
 
-    let { error } = await supabase.from("olaclick_connections").delete().eq("id", id);
-    if (error && hasSupabaseServiceRoleKey()) {
-      try {
-        const adminDb = createSupabaseAdminClient();
-        error = (await adminDb.from("olaclick_connections").delete().eq("id", id)).error;
-      } catch { /* mantém erro original */ }
-    }
+    // Autorização já validada de forma independente acima -- só agora é
+    // seguro usar service_role para a mutação técnica (Fase 10).
+    const deleteDb = hasSupabaseServiceRoleKey() ? createSupabaseAdminClient() : supabase;
+    const { error } = await deleteDb.from("olaclick_connections").delete().eq("id", id);
 
     if (error) {
       return NextResponse.json({ ok: false, reason: "db_error", message: "Não foi possível remover a conexão." }, { status: 500 });

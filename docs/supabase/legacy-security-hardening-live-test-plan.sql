@@ -318,6 +318,142 @@ BEGIN;
 ROLLBACK;
 
 
+-- ── 13. Data API direta client_meta_assets -- SELECT cross-company (P0-A) ──
+-- Admin A (autorizado só para Company A) não pode ler ativos Meta de
+-- Company B via PostgREST direto (bypass que as RPCs corrigidas não
+-- cobrem sozinhas).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT COUNT(*) FROM public.client_meta_assets WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve ser 0 (RLS filtra, não erro)
+ROLLBACK;
+
+-- ── 14. Data API direta client_meta_assets -- INSERT cross-company (P0-A) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  INSERT INTO public.client_meta_assets (client_id, asset_type, asset_id)
+  VALUES ('<COMPANY_B_ID>'::uuid, 'facebook_page', 'forjado-via-data-api');  -- deve falhar (RLS WITH CHECK)
+ROLLBACK;
+
+-- ── 15. Data API direta client_meta_assets -- UPDATE cross-company (P0-A) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.client_meta_assets SET asset_name = 'forjado'
+  WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve afetar 0 linhas (RLS filtra o USING antes do WITH CHECK)
+ROLLBACK;
+
+-- ── 16. Data API direta client_meta_assets -- DELETE cross-company (P0-A) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  DELETE FROM public.client_meta_assets WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve afetar 0 linhas
+ROLLBACK;
+
+-- ── 17. Data API direta olaclick_connections -- cross-company (P0-B) ──
+-- Cobre SELECT/INSERT/UPDATE/DELETE nas 4 policies novas
+-- (olaclick_connections_select/insert/update/delete).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT COUNT(*) FROM public.olaclick_connections WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve ser 0
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.olaclick_connections SET connection_name = 'forjado'
+  WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve afetar 0 linhas
+ROLLBACK;
+
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  DELETE FROM public.olaclick_connections WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve afetar 0 linhas
+ROLLBACK;
+
+-- ── 18. v_olaclick_connections_safe -- escrita negada pós-patch ─────────
+-- View nunca deve mais aceitar mutação alguma, de nenhum role client-side.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.v_olaclick_connections_safe SET connection_name = 'forjado'
+  WHERE client_id = '<COMPANY_A_ID>'::uuid;  -- deve falhar: permission denied (REVOKE ALL)
+ROLLBACK;
+
+-- ── 19. v_olaclick_connections_safe -- grants não-SELECT pós-patch ──────
+-- Verificação estrutural (read-only, não muta nada): nenhum grantee deve
+-- ter INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN.
+SELECT grantee, privilege_type
+FROM information_schema.table_privileges
+WHERE table_name = 'v_olaclick_connections_safe'
+  AND privilege_type <> 'SELECT';  -- esperado: 0 linhas (nenhum grant não-SELECT restante)
+
+-- ── 20. Restore cross-company: RPC deny, SEM fallback service-role (P0-C) ──
+-- Nível de aplicação (HTTP), não SQL puro -- testar via:
+--   POST /api/admin/clients/<COMPANY_B_ID>/restore, sessão de ADMIN_A
+--   (autorizado só para Company A) → 403 forbidden. Confirmar que
+--   clients.status/archived_at/deleted_at de Company B NÃO mudou (nenhum
+--   fallback service_role deve ter rodado -- ver
+--   src/app/api/admin/clients/[id]/restore/route.ts, isAuthorizationDeniedError).
+
+-- ── 21. Archive/delete cross-company: RPC deny, SEM fallback service-role (P0-C) ──
+-- Nível de aplicação (HTTP): DELETE /api/admin/clients/<COMPANY_B_ID>
+-- (mode=archive), sessão de ADMIN_A → 403 forbidden. Confirmar que
+-- clients de Company B NÃO mudou (ver src/app/api/admin/clients/[id]/route.ts,
+-- isAuthorizationDeniedError + canAccessClientIndependently).
+
+-- ── 22. Meta delete: lookup não encontra ownership → fail closed (Fase 12) ──
+-- Nível de aplicação (HTTP): DELETE /api/meta/assets/link?id=<uuid
+-- inexistente>, sessão de ADMIN_A autorizado → 404 not_found, nenhuma
+-- mutação. DELETE /api/meta/assets/link?id=<asset de Company B>, sessão
+-- de ADMIN_A → 403 forbidden, nenhuma mutação (ver
+-- src/app/api/meta/assets/link/route.ts DELETE, lookupError/not_found/
+-- forbidden antes de qualquer .delete()).
+
+-- ── 23. OlaClick delete: lookup não resolve → fail closed (Fase 13) ─────
+-- Nível de aplicação (HTTP): mesmo teste do item 22 para
+-- DELETE /api/olaclick/connect?id=... (ver src/app/api/olaclick/connect/route.ts).
+
+-- ── 24. Signup pós-confirmação legítimo sem passar por onboarding/conclusao (Fase 15) ──
+-- Usuário com sessão real, sem client vinculado por nenhuma das 5 fontes
+-- de resolveCurrentClient(): a RPC ainda cria a Company (bootstrap,
+-- fonte "signup_bootstrap" em src/lib/client/resolve-client.ts).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<USER_B_ID>"}';
+  SELECT public.create_client_on_signup(
+    '<USER_B_ID>'::uuid, 'Empresa Bootstrap Tardio', 'Teste', 'bootstrap@example.com'
+  ) IS NOT NULL AS late_bootstrap_still_works;  -- deve retornar true
+ROLLBACK;
+
+-- ── 25. Signup idempotente: repetição não duplica Company (Fase 16) ────
+-- Chamar duas vezes com o mesmo p_user_id deve retornar o MESMO client_id
+-- (create_client_on_signup já faz lookup por owner_id antes de inserir).
+-- ⚠ NEEDS_READ_ONLY_LIVE_CAPTURE: não existe unique constraint em
+-- clients.owner_id (não adicionada nesta correção -- exigiria confirmar
+-- ao vivo que não há owner_id duplicado hoje antes de aplicar, o que
+-- está fora do escopo read-only desta missão). Este teste cobre o
+-- comportamento sequencial (não uma corrida real de duas conexões
+-- simultâneas, que a ausência do constraint ainda não impede em teoria).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<USER_B_ID>"}';
+  WITH first_call AS (
+    SELECT public.create_client_on_signup(
+      '<USER_B_ID>'::uuid, 'Empresa Idempotente', 'Teste', 'idempotente@example.com'
+    ) AS client_id
+  ),
+  second_call AS (
+    SELECT public.create_client_on_signup(
+      '<USER_B_ID>'::uuid, 'Empresa Idempotente Repetida', 'Teste', 'idempotente@example.com'
+    ) AS client_id
+  )
+  SELECT (SELECT client_id FROM first_call) = (SELECT client_id FROM second_call) AS idempotent;  -- deve ser true
+ROLLBACK;
+
+
 -- ── 12. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
@@ -329,5 +465,6 @@ ROLLBACK;
 --   get_request_owner_for_client, admin_archive_client,
 --   admin_archive_clients, admin_restore_client, admin_delete_client,
 --   admin_hard_delete_client, admin_hard_delete_clients,
---   admin_create_client.
+--   admin_create_client, client_meta_assets (table), olaclick_connections
+--   (table).
 -- ============================================================

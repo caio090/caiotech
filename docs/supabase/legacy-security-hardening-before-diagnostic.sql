@@ -71,6 +71,9 @@
 -- admin_hard_delete_client(uuid)         | revoke (V2) | revoke (V2) | GRANT | --
 -- admin_hard_delete_clients(uuid[])      | revoke (V2) | revoke (V2) | GRANT | --
 -- admin_create_client(...)               | revoke (Final) | revoke (Final) | GRANT | --
+-- client_meta_assets (table, PROMPT 04A) | role-only+ownership (can_access_client) nas 4 policies (select/insert/update/delete)
+-- olaclick_connections (table, PROMPT 04A) | role-only+ownership (can_access_client) nas 4 policies (select/insert/update/delete)
+-- v_olaclick_connections_safe (mutating) | REVOKE ALL de PUBLIC/anon/authenticated (PROMPT 04A) -- só SELECT já revogado na seção 3
 -- ============================================================
 
 BEGIN;
@@ -982,6 +985,166 @@ $$;
 REVOKE ALL ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_create_client(text, text, text, text, text, text, uuid, uuid) TO authenticated;
+
+
+-- ============================================================
+-- 10. client_meta_assets — Company ownership real na Data API (P0-A, PROMPT 04A)
+-- ============================================================
+-- CODEX (auditoria live, PROMPT 04A): authenticated tinha SELECT/INSERT/
+-- UPDATE/DELETE diretos via Data API, com policies role-only
+-- (client_meta_assets_select/insert/update/delete, docs/supabase/62) --
+-- um admin comum podia ler/escrever ativos Meta de QUALQUER Company via
+-- PostgREST direto, contornando por completo admin_link_meta_asset()/
+-- get_client_meta_status() (já corrigidas na seção 6). Role nunca foi
+-- ownership -- mesmo princípio já aplicado a can_access_client() e às
+-- RPCs de archive/restore/delete (seção 8).
+--
+-- Decisão de arquitetura (Fase 3, PROMPT 04A): a Data API permanece viva
+-- -- dezenas de call sites reais em src/ leem esta tabela diretamente
+-- para UI (contentos/home, meta/hub-assets, meta/insights, etc.);
+-- revogar acesso direto quebraria a aplicação. Em vez disso, toda
+-- operação agora exige can_access_client(client_id) ALÉM do role já
+-- existente -- nunca dois caminhos com regras diferentes: reutiliza a
+-- MESMA função canônica SECURITY DEFINER já usada pelas RPCs.
+DROP POLICY IF EXISTS "client_meta_assets_select" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_select"
+  ON public.client_meta_assets FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency', 'team', 'operacional')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_insert" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_insert"
+  ON public.client_meta_assets FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_update" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_update"
+  ON public.client_meta_assets FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+DROP POLICY IF EXISTS "client_meta_assets_delete" ON public.client_meta_assets;
+CREATE POLICY "client_meta_assets_delete"
+  ON public.client_meta_assets FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+
+-- ============================================================
+-- 11. olaclick_connections — Company ownership real na Data API (P0-B, PROMPT 04A)
+-- ============================================================
+-- CODEX (auditoria live, PROMPT 04A): admin_all_olaclick (docs/supabase/
+-- 61) era FOR ALL TO authenticated, role-only (super_admin/admin/agency/
+-- operacional para leitura+delete; super_admin/admin/agency para
+-- insert+update) -- sem nenhuma checagem de Company ownership. Mesmo
+-- bypass da seção 10, mesma correção: Data API permanece viva (usada
+-- amplamente em src/ -- admin/diagnosticos, admin/contentos/home,
+-- olaclick/connect, olaclick/connections, etc.), mas exige
+-- can_access_client(client_id) além do role, nos mesmos 4 grupos de
+-- operação já existentes -- role semantics preservadas, ownership
+-- adicionada. Split em 4 policies nomeadas (mesmo padrão de
+-- client_meta_assets) em vez de uma única FOR ALL, por clareza.
+DROP POLICY IF EXISTS "admin_all_olaclick" ON public.olaclick_connections;
+
+CREATE POLICY "olaclick_connections_select"
+  ON public.olaclick_connections FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency', 'operacional')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+CREATE POLICY "olaclick_connections_insert"
+  ON public.olaclick_connections FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+CREATE POLICY "olaclick_connections_update"
+  ON public.olaclick_connections FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+CREATE POLICY "olaclick_connections_delete"
+  ON public.olaclick_connections FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid()
+        AND p.role IN ('super_admin', 'admin', 'agency', 'operacional')
+    )
+    AND public.can_access_client(client_id)
+  );
+
+
+-- ============================================================
+-- 12. v_olaclick_connections_safe — remove privilégios mutantes (P0-B cont., PROMPT 04A)
+-- ============================================================
+-- CODEX confirmou is_updatable=YES, is_insertable_into=YES -- a seção 3
+-- já revoga SELECT de anon/authenticated (não reescrita aqui), mas nunca
+-- tocou INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN,
+-- herdados dos default privileges do schema no momento da criação da
+-- view (docs/supabase/67). A view nunca é consultada pelo código
+-- (comentário do próprio SQL 67: "queries acessam a tabela diretamente")
+-- -- fecha por completo, sem re-conceder nada.
+REVOKE ALL ON public.v_olaclick_connections_safe FROM PUBLIC;
+REVOKE ALL ON public.v_olaclick_connections_safe FROM anon;
+REVOKE ALL ON public.v_olaclick_connections_safe FROM authenticated;
 
 
 COMMIT;

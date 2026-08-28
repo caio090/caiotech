@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn } from "@/lib/client-visibility";
 import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
+import { isAuthorizationDeniedError, canAccessClientIndependently } from "@/lib/supabase/authorization-guard";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -168,6 +169,31 @@ export const DELETE = withMutationProtection(async function DELETE(
       return NextResponse.json({ ok: true, mode: "hard", affected: hardResult.data ?? 0 });
     }
 
+    const archiveResult = await supabase.rpc("admin_archive_clients", { p_client_ids: [id] });
+    if (!archiveResult.error) {
+      return NextResponse.json({ ok: true, mode: "archive", affected: archiveResult.data ?? 0 });
+    }
+    if (isAuthorizationDeniedError(archiveResult.error)) {
+      // Uma negação de autorização da RPC é FINAL -- nunca dispara fallback privilegiado.
+      return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+    }
+
+    const rpcResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
+    if (!rpcResult.error) {
+      return NextResponse.json({ ok: true, mode: "archive" });
+    }
+    if (isAuthorizationDeniedError(rpcResult.error)) {
+      return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+    }
+
+    // As duas RPCs falharam por motivo técnico (não autorização) -- só
+    // agora um fallback privilegiado pode ser considerado, e só depois de
+    // revalidar autorização de forma independente (service_role disponível
+    // nunca significa autorização concedida).
+    if (!(await canAccessClientIndependently(supabase, id))) {
+      return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+    }
+
     const serviceRolePresent = hasSupabaseServiceRoleKey();
     let db = supabase;
     try {
@@ -176,16 +202,6 @@ export const DELETE = withMutationProtection(async function DELETE(
       db = supabase;
     }
     const deletedAt = new Date().toISOString();
-
-    const archiveResult = await supabase.rpc("admin_archive_clients", { p_client_ids: [id] });
-    if (!archiveResult.error) {
-      return NextResponse.json({ ok: true, mode: "archive", affected: archiveResult.data ?? 0 });
-    }
-
-    const rpcResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
-    if (!rpcResult.error) {
-      return NextResponse.json({ ok: true, mode: "archive" });
-    }
 
     let result = await db
       .from("clients")

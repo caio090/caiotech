@@ -314,31 +314,34 @@ export const DELETE = withMutationProtection(async function DELETE(request: Next
     return NextResponse.json({ ok: false, reason: "missing_id" }, { status: 400 });
   }
 
-  // Fase 17/18: resolve a Company real do registro antes de deletar --
-  // "está logado e tem o role certo" não é autorização para a Company
-  // dona deste vínculo específico.
-  const { data: assetRow } = await supabase
+  // Fase 17/18 + Fase 12 (PROMPT 04A): resolve a Company real do registro
+  // antes de deletar -- "está logado e tem o role certo" não é autorização
+  // para a Company dona deste vínculo específico. Lookup que não resolve
+  // ownership NUNCA é interpretado como autorização implícita -- fail
+  // closed em cada ramo (erro de lookup, registro inexistente, ou
+  // client_id ausente).
+  const { data: assetRow, error: lookupError } = await supabase
     .from("client_meta_assets").select("client_id").eq("id", assetRecordId).maybeSingle();
-  if (assetRow?.client_id) {
-    const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: assetRow.client_id });
-    if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+  if (lookupError) {
+    return NextResponse.json({ ok: false, reason: "lookup_failed" }, { status: 500 });
   }
+  if (!assetRow) {
+    return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
+  }
+  if (!assetRow.client_id) {
+    return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+  }
+  const { data: canAccess } = await supabase.rpc("can_access_client", { target_client_id: assetRow.client_id });
+  if (!canAccess) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
 
-  let { error } = await supabase
+  // Autorização já validada de forma independente acima -- só agora é
+  // seguro usar service_role para a mutação técnica (Fase 10). Nunca mais
+  // "tenta com sessão, cai pro admin em qualquer erro".
+  const deleteDb = hasSupabaseServiceRoleKey() ? createSupabaseAdminClient() : supabase;
+  const { error } = await deleteDb
     .from("client_meta_assets")
     .delete()
     .eq("id", assetRecordId);
-
-  if (error && hasSupabaseServiceRoleKey()) {
-    try {
-      const adminDb = createSupabaseAdminClient();
-      error = (await adminDb
-        .from("client_meta_assets")
-        .delete()
-        .eq("id", assetRecordId)
-      ).error;
-    } catch { /* mantém erro original */ }
-  }
 
   if (error) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });

@@ -11,6 +11,7 @@ export type ResolveSource =
   | "invite_email"
   | "invite_email_pending_claimed"
   | "client_email"
+  | "signup_bootstrap"
   | "not_found";
 
 export interface ResolvedClient {
@@ -74,9 +75,15 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
   };
 
   // ── Auth: usa cookie client apenas para validar sessão ────────
+  // Sprint Legacy Security Hardening V2 (Fase 15/16, PROMPT 04A): mantido
+  // em escopo -- create_client_on_signup exige auth.uid() real (JWT da
+  // sessão), nunca funciona via admin client (service_role não tem
+  // auth.uid()).
   let user: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let sessionClient: any = null;
   try {
-    const sessionClient = await createServerSupabaseClient();
+    sessionClient = await createServerSupabaseClient();
     const { data, error } = await sessionClient.auth.getUser();
     if (error) debug.errors.push(`auth.getUser: ${error.message}`);
     user = data?.user ?? null;
@@ -316,6 +323,46 @@ export async function resolveCurrentClient(): Promise<ResolvedClient | null> {
       }
     } catch (e) {
       debug.errors.push(`client_email(${tryEmail}): ${String(e)}`);
+    }
+  }
+
+  // ── F. Bootstrap idempotente (Fase 15/16, PROMPT 04A) ────────────
+  // Nenhuma das 5 fontes acima encontrou uma Company para este usuário
+  // autenticado. Reutiliza a MESMA RPC canônica e idempotente já usada em
+  // /criar-conta e /onboarding/conclusao (nunca um sistema paralelo de
+  // criação de Company) -- cobre o caso de um usuário legítimo que
+  // confirmou e-mail e autenticou sem nunca passar por
+  // /onboarding/conclusao. create_client_on_signup já é idempotente
+  // (busca por owner_id antes de inserir) e exige auth.uid() = p_user_id,
+  // por isso usa sessionClient (JWT real), nunca o admin client.
+  debug.triedSources.push("signup_bootstrap");
+  if (sessionClient) {
+    try {
+      const nameFallback = (user.user_metadata?.["name"] as string)
+        ?? (user.user_metadata?.["full_name"] as string)
+        ?? (userEmail?.split("@")[0] ?? "Minha Empresa");
+
+      const { data: newId, error: bootstrapErr } = await sessionClient.rpc(
+        "create_client_on_signup",
+        {
+          p_user_id:      userId,
+          p_company_name: nameFallback,
+          p_responsible:  nameFallback,
+          p_email:        user.email ?? null,
+        }
+      );
+
+      if (bootstrapErr) {
+        debug.errors.push(`signup_bootstrap: ${bootstrapErr.message ?? String(bootstrapErr)}`);
+      } else if (newId) {
+        const { data: c } = await db.from("clients").select("*").eq("id", newId).maybeSingle();
+        await upsertProfile(db, userId, user, newId as string, debug);
+        const cl = (c as Record<string, unknown>) ?? null;
+        console.log("[resolve-client] source=signup_bootstrap client:", cl?.company_name ?? newId);
+        return build(userId, user.email, profile, cl, newId as string, "signup_bootstrap", debug);
+      }
+    } catch (e) {
+      debug.errors.push(`signup_bootstrap: ${String(e)}`);
     }
   }
 
