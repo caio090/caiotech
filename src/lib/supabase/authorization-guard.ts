@@ -35,3 +35,30 @@ export async function canAccessClientIndependently(
   if (error) return false;
   return data === true;
 }
+
+/**
+ * Sprint Legacy Security Hardening V2 (Fase 2-4, PROMPT 04E): classificação
+ * explícita de um erro de RPC em exatamente uma categoria -- nunca "qualquer
+ * erro pode virar fallback". `rpc_unavailable` é a ÚNICA categoria que pode
+ * seguir adiante para um fallback técnico; `authorization_denied` e
+ * `unknown_error` são sempre finais (fail closed).
+ */
+export type RpcOutcome = "success" | "authorization_denied" | "rpc_unavailable" | "unknown_error";
+
+export function classifyRpcError(error: SupabaseLikeError): RpcOutcome {
+  if (!error) return "success";
+  if (isAuthorizationDeniedError(error)) return "authorization_denied";
+  if (isRpcUnavailableError(error)) return "rpc_unavailable";
+  return "unknown_error";
+}
+
+/**
+ * Gate único que decide se um fallback privilegiado (service_role) pode
+ * rodar. Exige as DUAS condições ao mesmo tempo (Fase 3): o erro precisa
+ * ser comprovadamente rpc_unavailable E a autorização independente precisa
+ * ter retornado true -- nunca uma sozinha. "service_role disponível" nunca
+ * entra nesta decisão.
+ */
+export function shouldAttemptPrivilegedFallback(error: SupabaseLikeError, independentlyAuthorized: boolean): boolean {
+  return classifyRpcError(error) === "rpc_unavailable" && independentlyAuthorized === true;
+}

@@ -353,11 +353,22 @@ ROLLBACK;
 
 -- ── 17. Data API direta olaclick_connections -- cross-company (P0-B) ──
 -- Cobre SELECT/INSERT/UPDATE/DELETE nas 4 policies novas
--- (olaclick_connections_select/insert/update/delete).
+-- (olaclick_connections_select/insert/update/delete) -- executável de
+-- verdade, não apenas comentário (PROMPT 04E, Fase 20/21).
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
   SELECT COUNT(*) FROM public.olaclick_connections WHERE client_id = '<COMPANY_B_ID>'::uuid;  -- deve ser 0
+ROLLBACK;
+
+-- Fase 20 (PROMPT 04E): INSERT cross-company real, não só SELECT/UPDATE/
+-- DELETE -- admin_A (autorizado só para Company A) tentando criar uma
+-- conexão diretamente via Data API para Company B.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  INSERT INTO public.olaclick_connections (client_id, connection_name, access_token, token_last_four, status)
+  VALUES ('<COMPANY_B_ID>'::uuid, 'forjado-via-data-api', 'fake-token-0000', '0000', 'connected');  -- deve falhar: RLS WITH CHECK nega (olaclick_connections_insert)
 ROLLBACK;
 
 BEGIN;
@@ -382,13 +393,30 @@ BEGIN;
   WHERE client_id = '<COMPANY_A_ID>'::uuid;  -- deve falhar: permission denied (REVOKE ALL)
 ROLLBACK;
 
--- ── 19. v_olaclick_connections_safe -- grants não-SELECT pós-patch ──────
--- Verificação estrutural (read-only, não muta nada): nenhum grantee deve
--- ter INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN.
+-- ── 19. v_olaclick_connections_safe -- ACL pós-patch dos browser roles ──
+-- Verificação estrutural (read-only, não muta nada). PROMPT 04E, Fase 22:
+-- NÃO espera zero linhas globalmente -- service_role e postgres
+-- preservam seu ACL normalmente (o patch nunca os revoga, seção 12).
+-- Filtra explicitamente aos 3 roles que o browser pode assumir: PUBLIC,
+-- anon, authenticated. Para esses três, nenhum privilégio deve restar --
+-- nem SELECT, nem os demais (INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/
+-- TRIGGER). MAINTAIN não faz parte da checagem porque nunca esteve
+-- presente no ACL real auditado (Fase 23) -- não inventar privilégio.
 SELECT grantee, privilege_type
 FROM information_schema.table_privileges
 WHERE table_name = 'v_olaclick_connections_safe'
-  AND privilege_type <> 'SELECT';  -- esperado: 0 linhas (nenhum grant não-SELECT restante)
+  AND grantee IN ('PUBLIC', 'anon', 'authenticated');
+-- esperado: 0 linhas (nenhum privilégio de nenhum tipo para PUBLIC/anon/authenticated)
+
+-- Confirma em separado que service_role/postgres NÃO foram afetados
+-- (positivo, não apenas ausência) -- o patch nunca revoga deles.
+SELECT grantee, privilege_type
+FROM information_schema.table_privileges
+WHERE table_name = 'v_olaclick_connections_safe'
+  AND grantee IN ('service_role', 'postgres')
+ORDER BY grantee, privilege_type;
+-- esperado: 7 linhas por grantee (SELECT/INSERT/UPDATE/DELETE/TRUNCATE/
+-- REFERENCES/TRIGGER), preservadas exatamente como capturado em 28/08/2026.
 
 -- ── 20. Restore cross-company: RPC deny, SEM fallback service-role (P0-C) ──
 -- Nível de aplicação (HTTP), não SQL puro -- testar via:
@@ -431,16 +459,13 @@ ROLLBACK;
 -- ── 25. Signup idempotente: repetição não duplica Company (Fase 16) ────
 -- Chamar duas vezes com o mesmo p_user_id deve retornar o MESMO client_id
 -- (create_client_on_signup já faz lookup por owner_id antes de inserir).
--- FATOS capturados por consulta read-only em 28/08/2026 (sem mutação):
---   clients.owner_id duplicatas (owner_id IS NOT NULL, GROUP BY ... HAVING
---   count(*) > 1): NONE. Unique constraint/index sobre owner_id: NONE --
---   só existe idx_clients_owner (índice comum, não único) e a FK
---   clients_owner_id_fkey → profiles(id). Classificação:
---   IDEMPOTENCY_SEQUENTIAL_ONLY -- sem duplicata hoje, mas sem proteção
---   estrutural contra uma corrida real entre duas conexões simultâneas.
--- NÃO adicionar unique constraint/index nesta correção -- exige validação
--- semântica separada (não presumir cardinalidade 1 owner = 1 client).
--- Este teste cobre o comportamento sequencial, não uma corrida real.
+-- ATUALIZADO (PROMPT 04E): a seção 13 do patch principal agora adiciona
+-- clients_owner_id_unique_idx (unique partial index) com preflight
+-- fail-closed de duplicatas, e create_client_on_signup (seção 5) ganhou
+-- tratamento específico de unique_violation nesse constraint exato --
+-- fecha a janela de corrida que a idempotência sequencial sozinha não
+-- cobria. Este teste sequencial continua válido; os itens 26-27 abaixo
+-- cobrem o estado pós-apply do índice.
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<USER_B_ID>"}';
@@ -457,8 +482,28 @@ BEGIN;
   SELECT (SELECT client_id FROM first_call) = (SELECT client_id FROM second_call) AS idempotent;  -- deve ser true
 ROLLBACK;
 
+-- ── 26. owner_id: unique partial index existe pós-apply (Fase 19) ──────
+-- Verificação estrutural (read-only, não muta nada).
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public' AND tablename = 'clients'
+  AND indexname = 'clients_owner_id_unique_idx';
+-- esperado: 1 linha, indexdef contém "UNIQUE" e "WHERE (owner_id IS NOT NULL)".
+-- idx_clients_owner (comum, não único) deve continuar existindo também --
+-- este patch nunca o remove.
 
--- ── 12. Após aplicar: Advisor deve estar limpo para estes itens ──
+-- ── 27. owner_id: sem duplicatas pós-apply (Fase 19) ────────────────────
+-- Verificação estrutural (read-only, não muta nada) -- reconfirma o que
+-- o preflight do patch já teria abortado se fosse falso.
+SELECT owner_id, COUNT(*) AS cnt
+FROM public.clients
+WHERE owner_id IS NOT NULL
+GROUP BY owner_id
+HAVING COUNT(*) > 1;
+-- esperado: 0 linhas.
+
+
+-- ── 28. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
 --   v_platform_accounts_overview, admin_signups_view,

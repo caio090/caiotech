@@ -243,14 +243,28 @@ GRANT EXECUTE ON FUNCTION public.finance_mark_overdue() TO service_role;
 -- tempo, nenhum "UUID difícil de adivinhar" -- nenhuma prova de posse
 -- client-provided é aceita como autorização.
 --
--- Observação para o produto (fora do escopo desta correção de
--- segurança -- não é uma mudança de arquitetura, é uma nota para
--- decisão futura): se um usuário confirma o e-mail e faz login sem
--- nunca revisitar /onboarding/conclusao, o client não será criado
--- automaticamente por este caminho. Isso já seria verdade mesmo com a
--- janela temporal da V1 rejeitada (que só cobria os primeiros minutos
--- pós-cadastro). Resolver isso é uma decisão de fluxo de login/roteamento
--- de onboarding, não uma correção de segurança -- não tocado aqui.
+-- ATUALIZADO (PROMPT 04A/Fase 15): o gap descrito acima nesta observação
+-- foi fechado no nível de aplicação, reutilizando esta MESMA RPC -- não
+-- fica mais pendente. src/lib/client/resolve-client.ts →
+-- resolveCurrentClient() ganhou uma fonte adicional "signup_bootstrap":
+-- se as 5 fontes normais (profiles.client_id, client_user_access,
+-- convites, client_email) não encontrarem nenhuma Company para o usuário
+-- autenticado, ela chama create_client_on_signup(auth.uid(), ...) usando
+-- o client de sessão -- cobre exatamente o caso de um usuário que
+-- confirma o e-mail e autentica sem nunca revisitar
+-- /onboarding/conclusao. Continua sem nenhum caminho anônimo: só roda
+-- quando resolveCurrentClient() já confirmou uma sessão real via
+-- auth.getUser().
+-- Fase 15 (PROMPT 04E): mesmo com o lookup-then-insert abaixo, uma corrida
+-- genuína entre duas requisições simultâneas (ambas veem "não existe"
+-- antes de qualquer uma inserir) ainda podia criar duas linhas. Com o
+-- unique index da seção 13 (clients_owner_id_unique_idx), a segunda
+-- tentativa levanta unique_violation em vez de duplicar -- a função
+-- captura ESPECIFICAMENTE esse constraint pelo nome (nunca qualquer
+-- unique_violation genérico de outro constraint) e reage relendo e
+-- retornando o client que a outra transação já criou -- idempotente,
+-- nunca um erro destrutivo para um caller legítimo que só perdeu a
+-- corrida por milissegundos.
 CREATE OR REPLACE FUNCTION public.create_client_on_signup(
   p_user_id        uuid,
   p_company_name   text,
@@ -264,6 +278,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_client_id uuid;
+  v_constraint text;
 BEGIN
   IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN
     RAISE EXCEPTION 'unauthorized: caller must be authenticated as the target user' USING ERRCODE = 'P0002';
@@ -277,9 +292,18 @@ BEGIN
     RETURN v_client_id;
   END IF;
 
-  INSERT INTO public.clients (owner_id, company_name, responsible_name, email, status)
-  VALUES (p_user_id, p_company_name, p_responsible, p_email, 'onboarding')
-  RETURNING id INTO v_client_id;
+  BEGIN
+    INSERT INTO public.clients (owner_id, company_name, responsible_name, email, status)
+    VALUES (p_user_id, p_company_name, p_responsible, p_email, 'onboarding')
+    RETURNING id INTO v_client_id;
+  EXCEPTION WHEN unique_violation THEN
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+    IF v_constraint = 'clients_owner_id_unique_idx' THEN
+      SELECT id INTO v_client_id FROM public.clients WHERE owner_id = p_user_id;
+      RETURN v_client_id;
+    END IF;
+    RAISE;
+  END;
 
   RETURN v_client_id;
 END;
@@ -1145,6 +1169,51 @@ CREATE POLICY "olaclick_connections_delete"
 REVOKE ALL ON public.v_olaclick_connections_safe FROM PUBLIC;
 REVOKE ALL ON public.v_olaclick_connections_safe FROM anon;
 REVOKE ALL ON public.v_olaclick_connections_safe FROM authenticated;
+
+
+-- ============================================================
+-- 13. clients.owner_id — unique partial index (PROMPT 04E)
+-- ============================================================
+-- Contrato de negócio confirmado por auditoria live (CODEX WEB,
+-- 28/08/2026): ONE_OWNER_ONE_CLIENT -- create_client_on_signup (seção 5)
+-- já faz lookup por owner_id antes de inserir, os call sites reais usam
+-- maybeSingle() sobre owner_id, e relações multi-Company de agência
+-- passam por agency_workspaces/agency_clients, nunca por múltiplos
+-- clients com o mesmo owner_id. Esta seção formaliza estruturalmente o
+-- que já era o comportamento esperado -- fecha a janela de corrida que a
+-- idempotência apenas sequencial (lookup → insert) não cobria.
+--
+-- Preflight fail-closed (Fase 14): NÃO cria o índice silenciosamente se
+-- já existirem duplicatas -- aborta a transação inteira desta migration
+-- com uma mensagem clara, sem apagar/escolher nenhum registro
+-- automaticamente. Captura live em 28/08/2026 já confirmou 0 duplicatas
+-- (ver docs/supabase/legacy-security-hardening-live-test-plan.sql,
+-- seção de owner_id), mas o preflight roda de novo aqui porque o estado
+-- pode ter mudado entre a captura e o apply real.
+DO $$
+DECLARE
+  v_dup_count integer;
+BEGIN
+  SELECT COUNT(*) INTO v_dup_count
+  FROM (
+    SELECT owner_id
+    FROM public.clients
+    WHERE owner_id IS NOT NULL
+    GROUP BY owner_id
+    HAVING COUNT(*) > 1
+  ) dupes;
+
+  IF v_dup_count > 0 THEN
+    RAISE EXCEPTION 'ABORT: % owner_id(s) duplicado(s) em public.clients -- contrato ONE_OWNER_ONE_CLIENT violado. Resolva manualmente (nunca automaticamente) antes de reaplicar este hardening.', v_dup_count;
+  END IF;
+END $$;
+
+-- Nome escolhido para nunca colidir com idx_clients_owner (índice comum
+-- já existente hoje, não único -- preservado, nunca removido por este
+-- patch nem pelo rollback).
+CREATE UNIQUE INDEX IF NOT EXISTS clients_owner_id_unique_idx
+  ON public.clients (owner_id)
+  WHERE owner_id IS NOT NULL;
 
 
 COMMIT;

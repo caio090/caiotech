@@ -5,7 +5,7 @@ import {
   hasSupabaseServiceRoleKey,
 } from "@/lib/supabase/server";
 import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
-import { isAuthorizationDeniedError, canAccessClientIndependently } from "@/lib/supabase/authorization-guard";
+import { classifyRpcError, canAccessClientIndependently, shouldAttemptPrivilegedFallback } from "@/lib/supabase/authorization-guard";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -40,16 +40,22 @@ export const POST = withMutationProtection(async function POST(_req: NextRequest
     if (!rpcResult.error) {
       return NextResponse.json({ restored: true });
     }
-    if (isAuthorizationDeniedError(rpcResult.error)) {
+    const outcome = classifyRpcError(rpcResult.error);
+    if (outcome === "authorization_denied") {
       // Uma negação de autorização da RPC é FINAL -- nunca dispara fallback privilegiado.
       return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
     }
+    if (outcome === "unknown_error") {
+      // Erro técnico não classificado -- fail closed, nenhum fallback.
+      return NextResponse.json({ error: "forbidden", code: "UNKNOWN_DB_ERROR" }, { status: 400 });
+    }
 
-    // A RPC falhou por motivo técnico (não autorização) -- só agora um
-    // fallback privilegiado pode ser considerado, e só depois de revalidar
-    // autorização de forma independente (service_role disponível nunca
-    // significa autorização concedida).
-    if (!(await canAccessClientIndependently(supabase, clientId))) {
+    // outcome === "rpc_unavailable" (nunca negação nem erro desconhecido)
+    // -- só agora um fallback privilegiado pode ser considerado, e só
+    // depois de revalidar autorização de forma independente (service_role
+    // disponível nunca significa autorização concedida).
+    const independentlyAuthorized = await canAccessClientIndependently(supabase, clientId);
+    if (!shouldAttemptPrivilegedFallback(rpcResult.error, independentlyAuthorized)) {
       return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
     }
 

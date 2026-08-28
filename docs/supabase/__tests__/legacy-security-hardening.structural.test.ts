@@ -341,9 +341,12 @@ console.log("[test] 20 — PROMPT 04A/P0-C: authorization denial de RPC é FINAL
   assert(/canAccessClientIndependently/.test(authGuard), "helper canAccessClientIndependently existe -- revalidação independente antes de qualquer fallback service_role");
 
   for (const [name, route] of [["archive/delete route", archiveRoute], ["restore route", restoreRoute]] as const) {
-    assert(/isAuthorizationDeniedError/.test(route), `${name}: importa/usa isAuthorizationDeniedError`);
+    // PROMPT 04E: refatorado para usar classifyRpcError/shouldAttemptPrivilegedFallback
+    // (gate único, ver teste 31) em vez de isAuthorizationDeniedError direto --
+    // a classificação de negação continua acontecendo, só que via helper composto.
+    assert(/classifyRpcError\(/.test(route), `${name}: classifica o erro da RPC explicitamente (authorization_denied é uma das categorias)`);
     assert(/canAccessClientIndependently/.test(route), `${name}: revalida autorização independentemente antes do fallback service_role (Fase 9-11)`);
-    const authIdx = route.indexOf("isAuthorizationDeniedError(");
+    const authIdx = route.indexOf('=== "authorization_denied"');
     const fallbackIdx = Math.max(route.lastIndexOf("createSupabaseAdminClient()"), route.lastIndexOf("createRequiredSupabaseAdminClient()"));
     assert(authIdx > -1 && fallbackIdx > -1 && authIdx < fallbackIdx, `${name}: checagem de authorization denial vem ANTES do client admin/service_role no código`);
   }
@@ -427,6 +430,71 @@ console.log("[test] 26 — PROMPT 04A/Fase 18-19: live-test-plan cobre os novos 
   const rollbackCount = (liveTestPlan.match(/\bROLLBACK;/g) ?? []).length;
   assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; tem um ROLLBACK; correspondente (${beginCount} pares) -- nenhum COMMIT; em todo o arquivo`);
   assert(!/\bCOMMIT;/.test(liveTestPlan), "live-test-plan nunca usa COMMIT -- nenhuma mutação de teste persiste de verdade");
+}
+
+console.log("[test] 28 — PROMPT 04E/Fase 12-14: unique partial index em clients.owner_id com preflight fail-closed");
+{
+  assert(sql.includes("CREATE UNIQUE INDEX IF NOT EXISTS clients_owner_id_unique_idx"), "patch cria clients_owner_id_unique_idx");
+  assert(/CREATE UNIQUE INDEX IF NOT EXISTS clients_owner_id_unique_idx\s*\n\s*ON public\.clients \(owner_id\)\s*\n\s*WHERE owner_id IS NOT NULL;/.test(sql), "índice é parcial (WHERE owner_id IS NOT NULL) -- nunca exige unicidade para NULL");
+  assert(sql.includes("idx_clients_owner") && !sql.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_owner"), "nome escolhido (clients_owner_id_unique_idx) é distinto de idx_clients_owner -- documentado no patch, nunca reutiliza o nome do índice comum existente");
+  const preflightBlock = sql.slice(sql.indexOf("DO $$"), sql.indexOf("CREATE UNIQUE INDEX IF NOT EXISTS clients_owner_id_unique_idx"));
+  assert(preflightBlock.includes("HAVING COUNT(*) > 1"), "preflight verifica duplicatas antes de criar o índice");
+  assert(/RAISE EXCEPTION 'ABORT:/.test(preflightBlock), "preflight aborta com RAISE EXCEPTION explícito -- nunca cria o índice silenciosamente sobre duplicatas");
+  assert(!/DELETE FROM public\.clients/.test(preflightBlock) && !/UPDATE public\.clients/.test(preflightBlock), "preflight nunca corrige/apaga dados automaticamente -- só aborta");
+}
+
+console.log("[test] 29 — PROMPT 04E/Fase 15: create_client_on_signup trata unique_violation específico do novo índice");
+{
+  const fnBody = sql.slice(sql.indexOf("Fase 15 (PROMPT 04E)"), sql.indexOf("REVOKE ALL ON FUNCTION public.create_client_on_signup"));
+  assert(/EXCEPTION WHEN unique_violation THEN/.test(fnBody), "função captura unique_violation explicitamente");
+  assert(/GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;/.test(fnBody), "identifica o constraint pelo nome via GET STACKED DIAGNOSTICS -- nunca captura genericamente");
+  assert(/IF v_constraint = 'clients_owner_id_unique_idx' THEN/.test(fnBody), "só trata como sucesso idempotente o constraint exato criado nesta correção");
+  assert(/\bRAISE;\s*\n\s*END IF;|RAISE;\n\s*END;/.test(fnBody) || /RAISE;/.test(fnBody), "re-propaga (RAISE) qualquer outro unique_violation não relacionado -- nunca engole silenciosamente");
+  assert(/auth\.uid\(\) IS NULL OR auth\.uid\(\) <> p_user_id/.test(fnBody), "contrato de identidade (auth.uid() = p_user_id) preservado -- corrida não reabre caminho anônimo");
+}
+
+console.log("[test] 30 — PROMPT 04E/Fase 17-18: rollback remove só o índice novo, preserva idx_clients_owner");
+{
+  assert(rollback.includes("DROP INDEX IF EXISTS public.clients_owner_id_unique_idx;"), "rollback remove clients_owner_id_unique_idx");
+  assert(!rollback.includes("DROP INDEX IF EXISTS public.idx_clients_owner") && !rollback.includes("DROP INDEX IF EXISTS idx_clients_owner"), "rollback NUNCA remove idx_clients_owner (índice comum pré-existente, não criado por este hardening)");
+  const idx13 = rollback.indexOf("-- 13. clients.owner_id");
+  const idx12 = rollback.indexOf("-- 12. v_olaclick_connections_safe");
+  assert(idx13 > -1 && idx12 > -1 && idx13 < idx12, "seção 13 (índice) é desfeita ANTES da seção 12 -- ordem reversa correta em relação ao patch");
+}
+
+console.log("[test] 31 — PROMPT 04E/Fase 1-4: rotas archive/restore usam o gate único shouldAttemptPrivilegedFallback + classifyRpcError");
+{
+  for (const [name, route] of [["archive/delete route", archiveRoute], ["restore route", restoreRoute]] as const) {
+    assert(/classifyRpcError/.test(route), `${name}: usa classifyRpcError -- classificação explícita, nunca "qualquer erro vira fallback"`);
+    assert(/shouldAttemptPrivilegedFallback/.test(route), `${name}: usa o gate único shouldAttemptPrivilegedFallback antes do fallback final`);
+    assert(/"unknown_error"/.test(route), `${name}: trata unknown_error como caminho fail-closed explícito (não apenas authorization_denied)`);
+  }
+}
+
+console.log("[test] 32 — PROMPT 04E/Fase 20-23: live-test-plan tem INSERT real do OlaClick e ACL da view filtrada por role");
+{
+  assert(/INSERT INTO public\.olaclick_connections/.test(liveTestPlan), "existe um INSERT executável real contra olaclick_connections (não só comentário)");
+  const insertBlock = liveTestPlan.slice(liveTestPlan.indexOf("INSERT INTO public.olaclick_connections"), liveTestPlan.indexOf("INSERT INTO public.olaclick_connections") + 400);
+  assert(insertBlock.includes("<COMPANY_B_ID>"), "INSERT usa fixture cross-company (Company B) sob sessão autorizada só para Company A");
+  assert(liveTestPlan.includes("grantee IN ('PUBLIC', 'anon', 'authenticated')"), "query de ACL da view filtra explicitamente aos browser roles, não espera zero linhas globalmente");
+  assert(liveTestPlan.includes("grantee IN ('service_role', 'postgres')"), "existe verificação positiva de que service_role/postgres preservam o ACL (não só ausência para browser roles)");
+  const section19 = liveTestPlan.slice(liveTestPlan.indexOf("── 19."), liveTestPlan.indexOf("── 20."));
+  const section19Queries = section19.match(/SELECT grantee, privilege_type[\s\S]*?;/g) ?? [];
+  assert(section19Queries.length > 0 && section19Queries.every((q) => !/MAINTAIN/.test(q)), "as queries SQL da seção 19 não filtram/mencionam MAINTAIN -- nunca esteve presente no ACL real auditado (comentário explicativo à parte pode citar o nome)");
+}
+
+console.log("[test] 33 — PROMPT 04E/Fase 19: live-test-plan verifica índice único e ausência de duplicatas pós-apply");
+{
+  assert(liveTestPlan.includes("clients_owner_id_unique_idx"), "live-test-plan confirma existência do índice pós-apply");
+  assert(/GROUP BY owner_id\s*\n\s*HAVING COUNT\(\*\) > 1/.test(liveTestPlan), "live-test-plan reconfirma ausência de duplicatas pós-apply");
+}
+
+console.log("[test] 34 — PROMPT 04E/Fase 24-25: numeração do live-test-plan e comentários de bootstrap atualizados");
+{
+  assert(liveTestPlan.includes("── 28. Após aplicar"), "seção final do Advisor renumerada para seguir a sequência (28), não mais 'volta' para 12");
+  assert(!/── 12\. Após aplicar/.test(liveTestPlan), "não existe mais uma seção '12' duplicada/fora de ordem no fim do arquivo");
+  assert(sql.includes("signup_bootstrap") || sql.includes("resolveCurrentClient()"), "comentário do patch sobre create_client_on_signup já reflete o bootstrap de resolveCurrentClient() (Fase 25) -- não afirma mais que o gap fica sem cobertura");
+  assert(!/não é uma correção de segurança -- não tocado aqui\./.test(sql.slice(sql.indexOf("-- 5. create_client_on_signup"), sql.indexOf("-- 6. Meta/OlaClick RPCs"))), "afirmação obsoleta removida do comentário da seção 5 -- o gap descrito ali já foi fechado");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

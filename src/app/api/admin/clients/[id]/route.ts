@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createSupabaseAdminClient, hasSupabaseServiceRoleKey } from "@/lib/supabase/server";
 import { CLIENT_VISIBLE_STATUSES, isMissingClientVisibilityColumn } from "@/lib/client-visibility";
 import { withMutationProtection } from "@/lib/workspaces/assert-not-preview";
-import { isAuthorizationDeniedError, canAccessClientIndependently } from "@/lib/supabase/authorization-guard";
+import { classifyRpcError, canAccessClientIndependently, shouldAttemptPrivilegedFallback } from "@/lib/supabase/authorization-guard";
 
 const CLIENT_MANAGER_ROLES = new Set(["admin", "super_admin", "agency"]);
 const CLIENT_DELETE_ROLES = new Set(["admin", "super_admin"]);
@@ -173,24 +173,45 @@ export const DELETE = withMutationProtection(async function DELETE(
     if (!archiveResult.error) {
       return NextResponse.json({ ok: true, mode: "archive", affected: archiveResult.data ?? 0 });
     }
-    if (isAuthorizationDeniedError(archiveResult.error)) {
+    const archiveOutcome = classifyRpcError(archiveResult.error);
+    if (archiveOutcome === "authorization_denied") {
       // Uma negação de autorização da RPC é FINAL -- nunca dispara fallback privilegiado.
       return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
     }
+    if (archiveOutcome === "unknown_error") {
+      // Erro técnico não classificado -- fail closed. Nenhum fallback é
+      // tentado para um erro desconhecido (só rpc_unavailable segue adiante).
+      console.error("[api/admin/clients DELETE] erro desconhecido na RPC de archive", {
+        clientId: id, supabaseError: safeDbError(archiveResult.error),
+      });
+      return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, code: "UNKNOWN_DB_ERROR", technical: safeDbError(archiveResult.error) }, { status: 400 });
+    }
 
+    // archiveOutcome === "rpc_unavailable" -- a segunda RPC ainda respeita
+    // RLS/ownership (não é um bypass), então é uma tentativa legítima.
     const rpcResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
     if (!rpcResult.error) {
       return NextResponse.json({ ok: true, mode: "archive" });
     }
-    if (isAuthorizationDeniedError(rpcResult.error)) {
+    const deleteOutcome = classifyRpcError(rpcResult.error);
+    if (deleteOutcome === "authorization_denied") {
       return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
     }
+    if (deleteOutcome === "unknown_error") {
+      console.error("[api/admin/clients DELETE] erro desconhecido na RPC de delete", {
+        clientId: id, supabaseError: safeDbError(rpcResult.error),
+      });
+      return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, code: "UNKNOWN_DB_ERROR", technical: safeDbError(rpcResult.error) }, { status: 400 });
+    }
 
-    // As duas RPCs falharam por motivo técnico (não autorização) -- só
-    // agora um fallback privilegiado pode ser considerado, e só depois de
-    // revalidar autorização de forma independente (service_role disponível
-    // nunca significa autorização concedida).
-    if (!(await canAccessClientIndependently(supabase, id))) {
+    // As duas RPCs estão confirmadamente indisponíveis (rpc_unavailable,
+    // nunca negação nem erro desconhecido) -- só agora um fallback
+    // privilegiado pode ser considerado, e só depois de revalidar
+    // autorização de forma independente (service_role disponível nunca
+    // significa autorização concedida). shouldAttemptPrivilegedFallback
+    // exige as DUAS condições ao mesmo tempo.
+    const independentlyAuthorized = await canAccessClientIndependently(supabase, id);
+    if (!shouldAttemptPrivilegedFallback(rpcResult.error, independentlyAuthorized)) {
       return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
     }
 

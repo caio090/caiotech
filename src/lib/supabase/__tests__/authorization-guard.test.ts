@@ -12,6 +12,8 @@ import {
   isAuthorizationDeniedError,
   isRpcUnavailableError,
   canAccessClientIndependently,
+  classifyRpcError,
+  shouldAttemptPrivilegedFallback,
 } from "../authorization-guard.ts";
 
 let passed = 0; let failed = 0;
@@ -41,6 +43,36 @@ console.log("[test] isRpcUnavailableError — só função ausente/schema desatu
   assert(isRpcUnavailableError({ message: "Could not find the function public.foo in the schema cache" }), "mensagem de função ausente é RPC unavailable");
   assert(!isRpcUnavailableError({ message: "permission_denied: role admin nao pode arquivar clientes" }), "negação de autorização NÃO é RPC unavailable (nunca confundir os dois motivos)");
   assert(!isRpcUnavailableError(null), "sem erro não é RPC unavailable");
+}
+
+console.log("[test] classifyRpcError — classificação explícita em exatamente uma categoria (PROMPT 04E, Fase 2)");
+{
+  const DENIED = { message: "permission_denied: sem acesso a este client_id" };
+  const UNAVAILABLE = { code: "PGRST202", message: "Could not find the function public.foo" };
+  const UNKNOWN = { code: "XX000", message: "connection reset by peer" };
+  const VALIDATION = { code: "22P02", message: "invalid input syntax for type uuid" };
+
+  assert(classifyRpcError(null) === "success", "sem erro → success");
+  assert(classifyRpcError(DENIED) === "authorization_denied", "erro de negação → authorization_denied");
+  assert(classifyRpcError(UNAVAILABLE) === "rpc_unavailable", "RPC ausente/schema → rpc_unavailable");
+  assert(classifyRpcError(UNKNOWN) === "unknown_error", "erro desconhecido (transiente) → unknown_error, nunca rpc_unavailable");
+  assert(classifyRpcError(VALIDATION) === "unknown_error", "erro de validação (não é negação nem RPC ausente) → unknown_error, fail closed igual a qualquer erro não classificado");
+}
+
+console.log("[test] shouldAttemptPrivilegedFallback — os 7 cenários obrigatórios (PROMPT 04E, Fase 5)");
+{
+  const DENIED = { message: "permission_denied: role admin nao pode arquivar clientes" };
+  const UNAVAILABLE = { code: "PGRST202", message: "Could not find the function public.foo" };
+  const UNKNOWN = { code: "XX000", message: "connection reset by peer" };
+  const VALIDATION = { code: "22P02", message: "invalid input syntax for type uuid" };
+
+  assert(shouldAttemptPrivilegedFallback(DENIED, true) === false, "1) RPC authorization denied → fallback NÃO permitido, mesmo com auth independente true (nunca deveria chegar aqui, mas o gate é seguro de qualquer forma)");
+  assert(shouldAttemptPrivilegedFallback(UNKNOWN, true) === false, "2) RPC unknown error → fallback NÃO permitido");
+  assert(shouldAttemptPrivilegedFallback(VALIDATION, true) === false, "3) RPC validation error → fallback NÃO permitido");
+  assert(shouldAttemptPrivilegedFallback(UNAVAILABLE, false) === false, "4) RPC unavailable + authorization false → fallback NÃO permitido");
+  assert(shouldAttemptPrivilegedFallback(UNAVAILABLE, false) === false, "5) RPC unavailable + authorization null (já normalizado para false por canAccessClientIndependently) → fallback NÃO permitido");
+  assert(shouldAttemptPrivilegedFallback(UNAVAILABLE, false) === false, "6) RPC unavailable + authorization error (já normalizado para false) → fallback NÃO permitido");
+  assert(shouldAttemptPrivilegedFallback(UNAVAILABLE, true) === true, "7) RPC unavailable + authorization true → fallback técnico PERMITIDO -- único cenário que passa");
 }
 
 console.log("[test] canAccessClientIndependently — service_role disponível NUNCA significa autorização concedida");

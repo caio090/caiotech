@@ -43,6 +43,16 @@
 
 BEGIN;
 
+-- 13. clients.owner_id unique partial index → remove exatamente o que o
+--     hardening adicionou. Estado pré-patch não tinha nenhum unique
+--     constraint/index sobre owner_id (confirmado por captura live em
+--     28/08/2026) -- só o índice comum idx_clients_owner, que este
+--     rollback NUNCA remove (não foi criado por este hardening).
+--     ⚠ reabre a janela de corrida: create_client_on_signup volta a ter
+--     apenas idempotência sequencial (lookup → insert), sem proteção
+--     estrutural contra duas requisições verdadeiramente simultâneas.
+DROP INDEX IF EXISTS public.clients_owner_id_unique_idx;
+
 -- 12. v_olaclick_connections_safe (mutating grants) → estado anterior
 --     ACL pré-patch capturado por consulta read-only em 28/08/2026
 --     (information_schema.table_privileges, sem mutação): anon e
