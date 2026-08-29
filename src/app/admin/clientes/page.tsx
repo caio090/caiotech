@@ -657,7 +657,7 @@ function EditModal({
     email:            client.email            ?? "",
     phone:            client.phone            ?? "",
     segment:          client.segment          ?? "",
-    status:           client.status           ?? "active",
+    status:           client.status           ?? "ativo",
   });
 
   return (
@@ -694,7 +694,7 @@ function EditModal({
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-indigo-400"
             >
               <option value="onboarding">Onboarding — em implantação</option>
-              <option value="active">Ativo — operacional</option>
+              <option value="ativo">Ativo — operacional</option>
               <option value="pausado">Pausado</option>
               <option value="inadimplente">Inadimplente</option>
               <option value="encerrado">Encerrado</option>

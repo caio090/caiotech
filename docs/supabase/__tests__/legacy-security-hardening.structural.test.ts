@@ -26,6 +26,8 @@ const billingPage = fs.readFileSync(path.join(root, "src/app/admin/super/billing
 const mrrRoute = fs.readFileSync(path.join(root, "src/app/api/admin/billing/mrr-summary/route.ts"), "utf8");
 const liveTestPlan = fs.readFileSync(path.join(root, "docs/supabase/legacy-security-hardening-live-test-plan.sql"), "utf8");
 const authGuard = fs.readFileSync(path.join(root, "src/lib/supabase/authorization-guard.ts"), "utf8");
+const runtimeRepair = fs.readFileSync(path.join(root, "docs/supabase/post-hardening-runtime-repair.sql"), "utf8");
+const runtimeRepairRollback = fs.readFileSync(path.join(root, "docs/supabase/post-hardening-runtime-repair-rollback.sql"), "utf8");
 const archiveRoute = fs.readFileSync(path.join(root, "src/app/api/admin/clients/[id]/route.ts"), "utf8");
 const restoreRoute = fs.readFileSync(path.join(root, "src/app/api/admin/clients/[id]/restore/route.ts"), "utf8");
 const resolveClient = fs.readFileSync(path.join(root, "src/lib/client/resolve-client.ts"), "utf8");
@@ -512,16 +514,58 @@ console.log("[test] 35 — PROMPT 05D/Blocker 1: clients.status usa exclusivamen
 
   for (const [name, body] of [["admin_archive_client", archiveSingleBody], ["admin_archive_clients", archiveBulkBody], ["admin_delete_client", deleteBody]] as const) {
     assert(body.length > 0, `${name}: definição encontrada`);
-    assert(/status\s*=\s*'encerrado'/.test(body), `${name}: usa status = 'encerrado' (único valor canônico válido para arquivado/deletado)`);
     assert(!/status\s*=\s*'archived'/.test(body) && !/status\s*=\s*'inactive'/.test(body), `${name}: não usa mais 'archived'/'inactive' -- nunca foram valores aceitos por clients_status_check`);
   }
   assert(!/EXCEPTION WHEN check_violation/.test(deleteBody), "admin_delete_client: cascata de tentativas (archived→inactive→pausado) removida -- atribuição direta e correta no lugar");
 
-  assert(/IF p_status NOT IN \('onboarding', 'aguardando_validacao'\) THEN/.test(createBody), "admin_create_client: aceita exatamente os 2 status de criação válidos do produto (onboarding, aguardando_validacao)");
-  assert(!/NOT IN \('active', 'onboarding'\)/.test(createBody), "admin_create_client: não usa mais 'active' (nunca foi valor válido)");
+  assert(/IF p_status NOT IN \('onboarding', 'aguardando_validacao', 'ativo'\) THEN/.test(createBody), "admin_create_client (Regra 5, PROMPT 05G): aceita exatamente os 3 status de criação válidos (onboarding, aguardando_validacao, ativo)");
+  assert(!/NOT IN \('active', 'onboarding'\)/.test(createBody) && !/NOT IN \('onboarding', 'aguardando_validacao'\) THEN/.test(createBody), "admin_create_client: não usa mais 'active', nem a versão anterior de 2 valores (05D) sem 'ativo'");
 
   assert(/c\.status IN \('ativo', 'onboarding'\)/.test(olaclickUpsertBody), "admin_upsert_olaclick_connection: valida clients.status com 'ativo' (canônico), não 'active'");
   assert(!/c\.status IN \('active', 'onboarding'\)/.test(olaclickUpsertBody), "admin_upsert_olaclick_connection: não usa mais 'active' para clients.status");
+}
+
+console.log("[test] 40 — PROMPT 05G, Regra 1/2/3: archive/restore/delete têm semânticas distintas (business lifecycle vs. administrative visibility)");
+{
+  const archiveSingleBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const archiveBulkBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_clients\(p_client_ids uuid\[\]\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const restoreBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_restore_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const deleteBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_delete_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+
+  for (const [name, body] of [["admin_archive_client", archiveSingleBody], ["admin_archive_clients", archiveBulkBody]] as const) {
+    assert(body.length > 0, `${name}: definição encontrada`);
+    assert(!/status\s*=/.test(body), `${name} (Regra 1): NUNCA escreve em status -- preserva o que já estava`);
+    assert(/archived_at\s*=\s*now\(\)/.test(body), `${name}: grava archived_at = now()`);
+    assert(/deleted_at\s*=\s*NULL/.test(body), `${name}: grava deleted_at = NULL -- archive nunca marca como deletado`);
+  }
+
+  assert(restoreBody.length > 0, "admin_restore_client: definição encontrada");
+  assert(/SELECT \(deleted_at IS NOT NULL\) INTO v_was_deleted/.test(restoreBody), "admin_restore_client (Regra 2): consulta deleted_at ANTES de decidir o status -- não assume um único caminho");
+  assert(/IF v_was_deleted THEN\s*\n\s*UPDATE public\.clients\s*\n\s*SET status = 'onboarding'/.test(restoreBody), "admin_restore_client (Regra 2B): se veio da lixeira (deleted_at preenchido), status vira 'onboarding' de forma conservadora");
+  assert(/ELSE\s*\n\s*UPDATE public\.clients\s*\n\s*SET archived_at = NULL, deleted_at = NULL\s*\n\s*WHERE/.test(restoreBody), "admin_restore_client (Regra 2A): se só estava arquivada, o branch ELSE não toca status -- preserva o valor atual");
+  assert(!/previous_status/.test(restoreBody), "admin_restore_client: não introduz previous_status -- fora de escopo desta correção (nunca tenta adivinhar o status anterior)");
+
+  assert(/status\s*=\s*'encerrado'/.test(deleteBody), "admin_delete_client (Regra 3): continua usando status='encerrado' -- ação TERMINAL, única função que grava esse valor agora");
+  assert(/deleted_at\s*=\s*v_deleted_at/.test(deleteBody) && /archived_at\s*=\s*v_deleted_at/.test(deleteBody), "admin_delete_client: grava archived_at E deleted_at (ambos preenchidos) -- distinto de archive (Regra 1), que nunca preenche deleted_at");
+}
+
+console.log("[test] 41 — PROMPT 05G, Regra 4: fallback HTTP tem exatamente a mesma semântica das RPCs");
+{
+  assert(!/status: "archived"/.test(archiveRoute) && !/status: "inactive"/.test(archiveRoute) && !/status: "pausado"/.test(archiveRoute), "[id]/route.ts: cascata archived/inactive/pausado removida do fallback bruto");
+  assert(!/\.rpc\("admin_delete_client"/.test(archiveRoute), "[id]/route.ts: não CHAMA mais admin_delete_client como alternativa para um archive que falhou -- semânticas divergentes agora (Regra 4)");
+  assert(/archived_at: new Date\(\)\.toISOString\(\), deleted_at: null/.test(archiveRoute), "[id]/route.ts: fallback de archive grava archived_at=now()/deleted_at=null, nunca toca status -- mesmo contrato da RPC");
+
+  assert(!/status: "onboarding", archived_at: null, deleted_at: null/.test(restoreRoute) || /wasDeleted/.test(restoreRoute), "restore/route.ts: fallback não grava 'onboarding' incondicionalmente -- consulta deleted_at antes");
+  assert(/wasDeleted/.test(restoreRoute), "restore/route.ts: fallback verifica deleted_at antes de decidir o status (mesmo contrato de Regra 2 da RPC)");
+  assert(/select\("deleted_at"\)/.test(restoreRoute), "restore/route.ts: faz lookup de deleted_at antes do UPDATE -- não assume estado");
+}
+
+console.log("[test] 42 — PROMPT 05G, Regra 5: caller real corrigido para enviar 'ativo' diretamente, sem tradução silenciosa permanente");
+{
+  assert(!/if \(update\.status === "active"\) update\.status = "ativo";/.test(archiveRoute), "[id]/route.ts PATCH: tradução silenciosa active→ativo removida");
+  const clientesPage = fs.readFileSync(path.join(root, "src/app/admin/clientes/page.tsx"), "utf8");
+  assert(clientesPage.includes('<option value="ativo">Ativo'), "src/app/admin/clientes/page.tsx: <select> de status envia 'ativo' diretamente na origem, não 'active'");
+  assert(!clientesPage.includes('<option value="active">'), "clientes/page.tsx: opção 'active' removida do <select>");
 }
 
 console.log("[test] 36 — PROMPT 05D/Blocker 2-3: ON CONFLICT ambíguo corrigido (RETURNS TABLE colide com conflict target)");
@@ -576,7 +620,7 @@ console.log("[test] 38 — PROMPT 05D: nenhuma correção reabre fallback role-o
 console.log("[test] 39 — PROMPT 05D: live-test-plan cobre os 8 novos casos de runtime (status + ON CONFLICT), transacional");
 {
   const newCases = [
-    "clients_status_check", "status = 'encerrado'", "nunca SQLSTATE 42702", "sem_duplicata",
+    "status_preservado", "status = 'encerrado'", "nunca SQLSTATE 42702", "sem_duplicata",
   ];
   for (const c of newCases) {
     assert(liveTestPlan.includes(c), `live-test-plan cobre um caso referenciando "${c}"`);
@@ -585,6 +629,40 @@ console.log("[test] 39 — PROMPT 05D: live-test-plan cobre os 8 novos casos de 
   const rollbackCount = (liveTestPlan.match(/\bROLLBACK;/g) ?? []).length;
   assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; ainda tem ROLLBACK; correspondente (${beginCount} pares) após as adições do PROMPT 05D`);
   assert(!/\bCOMMIT;/.test(liveTestPlan), "live-test-plan ainda nunca usa COMMIT");
+}
+
+console.log("[test] 43 — PROMPT 05G: fresh install (patch) e live repair contêm a mesma correção final, escopo mínimo respeitado");
+{
+  assert(runtimeRepair.includes("BEGIN;") && runtimeRepair.includes("COMMIT;"), "runtime repair: envolvido em transação única");
+  assert(runtimeRepairRollback.includes("BEGIN;") && runtimeRepairRollback.includes("COMMIT;"), "runtime repair rollback: envolvido em transação única");
+
+  const expectedFns = [
+    "admin_archive_client", "admin_archive_clients", "admin_restore_client",
+    "admin_delete_client", "admin_create_client", "admin_link_meta_asset",
+    "admin_upsert_olaclick_connection",
+  ];
+  for (const fn of expectedFns) {
+    assert(runtimeRepair.includes(`CREATE OR REPLACE FUNCTION public.${fn}(`), `runtime repair: inclui ${fn}`);
+  }
+
+  const forbidden = [
+    /CREATE POLICY/, /DROP POLICY/, /ALTER VIEW/, /CREATE VIEW/,
+    /CREATE (UNIQUE )?INDEX/, /admin_hard_delete/, /finance_mark_overdue/,
+    /CREATE OR REPLACE FUNCTION public\.can_access_client/,
+    /company_diagnostics|diagnostic_checklist_items|diagnostic_findings|diagnostic_recommendations|roadmap_items/,
+  ];
+  for (const re of forbidden) {
+    assert(!re.test(runtimeRepair), `runtime repair: não contém ${re} -- escopo mínimo (só as 7 funções listadas)`);
+  }
+
+  // Fresh install (patch principal) e o repair devem concordar na regra final --
+  // nenhuma toca status em archive, delete continua 'encerrado', create aceita 'ativo'.
+  const patchArchive = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const repairArchive = runtimeRepair.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  assert(!/status\s*=/.test(patchArchive) && !/status\s*=/.test(repairArchive), "patch principal e runtime repair concordam: admin_archive_client nunca escreve status em nenhum dos dois artefatos");
+
+  assert(runtimeRepairRollback.includes("aa750ce9"), "runtime repair rollback documenta explicitamente que reverte para o commit aa750ce9, não para o estado pré-security");
+  assert(!runtimeRepairRollback.includes("legacy-security-hardening-before-diagnostic-rollback.sql") || runtimeRepairRollback.includes("NÃO é o rollback histórico"), "runtime repair rollback se distingue claramente do rollback histórico do Security Hardening");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

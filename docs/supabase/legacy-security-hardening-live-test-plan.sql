@@ -503,44 +503,94 @@ HAVING COUNT(*) > 1;
 -- esperado: 0 linhas.
 
 
--- ── 28. Archive legítimo (Company própria) não viola clients_status_check (PROMPT 05D) ──
--- Bug real confirmado ao vivo: 'archived' nunca foi aceito pelo
--- constraint. Corrigido para 'encerrado' -- este teste garante que a
--- correção não regride.
+-- ── 28. Archive de Company com status='ativo' preserva o status (PROMPT 05G, Regra 1) ──
+-- Correção do P1 apontado pelo Codex Web no commit aa750ce9: archive
+-- deixou de gravar status='encerrado' -- agora NUNCA toca status.
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.clients SET status = 'ativo' WHERE id = '<COMPANY_A_ID>'::uuid;
   SELECT public.admin_archive_client('<COMPANY_A_ID>'::uuid) AS archived;  -- deve retornar true, nunca SQLSTATE 23514
-  SELECT status = 'encerrado' AS status_correto, archived_at IS NOT NULL AS archived_at_setado
-  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- ambos devem ser true
+  SELECT status = 'ativo' AS status_preservado, archived_at IS NOT NULL AS archived_at_setado, deleted_at IS NULL AS deleted_at_nulo
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- os três devem ser true
 ROLLBACK;
 
--- ── 29. Bulk archive: todos os IDs autorizados → sucesso (PROMPT 05D) ──
+-- ── 29. Archive de Company com status='onboarding' preserva o status (PROMPT 05G, Regra 1) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.clients SET status = 'onboarding' WHERE id = '<COMPANY_A_ID>'::uuid;
+  SELECT public.admin_archive_client('<COMPANY_A_ID>'::uuid) AS archived;  -- deve retornar true
+  SELECT status = 'onboarding' AS status_preservado, archived_at IS NOT NULL AS archived_at_setado, deleted_at IS NULL AS deleted_at_nulo
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- os três devem ser true
+ROLLBACK;
+
+-- ── 30. Bulk archive: todos os IDs autorizados preservam seu próprio status (PROMPT 05G) ──
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<SUPER_ADMIN_USER_ID>"}';
+  UPDATE public.clients SET status = 'ativo' WHERE id = '<COMPANY_A_ID>'::uuid;
+  UPDATE public.clients SET status = 'pausado' WHERE id = '<COMPANY_B_ID>'::uuid;
   SELECT public.admin_archive_clients(ARRAY['<COMPANY_A_ID>'::uuid, '<COMPANY_B_ID>'::uuid]) AS affected;  -- deve retornar 2, nunca SQLSTATE 23514
+  SELECT id, status FROM public.clients WHERE id IN ('<COMPANY_A_ID>'::uuid, '<COMPANY_B_ID>'::uuid);  -- A continua 'ativo', B continua 'pausado'
 ROLLBACK;
 
--- ── 30. Restore legítimo continua funcionando (PROMPT 05D) ──
+-- ── 31. Restore de Company só arquivada preserva o status anterior (PROMPT 05G, Regra 2A) ──
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.clients SET status = 'pausado', archived_at = now(), deleted_at = NULL WHERE id = '<COMPANY_A_ID>'::uuid;
   SELECT public.admin_restore_client('<COMPANY_A_ID>'::uuid) AS restored;  -- deve retornar true
-  SELECT status = 'onboarding' AS status_correto FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- deve ser true
+  SELECT status = 'pausado' AS status_preservado, archived_at IS NULL AS archived_at_limpo, deleted_at IS NULL AS deleted_at_limpo
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- os três devem ser true (NUNCA vira 'onboarding' aqui)
 ROLLBACK;
 
--- ── 31. Logical delete legítimo continua funcionando, sem cascata de tentativas (PROMPT 05D) ──
--- A versão antiga só funcionava na terceira tentativa (status='pausado',
--- semanticamente errado). Corrigida para uma atribuição direta.
+-- ── 32. Restore da lixeira (deleted_at preenchido) volta para 'onboarding' (PROMPT 05G, Regra 2B) ──
+-- Conservador de propósito -- nunca tenta adivinhar o status anterior.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  UPDATE public.clients SET status = 'encerrado', archived_at = now(), deleted_at = now() WHERE id = '<COMPANY_A_ID>'::uuid;
+  SELECT public.admin_restore_client('<COMPANY_A_ID>'::uuid) AS restored;  -- deve retornar true
+  SELECT status = 'onboarding' AS status_correto, archived_at IS NULL AS archived_at_limpo, deleted_at IS NULL AS deleted_at_limpo
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- os três devem ser true
+ROLLBACK;
+
+-- ── 33. Logical delete legítimo continua funcionando (PROMPT 05D/05G, Regra 3) ──
+-- Ação TERMINAL, distinta de archive -- status='encerrado',
+-- archived_at e deleted_at ambos preenchidos.
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
   SELECT public.admin_delete_client('<COMPANY_A_ID>'::uuid) AS deleted;  -- deve retornar true, nunca SQLSTATE 23514
-  SELECT status = 'encerrado' AS status_correto FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- deve ser true
+  SELECT status = 'encerrado' AS status_correto, archived_at IS NOT NULL AS archived_at_setado, deleted_at IS NOT NULL AS deleted_at_setado
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- os três devem ser true
 ROLLBACK;
 
--- ── 32. admin_link_meta_asset: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
+-- ── 34. Nenhuma ocorrência mutante de status inválido em public.clients (PROMPT 05G) ──
+-- Verificação estrutural (read-only, não muta nada): confirma que
+-- nenhuma linha real do banco tem um valor de status que nunca foi
+-- aceito pelo constraint -- prova que nenhuma correção regrediu.
+SELECT COUNT(*) = 0 AS nenhum_status_invalido
+FROM public.clients
+WHERE status IN ('archived', 'inactive', 'active');
+
+-- ── HTTP fallback parity (nível de aplicação, não SQL puro -- PROMPT 05G, Regra 4) ──
+-- Testar via HTTP com RPC temporariamente indisponível (ou SET LOCAL
+-- ROLE authenticated direto no fallback, se isolável):
+--   DELETE /api/admin/clients/<COMPANY_A_ID> (mode=archive) → mesmo
+--     contrato do admin_archive_clients: status preservado,
+--     archived_at=now(), deleted_at=NULL. Nunca mais tenta
+--     admin_delete_client como alternativa (removido -- semânticas
+--     divergentes agora).
+--   POST /api/admin/clients/<COMPANY_A_ID>/restore → mesmo contrato do
+--     admin_restore_client: verifica deleted_at antes de decidir
+--     status.
+--   Nenhum dos dois grava mais 'archived'/'inactive'/'pausado' em
+--     cascata -- removido de src/app/api/admin/clients/[id]/route.ts e
+--     .../[id]/restore/route.ts.
+
+-- ── 35. admin_link_meta_asset: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
 -- Bug real confirmado ao vivo: SQLSTATE 42702 "column reference
 -- client_id is ambiguous" no ON CONFLICT. Corrigido com
 -- #variable_conflict use_column.
@@ -552,7 +602,7 @@ BEGIN;
   );  -- deve retornar 1 linha, nunca SQLSTATE 42702
 ROLLBACK;
 
--- ── 33. admin_link_meta_asset repetido: ON CONFLICT atualiza, não duplica (PROMPT 05D) ──
+-- ── 36. admin_link_meta_asset repetido: ON CONFLICT atualiza, não duplica (PROMPT 05D) ──
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
@@ -562,7 +612,7 @@ BEGIN;
   WHERE client_id = '<COMPANY_A_ID>'::uuid AND asset_type = 'facebook_page' AND asset_id = 'fixture-asset-1';  -- deve ser true
 ROLLBACK;
 
--- ── 34. admin_upsert_olaclick_connection: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
+-- ── 37. admin_upsert_olaclick_connection: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
 -- Bug real confirmado ao vivo: SQLSTATE 42702 no ON CONFLICT
 -- (client_id, connection_name). Corrigido com #variable_conflict
 -- use_column (não existe CONSTRAINT nomeada aqui, só um índice único --
@@ -575,7 +625,7 @@ BEGIN;
   );  -- deve retornar 1 linha, nunca SQLSTATE 42702
 ROLLBACK;
 
--- ── 35. OlaClick upsert repetido: atualiza a mesma conexão, não duplica (PROMPT 05D) ──
+-- ── 38. OlaClick upsert repetido: atualiza a mesma conexão, não duplica (PROMPT 05D) ──
 BEGIN;
   SET LOCAL ROLE authenticated;
   SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
@@ -586,7 +636,7 @@ BEGIN;
 ROLLBACK;
 
 
--- ── 36. Após aplicar: Advisor deve estar limpo para estes itens ──
+-- ── 39. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
 --   v_platform_accounts_overview, admin_signups_view,

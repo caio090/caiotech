@@ -718,15 +718,13 @@ GRANT EXECUTE ON FUNCTION public.get_request_owner_for_client(uuid) TO authentic
 -- (...)) -- corrigida agora na seção 9, sprint Final Closure (Fase 3-8).
 
 -- 8.1 admin_archive_client (single)
--- PROMPT 05D: 'archived' NUNCA foi um valor válido de clients.status --
--- clients_status_check (docs/supabase/01-schema-inicial.sql) só aceita
--- aguardando_validacao/onboarding/ativo/pausado/inadimplente/encerrado
--- desde a criação da tabela. Bug pré-existente (SQL 52/53, anterior a
--- este hardening), nunca corrigido antes -- só foi exercitado de verdade
--- pela primeira vez na validação live pós-apply deste sprint. 'encerrado'
--- é o valor canônico mais próximo semanticamente de "arquivado"
--- (relacionamento com o cliente encerrado); archived_at/deleted_at
--- continuam sendo o sinal real de visibilidade (client-visibility.ts).
+-- PROMPT 05G, Regra 1: archive é arquivamento ADMINISTRATIVO, não
+-- encerramento de lifecycle -- NUNCA toca clients.status (preserva
+-- exatamente o status atual, seja 'ativo', 'onboarding' etc.). Só
+-- archived_at/deleted_at mudam. Isso separa business lifecycle
+-- (status) de administrative visibility (archived_at/deleted_at),
+-- corrigindo a mistura introduzida no PROMPT 05D (que usava
+-- status='encerrado' aqui, achado do Codex Web como P1).
 CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -746,9 +744,8 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'encerrado',
     archived_at = now(),
-    deleted_at  = now()
+    deleted_at  = NULL
   WHERE id = p_client_id;
 
   RETURN FOUND;
@@ -761,7 +758,7 @@ GRANT EXECUTE ON FUNCTION public.admin_archive_client(uuid) TO authenticated;
 
 -- 8.2 admin_archive_clients (bulk) — Fase 26/27: TODOS os ids validados
 -- antes de mutar QUALQUER um; aborta o lote inteiro se um só for
--- não-autorizado (nunca resultado parcial).
+-- não-autorizado (nunca resultado parcial). Regra 1: idem 8.1, preserva status.
 CREATE OR REPLACE FUNCTION public.admin_archive_clients(p_client_ids uuid[])
 RETURNS integer
 LANGUAGE plpgsql
@@ -790,9 +787,8 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'encerrado',
     archived_at = now(),
-    deleted_at  = now()
+    deleted_at  = NULL
   WHERE id = ANY(p_client_ids);
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
@@ -805,6 +801,14 @@ REVOKE ALL ON FUNCTION public.admin_archive_clients(uuid[]) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_archive_clients(uuid[]) TO authenticated;
 
 -- 8.3 admin_restore_client
+-- PROMPT 05G, Regra 2: distingue dois cenários pelo estado ANTES da
+-- restauração. (A) Company só arquivada (deleted_at IS NULL,
+-- archived_at IS NOT NULL): preserva o status atual -- ele nunca foi
+-- alterado pelo archive (Regra 1). (B) Company restaurada da lixeira
+-- (deleted_at IS NOT NULL): volta para 'onboarding' de forma
+-- conservadora -- nunca tenta adivinhar o status anterior (sem
+-- previous_status nesta missão). Em ambos os casos, archived_at/
+-- deleted_at sempre voltam a NULL.
 CREATE OR REPLACE FUNCTION public.admin_restore_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -812,7 +816,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_role text;
+  v_role         text;
+  v_was_deleted  boolean;
 BEGIN
   v_role := public.current_user_role();
   IF v_role IS NULL OR v_role NOT IN ('admin', 'super_admin') THEN
@@ -822,12 +827,22 @@ BEGIN
     RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
   END IF;
 
-  UPDATE public.clients
-  SET
-    status      = 'onboarding',
-    archived_at = NULL,
-    deleted_at  = NULL
-  WHERE id = p_client_id;
+  SELECT (deleted_at IS NOT NULL) INTO v_was_deleted
+  FROM public.clients WHERE id = p_client_id;
+
+  IF v_was_deleted IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF v_was_deleted THEN
+    UPDATE public.clients
+    SET status = 'onboarding', archived_at = NULL, deleted_at = NULL
+    WHERE id = p_client_id;
+  ELSE
+    UPDATE public.clients
+    SET archived_at = NULL, deleted_at = NULL
+    WHERE id = p_client_id;
+  END IF;
 
   RETURN FOUND;
 END;
@@ -844,9 +859,12 @@ GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO authenticated;
 -- primeiras tentativas SEMPRE falhavam (nem 'archived' nem 'inactive'
 -- jamais foram valores válidos) e o resultado real dependia só do
 -- terceiro fallback ('pausado', semanticamente errado para um cliente
--- deletado). Substituída por uma atribuição direta e correta -- mesmo
--- valor canônico usado por admin_archive_client(s) (Fase "não manter
--- simultaneamente múltiplos vocabulários").
+-- deletado). Substituída por uma atribuição direta e correta.
+-- PROMPT 05G, Regra 3: logical delete é a ação TERMINAL de exclusão
+-- lógica -- status='encerrado' representa exatamente isso (distinto de
+-- admin_archive_client(s), que a partir da Regra 1 NUNCA mais toca
+-- status -- as duas operações deixaram de compartilhar semântica).
+-- Corpo inalterado nesta correção, só o comentário estava desatualizado.
 CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -1007,17 +1025,16 @@ BEGIN
     RAISE EXCEPTION 'unauthorized: cannot attribute a new client to another workspace' USING ERRCODE = 'P0002';
   END IF;
 
-  -- PROMPT 05D: 'active' NUNCA foi um valor válido de clients.status
-  -- (clients_status_check só aceita ativo, não active) -- bug
-  -- pré-existente, inofensivo em produção só porque o único call site
-  -- real (src/app/api/admin/clients/route.ts) nunca envia 'active'.
-  -- Porém o mesmo bug também rejeitava 'aguardando_validacao' (o outro
-  -- status de criação que a rota já suporta -- ALLOWED_CREATION),
-  -- forçando-o silenciosamente para 'onboarding' -- esse caminho É
-  -- exercitado na prática. Corrigido para aceitar exatamente os dois
-  -- status de criação válidos do produto; qualquer outro valor (incluindo
-  -- o legado 'active') cai em 'onboarding' como default seguro.
-  IF p_status NOT IN ('onboarding', 'aguardando_validacao') THEN
+  -- PROMPT 05D/05G: 'active' NUNCA foi um valor válido de clients.status
+  -- (clients_status_check só aceita 'ativo') -- bug pré-existente. O
+  -- mesmo bug também rejeitava 'aguardando_validacao' (status de criação
+  -- que a rota já suporta -- ALLOWED_CREATION), forçando-o silenciosamente
+  -- para 'onboarding'. Corrigido para aceitar os três estados iniciais
+  -- semanticamente válidos do produto (Regra 5): onboarding,
+  -- aguardando_validacao, ativo -- nunca pausado/inadimplente/encerrado
+  -- como estado inicial arbitrário. Qualquer valor fora desse conjunto
+  -- (incluindo o legado 'active') cai em 'onboarding' como default seguro.
+  IF p_status NOT IN ('onboarding', 'aguardando_validacao', 'ativo') THEN
     v_status := 'onboarding';
   ELSE
     v_status := p_status;

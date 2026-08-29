@@ -60,9 +60,34 @@ export const POST = withMutationProtection(async function POST(_req: NextRequest
     }
 
     if (hasSupabaseServiceRoleKey()) {
-      const { error } = await createRequiredSupabaseAdminClient()
+      const adminDb = createRequiredSupabaseAdminClient();
+
+      // Contrato RESTORE (PROMPT 05G, Regra 2/4): distingue os dois
+      // cenários -- Company só arquivada (deleted_at NULL) preserva o
+      // status atual; Company restaurada da lixeira (deleted_at
+      // preenchido) volta para 'onboarding' de forma conservadora (nunca
+      // adivinha o status anterior). archived_at/deleted_at sempre limpos.
+      const { data: current, error: lookupError } = await adminDb
         .from("clients")
-        .update({ status: "onboarding", archived_at: null, deleted_at: null })
+        .select("deleted_at")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (lookupError) {
+        return NextResponse.json({ error: "Nao foi possivel restaurar o cliente." }, { status: 500 });
+      }
+      if (!current) {
+        return NextResponse.json({ error: "not_found" }, { status: 404 });
+      }
+
+      const wasDeleted = current.deleted_at !== null;
+      const update = wasDeleted
+        ? { status: "onboarding", archived_at: null, deleted_at: null }
+        : { archived_at: null, deleted_at: null };
+
+      const { error } = await adminDb
+        .from("clients")
+        .update(update)
         .eq("id", clientId);
 
       if (!error) return NextResponse.json({ restored: true });

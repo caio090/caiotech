@@ -81,18 +81,54 @@ test("restore: erro de RPC desconhecido -- fail closed, fallback NÃO chamado", 
   assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 0);
 });
 
-test("restore: RPC indisponível + autorização independente TRUE -- fallback técnico executa", async (t) => {
+test("restore: RPC indisponível + autorização independente TRUE -- fallback técnico executa (não estava na lixeira, status preservado)", async (t) => {
   const { POST, admin } = await loadRouteWith(t, {
     user: ADMIN_A,
     profileRole: "admin",
     rpcResults: { admin_restore_client: RPC_MISSING, can_access_client: OK(true) },
-    fromResults: { clients: { update: OK() } },
+    fromResults: { clients: { select: OK({ deleted_at: null }), update: OK() } },
   });
   const res = await POST(req(), ctx(COMPANY_A));
   const body = await res.json();
   assert.equal(res.status, 200);
   assert.equal(body.restored, true);
-  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 1);
+  const updateCalls = admin.fromCalls.filter((c) => c.op === "update");
+  assert.equal(updateCalls.length, 1);
+  const payload = updateCalls[0]?.payload as Record<string, unknown>;
+  assert.equal("status" in payload, false, "não veio da lixeira -- status não deve ser tocado");
+  assert.equal(payload.archived_at, null);
+  assert.equal(payload.deleted_at, null);
+});
+
+test("restore: RPC indisponível + autorização independente TRUE -- fallback técnico executa (estava na lixeira, status volta para onboarding)", async (t) => {
+  const { POST, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_restore_client: RPC_MISSING, can_access_client: OK(true) },
+    fromResults: { clients: { select: OK({ deleted_at: "2026-08-01T00:00:00.000Z" }), update: OK() } },
+  });
+  const res = await POST(req(), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.restored, true);
+  const updateCalls = admin.fromCalls.filter((c) => c.op === "update");
+  assert.equal(updateCalls.length, 1);
+  const payload = updateCalls[0]?.payload as Record<string, unknown>;
+  assert.equal(payload.status, "onboarding", "veio da lixeira -- status conservador onboarding, nunca adivinhado");
+  assert.equal(payload.archived_at, null);
+  assert.equal(payload.deleted_at, null);
+});
+
+test("restore: RPC indisponível + autorização independente TRUE -- registro não encontrado no lookup -- 404, sem mutação", async (t) => {
+  const { POST, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_restore_client: RPC_MISSING, can_access_client: OK(true) },
+    fromResults: { clients: { select: OK(null) } },
+  });
+  const res = await POST(req(), ctx(COMPANY_A));
+  assert.equal(res.status, 404);
+  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 0);
 });
 
 test("restore: RPC indisponível + autorização independente FALSE -- nenhuma mutação, 403", async (t) => {

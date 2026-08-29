@@ -95,7 +95,6 @@ test("archive: RPC indisponível (schema desatualizado) + autorização independ
     profileRole: "admin",
     rpcResults: {
       admin_archive_clients: RPC_MISSING,
-      admin_delete_client: RPC_MISSING,
       can_access_client: OK(true),
     },
     fromResults: { clients: { update: OK() } },
@@ -103,7 +102,10 @@ test("archive: RPC indisponível (schema desatualizado) + autorização independ
   const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}`), ctx(COMPANY_A));
   assert.equal(res.status, 200);
   const privilegedUpdate = admin.fromCalls.filter((c) => c.table === "clients" && c.op === "update");
-  assert.equal(privilegedUpdate.length, 1, "fallback técnico SÓ roda quando RPC_UNAVAILABLE confirmado E autorização independente = true");
+  assert.equal(privilegedUpdate.length, 1, "fallback técnico SÓ roda quando RPC_UNAVAILABLE confirmado E autorização independente = true (PROMPT 05G: fallback NUNCA tenta admin_delete_client como alternativa)");
+  const payload = privilegedUpdate[0]?.payload as Record<string, unknown>;
+  assert.equal("status" in payload, false, "archive nunca escreve status (PROMPT 05G, Regra 1)");
+  assert.equal(payload.deleted_at, null);
 });
 
 test("archive: RPC indisponível + autorização independente FALSE -- nenhuma mutação, 403", async (t) => {
