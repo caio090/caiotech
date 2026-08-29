@@ -131,7 +131,8 @@ export const DELETE = withMutationProtection(async function DELETE(
 ) {
   const { id } = await params;
   try {
-    const mode = new URL(req.url).searchParams.get("mode") === "hard" ? "hard" : "archive";
+    const modeParam = new URL(req.url).searchParams.get("mode");
+    const mode = modeParam === "hard" ? "hard" : modeParam === "logical" ? "logical" : "archive";
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -171,6 +172,76 @@ export const DELETE = withMutationProtection(async function DELETE(
       }
 
       return NextResponse.json({ ok: true, mode: "hard", affected: hardResult.data ?? 0 });
+    }
+
+    if (mode === "logical") {
+      // PROMPT 05J, P1 #3: lixeira lógica tem RPC própria
+      // (admin_delete_client) mas não tinha caminho HTTP dedicado --
+      // fallback bruto abaixo reusa o MESMO discriminador (?mode=) já
+      // existente, sem criar um sistema paralelo.
+      const deleteResult = await supabase.rpc("admin_delete_client", { p_client_id: id });
+      if (!deleteResult.error) {
+        // admin_delete_client retorna boolean (FOUND) -- data===false
+        // significa client_id inexistente, nunca sucesso.
+        if (deleteResult.data === true) {
+          return NextResponse.json({ ok: true, mode: "logical" });
+        }
+        return NextResponse.json({ error: "not_found" }, { status: 404 });
+      }
+      const deleteOutcome = classifyRpcError(deleteResult.error);
+      if (deleteOutcome === "authorization_denied") {
+        // Uma negação de autorização da RPC é FINAL -- nunca dispara fallback privilegiado.
+        return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+      }
+      if (deleteOutcome === "unknown_error") {
+        // Erro técnico não classificado -- fail closed, nenhum fallback.
+        console.error("[api/admin/clients DELETE] erro desconhecido na RPC de logical delete", {
+          clientId: id, supabaseError: safeDbError(deleteResult.error),
+        });
+        return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, code: "UNKNOWN_DB_ERROR", technical: safeDbError(deleteResult.error) }, { status: 400 });
+      }
+
+      // deleteOutcome === "rpc_unavailable" -- só agora um fallback
+      // privilegiado pode ser considerado, e só depois de revalidar
+      // autorização de forma independente.
+      const independentlyAuthorizedLogical = await canAccessClientIndependently(supabase, id);
+      if (!shouldAttemptPrivilegedFallback(deleteResult.error, independentlyAuthorizedLogical)) {
+        return NextResponse.json({ error: "forbidden", code: "AUTHORIZATION_DENIED" }, { status: 403 });
+      }
+
+      const serviceRolePresentLogical = hasSupabaseServiceRoleKey();
+      let logicalDb = supabase;
+      try {
+        logicalDb = createSupabaseAdminClient();
+      } catch {
+        logicalDb = supabase;
+      }
+
+      // Contrato LOGICAL DELETE (PROMPT 05J): terminal -- status
+      // 'encerrado', archived_at e deleted_at recebem o MESMO timestamp,
+      // calculado UMA única vez no servidor (nunca duas chamadas
+      // separadas a new Date()).
+      const deletionTimestamp = new Date().toISOString();
+      const logicalResult = await logicalDb
+        .from("clients")
+        .update({ status: "encerrado", archived_at: deletionTimestamp, deleted_at: deletionTimestamp })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+
+      if (logicalResult.error) {
+        console.error("[api/admin/clients DELETE] erro ao apagar logicamente cliente", {
+          clientId: id,
+          role: profile?.role ?? null,
+          serviceRolePresent: serviceRolePresentLogical,
+          supabaseError: logicalResult.error,
+        });
+        return NextResponse.json({ error: CLIENT_WRITE_FRIENDLY_ERROR, technical: logicalResult.error }, { status: 400 });
+      }
+      if (!logicalResult.data) {
+        return NextResponse.json({ error: "not_found" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, mode: "logical" });
     }
 
     // PROMPT 05G: archive e logical delete têm semânticas diferentes agora

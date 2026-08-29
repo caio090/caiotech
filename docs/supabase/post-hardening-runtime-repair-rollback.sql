@@ -1,5 +1,5 @@
 -- ============================================================
--- POST-HARDENING RUNTIME REPAIR — ROLLBACK — PROMPT 05G
+-- POST-HARDENING RUNTIME REPAIR — ROLLBACK — PROMPT 05J (V3)
 -- AINDA NÃO EXECUTADO.
 --
 -- ⚠ Este rollback NÃO é o rollback histórico do Security Hardening
@@ -7,25 +7,70 @@
 -- continua representando o estado PRÉ-security (reabre os P0/P1 de
 -- autorização já documentados lá) e não foi alterado por esta missão.
 --
--- Este rollback reverte SOMENTE post-hardening-runtime-repair.sql --
--- ou seja, volta as 7 funções para o estado exatamente como estavam no
--- commit aa750ce9 (PROMPT 05D, já publicado em
--- github.com/caio090/lokat-os antes deste repair), não para o estado
--- pré-hardening. Autorização/ownership/can_access_client permanecem
--- IDÊNTICOS em ambos os lados -- a única coisa que muda é a semântica
--- de status/archived_at/deleted_at do archive/restore, o vocabulário
--- aceito por admin_create_client, e (nas 3 funções que não mudaram
--- entre aa750ce9 e este repair) nada.
+-- ⚠ CORREÇÃO EM RELAÇÃO À V2 (PROMPT 05G): a V2 deste rollback foi
+-- construída contra o commit aa750ce9 (PROMPT 05D), assumindo que os
+-- bugfixes de 05D (cascata archived→inactive→pausado removida,
+-- #variable_conflict use_column adicionado, 'active'→'ativo' no
+-- OlaClick) já estavam LIVE em Production. Um audit independente
+-- (Codex Web, PROMPT 05I) apontou que isso é FALSO: Production nunca
+-- recebeu o apply de 05D. O estado LIVE real, confirmado via
+-- pg_get_functiondef() read-only no project ziursnveqpvqkqmaacpl, é o
+-- estado ANTERIOR a 05D -- que corresponde EXATAMENTE ao commit
+-- 9d8de3c (fix(security): close final hardening test gaps), pai direto
+-- de aa750ce9 nesta branch. Os 7 corpos abaixo foram extraídos
+-- literalmente de `git show 9d8de3c:docs/supabase/legacy-security-
+-- hardening-before-diagnostic.sql` -- não reconstruídos de memória --
+-- e conferidos campo a campo contra a semântica reportada como LIVE
+-- (status='archived' no archive, cascata archived→inactive→pausado no
+-- delete, ('active','onboarding') no create e no check de status do
+-- OlaClick, ausência da diretiva #variable_conflict use_column em
+-- Meta/OlaClick). v_role já é `text` (nunca `integer`) em toda a
+-- história deste arquivo -- o "repair pontual" mencionado no PROMPT
+-- 05J não corresponde a nenhuma mudança rastreável neste arquivo; o
+-- estado 9d8de3c já satisfaz essa propriedade sem qualquer ajuste
+-- adicional.
 --
--- Reverter para aa750ce9 significa voltar a misturar archive/delete
--- (admin_archive_client(s) volta a gravar status='encerrado'), e
--- admin_create_client volta a não aceitar 'ativo' como estado inicial.
+-- Este rollback reverte SOMENTE post-hardening-runtime-repair.sql --
+-- ou seja, volta as 7 funções para o estado LIVE real imediatamente
+-- anterior ao Runtime Repair V3 (commit 9d8de3c), não para o estado
+-- pré-hardening (que também revogaria toda a autorização Company-scoped
+-- introduzida por este Security Hardening -- can_access_client,
+-- ownership real em vez de role-only, etc. -- e essa NÃO é a intenção
+-- deste rollback). Autorização/ownership/can_access_client permanecem
+-- IDÊNTICOS em ambos os lados -- a única coisa que muda entre este
+-- rollback e o repair é a semântica de status/archived_at/deleted_at
+-- do archive/restore/delete, o vocabulário aceito por
+-- admin_create_client, o vocabulário aceito pelo check de status do
+-- OlaClick, e a presença/ausência de #variable_conflict use_column em
+-- Meta/OlaClick.
+--
+-- Reverter para este estado significa voltar a:
+--   • admin_archive_client(s) grava status='archived' (valor NUNCA
+--     aceito por clients_status_check -- toda chamada real falha com
+--     23514, exatamente o bug runtime original);
+--   • admin_delete_client volta à cascata archived→inactive→pausado
+--     (as duas primeiras tentativas sempre falham; resultado real é
+--     sempre 'pausado', semanticamente errado para lixeira);
+--   • admin_restore_client continua sem distinguir archive de lixeira
+--     (sempre 'onboarding' -- isso NÃO muda entre este rollback e o
+--     repair, listado aqui só por completude);
+--   • admin_create_client volta a rejeitar 'ativo'/'aguardando_validacao'
+--     como status inicial (só aceita 'active'/'onboarding', e 'active'
+--     nunca é um valor válido -- cai sempre em 'onboarding');
+--   • admin_link_meta_asset e admin_upsert_olaclick_connection voltam
+--     a não ter #variable_conflict use_column -- todo ON CONFLICT nessas
+--     duas funções volta a falhar com SQLSTATE 42702 (ambiguidade entre
+--     OUT params e colunas reais);
+--   • admin_upsert_olaclick_connection volta a checar
+--     c.status IN ('active', 'onboarding') -- 'active' nunca é válido,
+--     então todo client_id com status='ativo' de verdade (o caminho
+--     legítimo mais comum) falha com client_not_active (P0004).
 -- Use apenas se o repair causar uma regressão crítica.
 -- ============================================================
 
 BEGIN;
 
--- ── admin_archive_client (single) → estado aa750ce9 ──────────────────
+-- ── admin_archive_client (single) → estado LIVE real (9d8de3c) ──────
 CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -45,7 +90,7 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'encerrado',
+    status      = 'archived',
     archived_at = now(),
     deleted_at  = now()
   WHERE id = p_client_id;
@@ -54,7 +99,7 @@ BEGIN
 END;
 $$;
 
--- ── admin_archive_clients (bulk) → estado aa750ce9 ───────────────────
+-- ── admin_archive_clients (bulk) → estado LIVE real (9d8de3c) ───────
 CREATE OR REPLACE FUNCTION public.admin_archive_clients(p_client_ids uuid[])
 RETURNS integer
 LANGUAGE plpgsql
@@ -83,7 +128,7 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'encerrado',
+    status      = 'archived',
     archived_at = now(),
     deleted_at  = now()
   WHERE id = ANY(p_client_ids);
@@ -93,7 +138,9 @@ BEGIN
 END;
 $$;
 
--- ── admin_restore_client → estado aa750ce9 (sempre 'onboarding') ────
+-- ── admin_restore_client → estado LIVE real (sempre 'onboarding',
+--    não distingue archive de lixeira -- idêntico entre 9d8de3c e
+--    aa750ce9, só mudou no repair V2/V3) ──────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_restore_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -122,7 +169,8 @@ BEGIN
 END;
 $$;
 
--- ── admin_delete_client → idêntico (nunca mudou entre aa750ce9 e o repair) ──
+-- ── admin_delete_client → estado LIVE real (cascata
+--    archived→inactive→pausado, 9d8de3c) ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -141,11 +189,27 @@ BEGIN
     RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
   END IF;
 
-  UPDATE public.clients
-     SET deleted_at  = v_deleted_at,
-         archived_at = v_deleted_at,
-         status      = 'encerrado'
-   WHERE id = p_client_id;
+  BEGIN
+    UPDATE public.clients
+       SET deleted_at = v_deleted_at,
+           archived_at = v_deleted_at,
+           status = 'archived'
+     WHERE id = p_client_id;
+  EXCEPTION WHEN check_violation THEN
+    BEGIN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'inactive'
+       WHERE id = p_client_id;
+    EXCEPTION WHEN check_violation THEN
+      UPDATE public.clients
+         SET deleted_at = v_deleted_at,
+             archived_at = v_deleted_at,
+             status = 'pausado'
+       WHERE id = p_client_id;
+    END;
+  END;
 
   IF NOT FOUND THEN
     RETURN false;
@@ -155,7 +219,9 @@ BEGIN
 END;
 $$;
 
--- ── admin_create_client → estado aa750ce9 (sem 'ativo' como criação) ──
+-- ── admin_create_client → estado LIVE real (só aceita
+--    'active'/'onboarding' -- 'active' nunca é válido, cai sempre em
+--    'onboarding'; 9d8de3c) ────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_create_client(
   p_company_name     text,
   p_responsible_name text DEFAULT NULL,
@@ -199,7 +265,7 @@ BEGIN
     RAISE EXCEPTION 'unauthorized: cannot attribute a new client to another workspace' USING ERRCODE = 'P0002';
   END IF;
 
-  IF p_status NOT IN ('onboarding', 'aguardando_validacao') THEN
+  IF p_status NOT IN ('active', 'onboarding') THEN
     v_status := 'onboarding';
   ELSE
     v_status := p_status;
@@ -224,7 +290,9 @@ BEGIN
 END;
 $$;
 
--- ── admin_link_meta_asset → idêntico (nunca mudou entre aa750ce9 e o repair) ──
+-- ── admin_link_meta_asset → estado LIVE real (SEM
+--    #variable_conflict use_column -- ON CONFLICT falha com 42702;
+--    9d8de3c) ───────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_link_meta_asset(
   p_client_id                      uuid,
   p_asset_type                     text,
@@ -246,7 +314,6 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-#variable_conflict use_column
 DECLARE
   v_caller_id     uuid;
   v_is_super      boolean;
@@ -314,8 +381,9 @@ BEGIN
 END;
 $$;
 
--- ── admin_upsert_olaclick_connection → idêntico (nunca mudou entre
---    aa750ce9 e o repair) ─────────────────────────────────────────────
+-- ── admin_upsert_olaclick_connection → estado LIVE real (SEM
+--    #variable_conflict use_column; status check ('active','onboarding')
+--    -- 'active' nunca é válido; 9d8de3c) ──────────────────────────────
 CREATE OR REPLACE FUNCTION public.admin_upsert_olaclick_connection(
   p_client_id        uuid,
   p_connection_name  text,
@@ -338,7 +406,6 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-#variable_conflict use_column
 DECLARE
   v_caller_id  uuid;
   v_last_four  text;
@@ -356,7 +423,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.clients c
     WHERE c.id = p_client_id
-      AND c.status IN ('ativo', 'onboarding')
+      AND c.status IN ('active', 'onboarding')
   ) THEN
     IF NOT EXISTS (SELECT 1 FROM public.clients WHERE id = p_client_id) THEN
       RAISE EXCEPTION 'client_not_found' USING ERRCODE = 'P0003';
@@ -400,8 +467,9 @@ $$;
 COMMIT;
 
 -- ============================================================
--- FIM DO ROLLBACK DO RUNTIME REPAIR
--- Restaura exatamente o estado do commit aa750ce9 (PROMPT 05D) --
--- NÃO o estado pré-security. Para reabrir os P0/P1 de autorização,
--- use legacy-security-hardening-before-diagnostic-rollback.sql.
+-- FIM DO ROLLBACK DO RUNTIME REPAIR (V3)
+-- Restaura exatamente o estado LIVE real confirmado em Production
+-- (equivalente ao commit 9d8de3c, pai de aa750ce9) -- NÃO o estado
+-- pré-security. Para reabrir os P0/P1 de autorização, use
+-- legacy-security-hardening-before-diagnostic-rollback.sql.
 -- ============================================================

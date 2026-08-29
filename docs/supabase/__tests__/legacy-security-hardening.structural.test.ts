@@ -552,12 +552,25 @@ console.log("[test] 40 — PROMPT 05G, Regra 1/2/3: archive/restore/delete têm 
 console.log("[test] 41 — PROMPT 05G, Regra 4: fallback HTTP tem exatamente a mesma semântica das RPCs");
 {
   assert(!/status: "archived"/.test(archiveRoute) && !/status: "inactive"/.test(archiveRoute) && !/status: "pausado"/.test(archiveRoute), "[id]/route.ts: cascata archived/inactive/pausado removida do fallback bruto");
-  assert(!/\.rpc\("admin_delete_client"/.test(archiveRoute), "[id]/route.ts: não CHAMA mais admin_delete_client como alternativa para um archive que falhou -- semânticas divergentes agora (Regra 4)");
+  // PROMPT 05J, P1 #3: admin_delete_client agora É chamado legitimamente
+  // pelo branch mode==="logical" (novo caminho HTTP dedicado) -- o que a
+  // Regra 4 continua proibindo é o branch de ARCHIVE tentar
+  // admin_delete_client como alternativa para um archive que falhou.
+  // Escopo isolado só ao trecho do fluxo de archive (delimitado pelos
+  // próprios anchors do RPC de archive até o retorno "mode: archive").
+  const archiveFlowBody = archiveRoute.match(/const archiveResult = await supabase\.rpc\("admin_archive_clients"[\s\S]*?mode:\s*"archive"\s*\}\);/)?.[0] ?? "";
+  assert(archiveFlowBody.length > 0, "[id]/route.ts: trecho do fluxo de archive encontrado para escopar a asserção");
+  assert(!/\.rpc\("admin_delete_client"/.test(archiveFlowBody), "[id]/route.ts: dentro do fluxo de archive, não CHAMA admin_delete_client como alternativa para um archive que falhou -- semânticas divergentes agora (Regra 4)");
   assert(/archived_at: new Date\(\)\.toISOString\(\), deleted_at: null/.test(archiveRoute), "[id]/route.ts: fallback de archive grava archived_at=now()/deleted_at=null, nunca toca status -- mesmo contrato da RPC");
 
   assert(!/status: "onboarding", archived_at: null, deleted_at: null/.test(restoreRoute) || /wasDeleted/.test(restoreRoute), "restore/route.ts: fallback não grava 'onboarding' incondicionalmente -- consulta deleted_at antes");
   assert(/wasDeleted/.test(restoreRoute), "restore/route.ts: fallback verifica deleted_at antes de decidir o status (mesmo contrato de Regra 2 da RPC)");
   assert(/select\("deleted_at"\)/.test(restoreRoute), "restore/route.ts: faz lookup de deleted_at antes do UPDATE -- não assume estado");
+
+  // PROMPT 05J, P1 #2: RPC retornando data===false (client_id inexistente)
+  // não pode ser tratado como sucesso -- só data===true é sucesso real.
+  assert(/rpcResult\.data === true/.test(restoreRoute), "restore/route.ts: só rpcResult.data===true é sucesso -- data===false vira not_found, nunca 'restored: true'");
+  assert(!/if \(!rpcResult\.error\) \{\s*return NextResponse\.json\(\{ restored: true \}\);/.test(restoreRoute), "restore/route.ts: não trata mais '!error' sozinho como sucesso (bug P1 #2 corrigido)");
 }
 
 console.log("[test] 42 — PROMPT 05G, Regra 5: caller real corrigido para enviar 'ativo' diretamente, sem tradução silenciosa permanente");
@@ -661,8 +674,102 @@ console.log("[test] 43 — PROMPT 05G: fresh install (patch) e live repair cont�
   const repairArchive = runtimeRepair.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
   assert(!/status\s*=/.test(patchArchive) && !/status\s*=/.test(repairArchive), "patch principal e runtime repair concordam: admin_archive_client nunca escreve status em nenhum dos dois artefatos");
 
-  assert(runtimeRepairRollback.includes("aa750ce9"), "runtime repair rollback documenta explicitamente que reverte para o commit aa750ce9, não para o estado pré-security");
   assert(!runtimeRepairRollback.includes("legacy-security-hardening-before-diagnostic-rollback.sql") || runtimeRepairRollback.includes("NÃO é o rollback histórico"), "runtime repair rollback se distingue claramente do rollback histórico do Security Hardening");
+}
+
+console.log("[test] 44 — PROMPT 05J (V3): runtime repair rollback representa o estado LIVE real (9d8de3c), não aa750ce9 idealizado");
+{
+  // Codex Web (PROMPT 05I) apontou que a V2 deste rollback foi construída
+  // contra aa750ce9 sem confirmar que 05D chegou a ser aplicado ao vivo.
+  // A partir de agora a prova é por PROPRIEDADE LIVE específica de cada
+  // função, nunca por "corresponde a tal commit".
+  const rbFn = (name: string) => runtimeRepairRollback.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$\\$;`))?.[0] ?? "";
+
+  const rbArchiveSingle = rbFn("admin_archive_client");
+  assert(/status\s*=\s*'archived'/.test(rbArchiveSingle), "rollback V3 admin_archive_client: contém status = 'archived' (estado LIVE real, não o produto ideal)");
+  assert(/archived_at\s*=\s*now\(\)/.test(rbArchiveSingle), "rollback V3 admin_archive_client: archived_at = now()");
+  assert(/deleted_at\s*=\s*now\(\)/.test(rbArchiveSingle), "rollback V3 admin_archive_client: deleted_at = now() (LIVE real grava ambos os timestamps no archive, diferente do repair)");
+
+  const rbArchiveBulk = rbFn("admin_archive_clients");
+  assert(/v_role\s+text/.test(rbArchiveBulk), "rollback V3 admin_archive_clients: v_role text");
+  assert(!/v_role\s+integer/.test(rbArchiveBulk), "rollback V3 admin_archive_clients: NUNCA v_role integer");
+
+  const rbRestore = rbFn("admin_restore_client");
+  assert(/status\s*=\s*'onboarding'/.test(rbRestore), "rollback V3 admin_restore_client: status = 'onboarding' (LIVE real não distingue archive de lixeira)");
+
+  const rbDelete = rbFn("admin_delete_client");
+  assert(/status\s*=\s*'archived'/.test(rbDelete) && /status\s*=\s*'inactive'/.test(rbDelete) && /status\s*=\s*'pausado'/.test(rbDelete), "rollback V3 admin_delete_client: mantém a cascata LIVE real archived→inactive→pausado");
+  assert(/EXCEPTION WHEN check_violation/.test(rbDelete), "rollback V3 admin_delete_client: mantém EXCEPTION WHEN check_violation (a cascata em si, não só os valores)");
+
+  const rbCreate = rbFn("admin_create_client");
+  assert(/IF p_status NOT IN \('active', 'onboarding'\)/.test(rbCreate), "rollback V3 admin_create_client: contém ('active', 'onboarding') -- LIVE real ainda não aceita 'ativo'/'aguardando_validacao' como criação");
+
+  const rbMeta = rbFn("admin_link_meta_asset");
+  assert(!rbMeta.includes("#variable_conflict use_column"), "rollback V3 admin_link_meta_asset: NÃO contém #variable_conflict use_column (LIVE real ainda quebrado com SQLSTATE 42702)");
+
+  const rbOla = rbFn("admin_upsert_olaclick_connection");
+  assert(!rbOla.includes("#variable_conflict use_column"), "rollback V3 admin_upsert_olaclick_connection: NÃO contém #variable_conflict use_column");
+  assert(/c\.status IN \('active', 'onboarding'\)/.test(rbOla), "rollback V3 admin_upsert_olaclick_connection: contém ('active', 'onboarding') no check de status do client");
+
+  // Autorização do hardening permanece intacta em TODAS as 7 -- este
+  // rollback é pós-hardening, nunca pré-security.
+  for (const [name, body] of [
+    ["admin_archive_client", rbArchiveSingle],
+    ["admin_archive_clients", rbArchiveBulk],
+    ["admin_restore_client", rbRestore],
+    ["admin_delete_client", rbDelete],
+  ] as const) {
+    assert(/v_role IS NULL OR v_role NOT IN/.test(body), `rollback V3 ${name}: continua NULL-safe -- autorização do hardening preservada`);
+  }
+  assert(/can_access_client\(p_client_id\)/.test(rbMeta), "rollback V3 admin_link_meta_asset: continua exigindo can_access_client");
+  assert(/can_access_client\(p_client_id\)/.test(rbOla), "rollback V3 admin_upsert_olaclick_connection: continua exigindo can_access_client");
+}
+
+console.log("[test] 45 — PROMPT 05J (V3): nenhuma das 7 funções do runtime repair é redundante contra o estado LIVE real");
+{
+  // Na V2 assumia-se que admin_delete_client, admin_link_meta_asset e
+  // admin_upsert_olaclick_connection eram redundantes (LIVE == aa750ce9
+  // para essas 3). Confirmado falso pelo Codex Web -- o repair difere do
+  // rollback (== LIVE real) para as 7, não só 4.
+  const repairFn = (name: string) => runtimeRepair.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$\\$;`))?.[0] ?? "";
+  const rollbackFn = (name: string) => runtimeRepairRollback.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$\\$;`))?.[0] ?? "";
+
+  for (const name of [
+    "admin_archive_client",
+    "admin_archive_clients",
+    "admin_restore_client",
+    "admin_delete_client",
+    "admin_create_client",
+    "admin_link_meta_asset",
+    "admin_upsert_olaclick_connection",
+  ]) {
+    const repairBody = repairFn(name);
+    const rollbackBody = rollbackFn(name);
+    assert(repairBody.length > 0 && rollbackBody.length > 0, `${name}: definição encontrada em ambos os artefatos`);
+    assert(repairBody !== rollbackBody, `${name}: repair difere do estado LIVE real (rollback) -- não é redundante`);
+  }
+}
+
+console.log("[test] 46 — PROMPT 05J, P1 #3: caminho HTTP dedicado para logical delete, mesmo discriminador ?mode=, paridade RPC/fallback");
+{
+  assert(/mode === "logical"/.test(archiveRoute), "[id]/route.ts: reusa o discriminador ?mode= existente com o novo valor 'logical' -- não cria um sistema paralelo");
+  assert(/\.rpc\("admin_delete_client",\s*\{\s*p_client_id:\s*id\s*\}\)/.test(archiveRoute), "[id]/route.ts: branch logical chama a RPC real admin_delete_client");
+
+  const logicalFlowBody = archiveRoute.match(/if \(mode === "logical"\) \{[\s\S]*?\n {4}\}\n\n {4}\/\/ PROMPT 05G/)?.[0] ?? "";
+  assert(logicalFlowBody.length > 0, "[id]/route.ts: trecho do fluxo logical encontrado para escopar as asserções");
+
+  assert(/deleteResult\.data === true/.test(logicalFlowBody), "[id]/route.ts logical: só data===true é tratado como sucesso -- data===false nunca é sucesso (mesmo contrato de P1 #2 no restore)");
+  assert(/status:\s*404/.test(logicalFlowBody), "[id]/route.ts logical: data===false (ou UPDATE sem linha) retorna 404");
+
+  const timestampDeclarations = (logicalFlowBody.match(/new Date\(\)\.toISOString\(\)/g) ?? []).length;
+  assert(timestampDeclarations === 1, `[id]/route.ts logical: exatamente UM new Date().toISOString() no fallback (encontrado ${timestampDeclarations}) -- archived_at e deleted_at reusam a MESMA variável, nunca duas chamadas separadas`);
+  assert(/status:\s*"encerrado",\s*archived_at:\s*deletionTimestamp,\s*deleted_at:\s*deletionTimestamp/.test(logicalFlowBody), "[id]/route.ts logical: fallback grava status='encerrado' e archived_at===deleted_at (mesma variável deletionTimestamp)");
+  assert(!/status:\s*"archived"|status:\s*"inactive"|status:\s*"pausado"|status:\s*"active"/.test(logicalFlowBody), "[id]/route.ts logical: fallback nunca usa archived/inactive/pausado/active -- só 'encerrado'");
+
+  // Autorização: mesmo padrão de rpc_unavailable + autorização independente
+  // antes de qualquer fallback -- nenhum atalho novo para logical delete.
+  assert(/canAccessClientIndependently\(supabase, id\)/.test(logicalFlowBody), "[id]/route.ts logical: revalida autorização de forma independente antes do fallback -- mesmo contrato de archive/restore");
+  assert(/shouldAttemptPrivilegedFallback\(deleteResult\.error, independentlyAuthorizedLogical\)/.test(logicalFlowBody), "[id]/route.ts logical: usa o mesmo gate shouldAttemptPrivilegedFallback -- nenhum bypass novo");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

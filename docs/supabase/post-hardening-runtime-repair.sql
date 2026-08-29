@@ -1,26 +1,29 @@
 -- ============================================================
--- POST-HARDENING RUNTIME REPAIR — PROMPT 05G
+-- POST-HARDENING RUNTIME REPAIR — PROMPT 05J (V3)
 -- AINDA NÃO EXECUTADO.
 --
 -- Este arquivo NÃO é o Security Hardening (legacy-security-hardening-
 -- before-diagnostic.sql) -- esse já foi aplicado em Production. Este é
 -- um repair MÍNIMO que transforma o estado LIVE atual pós-hardening
--- (que ainda pode ter os bugs de runtime do PROMPT 05D/05G -- cascata
--- de status inválido, ON CONFLICT ambíguo, ou a mistura archive/delete
--- que o Codex Web sinalizou como P1 no commit aa750ce9) para o estado
--- final corrigido.
+-- para o estado final corrigido.
+--
+-- ⚠ CORREÇÃO EM RELAÇÃO À V2 (PROMPT 05G): a suposição de que o
+-- commit aa750ce9 (PROMPT 05D) já estava LIVE era falsa -- um audit
+-- independente (Codex Web, PROMPT 05I) confirmou via pg_get_functiondef()
+-- read-only (project ziursnveqpvqkqmaacpl) que Production está no
+-- estado ANTERIOR a 05D (equivalente ao commit 9d8de3c, ver
+-- post-hardening-runtime-repair-rollback.sql). Ou seja: as 7 funções
+-- abaixo, e não só 4, têm delta real contra o LIVE atual -- incluindo
+-- admin_delete_client (cascata archived→inactive→pausado ainda LIVE) e
+-- admin_link_meta_asset/admin_upsert_olaclick_connection (ainda SEM
+-- #variable_conflict use_column, ON CONFLICT ainda quebrado com
+-- SQLSTATE 42702 ao vivo). Nenhuma das 7 é redundante.
 --
 -- Contém SOMENTE CREATE OR REPLACE das 7 funções realmente afetadas por
 -- essas correções -- nenhuma RLS, view, índice, hard delete, finance,
--- can_access_client, SQL 91, diagnostic ou dado. As 3 primeiras (archive
--- single/bulk, restore) e admin_create_client tiveram mudança de
--- comportamento real entre o commit anterior (aa750ce9) e este; as
--- outras 3 (admin_delete_client, admin_link_meta_asset,
--- admin_upsert_olaclick_connection) já estavam corretas desde aa750ce9
--- -- incluídas aqui só como salvaguarda, já que não há confirmação de
--- que aa750ce9 chegou a ser aplicado ao vivo antes deste repair
--- (CREATE OR REPLACE é idempotente -- reaplicar uma definição já
--- correta não tem efeito).
+-- can_access_client, SQL 91, diagnostic ou dado. CREATE OR REPLACE é
+-- idempotente -- reaplicar uma definição já correta não tem efeito, mas
+-- neste momento nenhuma das 7 já está correta ao vivo.
 --
 -- Contrato final (docs/supabase/legacy-security-hardening-before-
 -- diagnostic.sql, seções 6, 8, 9, já contém a mesma versão -- uma

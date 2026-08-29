@@ -38,7 +38,14 @@ export const POST = withMutationProtection(async function POST(_req: NextRequest
     const rpcResult = await supabase.rpc("admin_restore_client", { p_client_id: clientId });
 
     if (!rpcResult.error) {
-      return NextResponse.json({ restored: true });
+      // PROMPT 05J, P1 #2: admin_restore_client retorna boolean (FOUND) --
+      // data===false significa client_id inexistente, nunca sucesso. Só
+      // data===true é sucesso real; qualquer outro valor (incluindo false)
+      // é not_found, nunca tratado como se tivesse restaurado algo.
+      if (rpcResult.data === true) {
+        return NextResponse.json({ restored: true });
+      }
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const outcome = classifyRpcError(rpcResult.error);
     if (outcome === "authorization_denied") {

@@ -169,3 +169,103 @@ test("hard delete: admin comum (não super_admin) -- 403 antes de qualquer RPC",
   assert.equal(res.status, 403);
   assert.equal(session.rpcCalls.some((c) => c.fn === "admin_hard_delete_clients"), false);
 });
+
+// ── PROMPT 05J, P1 #3: logical delete (?mode=logical) -- caminho HTTP
+//    dedicado que faltava para admin_delete_client, reusando o mesmo
+//    discriminador ?mode= já existente para archive/hard. ──────────────
+
+test("logical delete: admin autorizado (RPC retorna true) -- 200, sem fallback", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: OK(true) },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}?mode=logical`), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.mode, "logical");
+  assert.equal(admin.fromCalls.length, 0, "admin client nunca foi tocado -- RPC já resolveu");
+});
+
+test("logical delete: RPC retorna false (client_id inexistente) -- 404, sem fallback", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: OK(false) },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}?mode=logical`), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 404);
+  assert.equal(body.error, "not_found");
+  assert.equal(admin.fromCalls.length, 0, "data===false nunca é tratado como sucesso nem dispara fallback");
+});
+
+test("logical delete: RPC nega autorização (cross-company) -- 403, fallback NUNCA chamado", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: DENIED },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_B}?mode=logical`), ctx(COMPANY_B));
+  const body = await res.json();
+  assert.equal(res.status, 403);
+  assert.equal(body.code, "AUTHORIZATION_DENIED");
+  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 0, "negação é FINAL -- admin.from('clients').update NÃO chamado");
+});
+
+test("logical delete: erro de RPC desconhecido -- fail closed, fallback NÃO chamado", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: UNKNOWN_DB_ERROR },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}?mode=logical`), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 400);
+  assert.equal(body.code, "UNKNOWN_DB_ERROR");
+  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 0);
+});
+
+test("logical delete: RPC indisponível + autorização independente FALSE -- nenhuma mutação, 403", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: RPC_MISSING, can_access_client: OK(false) },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_B}?mode=logical`), ctx(COMPANY_B));
+  assert.equal(res.status, 403);
+  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 0, "service_role disponível não implica autorização");
+});
+
+test("logical delete: RPC indisponível + autorização independente TRUE -- fallback executa, status='encerrado' e mesmo timestamp em archived_at/deleted_at", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: RPC_MISSING, can_access_client: OK(true) },
+    fromResults: { clients: { update: OK({ id: COMPANY_A }) } },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}?mode=logical`), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.mode, "logical");
+  const updateCalls = admin.fromCalls.filter((c) => c.op === "update");
+  assert.equal(updateCalls.length, 1);
+  const payload = updateCalls[0]?.payload as Record<string, unknown>;
+  assert.equal(payload.status, "encerrado");
+  assert.ok(payload.archived_at, "archived_at deve estar preenchido");
+  assert.equal(payload.archived_at, payload.deleted_at, "archived_at e deleted_at devem ser EXATAMENTE o mesmo timestamp -- um único new Date() no servidor");
+});
+
+test("logical delete: RPC indisponível + autorização independente TRUE -- fallback não encontra a linha -- 404", async (t) => {
+  const { DELETE, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_delete_client: RPC_MISSING, can_access_client: OK(true) },
+    fromResults: { clients: { update: OK(null) } },
+  });
+  const res = await DELETE(req(`http://x/api/admin/clients/${COMPANY_A}?mode=logical`), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 404);
+  assert.equal(body.error, "not_found");
+  assert.equal(admin.fromCalls.filter((c) => c.op === "update").length, 1, "UPDATE foi tentado mas não encontrou a linha");
+});

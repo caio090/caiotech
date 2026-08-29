@@ -57,6 +57,19 @@ test("restore: admin autorizado (RPC sucede) -- permitido, sem fallback", async 
   assert.equal(admin.fromCalls.length, 0);
 });
 
+test("restore: RPC retorna false (client_id inexistente) -- 404, sem fallback (PROMPT 05J, P1 #2)", async (t) => {
+  const { POST, admin } = await loadRouteWith(t, {
+    user: ADMIN_A,
+    profileRole: "admin",
+    rpcResults: { admin_restore_client: OK(false) },
+  });
+  const res = await POST(req(), ctx(COMPANY_A));
+  const body = await res.json();
+  assert.equal(res.status, 404);
+  assert.equal(body.error, "not_found");
+  assert.equal(admin.fromCalls.length, 0, "data===false nunca é tratado como sucesso nem dispara fallback");
+});
+
 test("restore: RPC nega autorização (cross-company) -- 403, fallback NUNCA chamado", async (t) => {
   const { POST, admin } = await loadRouteWith(t, {
     user: ADMIN_A,
