@@ -503,7 +503,90 @@ HAVING COUNT(*) > 1;
 -- esperado: 0 linhas.
 
 
--- ── 28. Após aplicar: Advisor deve estar limpo para estes itens ──
+-- ── 28. Archive legítimo (Company própria) não viola clients_status_check (PROMPT 05D) ──
+-- Bug real confirmado ao vivo: 'archived' nunca foi aceito pelo
+-- constraint. Corrigido para 'encerrado' -- este teste garante que a
+-- correção não regride.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_archive_client('<COMPANY_A_ID>'::uuid) AS archived;  -- deve retornar true, nunca SQLSTATE 23514
+  SELECT status = 'encerrado' AS status_correto, archived_at IS NOT NULL AS archived_at_setado
+  FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- ambos devem ser true
+ROLLBACK;
+
+-- ── 29. Bulk archive: todos os IDs autorizados → sucesso (PROMPT 05D) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<SUPER_ADMIN_USER_ID>"}';
+  SELECT public.admin_archive_clients(ARRAY['<COMPANY_A_ID>'::uuid, '<COMPANY_B_ID>'::uuid]) AS affected;  -- deve retornar 2, nunca SQLSTATE 23514
+ROLLBACK;
+
+-- ── 30. Restore legítimo continua funcionando (PROMPT 05D) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_restore_client('<COMPANY_A_ID>'::uuid) AS restored;  -- deve retornar true
+  SELECT status = 'onboarding' AS status_correto FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- deve ser true
+ROLLBACK;
+
+-- ── 31. Logical delete legítimo continua funcionando, sem cascata de tentativas (PROMPT 05D) ──
+-- A versão antiga só funcionava na terceira tentativa (status='pausado',
+-- semanticamente errado). Corrigida para uma atribuição direta.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_delete_client('<COMPANY_A_ID>'::uuid) AS deleted;  -- deve retornar true, nunca SQLSTATE 23514
+  SELECT status = 'encerrado' AS status_correto FROM public.clients WHERE id = '<COMPANY_A_ID>'::uuid;  -- deve ser true
+ROLLBACK;
+
+-- ── 32. admin_link_meta_asset: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
+-- Bug real confirmado ao vivo: SQLSTATE 42702 "column reference
+-- client_id is ambiguous" no ON CONFLICT. Corrigido com
+-- #variable_conflict use_column.
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT * FROM public.admin_link_meta_asset(
+    '<COMPANY_A_ID>'::uuid, 'facebook_page', 'fixture-asset-1'
+  );  -- deve retornar 1 linha, nunca SQLSTATE 42702
+ROLLBACK;
+
+-- ── 33. admin_link_meta_asset repetido: ON CONFLICT atualiza, não duplica (PROMPT 05D) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_link_meta_asset('<COMPANY_A_ID>'::uuid, 'facebook_page', 'fixture-asset-1');
+  SELECT public.admin_link_meta_asset('<COMPANY_A_ID>'::uuid, 'facebook_page', 'fixture-asset-1', 'Nome Atualizado');
+  SELECT COUNT(*) = 1 AS sem_duplicata FROM public.client_meta_assets
+  WHERE client_id = '<COMPANY_A_ID>'::uuid AND asset_type = 'facebook_page' AND asset_id = 'fixture-asset-1';  -- deve ser true
+ROLLBACK;
+
+-- ── 34. admin_upsert_olaclick_connection: Company própria → sucesso, sem ambiguidade de coluna (PROMPT 05D) ──
+-- Bug real confirmado ao vivo: SQLSTATE 42702 no ON CONFLICT
+-- (client_id, connection_name). Corrigido com #variable_conflict
+-- use_column (não existe CONSTRAINT nomeada aqui, só um índice único --
+-- ON CONFLICT ON CONSTRAINT não se aplicava).
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT * FROM public.admin_upsert_olaclick_connection(
+    '<COMPANY_A_ID>'::uuid, 'conexao-fixture', 'fake-token-0000'
+  );  -- deve retornar 1 linha, nunca SQLSTATE 42702
+ROLLBACK;
+
+-- ── 35. OlaClick upsert repetido: atualiza a mesma conexão, não duplica (PROMPT 05D) ──
+BEGIN;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub": "<ADMIN_A_USER_ID>"}';
+  SELECT public.admin_upsert_olaclick_connection('<COMPANY_A_ID>'::uuid, 'conexao-fixture', 'fake-token-0000');
+  SELECT public.admin_upsert_olaclick_connection('<COMPANY_A_ID>'::uuid, 'conexao-fixture', 'fake-token-1111');
+  SELECT COUNT(*) = 1 AS sem_duplicata FROM public.olaclick_connections
+  WHERE client_id = '<COMPANY_A_ID>'::uuid AND connection_name = 'conexao-fixture';  -- deve ser true
+ROLLBACK;
+
+
+-- ── 36. Após aplicar: Advisor deve estar limpo para estes itens ──
 -- Rodar get_advisors (Supabase) e confirmar:
 --   0 findings de security para: v_olaclick_connections_safe,
 --   v_platform_accounts_overview, admin_signups_view,

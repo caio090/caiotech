@@ -491,10 +491,100 @@ console.log("[test] 33 — PROMPT 04E/Fase 19: live-test-plan verifica índice �
 
 console.log("[test] 34 — PROMPT 04E/Fase 24-25: numeração do live-test-plan e comentários de bootstrap atualizados");
 {
-  assert(liveTestPlan.includes("── 28. Após aplicar"), "seção final do Advisor renumerada para seguir a sequência (28), não mais 'volta' para 12");
+  {
+    const allSectionNumbers = [...liveTestPlan.matchAll(/── (\d+)\. /g)].map((m) => parseInt(m[1], 10));
+    const advisorMatch = liveTestPlan.match(/── (\d+)\. Após aplicar/);
+    const advisorNumber = advisorMatch ? parseInt(advisorMatch[1], 10) : -1;
+    assert(advisorNumber > -1 && advisorNumber === Math.max(...allSectionNumbers), "seção final do Advisor tem o maior número da sequência (segue em ordem, não mais 'volta' para 12) -- checagem robusta a renumeração futura");
+  }
   assert(!/── 12\. Após aplicar/.test(liveTestPlan), "não existe mais uma seção '12' duplicada/fora de ordem no fim do arquivo");
   assert(sql.includes("signup_bootstrap") || sql.includes("resolveCurrentClient()"), "comentário do patch sobre create_client_on_signup já reflete o bootstrap de resolveCurrentClient() (Fase 25) -- não afirma mais que o gap fica sem cobertura");
   assert(!/não é uma correção de segurança -- não tocado aqui\./.test(sql.slice(sql.indexOf("-- 5. create_client_on_signup"), sql.indexOf("-- 6. Meta/OlaClick RPCs"))), "afirmação obsoleta removida do comentário da seção 5 -- o gap descrito ali já foi fechado");
+}
+
+console.log("[test] 35 — PROMPT 05D/Blocker 1: clients.status usa exclusivamente o vocabulário canônico (clients_status_check)");
+{
+  const archiveSingleBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const archiveBulkBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_clients\(p_client_ids uuid\[\]\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const deleteBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_delete_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const createBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_create_client\([\s\S]*?\$\$;/)?.[0] ?? "";
+  const olaclickUpsertBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_upsert_olaclick_connection\([\s\S]*?\$\$;/)?.[0] ?? "";
+
+  for (const [name, body] of [["admin_archive_client", archiveSingleBody], ["admin_archive_clients", archiveBulkBody], ["admin_delete_client", deleteBody]] as const) {
+    assert(body.length > 0, `${name}: definição encontrada`);
+    assert(/status\s*=\s*'encerrado'/.test(body), `${name}: usa status = 'encerrado' (único valor canônico válido para arquivado/deletado)`);
+    assert(!/status\s*=\s*'archived'/.test(body) && !/status\s*=\s*'inactive'/.test(body), `${name}: não usa mais 'archived'/'inactive' -- nunca foram valores aceitos por clients_status_check`);
+  }
+  assert(!/EXCEPTION WHEN check_violation/.test(deleteBody), "admin_delete_client: cascata de tentativas (archived→inactive→pausado) removida -- atribuição direta e correta no lugar");
+
+  assert(/IF p_status NOT IN \('onboarding', 'aguardando_validacao'\) THEN/.test(createBody), "admin_create_client: aceita exatamente os 2 status de criação válidos do produto (onboarding, aguardando_validacao)");
+  assert(!/NOT IN \('active', 'onboarding'\)/.test(createBody), "admin_create_client: não usa mais 'active' (nunca foi valor válido)");
+
+  assert(/c\.status IN \('ativo', 'onboarding'\)/.test(olaclickUpsertBody), "admin_upsert_olaclick_connection: valida clients.status com 'ativo' (canônico), não 'active'");
+  assert(!/c\.status IN \('active', 'onboarding'\)/.test(olaclickUpsertBody), "admin_upsert_olaclick_connection: não usa mais 'active' para clients.status");
+}
+
+console.log("[test] 36 — PROMPT 05D/Blocker 2-3: ON CONFLICT ambíguo corrigido (RETURNS TABLE colide com conflict target)");
+{
+  const metaBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_link_meta_asset\([\s\S]*?\$\$;/)?.[0] ?? "";
+  const olaBody = sql.match(/CREATE OR REPLACE FUNCTION public\.admin_upsert_olaclick_connection\([\s\S]*?\$\$;/)?.[0] ?? "";
+
+  for (const [name, body] of [["admin_link_meta_asset", metaBody], ["admin_upsert_olaclick_connection", olaBody]] as const) {
+    assert(body.length > 0, `${name}: definição encontrada`);
+    const pragmaIdx = body.indexOf("#variable_conflict use_column");
+    const conflictIdx = body.indexOf("ON CONFLICT (");
+    assert(pragmaIdx > -1, `${name}: declara #variable_conflict use_column`);
+    assert(conflictIdx > -1 && pragmaIdx < conflictIdx, `${name}: a diretiva vem ANTES do ON CONFLICT ambíguo (precisa estar logo após AS $$, antes de DECLARE)`);
+    assert(body.indexOf("DECLARE") > pragmaIdx, `${name}: pragma está antes do DECLARE -- posição exigida pelo PL/pgSQL`);
+  }
+  // Meta: ambos os 3 nomes do conflict target colidem com OUT params (asset_record_id, client_id, asset_type, asset_id, linked)
+  assert(/ON CONFLICT \(client_id, asset_type, asset_id\)/.test(metaBody), "admin_link_meta_asset: ON CONFLICT continua na mesma signature (client_id, asset_type, asset_id) -- só a diretiva resolve a ambiguidade, contrato inalterado");
+  assert(/ON CONFLICT \(client_id, connection_name\)/.test(olaBody), "admin_upsert_olaclick_connection: ON CONFLICT continua (client_id, connection_name) -- contrato inalterado");
+  // Nenhuma correção envolveu renomear colunas de retorno público
+  assert(/RETURNS TABLE\(\s*asset_record_id\s+uuid,\s*client_id\s+uuid,\s*asset_type\s+text,\s*asset_id\s+text,\s*linked\s+boolean\s*\)/.test(metaBody), "admin_link_meta_asset: RETURNS TABLE inalterado -- nenhum nome de retorno público foi renomeado");
+}
+
+console.log("[test] 37 — PROMPT 05D: rollback preserva fielmente o estado histórico (bugs inclusos), não vira um segundo patch");
+{
+  const rbArchive = rollback.match(/CREATE OR REPLACE FUNCTION public\.admin_archive_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  const rbDelete = rollback.match(/CREATE OR REPLACE FUNCTION public\.admin_delete_client\(p_client_id uuid\)[\s\S]*?\$\$;/)?.[0] ?? "";
+  assert(/status\s*=\s*'archived'/.test(rbArchive), "rollback: admin_archive_client histórico continua usando 'archived' (bug preservado fielmente, nunca corrigido no rollback)");
+  assert(/EXCEPTION WHEN check_violation/.test(rbDelete), "rollback: admin_delete_client histórico mantém a cascata de tentativas original -- rollback não é um segundo patch de produto");
+  assert(rollback.includes("PROMPT 05D"), "rollback documenta a nota sobre os bugs de runtime pré-existentes, sem alterar o comportamento restaurado");
+}
+
+console.log("[test] 38 — PROMPT 05D: nenhuma correção reabre fallback role-only, anon, ou remove can_access_client");
+{
+  // Regressão: as correções desta rodada tocaram só valores de status e a
+  // diretiva #variable_conflict -- não devem ter tocado nenhuma cláusula
+  // de autorização já existente.
+  for (const fn of ["admin_archive_client", "admin_archive_clients", "admin_delete_client"]) {
+    const re = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\([^)]*\\)[\\s\\S]*?\\$\\$;`);
+    const body = sql.match(re)?.[0] ?? "";
+    assert(/can_access_client\(p_client_id\)|NOT public\.can_access_client\(cid\)/.test(body), `${fn}: continua exigindo can_access_client -- não removido pelas correções de status`);
+    assert(/v_role IS NULL OR v_role NOT IN/.test(body), `${fn}: continua NULL-safe -- não regrediu`);
+  }
+  for (const fn of ["admin_link_meta_asset", "admin_upsert_olaclick_connection"]) {
+    const re = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\([\\s\\S]*?\\$\\$;`);
+    const body = sql.match(re)?.[0] ?? "";
+    assert(/can_access_client\(p_client_id\)/.test(body), `${fn}: continua exigindo can_access_client -- não removido pela correção de ambiguidade/status`);
+  }
+  assert(sql.includes("REVOKE ALL ON FUNCTION public.admin_archive_client(uuid) FROM anon;"), "admin_archive_client: REVOKE de anon continua presente -- correções não reabriram anon");
+  assert(sql.includes("REVOKE ALL ON FUNCTION public.admin_link_meta_asset(uuid, text, text, text, text, text, uuid, boolean) FROM PUBLIC;"), "admin_link_meta_asset: REVOKE de PUBLIC continua presente");
+}
+
+console.log("[test] 39 — PROMPT 05D: live-test-plan cobre os 8 novos casos de runtime (status + ON CONFLICT), transacional");
+{
+  const newCases = [
+    "clients_status_check", "status = 'encerrado'", "nunca SQLSTATE 42702", "sem_duplicata",
+  ];
+  for (const c of newCases) {
+    assert(liveTestPlan.includes(c), `live-test-plan cobre um caso referenciando "${c}"`);
+  }
+  const beginCount = (liveTestPlan.match(/\bBEGIN;/g) ?? []).length;
+  const rollbackCount = (liveTestPlan.match(/\bROLLBACK;/g) ?? []).length;
+  assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; ainda tem ROLLBACK; correspondente (${beginCount} pares) após as adições do PROMPT 05D`);
+  assert(!/\bCOMMIT;/.test(liveTestPlan), "live-test-plan ainda nunca usa COMMIT");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

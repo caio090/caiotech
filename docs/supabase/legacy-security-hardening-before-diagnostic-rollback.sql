@@ -39,6 +39,20 @@
 -- Nenhuma tabela ou coluna foi criada pela migration corretiva, então não
 -- há estrutura nenhuma para remover aqui -- só CREATE OR REPLACE / REVOKE / GRANT
 -- revertendo cada objeto tocado.
+--
+-- NOTA (PROMPT 05D, runtime blockers pós-apply): validação live confirmou
+-- que admin_archive_client(s)/admin_delete_client usam valores de
+-- clients.status ('archived'/'inactive') que NUNCA foram aceitos por
+-- clients_status_check, e que admin_link_meta_asset/
+-- admin_upsert_olaclick_connection têm um ON CONFLICT ambíguo
+-- (SQLSTATE 42702, RETURNS TABLE colidindo com os nomes das colunas do
+-- conflict target) -- bugs pré-existentes ao hardening (SQL 51-55),
+-- nunca corrigidos antes. A migration principal corrige os dois; ESTE
+-- rollback DELIBERADAMENTE mantém as versões históricas originais, bugs
+-- inclusos -- corrigi-los aqui faria o rollback representar um estado
+-- que nunca existiu de fato. Se o rollback for executado, archive/
+-- delete/Meta-link/OlaClick-upsert voltam a ter esses bugs de runtime
+-- além de reabrir os P0/P1 de autorização já documentados acima.
 -- ============================================================
 
 BEGIN;

@@ -354,6 +354,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+#variable_conflict use_column
+-- PROMPT 05D: RETURNS TABLE acima cria OUT params chamados client_id/
+-- asset_type/asset_id -- sem esta diretiva, "ON CONFLICT (client_id,
+-- asset_type, asset_id)" mais abaixo é ambíguo entre esses OUT params e
+-- as colunas reais da tabela (SQLSTATE 42702, confirmado ao vivo).
+-- use_column resolve a favor da coluna real -- é exatamente o que o
+-- ON CONFLICT sempre quis dizer; nenhuma outra referência nesta função
+-- dependia da leitura como variável (auditado linha a linha).
 DECLARE
   v_caller_id     uuid;
   v_is_super      boolean;
@@ -464,6 +472,17 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+#variable_conflict use_column
+-- PROMPT 05D: RETURNS TABLE acima cria OUT params chamados client_id/
+-- connection_name -- sem esta diretiva, "ON CONFLICT (client_id,
+-- connection_name)" mais abaixo é ambíguo (SQLSTATE 42702, confirmado
+-- ao vivo). Não existe CONSTRAINT nomeada para ON CONFLICT ON CONSTRAINT
+-- (só o índice único idx_olaclick_conn_client_name -- ON CONFLICT ON
+-- CONSTRAINT exige uma constraint de verdade em pg_constraint, não
+-- aceita um índice solto), então a correção sem alterar schema é esta
+-- diretiva. Auditado linha a linha: nenhuma outra referência a
+-- client_id/connection_name nesta função dependia da leitura como
+-- variável.
 DECLARE
   v_caller_id  uuid;
   v_last_four  text;
@@ -478,10 +497,15 @@ BEGIN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = 'P0002';
   END IF;
 
+  -- PROMPT 05D: 'active' nunca foi um valor válido de clients.status
+  -- (clients_status_check só aceita 'ativo') -- bug pré-existente que
+  -- fazia todo upsert de conexão OlaClick para um cliente "ativo" de
+  -- verdade (status='ativo') falhar com client_not_active (P0004),
+  -- mesmo sendo exatamente o caminho legítimo mais comum.
   IF NOT EXISTS (
     SELECT 1 FROM public.clients c
     WHERE c.id = p_client_id
-      AND c.status IN ('active', 'onboarding')
+      AND c.status IN ('ativo', 'onboarding')
   ) THEN
     IF NOT EXISTS (SELECT 1 FROM public.clients WHERE id = p_client_id) THEN
       RAISE EXCEPTION 'client_not_found' USING ERRCODE = 'P0003';
@@ -694,6 +718,15 @@ GRANT EXECUTE ON FUNCTION public.get_request_owner_for_client(uuid) TO authentic
 -- (...)) -- corrigida agora na seção 9, sprint Final Closure (Fase 3-8).
 
 -- 8.1 admin_archive_client (single)
+-- PROMPT 05D: 'archived' NUNCA foi um valor válido de clients.status --
+-- clients_status_check (docs/supabase/01-schema-inicial.sql) só aceita
+-- aguardando_validacao/onboarding/ativo/pausado/inadimplente/encerrado
+-- desde a criação da tabela. Bug pré-existente (SQL 52/53, anterior a
+-- este hardening), nunca corrigido antes -- só foi exercitado de verdade
+-- pela primeira vez na validação live pós-apply deste sprint. 'encerrado'
+-- é o valor canônico mais próximo semanticamente de "arquivado"
+-- (relacionamento com o cliente encerrado); archived_at/deleted_at
+-- continuam sendo o sinal real de visibilidade (client-visibility.ts).
 CREATE OR REPLACE FUNCTION public.admin_archive_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -713,7 +746,7 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'archived',
+    status      = 'encerrado',
     archived_at = now(),
     deleted_at  = now()
   WHERE id = p_client_id;
@@ -757,7 +790,7 @@ BEGIN
 
   UPDATE public.clients
   SET
-    status      = 'archived',
+    status      = 'encerrado',
     archived_at = now(),
     deleted_at  = now()
   WHERE id = ANY(p_client_ids);
@@ -805,6 +838,15 @@ REVOKE ALL ON FUNCTION public.admin_restore_client(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_restore_client(uuid) TO authenticated;
 
 -- 8.4 admin_delete_client (logical delete / lixeira)
+-- PROMPT 05D: a cascata original (archived → inactive → pausado,
+-- capturando check_violation a cada tentativa) era um sintoma de nunca
+-- ter confirmado o vocabulário real de clients_status_check -- as duas
+-- primeiras tentativas SEMPRE falhavam (nem 'archived' nem 'inactive'
+-- jamais foram valores válidos) e o resultado real dependia só do
+-- terceiro fallback ('pausado', semanticamente errado para um cliente
+-- deletado). Substituída por uma atribuição direta e correta -- mesmo
+-- valor canônico usado por admin_archive_client(s) (Fase "não manter
+-- simultaneamente múltiplos vocabulários").
 CREATE OR REPLACE FUNCTION public.admin_delete_client(p_client_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -823,27 +865,11 @@ BEGIN
     RAISE EXCEPTION 'permission_denied: sem acesso a este client_id' USING ERRCODE = 'P0002';
   END IF;
 
-  BEGIN
-    UPDATE public.clients
-       SET deleted_at = v_deleted_at,
-           archived_at = v_deleted_at,
-           status = 'archived'
-     WHERE id = p_client_id;
-  EXCEPTION WHEN check_violation THEN
-    BEGIN
-      UPDATE public.clients
-         SET deleted_at = v_deleted_at,
-             archived_at = v_deleted_at,
-             status = 'inactive'
-       WHERE id = p_client_id;
-    EXCEPTION WHEN check_violation THEN
-      UPDATE public.clients
-         SET deleted_at = v_deleted_at,
-             archived_at = v_deleted_at,
-             status = 'pausado'
-       WHERE id = p_client_id;
-    END;
-  END;
+  UPDATE public.clients
+     SET deleted_at  = v_deleted_at,
+         archived_at = v_deleted_at,
+         status      = 'encerrado'
+   WHERE id = p_client_id;
 
   IF NOT FOUND THEN
     RETURN false;
@@ -981,7 +1007,17 @@ BEGIN
     RAISE EXCEPTION 'unauthorized: cannot attribute a new client to another workspace' USING ERRCODE = 'P0002';
   END IF;
 
-  IF p_status NOT IN ('active', 'onboarding') THEN
+  -- PROMPT 05D: 'active' NUNCA foi um valor válido de clients.status
+  -- (clients_status_check só aceita ativo, não active) -- bug
+  -- pré-existente, inofensivo em produção só porque o único call site
+  -- real (src/app/api/admin/clients/route.ts) nunca envia 'active'.
+  -- Porém o mesmo bug também rejeitava 'aguardando_validacao' (o outro
+  -- status de criação que a rota já suporta -- ALLOWED_CREATION),
+  -- forçando-o silenciosamente para 'onboarding' -- esse caminho É
+  -- exercitado na prática. Corrigido para aceitar exatamente os dois
+  -- status de criação válidos do produto; qualquer outro valor (incluindo
+  -- o legado 'active') cai em 'onboarding' como default seguro.
+  IF p_status NOT IN ('onboarding', 'aguardando_validacao') THEN
     v_status := 'onboarding';
   ELSE
     v_status := p_status;
