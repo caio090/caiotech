@@ -11,6 +11,7 @@ import * as path from "path";
 const root = process.cwd();
 const sql = fs.readFileSync(path.join(root, "docs/supabase/91-company-diagnostic-roadmap.sql"), "utf8");
 const rollback = fs.readFileSync(path.join(root, "docs/supabase/91-company-diagnostic-roadmap-rollback.sql"), "utf8");
+const liveTestPlan = fs.readFileSync(path.join(root, "docs/supabase/91-company-diagnostic-roadmap-rls-test-plan.sql"), "utf8");
 
 let passed = 0; let failed = 0;
 const assert = (condition: boolean, label: string) => { if (condition) { passed++; console.log(`  ok - ${label}`); } else { failed++; console.error(`  FAIL - ${label}`); } };
@@ -102,6 +103,35 @@ console.log("[test] 10 — SQL ainda não marcado como aprovado para produção 
 {
   assert(sql.includes("SQL_READY_FOR_MANUAL_APPROVAL"), "status permanece SQL_READY_FOR_MANUAL_APPROVAL -- nunca auto-aprovado por este sprint");
   assert(!sql.includes("SQL_APPROVED_FOR_APPLY"), "SQL_APPROVED_FOR_APPLY nunca é auto-atribuído -- só o CODEX WEB pode emitir esse veredito");
+}
+
+console.log("[test] 11 — PROMPT 08, Fase 22: live test plan é transacional (BEGIN;/ROLLBACK;, nunca COMMIT), nunca dados reais de produção");
+{
+  const beginCount = (liveTestPlan.match(/^BEGIN;/gm) ?? []).length;
+  const rollbackCount = (liveTestPlan.match(/^ROLLBACK;/gm) ?? []).length;
+  assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; tem ROLLBACK; correspondente (${beginCount} pares)`);
+  assert(!/^COMMIT;/m.test(liveTestPlan), "live test plan nunca usa COMMIT -- nenhum fixture persiste");
+  assert(/SET LOCAL ROLE authenticated/.test(liveTestPlan), "usa impersonação real via SET LOCAL ROLE -- mesmo padrão de legacy-security-hardening-live-test-plan.sql");
+  assert(/request\.jwt\.claims/.test(liveTestPlan), "usa request.jwt.claims para simular auth.uid() real por usuário de teste");
+  for (const placeholder of ["<COMPANY_A_ID>", "<COMPANY_B_ID>", "<SUPER_ADMIN_ID>", "<ADMIN_ALFA_ID>", "<ADMIN_BETA_ID>", "<CLIENTE_ALFA_ID>", "<REC_PROJECT_B_ID>"]) {
+    assert(liveTestPlan.includes(placeholder), `documenta o placeholder ${placeholder} -- nunca um ID de produção hardcoded`);
+  }
+}
+
+console.log("[test] 12 — PROMPT 08, Fase 22: os 14 itens mínimos de cobertura estão presentes");
+{
+  const requiredCoverage = [
+    "super_admin cria diagnóstico", "admin com Company access cria diagnóstico",
+    "admin cross-company é negado", "cliente lê SÓ a própria Company",
+    "cross-company SELECT negado", "checklist pertence ao diagnóstico correto",
+    "finding pertence ao diagnóstico correto", "recommendation pertence ao diagnóstico correto",
+    "roadmap pertence à Company correta", "bloqueado por trigger",
+    "constraints de status", "FK integrity", "delete behavior", "zero resíduo",
+  ];
+  for (const c of requiredCoverage) {
+    assert(liveTestPlan.includes(c), `live test plan cobre "${c}" (Fase 22 do PROMPT 08)`);
+  }
+  assert(/cliente é somente-leitura/.test(liveTestPlan), "confirma explicitamente que cliente NUNCA escreve neste domínio, mesmo na própria Company (Fase 45 do SQL 91)");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);
