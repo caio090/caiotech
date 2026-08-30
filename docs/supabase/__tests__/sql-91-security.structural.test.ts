@@ -76,12 +76,54 @@ console.log("[test] 6 — statuses revisados: draft incluído, in_roadmap/in_pro
   assert(sql.includes("'not_applicable'"), "checklist ganhou 'not_applicable' (Fase 16)");
 }
 
-console.log("[test] 7 — updated_at reaproveita o mecanismo canônico existente, não recria um novo por tabela");
+console.log("[test] 7 — PROMPT 08C, P1 #1: set_updated_at() é reutilizada como dependência LIVE, NUNCA recriada/redefinida");
 {
-  const setUpdatedAtDefs = (sql.match(/CREATE OR REPLACE FUNCTION public\.set_updated_at\(\)/g) ?? []).length;
-  assert(setUpdatedAtDefs === 1, "public.set_updated_at() definida uma única vez (idempotente, reaproveitando o padrão de docs/supabase/18 e /33), nunca duplicada com nome novo");
-  const triggerCount = (sql.match(/EXECUTE FUNCTION public\.set_updated_at\(\)/g) ?? []).length;
-  assert(triggerCount >= 5, "set_updated_at() usada em pelo menos 5 triggers (uma por tabela mutável)");
+  assert(!/CREATE OR REPLACE FUNCTION public\.set_updated_at/.test(sql), "SQL 91 NÃO contém CREATE OR REPLACE FUNCTION public.set_updated_at -- só reutiliza a dependência LIVE (blast radius de 10 triggers de outros domínios não pertence a este arquivo)");
+  const triggerCount = (sql.match(/FOR EACH ROW EXECUTE FUNCTION public\.set_updated_at\(\)/g) ?? []).length;
+  assert(triggerCount === 5, `set_updated_at() usada em exatamente 5 triggers reais (uma por tabela mutável -- escopado a "FOR EACH ROW EXECUTE FUNCTION", nunca a uma menção em comentário), encontrado ${triggerCount}`);
+
+  assert(!/CREATE OR REPLACE FUNCTION public\.set_updated_at/.test(rollback), "rollback NÃO contém CREATE OR REPLACE FUNCTION public.set_updated_at (nunca redefine)");
+  assert(!/DROP FUNCTION[^;]*set_updated_at/.test(rollback), "rollback NÃO contém DROP FUNCTION public.set_updated_at -- a SQL 91 nunca a criou, então não há o que reverter nela");
+}
+
+console.log("[test] 7b — PROMPT 08C: inventário de objetos novos — 6 funções (não 7) e 10 triggers (não 9)");
+{
+  const expectedFunctions = [
+    "can_access_client_company", "can_write_client_company",
+    "forbid_client_id_change", "forbid_diagnostic_id_change",
+    "forbid_finding_id_change", "validate_roadmap_item_consistency",
+  ];
+  const actualFunctionDefs = (sql.match(/CREATE OR REPLACE FUNCTION public\.\w+/g) ?? []);
+  assert(actualFunctionDefs.length === 6, `SQL 91 define exatamente 6 funções novas (encontrado ${actualFunctionDefs.length}: ${actualFunctionDefs.join(", ")})`);
+  for (const fn of expectedFunctions) {
+    assert(sql.includes(`CREATE OR REPLACE FUNCTION public.${fn}`), `função ${fn} presente entre as 6 esperadas`);
+  }
+
+  const triggerDefs = (sql.match(/^CREATE TRIGGER \w+/gm) ?? []);
+  assert(triggerDefs.length === 10, `SQL 91 cria exatamente 10 triggers (5 updated_at + 4 imutabilidade + 1 consistência), encontrado ${triggerDefs.length}`);
+
+  const rollbackDropFns = (rollback.match(/DROP FUNCTION IF EXISTS public\.\w+/g) ?? []);
+  assert(rollbackDropFns.length === 6, `rollback dropa exatamente 6 funções (mesmo inventário da SQL 91), encontrado ${rollbackDropFns.length}`);
+}
+
+console.log("[test] 7c — PROMPT 08C, P2: ACL mínima explícita nas 6 funções novas — PUBLIC/anon fechados, authenticated só onde necessário");
+{
+  const rlsHelperFns = ["can_access_client_company(uuid)", "can_write_client_company(uuid)"];
+  const triggerFns = ["forbid_client_id_change()", "forbid_diagnostic_id_change()", "forbid_finding_id_change()", "validate_roadmap_item_consistency()"];
+
+  for (const fnSig of [...rlsHelperFns, ...triggerFns]) {
+    const fnName = fnSig.split("(")[0];
+    assert(sql.includes(`REVOKE ALL ON FUNCTION public.${fnSig} FROM PUBLIC;`), `${fnName}: REVOKE ALL ... FROM PUBLIC presente`);
+    assert(sql.includes(`REVOKE ALL ON FUNCTION public.${fnSig} FROM anon;`), `${fnName}: REVOKE ALL ... FROM anon presente`);
+  }
+  for (const fnSig of rlsHelperFns) {
+    const fnName = fnSig.split("(")[0];
+    assert(sql.includes(`GRANT EXECUTE ON FUNCTION public.${fnSig} TO authenticated;`), `${fnName}: GRANT EXECUTE TO authenticated presente -- chamada dentro de USING/WITH CHECK das policies`);
+  }
+  for (const fnSig of triggerFns) {
+    const fnName = fnSig.split("(")[0];
+    assert(!sql.includes(`GRANT EXECUTE ON FUNCTION public.${fnSig} TO authenticated;`), `${fnName}: SEM GRANT EXECUTE TO authenticated -- função de trigger, nunca chamada diretamente (o Postgres dispara triggers sem exigir EXECUTE do emissor do DML)`);
+  }
 }
 
 console.log("[test] 8 — rollback não usa CASCADE genérico e dropa só o que o 91 cria");
@@ -105,33 +147,78 @@ console.log("[test] 10 — SQL ainda não marcado como aprovado para produção 
   assert(!sql.includes("SQL_APPROVED_FOR_APPLY"), "SQL_APPROVED_FOR_APPLY nunca é auto-atribuído -- só o CODEX WEB pode emitir esse veredito");
 }
 
-console.log("[test] 11 — PROMPT 08, Fase 22: live test plan é transacional (BEGIN;/ROLLBACK;, nunca COMMIT), nunca dados reais de produção");
+console.log("[test] 11 — PROMPT 08C, P1 #2: live test plan é transacional, uma única transação para o arquivo inteiro, nunca COMMIT");
 {
+  // Reescrito: agora é UMA transação para o arquivo inteiro (fixtures
+  // descobertas dinamicamente precisam persistir entre fases), não mais
+  // 16 blocos BEGIN/ROLLBACK independentes -- por isso exatamente 1 par.
   const beginCount = (liveTestPlan.match(/^BEGIN;/gm) ?? []).length;
   const rollbackCount = (liveTestPlan.match(/^ROLLBACK;/gm) ?? []).length;
-  assert(beginCount > 0 && beginCount === rollbackCount, `todo bloco BEGIN; tem ROLLBACK; correspondente (${beginCount} pares)`);
+  assert(beginCount === 1 && rollbackCount === 1, `exatamente 1 BEGIN; e 1 ROLLBACK; para o arquivo inteiro (encontrado ${beginCount}/${rollbackCount}) -- fixtures precisam sobreviver entre fases`);
   assert(!/^COMMIT;/m.test(liveTestPlan), "live test plan nunca usa COMMIT -- nenhum fixture persiste");
   assert(/SET LOCAL ROLE authenticated/.test(liveTestPlan), "usa impersonação real via SET LOCAL ROLE -- mesmo padrão de legacy-security-hardening-live-test-plan.sql");
-  assert(/request\.jwt\.claims/.test(liveTestPlan), "usa request.jwt.claims para simular auth.uid() real por usuário de teste");
-  for (const placeholder of ["<COMPANY_A_ID>", "<COMPANY_B_ID>", "<SUPER_ADMIN_ID>", "<ADMIN_ALFA_ID>", "<ADMIN_BETA_ID>", "<CLIENTE_ALFA_ID>", "<REC_PROJECT_B_ID>"]) {
-    assert(liveTestPlan.includes(placeholder), `documenta o placeholder ${placeholder} -- nunca um ID de produção hardcoded`);
+  assert(/request\.jwt\.claims/.test(liveTestPlan), "usa request.jwt.claims (via set_config) para simular auth.uid() real por usuário de teste");
+  assert(/RESET ROLE;/.test(liveTestPlan), "usa RESET ROLE entre fases para voltar ao papel padrão privilegiado");
+}
+
+console.log("[test] 12 — PROMPT 08C: fixture strategy substantiva -- descoberta dinâmica, precheck com RAISE EXCEPTION, nunca placeholder <ID> hardcoded");
+{
+  assert(liveTestPlan.includes("SQL91_TEST_FIXTURES_UNAVAILABLE"), "precheck de fixture levanta SQL91_TEST_FIXTURES_UNAVAILABLE se faltar super_admin/cliente/2 Companies, ANTES de qualquer mutação relevante");
+  assert(!/<COMPANY_A_ID>|<COMPANY_B_ID>|<ADMIN_ALFA_ID>|<USER_A_ID>/.test(liveTestPlan), "nenhum placeholder <ID> hardcoded -- todos os ids são descobertos em tempo de execução via SELECT");
+  assert(/CREATE TEMP TABLE/.test(liveTestPlan), "usa TEMP TABLE para compartilhar ids de fixture entre DO blocks (que não compartilham escopo de variável entre si)");
+  assert(/role = 'admin'/.test(liveTestPlan) && /client_user_access/.test(liveTestPlan), "promove um profile existente a admin + client_user_access ativo, dentro da própria transação (nunca depende de uma conta admin real pré-existente)");
+}
+
+console.log("[test] 13 — PROMPT 08C: substância real -- INSERT nas 5 tabelas, árvore A e B distintas, cross-company real (não só COUNT em tabela vazia)");
+{
+  for (const table of ["company_diagnostics", "diagnostic_checklist_items", "diagnostic_findings", "diagnostic_recommendations", "roadmap_items"]) {
+    assert(new RegExp(`INSERT INTO public\\.${table}`).test(liveTestPlan), `pelo menos um INSERT INTO public.${table} real (não apenas SELECT/COUNT)`);
+  }
+  assert(/__SQL91_TEST__/.test(liveTestPlan), "usa marcador único de teste (__SQL91_TEST__) em todo dado criado -- base do residue check");
+  assert(/finding_a|reco_a/.test(liveTestPlan) && /finding_b|reco_b/.test(liveTestPlan), "cria recommendation/finding tanto para árvore A quanto para árvore B (não só uma árvore com a outra assumida vazia)");
+  // Cross-company real: INSERT tentando um id de B dentro do escopo de A.
+  assert(/VALUES \(v_company_a, 'diagnostic_recommendation', v_reco_b/.test(liveTestPlan), "TEST 10: INSERT real de roadmap_items(client_id=A, source_id=recommendation de B) -- cross-company genuíno, não um comentário 'DEVE FALHAR'");
+}
+
+console.log("[test] 14 — PROMPT 08C: UPDATE de ownership proibido é EXECUTADO de verdade (imutabilidade), não só presença do trigger checada");
+{
+  const immutabilityUpdates = [
+    /UPDATE public\.company_diagnostics SET client_id = v_company_b/,
+    /UPDATE public\.diagnostic_findings SET diagnostic_id = gen_random_uuid\(\)/,
+    /UPDATE public\.diagnostic_recommendations SET finding_id = gen_random_uuid\(\)/,
+    /UPDATE public\.roadmap_items SET client_id = v_company_b/,
+  ];
+  for (const re of immutabilityUpdates) {
+    assert(re.test(liveTestPlan), `UPDATE proibido executado de verdade: ${re.source}`);
   }
 }
 
-console.log("[test] 12 — PROMPT 08, Fase 22: os 14 itens mínimos de cobertura estão presentes");
+console.log("[test] 15 — PROMPT 08C: DELETE real da árvore em cascata, verificado por COUNT pós-DELETE (não comentário)");
 {
-  const requiredCoverage = [
-    "super_admin cria diagnóstico", "admin com Company access cria diagnóstico",
-    "admin cross-company é negado", "cliente lê SÓ a própria Company",
-    "cross-company SELECT negado", "checklist pertence ao diagnóstico correto",
-    "finding pertence ao diagnóstico correto", "recommendation pertence ao diagnóstico correto",
-    "roadmap pertence à Company correta", "bloqueado por trigger",
-    "constraints de status", "FK integrity", "delete behavior", "zero resíduo",
-  ];
-  for (const c of requiredCoverage) {
-    assert(liveTestPlan.includes(c), `live test plan cobre "${c}" (Fase 22 do PROMPT 08)`);
+  assert(/DELETE FROM public\.company_diagnostics WHERE id = v_diag_c/.test(liveTestPlan), "DELETE real da raiz de uma árvore descartável dedicada (nunca a árvore A usada nos outros testes)");
+  assert(/SELECT COUNT\(\*\) INTO v_count FROM public\.diagnostic_checklist_items WHERE id = v_checklist_c/.test(liveTestPlan), "verifica programaticamente que o checklist descartável foi removido em cascata");
+  assert(/SELECT COUNT\(\*\) INTO v_count FROM public\.diagnostic_findings WHERE id = v_finding_c/.test(liveTestPlan), "verifica programaticamente que o finding descartável foi removido em cascata");
+  assert(/SELECT COUNT\(\*\) INTO v_count FROM public\.diagnostic_recommendations WHERE id = v_reco_c/.test(liveTestPlan), "verifica programaticamente que a recommendation descartável foi removida em cascata");
+}
+
+console.log("[test] 16 — PROMPT 08C: expected-failure handling programático (EXCEPTION WHEN), erro inesperado continua abortando");
+{
+  const expectedCatches = ["WHEN insufficient_privilege THEN", "WHEN raise_exception THEN", "WHEN check_violation THEN"];
+  for (const c of expectedCatches) {
+    assert(liveTestPlan.includes(c), `captura programática presente: ${c}`);
   }
-  assert(/cliente é somente-leitura/.test(liveTestPlan), "confirma explicitamente que cliente NUNCA escreve neste domínio, mesmo na própria Company (Fase 45 do SQL 91)");
+  assert(!/-- DEVE FALHAR\s*$/m.test(liveTestPlan.replace(/--[^\n]*DEVE FALHAR[^\n]*\([^\n]*nao deveria existir[^\n]*\)/g, "")), "nenhum 'DEVE FALHAR' restante como comentário solto sem assertion programática correspondente");
+  // Cada EXCEPTION captura um SQLSTATE específico -- nunca "WHEN OTHERS"
+  // mascarando um erro inesperado como PASS (a única exceção legítima a
+  // WHEN OTHERS é o SETUP best-effort do TEST 11, documentado à parte).
+  const othersCount = (liveTestPlan.match(/WHEN OTHERS THEN/g) ?? []).length;
+  assert(othersCount === 1, `WHEN OTHERS usado só 1 vez (setup best-effort do TEST 11 -- rec_projects fora do escopo do domínio), encontrado ${othersCount}`);
+}
+
+console.log("[test] 17 — PROMPT 08C: zero residue automático -- verificação programática, não comentário/manual");
+{
+  assert(/RESIDUE CHECK/.test(liveTestPlan), "existe um bloco de verificação de resíduo com marcador __SQL91_TEST__");
+  assert(/RAISE EXCEPTION 'RESIDUE CHECK INCONCLUSIVO/.test(liveTestPlan), "residue check falha alto se 0 marcadores forem encontrados ANTES do ROLLBACK -- prova que os testes rodaram de verdade, não é um check vazio");
 }
 
 console.log(`\n[result] ${passed} passed, ${failed} failed`);

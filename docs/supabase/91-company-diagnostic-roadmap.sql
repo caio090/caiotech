@@ -81,23 +81,20 @@
 
 BEGIN;
 
--- ── 0a. Reutiliza o mecanismo canônico de updated_at (Fase 28) ──
--- Já definida (sem prefixo de schema, então já em `public` pelo
--- search_path padrão) em docs/supabase/18 e novamente em /33 -- mesmo
--- padrão do projeto de redefinir defensivamente em vez de assumir que a
--- migration anterior rodou (não há migration history rastreada, Fase
--- "MIGRATION BASELINE" do audit). Redefinida aqui com prefixo `public.`
--- e search_path explícito -- mesmo corpo, só endurecida.
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
+-- ── 0a. public.set_updated_at() — DEPENDÊNCIA LIVE, NÃO objeto criado
+--    aqui (PROMPT 08C, P1 #1) ───────────────────────────────────────
+-- Já existe em Production (docs/supabase/18 e /33), com o mesmo corpo
+-- (NEW.updated_at = now(); RETURN NEW;), e é compartilhada por dez
+-- triggers de OUTROS domínios já ao vivo. A versão anterior desta SQL
+-- redefinia esta função só para acrescentar `SET search_path = public`
+-- -- um CREATE OR REPLACE sobre uma função compartilhada por 10 outros
+-- triggers tem raio de explosão (blast radius) que não pertence a este
+-- domínio, e cujo rollback não restaurava a configuração anterior. A
+-- SQL 91 SÓ REUTILIZA public.set_updated_at() (ver triggers abaixo,
+-- EXECUTE FUNCTION public.set_updated_at()) -- nunca recria, substitui,
+-- endurece, dropa ou restaura. O endurecimento de search_path desta
+-- função específica pertence ao backlog do Security Advisor, tratado à
+-- parte, nunca de passagem dentro de outro domínio.
 
 -- ── 0b. Helper de autorização canônico (Fase 3) ──────────────────
 -- Reproduz EXATAMENTE isCompanyAuthorizedForAdmin() + os dois caminhos
@@ -151,6 +148,17 @@ COMMENT ON FUNCTION public.can_access_client_company(uuid) IS
   'e os caminhos de resolveCurrentClient() -- nunca duplicar esta lógica em '
   'policies individuais, nunca conceder acesso Company-scoped só por role.';
 
+-- PROMPT 08C, P2 (default EXECUTE ACL): Production concede EXECUTE de
+-- funções novas por padrão a anon/authenticated/service_role -- "nenhum
+-- GRANT explícito" NÃO significava "sem exposição". Fechado
+-- explicitamente aqui. authenticated PRECISA de EXECUTE porque esta
+-- função é chamada DENTRO das próprias RLS policies (USING/WITH CHECK
+-- avaliam com o privilégio do papel que faz a query, diferente de
+-- funções de trigger -- ver nota nas 4 funções de trigger abaixo).
+REVOKE ALL ON FUNCTION public.can_access_client_company(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.can_access_client_company(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.can_access_client_company(uuid) TO authenticated;
+
 -- Escritas (INSERT/UPDATE/DELETE) neste domínio ficam restritas a quem
 -- tem ownership real da Company E é admin/super_admin (Fase 45: cliente
 -- é somente-leitura neste domínio -- não existe UI de escrita de
@@ -175,6 +183,12 @@ $$;
 COMMENT ON FUNCTION public.can_write_client_company(uuid) IS
   'Fase 45 -- cliente é somente-leitura no domínio Diagnostic/Roadmap até '
   'existir decisão de produto explícita permitindo escrita.';
+
+-- Mesmo motivo de can_access_client_company(uuid) acima -- usada
+-- diretamente nas policies de INSERT/UPDATE/DELETE das 5 tabelas.
+REVOKE ALL ON FUNCTION public.can_write_client_company(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.can_write_client_company(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.can_write_client_company(uuid) TO authenticated;
 
 -- ── 1. company_diagnostics ──────────────────────────────────────
 -- Uma "rodada" de diagnóstico para uma Company. Pode haver mais de uma
@@ -263,6 +277,18 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- PROMPT 08C, P2: função de TRIGGER, nunca chamada diretamente por
+-- código de aplicação ou por dentro de uma policy RLS -- o Postgres
+-- dispara triggers automaticamente como parte da própria execução do
+-- UPDATE, sem exigir que o papel que emitiu o UPDATE tenha EXECUTE na
+-- função de trigger em si (diferente de can_access_client_company()/
+-- can_write_client_company() acima, chamadas de dentro de USING/WITH
+-- CHECK). Por isso o mínimo necessário é revogar de PUBLIC/anon e não
+-- conceder authenticated -- fechando também a chamada direta via RPC
+-- (`SELECT forbid_client_id_change()`), que nunca é um uso legítimo.
+REVOKE ALL ON FUNCTION public.forbid_client_id_change() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.forbid_client_id_change() FROM anon;
 
 CREATE TRIGGER trg_company_diagnostics_immutable_client
   BEFORE UPDATE ON public.company_diagnostics
@@ -442,6 +468,11 @@ BEGIN
 END;
 $$;
 
+-- Mesmo motivo de forbid_client_id_change() acima -- função de trigger,
+-- nunca chamada diretamente.
+REVOKE ALL ON FUNCTION public.forbid_diagnostic_id_change() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.forbid_diagnostic_id_change() FROM anon;
+
 CREATE TRIGGER trg_diag_findings_immutable_diagnostic
   BEFORE UPDATE ON public.diagnostic_findings
   FOR EACH ROW EXECUTE FUNCTION public.forbid_diagnostic_id_change();
@@ -549,6 +580,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Mesmo motivo de forbid_client_id_change() acima -- função de trigger,
+-- nunca chamada diretamente.
+REVOKE ALL ON FUNCTION public.forbid_finding_id_change() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.forbid_finding_id_change() FROM anon;
 
 CREATE TRIGGER trg_diag_recommendations_immutable_finding
   BEFORE UPDATE ON public.diagnostic_recommendations
@@ -677,6 +713,11 @@ BEGIN
 END;
 $$;
 
+-- Mesmo motivo de forbid_client_id_change() acima -- função de trigger,
+-- nunca chamada diretamente.
+REVOKE ALL ON FUNCTION public.validate_roadmap_item_consistency() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.validate_roadmap_item_consistency() FROM anon;
+
 CREATE TRIGGER trg_roadmap_items_consistency
   BEFORE INSERT OR UPDATE ON public.roadmap_items
   FOR EACH ROW EXECUTE FUNCTION public.validate_roadmap_item_consistency();
@@ -687,14 +728,24 @@ COMMENT ON TABLE public.roadmap_items IS
   'garantida por trigger (trg_roadmap_items_consistency), não apenas '
   'pela aplicação.';
 
--- ── 6. Grants (Fase 35) ──────────────────────────────────────────
+-- ── 6. Grants de TABELA (Fase 35) ─────────────────────────────────
 -- Auditado contra o padrão real do projeto: nenhum dos 90 arquivos SQL
 -- anteriores adiciona GRANT explícito por tabela -- table-level DML é
 -- governado pelos grants padrão de schema do Supabase (authenticated/
 -- anon) com RLS como o filtro real linha-a-linha. Mantido o mesmo
--- padrão aqui -- nenhum GRANT novo, RLS é a camada de enforcement,
--- consistente com client_data_sources/client_report_uploads (SQL 64) e
--- client_projects/client_files (SQL 44).
+-- padrão aqui -- nenhum GRANT de TABELA novo, RLS é a camada de
+-- enforcement, consistente com client_data_sources/
+-- client_report_uploads (SQL 64) e client_projects/client_files (SQL 44).
+--
+-- PROMPT 08C, P2: isto é DIFERENTE do EXECUTE de FUNÇÃO -- Production
+-- confirmou (audit LIVE) que funções novas herdam EXECUTE por ACL
+-- default para anon/authenticated/service_role mesmo sem GRANT
+-- explícito. Por isso as 6 funções desta SQL (2 helpers de RLS + 4
+-- triggers) já foram fechadas explicitamente logo após cada definição
+-- acima -- REVOKE ALL FROM PUBLIC/anon em todas, GRANT EXECUTE TO
+-- authenticated só nas 2 usadas dentro de USING/WITH CHECK. Tabelas não
+-- têm esse "default ACL de função" -- por isso a decisão de não haver
+-- GRANT de tabela continua válida e não precisou mudar.
 
 COMMIT;
 

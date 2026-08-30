@@ -9,11 +9,14 @@
 -- é perigoso demais para um rollback. Este arquivo dropa explicitamente,
 -- na ordem inversa
 -- de dependência, SOMENTE os objetos que o 91 cria: 5 tabelas, os
--- triggers e funções auxiliares dedicadas a este domínio. Nunca toca em
--- `clients`, `profiles`, `rec_projects`, `commercial_leads`,
+-- triggers e as 6 funções auxiliares dedicadas a este domínio. Nunca
+-- toca em `clients`, `profiles`, `rec_projects`, `commercial_leads`,
 -- `client_user_access`, `agency_workspaces`, `agency_clients` ou
--- `public.set_updated_at()` (reaproveitada de docs/supabase/18 e /33 --
--- não pertence a este domínio, não é dropada aqui).
+-- `public.set_updated_at()` -- PROMPT 08C, P1 #1: a SQL 91 nunca CRIA
+-- nem redefine set_updated_at(), só a REUTILIZA (dependência LIVE já
+-- existente desde docs/supabase/18 e /33, compartilhada por dez
+-- triggers de outros domínios) -- portanto não há nada deste rollback
+-- para desfazer nela.
 --
 -- Execute no Supabase SQL Editor SOMENTE se o schema 91 precisar ser
 -- desfeito (ex.: revisão adicional necessária após teste real).
@@ -40,9 +43,10 @@ DROP FUNCTION IF EXISTS public.forbid_client_id_change();
 DROP FUNCTION IF EXISTS public.can_write_client_company(uuid);
 DROP FUNCTION IF EXISTS public.can_access_client_company(uuid);
 
--- Nota deliberada: public.set_updated_at() NÃO é dropada aqui -- não
--- foi criada por este domínio (já existia em docs/supabase/18 e /33) e
--- outras tabelas do projeto continuam usando-a.
+-- Nota deliberada: public.set_updated_at() NÃO é dropada aqui -- a SQL
+-- 91 nunca a criou nem redefiniu (só a reutiliza como dependência LIVE,
+-- já existente desde docs/supabase/18 e /33), e outras tabelas do
+-- projeto continuam usando-a.
 
 COMMIT;
 
