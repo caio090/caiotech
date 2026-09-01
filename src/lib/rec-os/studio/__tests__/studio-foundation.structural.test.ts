@@ -1,11 +1,18 @@
 /**
  * Executar com: node .tmp/run-ts-test.cjs src/lib/rec-os/studio/__tests__/studio-foundation.structural.test.ts
  * Sprint REC OS Studio Foundation V0.1 (Fase 13) — cobre os 14 itens
- * exigidos pelo brief. Importa e executa o Registry/Runtime reais
- * (não apenas grep de string) onde é comportamento executável; usa
- * leitura de arquivo só para os dois itens sobre AUSÊNCIA de import
- * (11/12), que não são observáveis em runtime sem tentar rodar o
- * módulo com rede desligada.
+ * exigidos pelo brief original. Importa e executa o Registry/Runtime
+ * reais (não apenas grep de string) onde é comportamento executável;
+ * usa leitura de arquivo só para os dois itens sobre AUSÊNCIA de
+ * import (11/12), que não são observáveis em runtime sem tentar rodar
+ * o módulo com rede desligada.
+ *
+ * V0.2 atualizou os testes 4/5/15 para os contratos evoluídos
+ * (runtimeStatus agora é "connected", execute() tem a nova assinatura
+ * StudioSkillExecutionRequest) -- ver
+ * studio-neural-runtime.structural.test.ts para a cobertura dos 20
+ * itens específicos da Fase 20 do brief V0.2 (execução real,
+ * autorização de Company, validação de output, etc.).
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -16,7 +23,7 @@ import {
   isStudioSkillContractAvailable,
   isStudioSkillRuntimeAvailable,
 } from "../registry";
-import { createNotConnectedRuntime, STUDIO_SKILL_RUNTIME_NOT_CONNECTED } from "../runtime";
+import { createNotConnectedRuntime } from "../runtime";
 import { VIDIGAL_PNG_DELIVERY_STEPS } from "../skills/vidigal-png/instructions";
 
 const root = process.cwd();
@@ -38,16 +45,21 @@ async function main() {
     assert(vidigal?.name === "Vidigal PNG", "skill.name === 'Vidigal PNG'");
   }
 
-  console.log("[test] 4 — runtimeStatus = not_connected");
+  console.log("[test] 4 — runtimeStatus = connected (V0.2: existe executor real ligado -- ver studio-neural-runtime.structural.test.ts para o contrato de execução)");
   {
-    assert(vidigal?.runtimeStatus === "not_connected", "vidigal.runtimeStatus === 'not_connected'");
+    assert(vidigal?.runtimeStatus === "connected", "vidigal.runtimeStatus === 'connected'");
   }
 
-  console.log("[test] 5 — available_contract não significa runtime disponível");
+  console.log("[test] 5 — available_contract não significa runtime disponível AGORA (depende do provider configurado no ambiente)");
   {
     assert(vidigal?.status === "available_contract", "vidigal.status === 'available_contract'");
     assert(!!vidigal && isStudioSkillContractAvailable(vidigal), "isStudioSkillContractAvailable(vidigal) === true");
-    assert(!!vidigal && isStudioSkillRuntimeAvailable(vidigal) === false, "isStudioSkillRuntimeAvailable(vidigal) === false -- mesmo com contrato disponível");
+    const hadKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    assert(!!vidigal && isStudioSkillRuntimeAvailable(vidigal) === false, "isStudioSkillRuntimeAvailable(vidigal) === false quando OPENAI_API_KEY ausente, mesmo com contrato disponível e runtimeStatus='connected'");
+    process.env.OPENAI_API_KEY = "sk-test-fake-key-for-structural-test-only";
+    assert(!!vidigal && isStudioSkillRuntimeAvailable(vidigal) === true, "isStudioSkillRuntimeAvailable(vidigal) === true quando OPENAI_API_KEY presente (só checa presença, nunca o valor)");
+    if (hadKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = hadKey;
   }
 
   console.log("[test] 6 — oito módulos registrados");
@@ -146,13 +158,14 @@ async function main() {
     assert(!studioDirHasCanvas, "nenhum arquivo de canvas criado dentro do domínio Studio -- EditorOS continua o único canvas real");
   }
 
-  console.log("[test] 15 — runtime nunca executa, sempre retorna STUDIO_SKILL_RUNTIME_NOT_CONNECTED");
+  console.log("[test] 15 — createNotConnectedRuntime nunca executa, sempre retorna STUDIO_AI_PROVIDER_UNAVAILABLE");
   {
     const runtime = createNotConnectedRuntime("vidigal_png");
-    const result = await runtime.execute({ freeformBrief: "teste" });
-    assert(result.status === "not_connected", "execute() retorna status 'not_connected'");
-    assert(result.code === STUDIO_SKILL_RUNTIME_NOT_CONNECTED, "execute() retorna code STUDIO_SKILL_RUNTIME_NOT_CONNECTED");
+    const result = await runtime.execute({ skillId: "vidigal_png", input: { freeformBrief: "teste" }, context: { company: null } });
+    assert(result.status === "runtime_unavailable", "execute() retorna status 'runtime_unavailable'");
+    assert(result.error?.code === "STUDIO_AI_PROVIDER_UNAVAILABLE", "execute() retorna error.code STUDIO_AI_PROVIDER_UNAVAILABLE");
     assert(result.output === null, "execute() nunca retorna output real -- sempre null");
+    assert(result.runtime === "not_connected", "execute() reporta runtime === 'not_connected'");
   }
 
   console.log(`\n[result] ${passed} passed, ${failed} failed`);

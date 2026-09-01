@@ -75,6 +75,7 @@ funcional no shell de demonstração hoje. Duas consequências práticas:
 | `api/jarvis/chat/route.ts` | POST | Jarvis (Sprint MVP Experience Completion V0.1) | Chamada externa (OpenAI Responses API, streaming), sem persistência — protegida por "chamada externa", mesmo padrão de `api/ai/*` |
 | `api/jarvis/transcribe/route.ts` | POST | Jarvis | Chamada externa (OpenAI Whisper); áudio processado só em memória, nunca gravado |
 | `api/jarvis/speech/route.ts` | POST | Jarvis | Chamada externa (OpenAI TTS); áudio de saída devolvido direto ao browser, nunca persistido |
+| `api/studio/skills/execute/route.ts` | POST | REC OS > Studio (Sprint REC OS Studio Foundation V0.2) | Chamada externa (OpenAI Responses API, texto estruturado via json_schema) da skill Vidigal PNG; sem persistência (nenhuma tabela nova), sem geração de imagem — mesmo padrão "chamada externa" de `api/jarvis/*`/`api/meu-negocio/ai/analyze` |
 
 ## Meu Negócio — `demo_memory_only`, confirmado por inspeção
 

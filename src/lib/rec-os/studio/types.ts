@@ -21,9 +21,15 @@ export type StudioSkillCategory = "visual_direction";
  *  "placeholder_contract" = módulo registrado na árvore mas sem comportamento definido ainda -- nunca inventar aqui. */
 export type StudioModuleStatus = "documented" | "placeholder_contract";
 
-/** Único valor hoje. Campo mantido explícito (em vez de um boolean) para que uma sprint futura
- *  que conecte runtime real tenha um único ponto a estender, sem precisar migrar o formato do campo. */
-export type StudioSkillRuntimeStatus = "not_connected";
+/** V0.2 -- "connected" significa que existe um executor real ligado a
+ *  esta skill (ver skills/<id>/neural-executor.ts), NUNCA que o
+ *  provider está configurado/disponível AGORA (isso é um fato de
+ *  runtime, checado em isStudioSkillRuntimeAvailable() e refletido no
+ *  status de cada StudioSkillExecutionResult -- nunca pré-declarado
+ *  aqui). Campo mantido explícito (em vez de um boolean) para que uma
+ *  eventual skill sem executor real continue "not_connected" mesmo
+ *  com outras skills já conectadas. */
+export type StudioSkillRuntimeStatus = "not_connected" | "connected";
 
 export interface StudioSkillModule {
   id: string;

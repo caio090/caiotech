@@ -1,12 +1,20 @@
 /**
- * Sprint REC OS Studio Foundation V0.1 — Studio Skill Registry.
- * Espelha AGENT_REGISTRY (neural-core/agents.ts): metadata apenas,
- * nenhuma skill executa IA real. Permite novas skills futuramente sem
- * reescrever o Studio -- a UI consome getStudioSkills()/findStudioSkill(),
- * nunca hardcoda "Vidigal PNG" diretamente.
+ * Sprint REC OS Studio Foundation V0.1/V0.2 — Studio Skill Registry.
+ * Espelha AGENT_REGISTRY (neural-core/agents.ts): metadata apenas.
+ * Permite novas skills futuramente sem reescrever o Studio -- a UI
+ * consome getStudioSkills()/findStudioSkill(), nunca hardcoda "Vidigal
+ * PNG" diretamente.
+ *
+ * Importa VIDIGAL_PNG_SKILL diretamente de ./skills/vidigal-png/manifest
+ * (NUNCA do barrel ./skills/vidigal-png/index.ts) -- o barrel reexporta
+ * neural-executor.ts, que importa o SDK do provider. Este arquivo
+ * precisa continuar seguro de importar de qualquer lugar que só queira
+ * LISTAR skills (ex.: a página do Studio) sem arrastar o SDK de IA para
+ * dentro desse bundle. A execução de fato vive em ./execute.ts,
+ * importado só pela rota da API.
  */
 import type { StudioSkillDefinition } from "./types";
-import { VIDIGAL_PNG_SKILL } from "./skills/vidigal-png";
+import { VIDIGAL_PNG_SKILL } from "./skills/vidigal-png/manifest";
 
 export const STUDIO_SKILL_REGISTRY: readonly StudioSkillDefinition[] = [
   VIDIGAL_PNG_SKILL,
@@ -26,10 +34,16 @@ export function isStudioSkillContractAvailable(skill: StudioSkillDefinition): bo
   return skill.status === "available_contract";
 }
 
-/** Nesta Foundation NENHUMA skill tem runtime real. Sempre retorna
- *  false; mantida como API explícita para que a sprint que conectar um
- *  runtime de verdade tenha um único ponto a atualizar. */
+/**
+ * V0.2 — "roda de verdade AGORA" exige duas coisas: (1) a skill tem um
+ * executor real ligado (`runtimeStatus === "connected"`, declarado no
+ * manifesto) E (2) o provider está configurado neste ambiente (mesma
+ * checagem de isVidigalTextRuntimeConfigured() em
+ * ./skills/vidigal-png/neural-executor.ts -- duplicada aqui de
+ * propósito, um `Boolean(process.env.OPENAI_API_KEY?.trim())` de uma
+ * linha, só a PRESENÇA da env var, nunca o valor -- para este arquivo
+ * não precisar importar o SDK do provider só para checar isso).
+ */
 export function isStudioSkillRuntimeAvailable(skill: StudioSkillDefinition): boolean {
-  void skill;
-  return false;
+  return skill.runtimeStatus === "connected" && Boolean(process.env.OPENAI_API_KEY?.trim());
 }

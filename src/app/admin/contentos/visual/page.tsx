@@ -1,23 +1,23 @@
 import { Palette, Sparkles, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
-import { DESIGN_FORMATS } from "@/lib/providers/shared/types";
 import { getStudioSkills, isStudioSkillContractAvailable, isStudioSkillRuntimeAvailable } from "@/lib/rec-os/studio";
 import { VIDIGAL_PNG_DELIVERY_STEPS } from "@/lib/rec-os/studio/skills/vidigal-png/instructions";
+import { StudioExecutionForm } from "./_studio-execution-form";
 
 /**
- * Sprint REC OS Studio Foundation V0.1 — reaproveita /admin/contentos/visual
- * (antes um redirect puro para /admin/contentos/criar?step=visual) como a
- * landing real do Studio. Nenhuma rota nova criada (/admin/contentos/studio
- * é só destino conceitual futuro, ver docs/product-roadmap/vidigal-png-
- * master-prompt.txt, STUDIO_ARCHITECTURE_DECISION_V1).
+ * Sprint REC OS Studio Foundation V0.1/V0.2 — reaproveita
+ * /admin/contentos/visual (antes um redirect puro para
+ * /admin/contentos/criar?step=visual) como a landing real do Studio.
+ * Nenhuma rota nova criada (/admin/contentos/studio é só destino
+ * conceitual futuro, ver docs/product-roadmap/vidigal-png-master-
+ * prompt.txt, STUDIO_ARCHITECTURE_DECISION_V1).
  *
- * Puramente estrutural/contrato: a skill listada vem do Studio Skill
- * Registry (nunca hardcoded aqui), o status runtime é sempre "não
- * conectado" (nenhum executor de IA existe nesta Foundation), e não há
- * nenhum botão que sugira execução real ("Gerar"/"Criar com IA"/
- * "Executar Vidigal"/"Gerar PNG") -- só "Preparar briefing", que não
- * chama nenhum backend.
+ * A skill listada vem do Studio Skill Registry (nunca hardcoded
+ * aqui). V0.2: o bloco "Nova criação visual" agora executa de verdade
+ * (StudioExecutionForm, client component -- chama só a própria API do
+ * projeto, nunca um provider diretamente) -- o resultado é sempre
+ * direção visual/texto estruturado, nunca o PNG final.
  */
 export default async function StudioPage({
   searchParams,
@@ -43,49 +43,7 @@ export default async function StudioPage({
         </div>
 
         {/* Nova criação visual */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
-          <h2 className="text-xs font-black uppercase tracking-wide text-gray-500">Nova criação visual</h2>
-
-          <div>
-            <label htmlFor="studio-brief" className="text-xs font-bold text-gray-600 mb-1.5 block">
-              O que você quer criar?
-            </label>
-            <textarea
-              id="studio-brief"
-              rows={3}
-              placeholder='Ex.: "Quero uma arte do aniversário da Duh para feed."'
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-200"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="studio-format" className="text-xs font-bold text-gray-600 mb-1.5 block">Formato</label>
-              <select id="studio-format" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
-                {DESIGN_FORMATS.map((f) => (
-                  <option key={f.id} value={f.id}>{f.label} ({f.ratio})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="studio-skill" className="text-xs font-bold text-gray-600 mb-1.5 block">Skill</label>
-              <select id="studio-skill" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
-                {skills.map((skill) => (
-                  <option key={skill.id} value={skill.id}>{skill.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            disabled
-            className="text-xs font-bold bg-gray-100 text-gray-400 px-4 py-2 rounded-xl cursor-not-allowed"
-            title="Estrutura disponível — IA ainda não conectada"
-          >
-            Preparar briefing
-          </button>
-        </div>
+        <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} />
 
         {/* Skills disponíveis */}
         <div>

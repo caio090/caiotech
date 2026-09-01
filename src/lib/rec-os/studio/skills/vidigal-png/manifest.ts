@@ -67,7 +67,11 @@ export const VIDIGAL_PNG_SKILL: StudioSkillDefinition = {
   version: "2.0.0",
   category: "visual_direction",
   status: "available_contract",
-  runtimeStatus: "not_connected",
+  // V0.2: existe um Studio Neural Executor real ligado a esta skill
+  // (./neural-executor.ts) -- "connected" NUNCA significa "IA está
+  // configurada agora" (isso é um fato de runtime, nunca declarado
+  // aqui). Ver isStudioSkillRuntimeAvailable() em ../../registry.ts.
+  runtimeStatus: "connected",
   supportedInputs: [
     "companyId", "projectId", "campaignId", "objective", "pieceType", "format",
     "headline", "supportingCopy", "cta", "references", "brandContext", "assets",
