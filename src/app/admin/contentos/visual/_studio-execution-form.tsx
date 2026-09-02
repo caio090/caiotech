@@ -45,7 +45,14 @@ interface GenerateApiResponse {
   image?: { status: string; image: { url: string; width: number; height: number } | null; providerId: string | null; warnings: string[]; error?: { code: string; message: string } };
 }
 
-const LOADING_STEPS = ["Entendendo o briefing…", "Lendo o contexto da marca…", "Preparando direção…", "Criando a imagem…"];
+const LOADING_STEPS = [
+  "Entendendo o briefing…",
+  "Lendo a identidade da marca…",
+  "Definindo a direção criativa…",
+  "Preparando a composição…",
+  "Criando o visual…",
+  "Finalizando a arte…",
+];
 const AI_UNAVAILABLE_CODES = new Set(["STUDIO_AI_PROVIDER_UNAVAILABLE", "STUDIO_SKILL_RUNTIME_UNAVAILABLE"]);
 const IMAGE_UNAVAILABLE_CODES = new Set(["STUDIO_IMAGE_PROVIDER_UNAVAILABLE"]);
 
@@ -172,10 +179,11 @@ export function StudioExecutionForm({ skills, clientId }: { skills: { id: string
     try {
       const res = await fetch(image.url);
       const blob = await res.blob();
+      const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `studio-vidigal-${new Date().toISOString().slice(0, 10)}.png`;
+      a.download = `studio-vidigal-${new Date().toISOString().slice(0, 10)}.${ext}`;
       document.body.appendChild(a);
       a.click();
       a.remove();

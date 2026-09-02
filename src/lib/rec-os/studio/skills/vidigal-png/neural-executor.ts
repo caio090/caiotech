@@ -56,8 +56,10 @@ const VIDIGAL_PNG_JSON_SCHEMA = {
       },
     },
     adaptations: stringArray,
+    suggestedHeadline: { type: "string" },
+    suggestedCta: { type: ["string", "null"] },
   },
-  required: ["briefReading", "creativeDirection", "conceptualBasis", "visualStructure", "visualGuidelines", "generationPrompt", "variations", "adaptations"],
+  required: ["briefReading", "creativeDirection", "conceptualBasis", "visualStructure", "visualGuidelines", "generationPrompt", "variations", "adaptations", "suggestedHeadline", "suggestedCta"],
 } as const;
 
 function isNonEmptyInput(request: StudioSkillExecutionRequest): boolean {
@@ -80,6 +82,8 @@ function isValidVidigalOutput(value: unknown): value is VidigalPngOutputContract
   if (!Array.isArray(v.variations)) return false;
   if (!v.variations.every((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).title === "string" && typeof (item as Record<string, unknown>).direction === "string" && typeof (item as Record<string, unknown>).promptDelta === "string")) return false;
   if (!Array.isArray(v.adaptations) || !v.adaptations.every((a) => typeof a === "string")) return false;
+  if (typeof v.suggestedHeadline !== "string" || v.suggestedHeadline.length === 0) return false;
+  if (v.suggestedCta !== null && typeof v.suggestedCta !== "string") return false;
   return true;
 }
 
@@ -123,6 +127,7 @@ export async function executeVidigalPng(
   // instruções de sistema (Fase 9).
   const requestPayload = {
     business_context: request.context,
+    reference_analysis: request.referenceVisualRules ?? null,
     user_brief: {
       freeformBrief: freeformBrief ?? null,
       objective: request.input.objective ?? null,

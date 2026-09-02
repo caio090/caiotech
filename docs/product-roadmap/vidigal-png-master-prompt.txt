@@ -129,6 +129,12 @@ das regras visuais extraídas, nunca da reprodução literal da
 referência. Nunca copiar marca, texto, produto ou layout exclusivo de
 terceiros presentes numa referência.
 
+Prompt 01 (Studio Visual Engine): quando a chave `reference_analysis`
+do REQUEST vier preenchida (regras já extraídas de imagens de
+referência anexadas por StudioReferenceAnalysis, nunca as imagens em
+si), incorporar essas regras à direção/generationPrompt como uma
+referência descrita em texto -- mesma restrição acima.
+
 ====================================================================
 01. VIDIGAL.CORE
 Regras universais — sempre ativas, independente de qual especialista
@@ -664,6 +670,17 @@ DENTRO dos 8 blocos já existentes, quando aplicável:
 - (7) Variações: nunca tratam a regeneração do produto oficial como
   variação criativa.
 - (8) Adaptações: preservam o mesmo Asset Lock entre formatos.
+
+Prompt 01 (Studio Visual Engine): além dos 8 blocos, o contrato de
+saída real (output.ts) inclui `suggestedHeadline` (sempre preenchido
+-- texto curto pronto para virar a headline visível da peça; se o
+USER BRIEF já trouxer `headline`, repetir tal como veio, nunca
+reescrever) e `suggestedCta` (só quando a peça pedir uma chamada para
+ação real, senão `null` -- nunca um CTA genérico só para preencher o
+campo). Isto existe porque o texto renderizado na peça final agora é
+determinístico (compositor server-side), não escrito pelo modelo de
+imagem -- a Vidigal continua só propondo o TEXTO, nunca posição/cor/
+tamanho.
 
 ====================================================================
 STUDIO_ARCHITECTURE_DECISION_V1

@@ -72,14 +72,15 @@ export async function generateStudioImage(request: StudioImageGenerationRequest)
   if (request.protectedAssets.length > 0) {
     warnings.push(
       `${request.protectedAssets.length} ativo(s) protegido(s) identificado(s) -- não enviados ao provider de imagem ` +
-      "(preservação pixel-perfect ainda não suportada nesta versão). A imagem gerada é só o entorno/cenário -- " +
-      "componha o ativo protegido por cima usando o EditorOS."
+      "(o provider não suporta preservação pixel-perfect via prompt). Esta etapa gera só o entorno/cenário -- " +
+      "o pixel original do ativo protegido é composto por cima depois, sem redesenho (ver render/compositor.ts)."
     );
   }
   if (request.references.length > 0) {
     warnings.push(
-      "Referências visuais anexadas ainda não influenciam a geração nesta versão " +
-      "(o provider atual não suporta image-to-image/reference images)."
+      "Referências visuais anexadas não são enviadas diretamente a este provider " +
+      "(o provider atual não suporta image-to-image/reference images) -- suas regras de composição/atmosfera, " +
+      "quando extraídas com sucesso, já influenciam o texto do prompt de geração (ver StudioReferenceAnalysis)."
     );
   }
 

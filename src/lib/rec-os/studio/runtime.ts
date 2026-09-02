@@ -78,6 +78,11 @@ export interface StudioSkillExecutionRequest {
   skillId: string;
   input: StudioBriefInput;
   context: StudioSkillBusinessContext;
+  /** Prompt 01 (Studio Visual Engine) -- regras visuais já extraídas das
+   *  referências anexadas por render/reference-analysis.ts (nunca a
+   *  imagem em si, nunca texto/marca copiada literalmente). Omitido
+   *  quando não há referências ou a análise falhou -- nunca inventado. */
+  referenceVisualRules?: string[];
 }
 
 export interface StudioSkillExecutionResult<TOutput = unknown> {

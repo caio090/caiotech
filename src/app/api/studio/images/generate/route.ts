@@ -165,6 +165,7 @@ export const POST = withMutationProtection(async function POST(request: NextRequ
         ? 502
         : imageOk ? 200
         : result.image.error?.code === "STUDIO_IMAGE_PROVIDER_UNAVAILABLE" ? 503
+        : result.image.error?.code === "STUDIO_OUTPUT_TOO_LARGE" ? 413
         : 502;
 
     return NextResponse.json({ ok: textOk && imageOk, text: result.text, image: result.image }, { status: statusCode });

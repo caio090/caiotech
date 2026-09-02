@@ -23,6 +23,13 @@ export interface StudioImageAsset {
   label: string;
   kind: StudioImageAssetKind;
   url: string;
+  /** Prompt 01 (Studio Visual Engine) -- só relevante para kind:"protected":
+   *  decide o slot de layout no StudioRenderPlan (logo = canto pequeno,
+   *  product = card central). Omitido para "reference". O logo oficial
+   *  da Company é sempre "logo" (create-studio-visual.ts); um asset
+   *  protegido enviado pelo usuário é sempre "product" por padrão (a UI
+   *  hoje não distingue logo/produto no upload). */
+  role?: "logo" | "product";
 }
 
 export type StudioImageCapabilityKey =

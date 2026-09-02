@@ -24,6 +24,8 @@ const FAKE_OUTPUT = {
   generationPrompt: "Prompt de geração de teste.",
   variations: [{ title: "V1", direction: "Direção 1", promptDelta: "delta 1" }],
   adaptations: ["Adaptação 1"],
+  suggestedHeadline: "Headline de teste",
+  suggestedCta: "CTA de teste",
 };
 
 class FakeOpenAI {
