@@ -36,13 +36,42 @@ export type StudioSkillErrorCode =
  * Fase 5 — nunca inventar dado ausente. Cada campo é só o que está
  * genuinamente disponível a partir do contexto canônico já resolvido
  * pelo caller (ResolvedCompanyContext/CanonicalBusinessContext) --
- * nunca preenchido com exemplo, nunca um cliente hardcoded. `brand`/
- * `initiative` (posicionamento, projeto, campanha) NÃO têm resolver
- * canônico identificado nesta auditoria -- omitidos aqui em vez de
- * inventados; ver riscos/dívida técnica do relatório desta sprint.
+ * nunca preenchido com exemplo, nunca um cliente hardcoded.
+ *
+ * V0.3 (Image Generation MVP, Fase 8/9) — identity/brand/market/
+ * products são opcionais de propósito: só existem quando
+ * buildStudioCreativeBusinessContext() (../business-context.ts)
+ * encontrar uma linha real em `onboarding_profiles` para a Company.
+ * Ausente permanece `null`, nunca um objeto com campos inventados.
+ * `initiative` (campanha/projeto) continua sem resolver canônico
+ * identificado -- omitido, não inventado.
  */
 export interface StudioSkillBusinessContext {
   company: { id: string; name: string | null } | null;
+  identity?: {
+    brandName: string | null;
+    logoUrl: string | null;
+    brandColors: unknown;
+    visualStyle: string | null;
+    visualReferences: string | null;
+  } | null;
+  brand?: {
+    toneOfVoice: string[] | null;
+    wordsToUse: string | null;
+    wordsToAvoid: string | null;
+  } | null;
+  market?: {
+    segment: string | null;
+    idealCustomer: string | null;
+    ageRange: string | null;
+    audienceLocation: string | null;
+    pains: string | null;
+    desires: string | null;
+    objections: string | null;
+  } | null;
+  products?: {
+    productsServices: string | null;
+  } | null;
 }
 
 export interface StudioSkillExecutionRequest {

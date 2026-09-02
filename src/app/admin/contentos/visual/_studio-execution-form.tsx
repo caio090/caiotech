@@ -1,187 +1,335 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, AlertTriangle, Sparkles } from "lucide-react";
-import { DESIGN_FORMATS, type DesignFormat } from "@/lib/providers/shared/types";
+import { useRef, useState } from "react";
+import { Loader2, AlertTriangle, Sparkles, Download, RefreshCw, Wand2, ChevronDown, ChevronUp, X, Building2, UserRound } from "lucide-react";
+import type { DesignFormat } from "@/lib/providers/shared/types";
 import { VIDIGAL_PNG_DELIVERY_STEPS } from "@/lib/rec-os/studio/skills/vidigal-png/instructions";
 import type { VidigalPngOutputContract } from "@/lib/rec-os/studio/skills/vidigal-png/output";
 
 /**
- * Sprint REC OS Studio Foundation V0.2 — client component do bloco
- * "Nova criação visual". Único ponto do Studio que chama
- * POST /api/studio/skills/execute -- nunca importa `openai` nem
- * qualquer provider diretamente (Fase "Vidigal PNG não conhece
- * provider" também vale para a UI: ela só fala com a própria API do
- * projeto). Estados: Pronto/Preparando/Concluído/Erro/IA indisponível
- * (Fase 11).
+ * Sprint REC OS Studio Image Generation MVP V0.3 — experiência de
+ * criação completa. Único ponto do Studio que chama
+ * POST /api/studio/images/generate -- nunca importa nenhum provider de
+ * IA/imagem diretamente (Vidigal PNG também não conhece o provider).
+ *
+ * Dois modos (Fase 2): "company" reaproveita o `clientId` já
+ * selecionado na navegação do REC OS (ContentosSubNavServer/?client=,
+ * nenhum seletor novo criado aqui); "free" nunca envia companyId --
+ * nunca cria Company fictícia.
+ *
+ * Assets são efêmeros: convertidos para data: URL no navegador
+ * (mesma técnica já usada em CanvasEditor.handleImageUpload), nunca
+ * enviados a um bucket -- sem banco, sem tabela, sem permanência.
  */
 
-interface StudioSkillOption {
+const IMAGE_FORMATS: { id: DesignFormat; label: string }[] = [
+  { id: "carousel", label: "Feed 4:5" },
+  { id: "story_vertical", label: "Story 9:16" },
+  { id: "feed_square", label: "Quadrado 1:1" },
+];
+
+type FormStatus = "idle" | "preparing" | "completed" | "error" | "ai_unavailable" | "image_unavailable";
+type CreationMode = "company" | "free";
+
+interface LocalAsset {
   id: string;
-  name: string;
+  label: string;
+  url: string; // data: URL
 }
 
-type FormStatus = "idle" | "preparing" | "completed" | "error" | "ai_unavailable";
-
-interface ExecuteApiResponse {
+interface GenerateApiResponse {
   ok: boolean;
   error?: string;
   code?: string;
-  result?: {
-    status: string;
-    output: VidigalPngOutputContract | null;
-    warnings: string[];
-    error?: { code: string; message: string };
-  };
+  text?: { status: string; output: VidigalPngOutputContract | null; warnings: string[]; error?: { code: string; message: string } };
+  image?: { status: string; image: { url: string; width: number; height: number } | null; providerId: string | null; warnings: string[]; error?: { code: string; message: string } };
 }
 
+const LOADING_STEPS = ["Entendendo o briefing…", "Lendo o contexto da marca…", "Preparando direção…", "Criando a imagem…"];
 const AI_UNAVAILABLE_CODES = new Set(["STUDIO_AI_PROVIDER_UNAVAILABLE", "STUDIO_SKILL_RUNTIME_UNAVAILABLE"]);
+const IMAGE_UNAVAILABLE_CODES = new Set(["STUDIO_IMAGE_PROVIDER_UNAVAILABLE"]);
 
-export function StudioExecutionForm({ skills, clientId }: { skills: StudioSkillOption[]; clientId: string | null }) {
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+export function StudioExecutionForm({ skills, clientId }: { skills: { id: string; name: string }[]; clientId: string | null }) {
+  const [mode, setMode] = useState<CreationMode>(clientId ? "company" : "free");
   const [freeformBrief, setFreeformBrief] = useState("");
-  const [format, setFormat] = useState<DesignFormat>(DESIGN_FORMATS[0].id);
-  const [skillId, setSkillId] = useState(skills[0]?.id ?? "");
+  const [format, setFormat] = useState<DesignFormat>(IMAGE_FORMATS[0].id);
+  const [skillId] = useState(skills[0]?.id ?? "vidigal_png");
+  const [references, setReferences] = useState<LocalAsset[]>([]);
+  const [protectedAssets, setProtectedAssets] = useState<LocalAsset[]>([]);
   const [status, setStatus] = useState<FormStatus>("idle");
+  const [loadingStep, setLoadingStep] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [output, setOutput] = useState<VidigalPngOutputContract | null>(null);
+  const [textOutput, setTextOutput] = useState<VidigalPngOutputContract | null>(null);
+  const [image, setImage] = useState<{ url: string; width: number; height: number } | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [showDirection, setShowDirection] = useState(false);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  const protectedInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleSubmit() {
-    if (!freeformBrief.trim() || !skillId) return;
+  async function handleAddAsset(kind: "reference" | "protected", fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) {
+      setErrorMessage("A imagem selecionada passa de 6MB.");
+      return;
+    }
+    const url = await fileToDataUrl(file);
+    const asset: LocalAsset = { id: `${kind}-${Date.now()}`, label: file.name, url };
+    if (kind === "reference") setReferences((prev) => (prev.length >= 4 ? prev : [...prev, asset]));
+    else setProtectedAssets((prev) => (prev.length >= 4 ? prev : [...prev, asset]));
+  }
+
+  function removeAsset(kind: "reference" | "protected", id: string) {
+    if (kind === "reference") setReferences((prev) => prev.filter((a) => a.id !== id));
+    else setProtectedAssets((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  async function runGeneration(brief: string) {
     setStatus("preparing");
+    setLoadingStep(0);
     setErrorMessage(null);
-    setOutput(null);
+    setTextOutput(null);
+    setImage(null);
     setWarnings([]);
+    const stepTimer = setInterval(() => setLoadingStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1)), 1800);
 
     try {
-      const response = await fetch("/api/studio/skills/execute", {
+      const response = await fetch("/api/studio/images/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           skillId,
-          input: { freeformBrief: freeformBrief.trim(), format, companyId: clientId ?? undefined },
+          input: { freeformBrief: brief.trim(), format, companyId: mode === "company" ? (clientId ?? undefined) : undefined },
+          assets: {
+            references: references.map((a) => ({ label: a.label, url: a.url })),
+            protectedAssets: protectedAssets.map((a) => ({ label: a.label, url: a.url })),
+          },
         }),
       });
-      const data = (await response.json().catch(() => null)) as ExecuteApiResponse | null;
+      const data = (await response.json().catch(() => null)) as GenerateApiResponse | null;
 
-      const code = data?.result?.error?.code ?? data?.code;
-      if (data?.ok && data.result?.output) {
-        setOutput(data.result.output);
-        setWarnings(data.result.warnings ?? []);
-        setStatus("completed");
-        return;
-      }
-      if (code && AI_UNAVAILABLE_CODES.has(code)) {
+      const textCode = data?.text?.error?.code ?? data?.code;
+      if (textCode && AI_UNAVAILABLE_CODES.has(textCode)) {
         setStatus("ai_unavailable");
         return;
       }
-      setErrorMessage(data?.result?.error?.message ?? data?.error ?? "Não foi possível preparar a direção criativa agora.");
-      setStatus("error");
+      if (data?.text?.status !== "completed" || !data.text.output) {
+        setErrorMessage(data?.text?.error?.message ?? data?.error ?? "Não foi possível preparar a direção criativa agora.");
+        setStatus("error");
+        return;
+      }
+      setTextOutput(data.text.output);
+
+      const imageCode = data.image?.error?.code;
+      if (imageCode && IMAGE_UNAVAILABLE_CODES.has(imageCode)) {
+        setWarnings(data.image?.warnings ?? []);
+        setStatus("image_unavailable");
+        return;
+      }
+      if (data.image?.status !== "completed" || !data.image.image) {
+        setErrorMessage(data?.image?.error?.message ?? "A direção criativa ficou pronta, mas não foi possível gerar a imagem agora.");
+        setWarnings(data.image?.warnings ?? []);
+        setStatus("error");
+        return;
+      }
+
+      setImage(data.image.image);
+      setWarnings([...(data.text.warnings ?? []), ...(data.image.warnings ?? [])]);
+      setStatus("completed");
     } catch {
       setErrorMessage("Não foi possível conectar ao servidor.");
       setStatus("error");
+    } finally {
+      clearInterval(stepTimer);
+    }
+  }
+
+  function handleSubmit() {
+    if (!freeformBrief.trim()) return;
+    void runGeneration(freeformBrief);
+  }
+
+  function handleRegenerate() {
+    void runGeneration(freeformBrief);
+  }
+
+  function handleVariation(variation: { direction: string; promptDelta: string }) {
+    const nudged = `${freeformBrief}\n\nPara esta nova versão, ajuste a direção: ${variation.direction} (${variation.promptDelta})`;
+    void runGeneration(nudged);
+  }
+
+  async function handleDownload() {
+    if (!image) return;
+    try {
+      const res = await fetch(image.url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `studio-vidigal-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      setErrorMessage("Não foi possível baixar a imagem agora.");
     }
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-3">
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4">
       <h2 className="text-xs font-black uppercase tracking-wide text-gray-500">Nova criação visual</h2>
 
       <div>
-        <label htmlFor="studio-brief" className="text-xs font-bold text-gray-600 mb-1.5 block">
-          O que você quer criar?
-        </label>
+        <label htmlFor="studio-brief" className="text-xs font-bold text-gray-600 mb-1.5 block">O que vamos criar?</label>
         <textarea
-          id="studio-brief"
-          rows={3}
-          value={freeformBrief}
-          onChange={(e) => setFreeformBrief(e.target.value)}
-          placeholder='Ex.: "Quero uma arte do aniversário da Duh para feed."'
+          id="studio-brief" rows={3} value={freeformBrief} onChange={(e) => setFreeformBrief(e.target.value)}
+          placeholder='Ex.: "Crie uma arte anunciando nosso combo por R$ 29"'
           className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-200"
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="studio-format" className="text-xs font-bold text-gray-600 mb-1.5 block">Formato</label>
-          <select id="studio-format" value={format} onChange={(e) => setFormat(e.target.value as DesignFormat)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
-            {DESIGN_FORMATS.map((f) => (
-              <option key={f.id} value={f.id}>{f.label} ({f.ratio})</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="studio-skill" className="text-xs font-bold text-gray-600 mb-1.5 block">Skill</label>
-          <select id="studio-skill" value={skillId} onChange={(e) => setSkillId(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
-            {skills.map((skill) => (
-              <option key={skill.id} value={skill.id}>{skill.name}</option>
-            ))}
-          </select>
+      <div>
+        <p className="text-xs font-bold text-gray-600 mb-1.5">Empresa</p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setMode("company")} disabled={!clientId}
+            className={`text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 ${mode === "company" ? "bg-purple-600 text-white" : "bg-gray-50 text-gray-500"} ${!clientId ? "opacity-40 cursor-not-allowed" : ""}`}>
+            <Building2 className="w-3.5 h-3.5" /> {clientId ? "Empresa selecionada" : "Selecione uma empresa acima"}
+          </button>
+          <button type="button" onClick={() => setMode("free")}
+            className={`text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 ${mode === "free" ? "bg-purple-600 text-white" : "bg-gray-50 text-gray-500"}`}>
+            <UserRound className="w-3.5 h-3.5" /> Sem empresa — criação livre
+          </button>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={status === "preparing" || !freeformBrief.trim()}
-        className="text-xs font-bold bg-purple-600 text-white px-4 py-2 rounded-xl disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
-        title="O resultado é direção visual (texto) -- não gera o PNG final"
-      >
-        {status === "preparing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-        {status === "preparing" ? "Preparando…" : "Executar Vidigal"}
+      <div>
+        <p className="text-xs font-bold text-gray-600 mb-1.5">Formato</p>
+        <div className="flex gap-2">
+          {IMAGE_FORMATS.map((f) => (
+            <button key={f.id} type="button" onClick={() => setFormat(f.id)}
+              className={`text-xs font-bold px-3 py-2 rounded-xl ${format === f.id ? "bg-purple-600 text-white" : "bg-gray-50 text-gray-500"}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs font-bold text-gray-600 mb-1.5">Referências (estilo/atmosfera)</p>
+          <div className="flex flex-wrap gap-1.5 mb-1.5">
+            {references.map((a) => (
+              <span key={a.id} className="text-[10px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 flex items-center gap-1">
+                {a.label.slice(0, 16)} <button type="button" onClick={() => removeAsset("reference", a.id)}><X className="w-2.5 h-2.5" /></button>
+              </span>
+            ))}
+          </div>
+          <button type="button" onClick={() => referenceInputRef.current?.click()} disabled={references.length >= 4} className="text-[10px] font-bold text-purple-600 disabled:text-gray-300">+ adicionar referência</button>
+          <input ref={referenceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void handleAddAsset("reference", e.target.files)} />
+        </div>
+        <div>
+          <p className="text-xs font-bold text-gray-600 mb-1.5">Assets oficiais (logo/produto — protegidos)</p>
+          <div className="flex flex-wrap gap-1.5 mb-1.5">
+            {protectedAssets.map((a) => (
+              <span key={a.id} className="text-[10px] bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 flex items-center gap-1">
+                {a.label.slice(0, 16)} <button type="button" onClick={() => removeAsset("protected", a.id)}><X className="w-2.5 h-2.5" /></button>
+              </span>
+            ))}
+          </div>
+          <button type="button" onClick={() => protectedInputRef.current?.click()} disabled={protectedAssets.length >= 4} className="text-[10px] font-bold text-purple-600 disabled:text-gray-300">+ adicionar asset oficial</button>
+          <input ref={protectedInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void handleAddAsset("protected", e.target.files)} />
+        </div>
+      </div>
+
+      <button type="button" onClick={handleSubmit} disabled={status === "preparing" || !freeformBrief.trim()}
+        className="text-xs font-bold bg-purple-600 text-white px-4 py-2.5 rounded-xl disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5">
+        {status === "preparing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+        {status === "preparing" ? LOADING_STEPS[loadingStep] : "Criar arte"}
       </button>
 
       {status === "ai_unavailable" && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-2 items-start">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700">IA indisponível no momento -- o provider não está configurado ou não respondeu. Tente novamente mais tarde.</p>
+        <StatusBanner tone="amber" text="IA indisponível no momento — o provider de direção criativa não está configurado ou não respondeu. Tente novamente mais tarde." />
+      )}
+      {status === "image_unavailable" && (
+        <StatusBanner tone="amber" text="A direção criativa ficou pronta, mas a geração de imagem está indisponível no momento (provider não configurado)." />
+      )}
+      {status === "error" && errorMessage && <StatusBanner tone="red" text={errorMessage} />}
+
+      {(status === "completed" || status === "image_unavailable") && warnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
+          {warnings.map((w) => <p key={w} className="text-[10px] text-amber-600">{w}</p>)}
         </div>
       )}
 
-      {status === "error" && errorMessage && (
-        <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex gap-2 items-start">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-700">{errorMessage}</p>
-        </div>
-      )}
+      {status === "completed" && image && (
+        <div className="space-y-3 pt-1">
+          <img src={image.url} alt="Peça gerada pela Vidigal PNG" className="w-full rounded-xl border border-gray-100" />
+          <div className="flex flex-wrap gap-2">
+            <ActionButton icon={RefreshCw} label="Gerar novamente" onClick={handleRegenerate} />
+            <ActionButton icon={Download} label="Baixar" onClick={() => void handleDownload()} />
+            <ActionButton icon={showDirection ? ChevronUp : ChevronDown} label="Ver direção criativa" onClick={() => setShowDirection((v) => !v)} />
+          </div>
 
-      {status === "completed" && output && (
-        <div className="space-y-3 pt-2">
-          {warnings.length > 0 && (
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-              {warnings.map((w) => <p key={w} className="text-[10px] text-amber-600">{w}</p>)}
+          {textOutput && textOutput.variations.length > 0 && (
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-2">Criar variação</p>
+              <div className="flex flex-wrap gap-2">
+                {textOutput.variations.map((v, i) => (
+                  <button key={`${v.title}-${i}`} type="button" onClick={() => handleVariation(v)}
+                    className="text-[10px] font-bold bg-gray-50 border border-gray-100 hover:bg-purple-50 hover:border-purple-100 text-gray-600 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" /> {v.title}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          {VIDIGAL_PNG_DELIVERY_STEPS.filter((s) => s.id !== "variations" && s.id !== "adaptations").map((step) => (
-            <div key={step.id} className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-1">
-                {String(step.order).padStart(2, "0")} {step.label}
-              </p>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap">{output[step.id as "briefReading" | "creativeDirection" | "conceptualBasis" | "visualStructure" | "visualGuidelines" | "generationPrompt"]}</p>
-            </div>
-          ))}
 
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-            <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-2">07 Variações</p>
-            <div className="space-y-2">
-              {output.variations.map((v, i) => (
-                <div key={`${v.title}-${i}`} className="bg-white border border-gray-100 rounded-lg p-2.5">
-                  <p className="text-xs font-bold text-gray-700">{v.title}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">{v.direction}</p>
-                  <p className="text-[11px] text-purple-600 mt-0.5">{v.promptDelta}</p>
+          {showDirection && textOutput && (
+            <div className="space-y-2 pt-1">
+              {VIDIGAL_PNG_DELIVERY_STEPS.filter((s) => s.id !== "variations" && s.id !== "adaptations").map((step) => (
+                <div key={step.id} className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-1">{String(step.order).padStart(2, "0")} {step.label}</p>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap">{textOutput[step.id as "briefReading" | "creativeDirection" | "conceptualBasis" | "visualStructure" | "visualGuidelines" | "generationPrompt"]}</p>
                 </div>
               ))}
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-2">08 Adaptações</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {textOutput.adaptations.map((a, i) => <li key={i} className="text-xs text-gray-700">{a}</li>)}
+                </ul>
+              </div>
             </div>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-            <p className="text-[10px] font-black uppercase tracking-wide text-gray-400 mb-2">08 Adaptações</p>
-            <ul className="list-disc list-inside space-y-1">
-              {output.adaptations.map((a, i) => <li key={i} className="text-xs text-gray-700">{a}</li>)}
-            </ul>
-          </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function StatusBanner({ tone, text }: { tone: "amber" | "red"; text: string }) {
+  const cls = tone === "amber" ? "bg-amber-50 border-amber-100 text-amber-700" : "bg-red-50 border-red-100 text-red-700";
+  return (
+    <div className={`border rounded-xl p-3 flex gap-2 items-start ${cls}`}>
+      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+      <p className="text-xs">{text}</p>
+    </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick }: { icon: typeof Download; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="text-xs font-bold bg-gray-50 hover:bg-gray-100 text-gray-700 px-3 py-2 rounded-xl flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5" /> {label}
+    </button>
   );
 }

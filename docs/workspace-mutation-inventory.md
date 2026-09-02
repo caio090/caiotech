@@ -76,6 +76,7 @@ funcional no shell de demonstração hoje. Duas consequências práticas:
 | `api/jarvis/transcribe/route.ts` | POST | Jarvis | Chamada externa (OpenAI Whisper); áudio processado só em memória, nunca gravado |
 | `api/jarvis/speech/route.ts` | POST | Jarvis | Chamada externa (OpenAI TTS); áudio de saída devolvido direto ao browser, nunca persistido |
 | `api/studio/skills/execute/route.ts` | POST | REC OS > Studio (Sprint REC OS Studio Foundation V0.2) | Chamada externa (OpenAI Responses API, texto estruturado via json_schema) da skill Vidigal PNG; sem persistência (nenhuma tabela nova), sem geração de imagem — mesmo padrão "chamada externa" de `api/jarvis/*`/`api/meu-negocio/ai/analyze` |
+| `api/studio/images/generate/route.ts` | POST | REC OS > Studio (Sprint REC OS Studio Image Generation MVP V0.3) | Rota única para o pipeline completo (texto Vidigal + imagem); chamada externa ao provider de imagem já existente e nunca conectado antes desta sprint (`src/lib/ai/image-providers/`, Google Gemini/OpenAI Images); sem persistência (nenhuma tabela nova, assets efêmeros em data: URL, nunca em Storage) |
 
 ## Meu Negócio — `demo_memory_only`, confirmado por inspeção
 
