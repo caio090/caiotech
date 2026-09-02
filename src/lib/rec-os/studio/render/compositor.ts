@@ -20,7 +20,10 @@ import { ensureStudioFontFiles } from "./fonts";
 import { fitTextToBox } from "./text-fit";
 import type { StudioRenderPlan, StudioTextLayer } from "./types";
 
-const MAX_OUTPUT_BYTES = 6_000_000;
+// Buffer bruto (antes de base64) -- o transporte final é JSON com uma
+// data: URL, que soma ~33% de overhead; mantido bem abaixo de limites
+// comuns de payload de resposta em functions serverless.
+const MAX_OUTPUT_BYTES = 4_000_000;
 const JPEG_QUALITY = 85;
 
 export interface ProtectedAssetBytes {
