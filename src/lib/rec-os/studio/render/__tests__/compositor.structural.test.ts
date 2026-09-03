@@ -105,3 +105,49 @@ test("ativo protegido corrompido é omitido da composição, mas a peça final a
   });
   assert.equal(result.ok, true, "asset protegido corrompido não derruba a geração inteira -- só é omitido");
 });
+
+test("[Prompt 03] teste de render anti-regressão: headline/CTA reais chegam ao resultado final (fundo claro para maximizar contraste com o scrim escuro/pill claro)", async () => {
+  const background = await solidPng(1080, 1350, { r: 235, g: 235, b: 235 });
+  const renderPlan = buildStudioRenderPlan({
+    format: "carousel",
+    headline: "HOJE ATÉ MAIS TARDE",
+    cta: "CONFIRA O NOVO HORÁRIO",
+    protectedAssetRoles: [],
+  });
+  assert.equal(renderPlan.textLayers.find((l) => l.role === "headline")?.text, "HOJE ATÉ MAIS TARDE", "string exata chega ao render plan");
+  assert.equal(renderPlan.textLayers.find((l) => l.role === "cta")?.text, "CONFIRA O NOVO HORÁRIO", "string exata chega ao render plan");
+
+  const result = await composeStudioVisual({ backgroundBytes: background, renderPlan, protectedAssetBytes: [] });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  // Prova estrutural sem OCR: nas duas regiões (headline com scrim
+  // escuro, CTA com pill claro) o pixel amostrado precisa divergir
+  // fortemente do cinza-claro cru do fundo -- prova de que algo foi
+  // desenhado ali (nunca overflow silencioso/layer ausente).
+  const { data, info } = await sharp(result.buffer).raw().toBuffer({ resolveWithObject: true });
+  const sample = (x: number, y: number) => {
+    const idx = (Math.round(y) * info.width + Math.round(x)) * info.channels;
+    return { r: data[idx], g: data[idx + 1], b: data[idx + 2] };
+  };
+  const headlineBox = renderPlan.textLayers.find((l) => l.role === "headline")!.box;
+  const headlinePixel = sample(headlineBox.x + 5, headlineBox.y + headlineBox.height / 2);
+  assert.ok(headlinePixel.r < 200, `região da headline deveria estar visivelmente mais escura que o fundo (235,235,235) por causa do scrim, veio rgb(${headlinePixel.r},${headlinePixel.g},${headlinePixel.b})`);
+
+  // O pill do CTA "abraça" o conteúdo (pode ser bem menor que a box
+  // alocada no render plan, e tem cantos totalmente arredondados) --
+  // em vez de arriscar amostrar um ponto específico fora do pill real,
+  // varre uma grade de pontos dentro da box e confirma que PELO MENOS
+  // UM deles é bem mais claro que o fundo cinza cru (prova de que o
+  // pill foi desenhado em algum lugar dali, sem depender da geometria exata).
+  const ctaBox = renderPlan.textLayers.find((l) => l.role === "cta")!.box;
+  let foundLightPixel = false;
+  for (let dx = 4; dx < ctaBox.width; dx += 6) {
+    for (let dy = 4; dy < ctaBox.height; dy += 6) {
+      const p = sample(ctaBox.x + dx, ctaBox.y + dy);
+      if (p.r > 240 && p.g > 240 && p.b > 240) { foundLightPixel = true; break; }
+    }
+    if (foundLightPixel) break;
+  }
+  assert.ok(foundLightPixel, "algum pixel dentro da box do CTA deveria estar bem mais claro que o fundo cinza (235,235,235) -- pill branco desenhado");
+});

@@ -25,6 +25,7 @@ async function loadOrchestratorWith(t: TestContext, opts: {
   businessContext?: unknown;
   imageResult?: unknown;
   composeResult?: unknown;
+  fetchAssetResult?: unknown;
   onBuildBusinessContext?: (companyId: unknown) => void;
   onCompose?: (input: unknown) => void;
 }) {
@@ -73,7 +74,7 @@ async function loadOrchestratorWith(t: TestContext, opts: {
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (t.mock.module as any)("../render/asset-fetch.ts", {
-    exports: { fetchAssetSafely: async () => ({ ok: true, bytes: Buffer.from("fake-logo-bytes"), contentType: "image/png" }) },
+    exports: { fetchAssetSafely: async () => opts.fetchAssetResult ?? { ok: true, bytes: Buffer.from("fake-logo-bytes"), contentType: "image/png" } },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (t.mock.module as any)("../render/compositor.ts", {
@@ -201,4 +202,102 @@ test("composição falhou -- resultado final é failed com STUDIO_RENDER_FAILED,
   assert.equal(result.image?.status, "failed");
   assert.equal(result.image?.error?.code, "STUDIO_RENDER_FAILED");
   assert.equal(result.image?.image, null);
+});
+
+test("logo_url malicioso/bloqueado pelo fetch seguro -- geração continua sem o logo, com warning, provider/compositor nunca recebe o conteúdo", async (t) => {
+  const businessContext = {
+    company: { id: "c1", name: "Empresa A" },
+    identity: { brandName: "A", logoUrl: "https://attacker.example/ssrf-payload.png", brandColors: null, visualStyle: null, visualReferences: null },
+    brand: null, market: null, products: null,
+  };
+  let composeInput: unknown = null;
+  const { createStudioVisual } = await loadOrchestratorWith(t, {
+    businessContext,
+    fetchAssetResult: { ok: false, error: "Host resolve para um endereço não permitido." },
+    onCompose: (input) => { composeInput = input; },
+  });
+  const result = await createStudioVisual({
+    skillId: "vidigal_png", input: { freeformBrief: "teste" },
+    companyId: "c1", companyName: "Empresa A", assets: { references: [], protectedAssets: [] },
+    db: {} as never,
+  });
+  assert.equal(result.image?.status, "completed", "logo bloqueado nunca derruba a geração inteira");
+  const compose = composeInput as { protectedAssetBytes: { assetId: string }[] };
+  assert.equal(compose.protectedAssetBytes.some((a) => a.assetId === "company-logo"), false, "bytes do logo NUNCA chegam ao compositor quando o fetch seguro bloqueia a URL");
+  assert.equal(result.image?.warnings.some((w: string) => w.includes("Ativo protegido") && w.includes("Logo")), true, "warning explícito e seguro sobre o logo indisponível, nunca conteúdo bruto da URL/erro interno");
+});
+
+test("[P1-3] directive 'Headline: TESTE' no freeform é extraída e usada no compositor, e removida do brief enviado à Vidigal", async (t) => {
+  let composeInput: unknown = null;
+  const { createStudioVisual, getLastExecuteRequest } = await loadOrchestratorWith(t, { onCompose: (input) => { composeInput = input; } });
+  await createStudioVisual({
+    skillId: "vidigal_png", input: { freeformBrief: "Divulgue o combo.\nHeadline: TESTE" },
+    companyId: null, companyName: null, assets: { references: [], protectedAssets: [] },
+    db: {} as never,
+  });
+  const compose = composeInput as { renderPlan: { textLayers: { role: string; text: string }[] } };
+  const headlineLayer = compose.renderPlan.textLayers.find((l) => l.role === "headline");
+  assert.equal(headlineLayer?.text, "TESTE", "directive extraída do freeform chega ao compositor");
+  const executeReq = getLastExecuteRequest() as { input: { freeformBrief?: string } };
+  assert.ok(!executeReq.input.freeformBrief?.includes("Headline:"), "a linha de directive é removida do brief enviado à Vidigal");
+  assert.ok(executeReq.input.freeformBrief?.includes("Divulgue o combo."), "o resto do briefing continua sendo enviado à Vidigal");
+});
+
+test("[P1-4] directive 'CTA: COMPRAR' no freeform é extraída e usada", async (t) => {
+  let composeInput: unknown = null;
+  const { createStudioVisual } = await loadOrchestratorWith(t, { onCompose: (input) => { composeInput = input; } });
+  await createStudioVisual({
+    skillId: "vidigal_png", input: { freeformBrief: "Divulgue o combo.\nCTA: COMPRAR" },
+    companyId: null, companyName: null, assets: { references: [], protectedAssets: [] },
+    db: {} as never,
+  });
+  const compose = composeInput as { renderPlan: { textLayers: { role: string; text: string }[] } };
+  assert.equal(compose.renderPlan.textLayers.find((l) => l.role === "cta")?.text, "COMPRAR");
+});
+
+test("[P1-5] campo estruturado + directive no mesmo freeform -- campo estruturado vence", async (t) => {
+  let composeInput: unknown = null;
+  const { createStudioVisual } = await loadOrchestratorWith(t, { onCompose: (input) => { composeInput = input; } });
+  await createStudioVisual({
+    skillId: "vidigal_png",
+    input: { freeformBrief: "Headline: DA DIRECTIVE", headline: "DO CAMPO ESTRUTURADO" },
+    companyId: null, companyName: null, assets: { references: [], protectedAssets: [] },
+    db: {} as never,
+  });
+  const compose = composeInput as { renderPlan: { textLayers: { role: string; text: string }[] } };
+  assert.equal(compose.renderPlan.textLayers.find((l) => l.role === "headline")?.text, "DO CAMPO ESTRUTURADO", "campo estruturado sempre vence sobre a directive do freeform");
+});
+
+test("[P1-9] regenerate (mesma chamada com o mesmo input) preserva a headline extraída de forma idêntica", async (t) => {
+  const calls: unknown[] = [];
+  const { createStudioVisual } = await loadOrchestratorWith(t, { onCompose: (input) => { calls.push(input); } });
+  const input = { freeformBrief: "Divulgue o combo.\nHeadline: HOJE ATÉ MAIS TARDE" };
+  await createStudioVisual({ skillId: "vidigal_png", input, companyId: null, companyName: null, assets: { references: [], protectedAssets: [] }, db: {} as never });
+  await createStudioVisual({ skillId: "vidigal_png", input, companyId: null, companyName: null, assets: { references: [], protectedAssets: [] }, db: {} as never });
+  const texts = calls.map((c) => (c as { renderPlan: { textLayers: { role: string; text: string }[] } }).renderPlan.textLayers.find((l) => l.role === "headline")?.text);
+  assert.equal(texts[0], "HOJE ATÉ MAIS TARDE");
+  assert.equal(texts[1], "HOJE ATÉ MAIS TARDE", "regenerar com o mesmo input produz a mesma headline, nunca reinterpretada");
+});
+
+test("[P1-10] Company DNA não sobrescreve headline explícita mesmo quando o tom de marca diverge", async (t) => {
+  const businessContext = {
+    company: { id: "c1", name: "Empresa Informal" },
+    identity: { brandName: "Empresa Informal", logoUrl: null, brandColors: null, visualStyle: null, visualReferences: null },
+    brand: { toneOfVoice: ["informal", "descontraído"], wordsToUse: null, wordsToAvoid: null },
+    market: null, products: null,
+  };
+  let composeInput: unknown = null;
+  const { createStudioVisual } = await loadOrchestratorWith(t, { businessContext, onCompose: (input) => { composeInput = input; } });
+  await createStudioVisual({
+    skillId: "vidigal_png",
+    input: { freeformBrief: "teste", headline: "Comunicado Oficial de Alteração de Horário de Funcionamento" },
+    companyId: "c1", companyName: "Empresa Informal", assets: { references: [], protectedAssets: [] },
+    db: {} as never,
+  });
+  const compose = composeInput as { renderPlan: { textLayers: { role: string; text: string }[] } };
+  assert.equal(
+    compose.renderPlan.textLayers.find((l) => l.role === "headline")?.text,
+    "Comunicado Oficial de Alteração de Horário de Funcionamento",
+    "headline explícita do usuário vence mesmo quando o tom de marca do DNA é claramente diferente (informal)",
+  );
 });

@@ -26,7 +26,7 @@ function req(body: unknown) {
 }
 
 const FAKE_RESULT = {
-  text: { skillId: "vidigal_png", skillVersion: "2.0.0", runtime: "openai_responses_api", status: "completed", output: { briefReading: "x", creativeDirection: "x", conceptualBasis: "x", visualStructure: "x", visualGuidelines: "x", generationPrompt: "x", variations: [], adaptations: [] }, warnings: [], generatedAt: new Date().toISOString() },
+  text: { skillId: "vidigal_png", skillVersion: "2.0.0", runtime: "openai_responses_api", status: "completed", output: { briefReading: "x", creativeDirection: "x", conceptualBasis: "x", visualStructure: "x", visualGuidelines: "x", generationPrompt: "x", variations: [], adaptations: [], suggestedHeadline: "x", suggestedCta: null }, warnings: [], generatedAt: new Date().toISOString() },
   image: { status: "completed", providerId: "fake", image: { url: "data:image/png;base64,ZmFrZQ==", width: 1024, height: 1024 }, warnings: [], generatedAt: new Date().toISOString() },
 };
 
@@ -123,6 +123,36 @@ test("mais de 4 assets do mesmo tipo -- 400, createStudioVisual nunca chamado", 
 test("asset com URL inválida (nem data:image nem https) -- 400, createStudioVisual nunca chamado", async (t) => {
   const { POST, getCreateCalls } = await loadRouteWith(t, {});
   const res = await POST(req({ skillId: "vidigal_png", input: { freeformBrief: "teste" }, assets: { protectedAssets: [{ label: "x", url: "javascript:alert(1)" }] } }));
+  assert.equal(res.status, 400);
+  assert.equal(getCreateCalls(), 0);
+});
+
+test("[P1-1/P1-2] headline/cta estruturados chegam intactos ao orquestrador", async (t) => {
+  const { POST, getLastCreateRequest } = await loadRouteWith(t, { currentUser: { id: "user-1" } });
+  const res = await POST(req({ skillId: "vidigal_png", input: { freeformBrief: "teste", headline: "HOJE ATÉ MAIS TARDE", cta: "PEÇA AGORA" } }));
+  assert.equal(res.status, 200);
+  const createReq = getLastCreateRequest() as { input: { headline?: string; cta?: string } };
+  assert.equal(createReq.input.headline, "HOJE ATÉ MAIS TARDE");
+  assert.equal(createReq.input.cta, "PEÇA AGORA");
+});
+
+test("headline acima do limite de caracteres -- 400, createStudioVisual nunca chamado", async (t) => {
+  const { POST, getCreateCalls } = await loadRouteWith(t, {});
+  const res = await POST(req({ skillId: "vidigal_png", input: { freeformBrief: "teste", headline: "A".repeat(500) } }));
+  assert.equal(res.status, 400);
+  assert.equal(getCreateCalls(), 0);
+});
+
+test("headline com tipo inválido (não-string) -- 400, createStudioVisual nunca chamado", async (t) => {
+  const { POST, getCreateCalls } = await loadRouteWith(t, {});
+  const res = await POST(req({ skillId: "vidigal_png", input: { freeformBrief: "teste", headline: 12345 } }));
+  assert.equal(res.status, 400);
+  assert.equal(getCreateCalls(), 0);
+});
+
+test("cta acima do limite de caracteres -- 400, createStudioVisual nunca chamado", async (t) => {
+  const { POST, getCreateCalls } = await loadRouteWith(t, {});
+  const res = await POST(req({ skillId: "vidigal_png", input: { freeformBrief: "teste", cta: "B".repeat(200) } }));
   assert.equal(res.status, 400);
   assert.equal(getCreateCalls(), 0);
 });

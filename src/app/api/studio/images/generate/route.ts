@@ -26,10 +26,27 @@ import type { StudioImageAsset, StudioImageAssetKind } from "@/lib/rec-os/studio
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Prompt 03 (Studio Release Fix) — P2: rate limit em memória local à
+ * instância/função serverless (best-effort, não distribuído entre
+ * instâncias). Auditado nesta tarefa: não existe Redis/Upstash/
+ * Vercel KV/Edge Config nem nenhuma outra infraestrutura de quota
+ * distribuída em uso no projeto -- este é o MESMO padrão já usado em
+ * várias outras rotas (admin/accounts, meta/hub-assets, olaclick/*,
+ * contato, meu-negocio/ai/analyze, studio/skills/execute), não uma
+ * lacuna específica do Studio. Criar um banco/serviço novo só para
+ * isto infla o escopo sem necessidade real hoje (custo real de
+ * geração já é limitado pelo provider de imagem + timeout). Ponto de
+ * extensão: se o Studio precisar de quota realmente distribuída no
+ * futuro, trocar `buckets` por um client de KV/Redis aqui, mantendo a
+ * mesma chave (`company:{id}|{workspaceId}` / `free:{userId}`).
+ */
 const buckets = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 3;
 const MAX_FREEFORM_BRIEF_CHARS = 4000;
+const MAX_HEADLINE_INPUT_CHARS = 200;
+const MAX_CTA_INPUT_CHARS = 80;
 const MAX_ASSETS_PER_KIND = 4;
 const MAX_ASSET_URL_CHARS = 8_000_000; // ~6MB binário em base64
 const ASSET_URL_PATTERN = /^data:image\/(png|jpe?g|webp|gif);base64,|^https:\/\//i;
@@ -68,8 +85,20 @@ function parseBody(raw: unknown): ParsedBody {
   const b = raw as Record<string, unknown>;
   const skillId = typeof b.skillId === "string" ? b.skillId.trim() : "";
   if (!skillId) return { ok: false, error: "skillId obrigatório." };
-  const input = b.input && typeof b.input === "object" ? (b.input as StudioBriefInput) : {};
+  const rawInput = (b.input && typeof b.input === "object" ? b.input : {}) as Record<string, unknown>;
   const companyId = typeof b.companyId === "string" && b.companyId.trim() ? b.companyId.trim() : undefined;
+
+  // Prompt 03 (P1) -- campos estruturados de texto determinístico:
+  // validados explicitamente (nunca um cast cego), nunca truncados em
+  // silêncio (o usuário preencheu de propósito -- rejeita com erro
+  // claro em vez de cortar o texto que ele escreveu).
+  if (rawInput.headline !== undefined && (typeof rawInput.headline !== "string" || rawInput.headline.length > MAX_HEADLINE_INPUT_CHARS)) {
+    return { ok: false, error: `Headline inválida (texto, até ${MAX_HEADLINE_INPUT_CHARS} caracteres).` };
+  }
+  if (rawInput.cta !== undefined && (typeof rawInput.cta !== "string" || rawInput.cta.length > MAX_CTA_INPUT_CHARS)) {
+    return { ok: false, error: `CTA inválido (texto, até ${MAX_CTA_INPUT_CHARS} caracteres).` };
+  }
+  const input = rawInput as StudioBriefInput;
 
   const assetsRaw = (b.assets as { references?: unknown; protectedAssets?: unknown } | undefined) ?? {};
   const references = parseAssetList(assetsRaw.references, "reference");

@@ -33,6 +33,7 @@ import { composeStudioVisual, type ProtectedAssetBytes } from "./render/composit
 import { fetchAssetSafely } from "./render/asset-fetch";
 import { decodeImageDataUrl } from "./render/data-url";
 import type { StudioProtectedAssetRole, StudioVisualResult } from "./render/types";
+import { parseStudioTextDirectives, resolveFinalText } from "./text-directives";
 
 export interface CreateStudioVisualRequest {
   skillId: string;
@@ -88,9 +89,19 @@ export async function createStudioVisual(request: CreateStudioVisualRequest): Pr
     request.assets.references.map((r) => ({ url: r.url, label: r.label })),
   );
 
+  // Prompt 03 (P1) -- reconhece "Headline: ..."/"CTA: ..." dentro do
+  // briefing livre de forma determinística (nunca via IA), ANTES de
+  // chamar a Vidigal, para que ela raciocine sobre o restante do
+  // pedido em vez da sintaxe da directive.
+  const directives = parseStudioTextDirectives(request.input.freeformBrief ?? "");
+  const textInput: StudioBriefInput = {
+    ...request.input,
+    freeformBrief: directives.headline || directives.cta ? directives.remainingBrief : request.input.freeformBrief,
+  };
+
   const textResult = await executeStudioSkill({
     skillId: request.skillId,
-    input: request.input,
+    input: textInput,
     context,
     referenceVisualRules: referenceAnalysis.rules.length > 0 ? referenceAnalysis.rules : undefined,
   });
@@ -129,11 +140,12 @@ export async function createStudioVisual(request: CreateStudioVisualRequest): Pr
     };
   }
 
-  // Texto final renderizado -- SEMPRE o texto exato do usuário quando
-  // informado (nunca reescrito pelo modelo); só usa a sugestão da
-  // Vidigal quando o briefing não trouxe headline/cta explícitos.
-  const finalHeadline = request.input.headline?.trim() || output.suggestedHeadline;
-  const finalCta = request.input.cta?.trim() || output.suggestedCta || null;
+  // Texto final renderizado -- precedência obrigatória (Prompt 03 P1):
+  // (1) campo estruturado do usuário > (2) directive determinística
+  // extraída do freeformBrief > (3) sugestão da Vidigal. (3) NUNCA
+  // sobrescreve (1)/(2); DNA/tom de marca nunca participa desta escolha.
+  const finalHeadline = resolveFinalText(request.input.headline, directives.headline, output.suggestedHeadline) ?? output.suggestedHeadline;
+  const finalCta = resolveFinalText(request.input.cta, directives.cta, output.suggestedCta);
 
   const protectedAssetRoles: { assetId: string; role: StudioProtectedAssetRole }[] = protectedAssets.map((a) => ({
     assetId: a.id,

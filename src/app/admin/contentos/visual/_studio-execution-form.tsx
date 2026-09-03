@@ -68,6 +68,9 @@ async function fileToDataUrl(file: File): Promise<string> {
 export function StudioExecutionForm({ skills, clientId }: { skills: { id: string; name: string }[]; clientId: string | null }) {
   const [mode, setMode] = useState<CreationMode>(clientId ? "company" : "free");
   const [freeformBrief, setFreeformBrief] = useState("");
+  const [headline, setHeadline] = useState("");
+  const [cta, setCta] = useState("");
+  const [showTextFields, setShowTextFields] = useState(false);
   const [format, setFormat] = useState<DesignFormat>(IMAGE_FORMATS[0].id);
   const [skillId] = useState(skills[0]?.id ?? "vidigal_png");
   const [references, setReferences] = useState<LocalAsset[]>([]);
@@ -115,7 +118,10 @@ export function StudioExecutionForm({ skills, clientId }: { skills: { id: string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           skillId,
-          input: { freeformBrief: brief.trim(), format, companyId: mode === "company" ? (clientId ?? undefined) : undefined },
+          input: {
+            freeformBrief: brief.trim(), format, companyId: mode === "company" ? (clientId ?? undefined) : undefined,
+            headline: headline.trim() || undefined, cta: cta.trim() || undefined,
+          },
           assets: {
             references: references.map((a) => ({ label: a.label, url: a.url })),
             protectedAssets: protectedAssets.map((a) => ({ label: a.label, url: a.url })),
@@ -257,6 +263,38 @@ export function StudioExecutionForm({ skills, clientId }: { skills: { id: string
           <button type="button" onClick={() => protectedInputRef.current?.click()} disabled={protectedAssets.length >= 4} className="text-[10px] font-bold text-purple-600 disabled:text-gray-300">+ adicionar asset oficial</button>
           <input ref={protectedInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void handleAddAsset("protected", e.target.files)} />
         </div>
+      </div>
+
+      <div>
+        <button type="button" onClick={() => setShowTextFields((v) => !v)}
+          className="text-[10px] font-bold text-purple-600 flex items-center gap-1">
+          {showTextFields ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          Texto da arte (opcional)
+        </button>
+        {showTextFields && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+            <div>
+              <label htmlFor="studio-headline" className="text-xs font-bold text-gray-600 mb-1.5 block">Headline</label>
+              <input
+                id="studio-headline" type="text" value={headline} onChange={(e) => setHeadline(e.target.value)}
+                placeholder="Ex.: HOJE ATÉ MAIS TARDE"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+              />
+            </div>
+            <div>
+              <label htmlFor="studio-cta" className="text-xs font-bold text-gray-600 mb-1.5 block">CTA</label>
+              <input
+                id="studio-cta" type="text" value={cta} onChange={(e) => setCta(e.target.value)}
+                placeholder="Ex.: PEÇA AGORA"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 sm:col-span-2">
+              Preenchido aqui, o texto vai para a peça exatamente como escrito. Deixe em branco para a Vidigal sugerir
+              (ou escreva direto no briefing acima: &quot;Headline: seu texto&quot; / &quot;CTA: seu texto&quot;).
+            </p>
+          </div>
+        )}
       </div>
 
       <button type="button" onClick={handleSubmit} disabled={status === "preparing" || !freeformBrief.trim()}
