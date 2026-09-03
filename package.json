@@ -22,6 +22,7 @@
     "@supabase/supabase-js": "^2.108.2",
     "framer-motion": "^12.42.0",
     "gsap": "^3.15.0",
+    "ipaddr.js": "^2.5.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
     "openai": "^6.45.0",
@@ -31,6 +32,7 @@
     "sharp": "^0.35.4",
     "swup": "^4.9.2",
     "three": "^0.185.1",
+    "undici": "^8.10.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
