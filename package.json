@@ -13,6 +13,8 @@
     "qa:info": "node scripts/qa-info.ts",
     "qa:smoke": "node scripts/qa-smoke.ts",
     "qa:doctor": "node scripts/qa-doctor.ts",
+    "qa:studio-native": "node --import ./.tmp/preload-ts-loader.mjs scripts/qa/studio-native-runtime-smoke.ts",
+    "qa:studio-trace": "node --import ./.tmp/preload-ts-loader.mjs scripts/qa/verify-studio-function-trace.ts",
     "lkt:record": "node scripts/lkt-record.ts"
   },
   "dependencies": {
