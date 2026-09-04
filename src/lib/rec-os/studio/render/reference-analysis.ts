@@ -15,7 +15,13 @@
 import OpenAI from "openai";
 
 const REFERENCE_MODEL = process.env.STUDIO_REFERENCE_VISION_MODEL?.trim() || "gpt-4o-mini";
-const REFERENCE_TIMEOUT_MS = 15_000;
+// Prompt 09 -- reduzido de 15s pra 10s (até MAX_REFERENCES_ANALYZED=2
+// referências, nunca mais que 20s aqui): a rota inteira tem um teto
+// real de 60s (route.ts maxDuration, limite do plano Hobby da
+// Vercel), e esta etapa roda ANTES do texto e da imagem no pipeline
+// (create-studio-visual.ts) -- precisa deixar espaço real pras etapas
+// que vêm depois, sobretudo a geração de imagem em si.
+const REFERENCE_TIMEOUT_MS = 10_000;
 const MAX_REFERENCES_ANALYZED = 2;
 
 let cachedClient: OpenAI | null = null;

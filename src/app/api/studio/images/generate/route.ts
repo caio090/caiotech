@@ -25,6 +25,18 @@ import type { StudioImageAsset, StudioImageAssetKind } from "@/lib/rec-os/studio
  * restritivo que /skills/execute.
  */
 export const dynamic = "force-dynamic";
+/**
+ * Prompt 09 (Studio Image Provider Compatibility) — 60s é o teto real
+ * do plano Hobby da Vercel (confirmado via API: team "caio21" ->
+ * plan:"hobby" -- `maxDuration` não pode passar disso neste projeto,
+ * independente do valor escrito aqui). Mesmo valor já usado e validado
+ * em produção por outra rota deste projeto (api/olaclick/orders).
+ * Sem isso, a rota ficava no timeout DEFAULT da Vercel (bem menor que
+ * 60s), o que já seria insuficiente pro pipeline completo (texto +
+ * eventual análise de referência + imagem) mesmo antes de qualquer
+ * chamada individual se aproximar do próprio limite dela.
+ */
+export const maxDuration = 60;
 
 /**
  * Prompt 03 (Studio Release Fix) — P2: rate limit em memória local à

@@ -24,12 +24,25 @@ Clientes compram créditos internos — não têm acesso às chaves de API.
 - Cobrança Google: por imagem / resolução (verificar pricing atual)
 - Capacidade futura: referência de estilo, pessoa (via edição de imagem)
 
-### OpenAI DALL-E 3 / gpt-image-1
+### OpenAI Images (GPT Image e DALL-E)
 
-- Arquivo: `src/lib/ai/image-providers/openai-images.ts`
+- Arquivos: `src/lib/ai/image-providers/openai-images.ts` (provider, usa o
+  SDK oficial `openai`), `openai-image-compat.ts` (resolve a família do
+  modelo e monta o request só com os parâmetros válidos pra ela) e
+  `openai-image-response.ts` (normaliza a resposta e os erros).
 - Variável: `OPENAI_API_KEY`
-- Modelo padrão: `dall-e-3` (via `OPENAI_IMAGE_MODEL`)
-- Suporte a: size, quality (standard/hd), n (1 para DALL-E 3)
+- Modelo padrão: `dall-e-3` (via `OPENAI_IMAGE_MODEL`) — mas o adapter
+  reconhece qualquer modelo do union `ImageModel` do SDK instalado
+  (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
+  `gpt-image-2-*`, `chatgpt-image-latest`, `dall-e-2`, `dall-e-3`) e
+  monta o request certo pra cada família — nunca trata todos os
+  modelos como se aceitassem os mesmos parâmetros (Prompt 09).
+- `response_format` **nunca** é enviado, pra nenhuma família — a API
+  real de Production rejeitou esse parâmetro mesmo pro modelo default
+  (`dall-e-3`), então o normalizador aceita tanto `b64_json` quanto
+  `url` na resposta, o que vier.
+- Suporte a: size/quality por família real (ver `openai-image-compat.ts`
+  pra matriz completa), n (1 pra dall-e-3, até 10 pra gpt-image-*/dall-e-2).
 - Cobrança OpenAI: por imagem / tamanho / qualidade
 
 ---
