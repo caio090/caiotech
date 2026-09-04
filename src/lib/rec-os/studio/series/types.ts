@@ -1,5 +1,7 @@
 /**
- * Prompt 13 (REC OS Core Experience) — Fase 20/21/29: Série Visual.
+ * Prompt 13/16/18 (REC OS Core Experience / Persistence Completion /
+ * Creative Series Control & Asset Link Repair) — Fase 20/21/29: Série
+ * Visual.
  *
  * REGRA ABSOLUTA (Fase 20): N peças = N imagens/arquivos independentes.
  * NUNCA uma imagem contendo N layouts, NUNCA um mosaico, NUNCA uma
@@ -8,14 +10,11 @@
  * compositor) -- o orquestrador (series-orchestrator.ts) nunca pede
  * "uma imagem com N variações" ao provider.
  *
- * PERSISTÊNCIA (Fase 25): esta sprint mantém a série em memória de
- * sessão (estado React) -- a tabela `creative_series`/
- * `creative_series_items` está desenhada em
- * docs/supabase/92-feed-dna-and-creative-series.sql mas NÃO foi
- * executada (mesma razão do Feed DNA: fora do escopo seguro de
- * automação desta sprint). Documentado como débito não-bloqueante --
- * a série funciona de ponta a ponta durante a sessão, mas não
- * sobrevive a um refresh ainda.
+ * PERSISTÊNCIA: `creative_series`/`creative_series_items` (SQL 92) e o
+ * Storage privado de assets (SQL 93) estão live em Production desde o
+ * Prompt 16 -- série e status sobrevivem a refresh. `visualAssetId`
+ * (Prompt 18) é o vínculo real com `client_visual_assets`, nunca uma
+ * URL assinada persistida (expira -- sempre regerada na hidratação).
  */
 export type CreativeSeriesSize = 1 | 3 | 6 | 9;
 
@@ -30,6 +29,8 @@ export interface CreativeSeriesItem {
   headline?: string;
   cta?: string;
   status: CreativeSeriesItemStatus;
+  /** Prompt 18 -- FK real pra client_visual_assets.id quando o item tem um asset persistido (Company-scoped); null em Free Mode ou antes da primeira geração bem-sucedida. */
+  visualAssetId?: string | null;
   image: { url: string; width: number; height: number } | null;
   error: string | null;
 }
