@@ -16,6 +16,8 @@ const FAKE_TEXT_OUTPUT = {
   briefReading: "x", creativeDirection: "x", conceptualBasis: "x", visualStructure: "x",
   visualGuidelines: "x", generationPrompt: "cenário gerado a partir do briefing", variations: [], adaptations: [],
   suggestedHeadline: "Headline sugerida", suggestedCta: null as string | null,
+  // Prompt 20 -- campos novos do VisualCompositionPlan.
+  layoutArchetype: "EDITORIAL_HERO" as const, headlineZone: "BOTTOM" as const, contrastTreatment: "SCRIM" as const, ctaStyle: "PILL" as const,
 };
 
 const FAKE_COMPOSE_RESULT = { ok: true as const, buffer: Buffer.from("fake-final-jpeg"), width: 1080, height: 1080, mime: "image/jpeg" };

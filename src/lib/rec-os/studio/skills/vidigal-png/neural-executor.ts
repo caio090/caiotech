@@ -66,8 +66,19 @@ const VIDIGAL_PNG_JSON_SCHEMA = {
     adaptations: stringArray,
     suggestedHeadline: { type: "string" },
     suggestedCta: { type: ["string", "null"] },
+    // Prompt 20 (Studio Visual Quality) -- plano de composição
+    // operacional, consumido de verdade por image-runtime.ts (negative
+    // space) e render-plan.ts (posição/tratamento reais) -- nunca só
+    // "texto bonito" adicional.
+    layoutArchetype: { type: "string", enum: ["EDITORIAL_HERO", "PRODUCT_FOCUS", "LIFESTYLE_HERO", "BOLD_PROMO", "MINIMAL_POSTER", "INFORMATIONAL", "BRAND_STATEMENT"] },
+    headlineZone: { type: "string", enum: ["TOP", "BOTTOM"] },
+    contrastTreatment: { type: "string", enum: ["SCRIM", "GRADIENT", "PANEL"] },
+    ctaStyle: { type: "string", enum: ["PILL", "LABEL", "UNDERLINE", "SMALL_BLOCK"] },
   },
-  required: ["briefReading", "creativeDirection", "conceptualBasis", "visualStructure", "visualGuidelines", "generationPrompt", "variations", "adaptations", "suggestedHeadline", "suggestedCta"],
+  required: [
+    "briefReading", "creativeDirection", "conceptualBasis", "visualStructure", "visualGuidelines", "generationPrompt", "variations", "adaptations", "suggestedHeadline", "suggestedCta",
+    "layoutArchetype", "headlineZone", "contrastTreatment", "ctaStyle",
+  ],
 } as const;
 
 function isNonEmptyInput(request: StudioSkillExecutionRequest): boolean {
@@ -82,6 +93,11 @@ function isNonEmptyInput(request: StudioSkillExecutionRequest): boolean {
  *  instruído com json_schema/strict:true, mas nunca confiamos cegamente
  *  numa resposta externa). Ausência de qualquer um dos 8 blocos invalida
  *  o output inteiro -- nunca devolvido parcialmente como sucesso. */
+const VALID_LAYOUT_ARCHETYPES = new Set(["EDITORIAL_HERO", "PRODUCT_FOCUS", "LIFESTYLE_HERO", "BOLD_PROMO", "MINIMAL_POSTER", "INFORMATIONAL", "BRAND_STATEMENT"]);
+const VALID_HEADLINE_ZONES = new Set(["TOP", "BOTTOM"]);
+const VALID_CONTRAST_TREATMENTS = new Set(["SCRIM", "GRADIENT", "PANEL"]);
+const VALID_CTA_STYLES = new Set(["PILL", "LABEL", "UNDERLINE", "SMALL_BLOCK"]);
+
 function isValidVidigalOutput(value: unknown): value is VidigalPngOutputContract {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
@@ -92,6 +108,11 @@ function isValidVidigalOutput(value: unknown): value is VidigalPngOutputContract
   if (!Array.isArray(v.adaptations) || !v.adaptations.every((a) => typeof a === "string")) return false;
   if (typeof v.suggestedHeadline !== "string" || v.suggestedHeadline.length === 0) return false;
   if (v.suggestedCta !== null && typeof v.suggestedCta !== "string") return false;
+  // Prompt 20 -- nunca confia cegamente nos 4 campos novos de composição: valor fora do enum invalida o output inteiro, mesmo com strict:true do lado do provider.
+  if (typeof v.layoutArchetype !== "string" || !VALID_LAYOUT_ARCHETYPES.has(v.layoutArchetype)) return false;
+  if (typeof v.headlineZone !== "string" || !VALID_HEADLINE_ZONES.has(v.headlineZone)) return false;
+  if (typeof v.contrastTreatment !== "string" || !VALID_CONTRAST_TREATMENTS.has(v.contrastTreatment)) return false;
+  if (typeof v.ctaStyle !== "string" || !VALID_CTA_STYLES.has(v.ctaStyle)) return false;
   return true;
 }
 

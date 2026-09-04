@@ -70,6 +70,45 @@ async function main() {
     assert(plan.canvas.width === plan.canvas.height, "formato desconhecido usa o canvas default (feed_square)");
   }
 
+  console.log("[test] [PROMPT 20] headlineZone TOP -- faixa de texto migra pro topo, logo migra pro canto oposto (nunca colide)");
+  {
+    const bottom = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: null, protectedAssetRoles: [{ assetId: "logo-1", role: "logo" }], headlineZone: "BOTTOM" });
+    const top = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: null, protectedAssetRoles: [{ assetId: "logo-1", role: "logo" }], headlineZone: "TOP" });
+    const headlineBottom = bottom.textLayers.find((l) => l.role === "headline")!;
+    const headlineTop = top.textLayers.find((l) => l.role === "headline")!;
+    const logoBottom = bottom.protectedAssets.find((a) => a.role === "logo")!;
+    const logoTop = top.protectedAssets.find((a) => a.role === "logo")!;
+    assert(headlineTop.box.y < bottom.canvas.height / 2, "headlineZone TOP -- faixa de texto fica na metade superior");
+    assert(headlineBottom.box.y > bottom.canvas.height / 2, "headlineZone BOTTOM (default) -- faixa de texto fica na metade inferior");
+    assert(logoTop.box.y > top.canvas.height / 2, "logo migra pro canto INFERIOR quando a headline ocupa o topo -- nunca colide com o texto");
+    assert(logoBottom.box.y < bottom.canvas.height / 2, "logo fica no canto SUPERIOR quando a headline ocupa a base (comportamento histórico preservado)");
+  }
+
+  console.log("[test] [PROMPT 20 Fase 27] contrastTreatment -- SCRIM/PANEL/GRADIENT produzem tratamentos REALMENTE diferentes, nunca 'caixa preta genérica sempre'");
+  {
+    const scrim = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: null, protectedAssetRoles: [], contrastTreatment: "SCRIM" }).textLayers.find((l) => l.role === "headline")!;
+    const panel = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: null, protectedAssetRoles: [], contrastTreatment: "PANEL" }).textLayers.find((l) => l.role === "headline")!;
+    const gradient = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: null, protectedAssetRoles: [], contrastTreatment: "GRADIENT" }).textLayers.find((l) => l.role === "headline")!;
+    assert(scrim.backdrop?.style === undefined, "SCRIM é preenchimento sólido (sem style -- compositor trata como solid)");
+    assert(panel.backdrop!.opacity > scrim.backdrop!.opacity, "PANEL é mais opaco/compacto que SCRIM -- hug real ao texto, não a mesma faixa ampla");
+    assert(gradient.backdrop?.style === "gradient", "GRADIENT usa um degradê real (compositor.ts), nunca um retângulo sólido");
+    assert(!(scrim.backdrop!.radius === panel.backdrop!.radius && scrim.backdrop!.opacity === panel.backdrop!.opacity), "SCRIM e PANEL nunca ficam pixel-a-pixel idênticos");
+  }
+
+  console.log("[test] [PROMPT 20 Fase 28] ctaStyle -- PILL/LABEL/UNDERLINE/SMALL_BLOCK são tratamentos visuais distintos, Vidigal escolhe");
+  {
+    const withStyle = (style: "PILL" | "LABEL" | "UNDERLINE" | "SMALL_BLOCK") =>
+      buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: "Peça já", protectedAssetRoles: [], ctaStyle: style }).textLayers.find((l) => l.role === "cta")!;
+    const pill = withStyle("PILL");
+    const label = withStyle("LABEL");
+    const underline = withStyle("UNDERLINE");
+    const smallBlock = withStyle("SMALL_BLOCK");
+    assert(pill.backdrop!.radius > label.backdrop!.radius, "PILL é totalmente arredondado, LABEL é um retângulo quase reto -- radius bem diferente");
+    assert(underline.backdrop === undefined && underline.underline !== undefined, "UNDERLINE nunca tem backdrop -- só o traço (nunca os dois juntos)");
+    assert(smallBlock.backdrop!.radius === 0, "SMALL_BLOCK é um bloco reto, sem arredondamento");
+    assert(pill.maxFontSize <= (buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: "Peça já", protectedAssetRoles: [] }).textLayers.find((l) => l.role === "headline")!.maxFontSize), "CTA nunca maior que a headline em nenhum estilo (hierarquia, Fase 28)");
+  }
+
   console.log(`\n[result] ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }

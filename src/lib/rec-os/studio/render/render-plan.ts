@@ -10,11 +10,13 @@
  * 1º produto/cena -- o canvas inteiro é a cena gerada; um asset
  *    PROTECTED de papel "product" ganha um card dedicado numa faixa
  *    central, sem cortar/distorcer o original (sempre "contain").
- * 2º headline -- faixa inferior, sobre um scrim escuro (garante
- *    contraste em cima de qualquer fundo gerado, sem depender de cor
- *    de marca que não temos garantia de conseguir interpretar aqui).
- * 3º CTA -- pill abaixo da headline, nunca compete com ela.
- * 4º logo -- canto superior direito, pequeno/discreto.
+ * 2º headline -- faixa TOP ou BOTTOM (Prompt 20: decidida pela Vidigal
+ *    via headlineZone, nunca sempre fixa embaixo), com tratamento de
+ *    contraste real (Prompt 20 Fase 27), sem depender de cor de marca
+ *    que não temos garantia de conseguir interpretar aqui.
+ * 3º CTA -- abaixo/ao lado da headline conforme o ctaStyle (Prompt 20
+ *    Fase 28), nunca compete com ela.
+ * 4º logo -- canto oposto à faixa de texto, pequeno/discreto.
  */
 import type { DesignFormat } from "@/lib/providers/shared/types";
 import { STUDIO_FONT_FAMILY_DISPLAY } from "./fonts";
@@ -26,6 +28,7 @@ import type {
   StudioSafeZone,
   StudioTextLayer,
 } from "./types";
+import type { VidigalContrastTreatment, VidigalCtaStyle, VidigalHeadlineZone } from "../skills/vidigal-png/output";
 
 /** Mesma aproximação de proporção já usada em image-runtime.ts
  *  (FORMAT_TO_ASPECT_RATIO) -- nunca inventa uma proporção nova. */
@@ -57,39 +60,67 @@ export interface BuildRenderPlanInput {
   headline: string;
   cta: string | null;
   protectedAssetRoles: { assetId: string; role: StudioProtectedAssetRole }[];
+  /** Prompt 20 -- decididos pela Vidigal (VisualCompositionPlan). Ausentes = comportamento anterior ao Prompt 20 (BOTTOM/SCRIM/PILL), nunca quebra chamadores antigos. */
+  headlineZone?: VidigalHeadlineZone;
+  contrastTreatment?: VidigalContrastTreatment;
+  ctaStyle?: VidigalCtaStyle;
+}
+
+/** Prompt 20 (Fase 27) -- backdrop real por tratamento, nunca "caixa preta genérica sempre". PANEL é mais compacto/opaco (hug ao texto); GRADIENT usa fade real (ver compositor.ts); SCRIM é a faixa ampla de sempre. */
+function buildHeadlineBackdrop(treatment: VidigalContrastTreatment): NonNullable<StudioTextLayer["backdrop"]> {
+  switch (treatment) {
+    case "PANEL":
+      return { color: "#000000", opacity: 0.78, radius: 16, paddingX: 20, paddingY: 16 };
+    case "GRADIENT":
+      return { color: "#000000", opacity: 0.75, radius: 0, paddingX: 24, paddingY: 18, style: "gradient" };
+    case "SCRIM":
+    default:
+      return { color: "#000000", opacity: 0.55, radius: 20, paddingX: 24, paddingY: 18 };
+  }
 }
 
 export function buildStudioRenderPlan(input: BuildRenderPlanInput): StudioRenderPlan {
   const canvas = CANVAS_BY_FORMAT[input.format] ?? CANVAS_BY_FORMAT.feed_square;
   const renderWarnings: string[] = [];
+  const headlineZone: VidigalHeadlineZone = input.headlineZone ?? "BOTTOM";
+  const contrastTreatment: VidigalContrastTreatment = input.contrastTreatment ?? "SCRIM";
+  const ctaStyle: VidigalCtaStyle = input.ctaStyle ?? "PILL";
 
   const safeMargin = Math.round(clamp(Math.min(canvas.width, canvas.height) * 0.05, 24, 64));
   const safeZone: StudioSafeZone = { top: safeMargin, right: safeMargin, bottom: safeMargin, left: safeMargin };
 
   const focalArea = clampRect({ x: 0, y: 0, width: canvas.width, height: canvas.height }, canvas);
 
-  // Logo -- canto superior direito, sempre fora da faixa de texto inferior.
+  // Faixa de texto -- TOP (logo abaixo da margem de segurança) ou
+  // BOTTOM (padrão histórico). Logo migra pro canto OPOSTO à faixa de
+  // texto -- nunca colide com ela (Prompt 20 Fase 20: "não colocar
+  // produto/rosto atrás da headline" vale igualmente pro logo).
+  const textBandHeight = Math.round(canvas.height * (input.cta ? 0.3 : 0.22));
+  const textBandTop = headlineZone === "TOP" ? safeMargin : canvas.height - safeMargin - textBandHeight;
+  const textBandWidth = canvas.width - safeMargin * 2;
+
   const logoRole = input.protectedAssetRoles.find((a) => a.role === "logo");
   const logoSize = Math.round(clamp(Math.min(canvas.width, canvas.height) * 0.11, 56, 160));
+  const logoTop = headlineZone === "TOP" ? canvas.height - safeMargin - logoSize : safeMargin;
   const protectedAssets: StudioRenderPlan["protectedAssets"] = [];
   if (logoRole) {
     protectedAssets.push({
       assetId: logoRole.assetId,
       role: "logo",
-      box: clampRect({ x: canvas.width - safeMargin - logoSize, y: safeMargin, width: logoSize, height: logoSize }, canvas),
+      box: clampRect({ x: canvas.width - safeMargin - logoSize, y: logoTop, width: logoSize, height: logoSize }, canvas),
     });
   }
 
-  // Faixa de texto -- ocupa a parte inferior do canvas.
-  const textBandHeight = Math.round(canvas.height * (input.cta ? 0.3 : 0.22));
-  const textBandTop = canvas.height - safeMargin - textBandHeight;
-  const textBandWidth = canvas.width - safeMargin * 2;
-
-  // Produto protegido -- card central entre a linha do logo e a faixa de texto.
+  // Produto protegido -- card central, sempre no espaço ENTRE a faixa
+  // de texto e o logo, qualquer que seja a zona escolhida.
   const productRole = input.protectedAssetRoles.find((a) => a.role === "product");
   if (productRole) {
-    const productTop = safeMargin + (logoRole ? logoSize + safeMargin : 0);
-    const productBottom = textBandTop - safeMargin;
+    const productTop = headlineZone === "TOP"
+      ? textBandTop + textBandHeight + safeMargin
+      : safeMargin + (logoRole ? logoSize + safeMargin : 0);
+    const productBottom = headlineZone === "TOP"
+      ? logoTop - safeMargin
+      : textBandTop - safeMargin;
     if (productBottom - productTop > 80) {
       protectedAssets.push({
         assetId: productRole.assetId,
@@ -115,15 +146,19 @@ export function buildStudioRenderPlan(input: BuildRenderPlanInput): StudioRender
     minFontSize: Math.min(20, headlineMax),
     color: "#FFFFFF",
     align: "left",
-    backdrop: { color: "#000000", opacity: 0.55, radius: 20, paddingX: 24, paddingY: 18 },
+    backdrop: buildHeadlineBackdrop(contrastTreatment),
   });
 
   if (input.cta) {
     const gap = Math.round(safeMargin * 0.4);
     const ctaTop = headlineBox.y + headlineBox.height + gap;
     const ctaHeight = Math.max(40, canvas.height - safeMargin - ctaTop);
-    const ctaWidth = Math.min(textBandWidth, Math.round(canvas.width * 0.55));
+    const ctaWidth = Math.min(textBandWidth, Math.round(canvas.width * (ctaStyle === "SMALL_BLOCK" ? 0.4 : 0.55)));
     const ctaBox = clampRect({ x: safeMargin, y: ctaTop, width: ctaWidth, height: ctaHeight }, canvas);
+    // Prompt 20 (Fase 28) -- CTA nunca compete com a headline: teto
+    // proporcionalmente menor que o da headline em todos os estilos, e
+    // cada estilo tem um tratamento visual realmente distinto (nunca
+    // sempre pill), Vidigal escolhe via ctaStyle.
     const ctaMax = Math.round(clamp(ctaBox.height * 0.5, 16, 44));
     textLayers.push({
       role: "cta",
@@ -133,9 +168,16 @@ export function buildStudioRenderPlan(input: BuildRenderPlanInput): StudioRender
       fontWeight: 600,
       maxFontSize: ctaMax,
       minFontSize: Math.min(16, ctaMax),
-      color: "#111111",
-      align: "center",
-      backdrop: { color: "#FFFFFF", opacity: 0.95, radius: ctaBox.height / 2, paddingX: 20, paddingY: 10 },
+      color: ctaStyle === "UNDERLINE" ? "#FFFFFF" : "#111111",
+      align: ctaStyle === "UNDERLINE" ? "left" : "center",
+      backdrop: ctaStyle === "PILL"
+        ? { color: "#FFFFFF", opacity: 0.95, radius: ctaBox.height / 2, paddingX: 20, paddingY: 10 }
+        : ctaStyle === "LABEL"
+        ? { color: "#FFFFFF", opacity: 0.95, radius: 4, paddingX: 16, paddingY: 8 }
+        : ctaStyle === "SMALL_BLOCK"
+        ? { color: "#FFFFFF", opacity: 1, radius: 0, paddingX: 14, paddingY: 8 }
+        : undefined, // UNDERLINE -- sem backdrop, ver `underline` abaixo.
+      underline: ctaStyle === "UNDERLINE" ? { color: "#FFFFFF", thickness: 2 } : undefined,
     });
   }
 

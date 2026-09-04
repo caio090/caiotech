@@ -43,8 +43,10 @@ export interface StudioTextLayer {
   minFontSize: number;
   color: string;
   align: "left" | "center" | "right";
-  /** Cor de fundo opcional (pill/plaquinha) para garantir contraste sobre o background gerado. */
-  backdrop?: { color: string; opacity: number; radius: number; paddingX: number; paddingY: number };
+  /** Cor de fundo opcional (pill/plaquinha/painel/gradiente) para garantir contraste sobre o background gerado. Prompt 20 (Fase 27) -- `style: "gradient"` substitui o preenchimento sólido por um degradê transparente->cor (nunca "caixa preta genérica sempre"). */
+  backdrop?: { color: string; opacity: number; radius: number; paddingX: number; paddingY: number; style?: "solid" | "gradient" };
+  /** Prompt 20 (Fase 28) -- traço sob o texto, usado pelo ctaStyle UNDERLINE (nunca junto de um backdrop). */
+  underline?: { color: string; thickness: number };
 }
 
 export type StudioProtectedAssetRole = "logo" | "product";

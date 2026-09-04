@@ -36,11 +36,19 @@ export const BACKGROUND_GUARD_STATUS = "prevention_only" as const;
  */
 const BACKGROUND_GUARD_POLICY = [
   "REGRA OBRIGATÓRIA DE BACKGROUND (vale sobre qualquer outra instrução deste prompt):",
-  "Gere APENAS o ambiente/cenário visual de fundo.",
+  "Gere UMA ÚNICA composição visual coesa -- uma cena, um canvas, um momento fotografado/ilustrado.",
   "NUNCA inclua texto, palavras, letras, números ou tipografia de qualquer tipo na imagem.",
   "NUNCA inclua logotipos, marcas d'água, assinaturas, selos ou marcas registradas -- reais, genéricas ou inventadas.",
   "NUNCA desenhe elementos de interface (botões, menus, ícones de app, molduras de UI).",
   "NUNCA adicione branding decorativo (emblemas, faixas com nome de marca, rótulos de produto inventados).",
+  // Prompt 20 (Studio Visual Quality) -- Background Guard V2: incidente
+  // real de Production (peça única saiu como um mosaico de seis fotos
+  // organizadas dentro da mesma imagem, como se fosse um feed inteiro
+  // comprimido numa peça). Regra anti-colagem reforçada aqui como a
+  // ÚLTIMA e mais recente instrução antes do provider, defesa em
+  // profundidade além da regra -1 já em instructions.ts.
+  "NUNCA produza colagem, grid interno, contact sheet, moodboard, storyboard, prancha multi-painel, mosaico de várias fotos, grid 2x2/2x3/3x3, ou split-screen.",
+  "NUNCA produza um pôster/cartaz dentro do próprio pôster, mockup de rede social, grid de Instagram, ou qualquer prancha com múltiplos quadros -- mesmo que o contexto seja uma série ou um feed de várias peças: cada peça é sempre UMA única composição, nunca uma representação do conjunto inteiro.",
   "Headline, CTA e logo oficial da marca são adicionados depois, fora desta geração -- este background deve funcionar como uma cena limpa, sem nenhum desses elementos.",
 ].join("\n");
 

@@ -26,6 +26,11 @@ const FAKE_OUTPUT = {
   adaptations: ["Adaptação 1"],
   suggestedHeadline: "Headline de teste",
   suggestedCta: "CTA de teste",
+  // Prompt 20 -- campos novos e obrigatórios do VisualCompositionPlan.
+  layoutArchetype: "EDITORIAL_HERO",
+  headlineZone: "BOTTOM",
+  contrastTreatment: "SCRIM",
+  ctaStyle: "PILL",
 };
 
 class FakeOpenAI {
@@ -146,6 +151,26 @@ test("[10] output faltando um bloco é rejeitado (STUDIO_SKILL_OUTPUT_INVALID)",
   assert.equal(result.status, "failed");
   assert.equal(result.error?.code, "STUDIO_SKILL_OUTPUT_INVALID");
   assert.equal(result.output, null, "output inválido nunca é devolvido, mesmo parcialmente");
+  delete process.env.OPENAI_API_KEY;
+});
+
+test("[PROMPT 20] output com layoutArchetype/headlineZone/contrastTreatment/ctaStyle fora do enum -- rejeitado, nunca confia cegamente no provider mesmo com strict:true do lado dele", async (t) => {
+  const invalidOutput = { ...FAKE_OUTPUT, headlineZone: "LEFT_INVENTADO_PELO_PROVIDER" };
+  class FakeOpenAIInvalid {
+    responses = { create: async () => ({ output_text: JSON.stringify(invalidOutput) }) };
+    constructor(_opts: unknown) { void _opts; }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (t.mock.module as any)("openai", { exports: { default: FakeOpenAIInvalid } });
+  const { executeVidigalPng } = await import(`../skills/vidigal-png/neural-executor.ts?t=${Date.now()}-${Math.random()}`);
+  process.env.OPENAI_API_KEY = "sk-test-fake-key-never-real";
+  const vidigal = findStudioSkill("vidigal_png")!;
+  const request: StudioSkillExecutionRequest = {
+    skillId: "vidigal_png", input: { freeformBrief: "teste" }, context: { company: null },
+  };
+  const result = await executeVidigalPng(vidigal, request);
+  assert.equal(result.status, "failed");
+  assert.equal(result.error?.code, "STUDIO_SKILL_OUTPUT_INVALID");
   delete process.env.OPENAI_API_KEY;
 });
 

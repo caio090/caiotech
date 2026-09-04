@@ -9,6 +9,21 @@
  * runtime visual, nunca a skill em si.
  */
 import type { DesignFormat } from "@/lib/providers/shared/types";
+import type { VidigalHeadlineZone } from "../skills/vidigal-png/output";
+
+/**
+ * Prompt 20 (Studio Visual Quality) — Fase 09/10: contrato conceitual
+ * que separa o que REALMENTE chama o provider de imagem do que é só
+ * UI organizando assets já existentes. SINGLE_PIECE e SERIES_ITEM
+ * geram UMA composição cada (nunca "várias peças numa imagem só").
+ * FEED_PREVIEW e STORY_PREVIEW NUNCA chamam o provider -- eles só
+ * organizam thumbnails/placeholders de peças que já existem (ver
+ * components/rec-os/feed-preview.tsx, testado explicitamente em
+ * visual-quality.structural.test.ts). Este tipo é só documentação/
+ * label -- a garantia real já está em qual código importa
+ * image-runtime.ts (só create-studio-visual.ts, nunca FeedPreview).
+ */
+export type VisualOutputIntent = "SINGLE_PIECE" | "SERIES_ITEM" | "FEED_PREVIEW" | "STORY_PREVIEW";
 
 export type StudioImageAssetKind = "reference" | "protected";
 
@@ -59,6 +74,8 @@ export interface StudioImageGenerationRequest {
   format: DesignFormat;
   references: StudioImageAsset[];
   protectedAssets: StudioImageAsset[];
+  /** Prompt 20 -- decidido pela Vidigal (VisualCompositionPlan); reserva negative space na cena ANTES da geração, nunca depois. Opcional/retrocompatível -- ausência cai no comportamento anterior (nenhuma instrução de zona). */
+  headlineZone?: VidigalHeadlineZone;
 }
 
 export type StudioImageResultStatus = "completed" | "failed" | "runtime_unavailable";

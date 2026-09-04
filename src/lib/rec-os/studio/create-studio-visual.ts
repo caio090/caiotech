@@ -124,6 +124,8 @@ export async function createStudioVisual(request: CreateStudioVisualRequest): Pr
     format: request.input.format ?? "feed_square",
     references: request.assets.references,
     protectedAssets,
+    // Prompt 20 -- negative space reservado na cena a partir do plano de composição real da Vidigal (nunca gera o fundo primeiro e só depois torce por espaço sobrando).
+    headlineZone: output.headlineZone,
   });
 
   const pipelineWarnings = [...referenceAnalysis.warnings, ...backgroundResult.warnings];
@@ -156,6 +158,10 @@ export async function createStudioVisual(request: CreateStudioVisualRequest): Pr
     headline: finalHeadline,
     cta: finalCta,
     protectedAssetRoles,
+    // Prompt 20 -- plano de composição real da Vidigal decide posição/tratamento visual, nunca sempre o mesmo layout fixo.
+    headlineZone: output.headlineZone,
+    contrastTreatment: output.contrastTreatment,
+    ctaStyle: output.ctaStyle,
   });
   pipelineWarnings.push(...renderPlan.renderWarnings);
 

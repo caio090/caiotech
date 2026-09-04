@@ -151,3 +151,46 @@ test("[Prompt 03] teste de render anti-regressão: headline/CTA reais chegam ao 
   }
   assert.ok(foundLightPixel, "algum pixel dentro da box do CTA deveria estar bem mais claro que o fundo cinza (235,235,235) -- pill branco desenhado");
 });
+
+test("[PROMPT 20 Fase 27] contrastTreatment GRADIENT -- renderiza de verdade (nunca crasha), produz variação real de luminosidade dentro da própria box (nunca um retângulo sólido uniforme como SCRIM/PANEL)", async () => {
+  const background = await solidPng(1080, 1080, { r: 200, g: 200, b: 200 });
+  const renderPlan = buildStudioRenderPlan({ format: "feed_square", headline: "Aberto até 4h", cta: null, protectedAssetRoles: [], contrastTreatment: "GRADIENT" });
+  const result = await composeStudioVisual({ backgroundBytes: background, renderPlan, protectedAssetBytes: [] });
+  assert.equal(result.ok, true, "GRADIENT compõe com sucesso, sem crashar o compositor");
+  if (!result.ok) return;
+  const meta = await sharp(result.buffer).metadata();
+  assert.equal(meta.format, "jpeg", "buffer final decodificável de verdade com GRADIENT");
+
+  // A altura real renderizada do layer pode ser menor que a box inteira
+  // (ver renderTextLayerPng: min(box.height, conteúdo+padding)) -- em
+  // vez de assumir uma posição exata de amostra (frágil), varre uma
+  // grade vertical dentro da box e prova que existe uma luminosidade
+  // BEM CLARA (perto do fundo, transparência real no início do
+  // degradê) E uma BEM ESCURA (opacidade real no fim dele) -- um
+  // preenchimento sólido (SCRIM/PANEL) nunca produziria as duas coisas
+  // na mesma varredura vertical.
+  const headlineBox = renderPlan.textLayers.find((l) => l.role === "headline")!.box;
+  const { data, info } = await sharp(result.buffer).raw().toBuffer({ resolveWithObject: true });
+  const sampleX = headlineBox.x + Math.round(headlineBox.width * 0.9); // canto direito -- longe do texto em si, só o backdrop.
+  const lumas: number[] = [];
+  for (let dy = 2; dy < headlineBox.height; dy += 4) {
+    const y = headlineBox.y + dy;
+    const idx = (y * info.width + sampleX) * info.channels;
+    lumas.push((data[idx] + data[idx + 1] + data[idx + 2]) / 3);
+  }
+  const minLuma = Math.min(...lumas);
+  const maxLuma = Math.max(...lumas);
+  assert.ok(maxLuma > 150, `deveria existir um ponto claro (perto do fundo cinza 200, degradê ainda transparente) na varredura -- max encontrado: ${maxLuma}`);
+  assert.ok(minLuma < 100, `deveria existir um ponto escuro (degradê opaco) na varredura -- min encontrado: ${minLuma}`);
+  assert.ok(maxLuma - minLuma > 60, `GRADIENT precisa produzir uma faixa real de luminosidade dentro da box (${minLuma} a ${maxLuma}) -- nunca uniforme como um preenchimento sólido`);
+});
+
+test("[PROMPT 20 Fase 28] ctaStyle UNDERLINE -- renderiza de verdade, sem backdrop sólido (nunca os dois juntos)", async () => {
+  const background = await solidPng(1080, 1080, { r: 20, g: 20, b: 20 });
+  const renderPlan = buildStudioRenderPlan({ format: "feed_square", headline: "x", cta: "Peça já", protectedAssetRoles: [], ctaStyle: "UNDERLINE" });
+  const result = await composeStudioVisual({ backgroundBytes: background, renderPlan, protectedAssetBytes: [] });
+  assert.equal(result.ok, true, "UNDERLINE compõe com sucesso, sem crashar o compositor");
+  if (!result.ok) return;
+  const meta = await sharp(result.buffer).metadata();
+  assert.equal(meta.format, "jpeg", "buffer final decodificável de verdade com UNDERLINE");
+});

@@ -23,6 +23,7 @@ import type { ImageAspectRatio } from "@/lib/ai/image-providers/types";
 import type { DesignFormat } from "@/lib/providers/shared/types";
 import type { StudioImageCapabilities, StudioImageGenerationRequest, StudioImageGenerationResult } from "./types";
 import { applyBackgroundGuardPolicy } from "./background-guard";
+import { applyCompositionGuidance } from "./composition-guidance";
 
 const IMAGE_GENERATION_TIMEOUT_MS = 45_000;
 
@@ -100,11 +101,16 @@ export async function generateStudioImage(request: StudioImageGenerationRequest)
   try {
     // Nunca envia protectedAssets/references ao provider hoje -- só o
     // prompt de texto (Vidigal já o escreve descrevendo só o entorno
-    // quando há Asset Lock, ver V0.2.1). Prompt 13 -- Background Guard
+    // quando há Asset Lock, ver V0.2.1). Prompt 20 -- se headlineZone
+    // foi decidido, reserva negative space na cena ANTES da política
+    // final (Fase 19/20: nunca gera o fundo primeiro pra só depois
+    // torcer por espaço sobrando). Prompt 13 -- Background Guard
     // (Defesa 1): sempre anexa a política "sem texto/logo/marca
-    // d'água" ao prompt real, independente do que a Vidigal escreveu
-    // (defesa em profundidade contra contaminação do background).
-    const guardedPrompt = applyBackgroundGuardPolicy(request.generationPrompt);
+    // d'água/colagem" como a ÚLTIMA instrução, independente do que a
+    // Vidigal escreveu (defesa em profundidade contra contaminação do
+    // background).
+    const withComposition = request.headlineZone ? applyCompositionGuidance(request.generationPrompt, request.headlineZone) : request.generationPrompt;
+    const guardedPrompt = applyBackgroundGuardPolicy(withComposition);
     const result = await provider.generate({ prompt: guardedPrompt, aspectRatio, outputCount: 1 });
     if (!result.success || !result.images || result.images.length === 0) {
       return {

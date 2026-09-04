@@ -77,11 +77,38 @@ function renderTextLayerPng(layer: StudioTextLayer, fontFiles: string[]): { buff
     })
     .join("");
 
-  const backdropRect = backdrop
-    ? `<rect x="0" y="0" width="${width}" height="${height}" rx="${backdrop.radius}" ry="${backdrop.radius}" fill="${backdrop.color}" fill-opacity="${backdrop.opacity}" />`
+  // Prompt 20 (Fase 27) -- SCRIM/PANEL continuam um retângulo sólido
+  // (radius/opacity/padding decididos em render-plan.ts já dão a
+  // variação visual); GRADIENT nunca é "caixa preta genérica" -- é um
+  // degradê real transparente -> cor, direção coerente com a zona do
+  // texto (topo->baixo quando a headline fica no topo, baixo->topo
+  // quando fica embaixo -- aproximado aqui sempre por y1=0/y2=1, o
+  // suficiente pro efeito real de fade sobre a cena).
+  let defs = "";
+  let backdropRect = "";
+  if (backdrop) {
+    if (backdrop.style === "gradient") {
+      defs = `<defs><linearGradient id="textBackdropGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${backdrop.color}" stop-opacity="0" /><stop offset="100%" stop-color="${backdrop.color}" stop-opacity="${backdrop.opacity}" /></linearGradient></defs>`;
+      backdropRect = `<rect x="0" y="0" width="${width}" height="${height}" fill="url(#textBackdropGradient)" />`;
+    } else {
+      backdropRect = `<rect x="0" y="0" width="${width}" height="${height}" rx="${backdrop.radius}" ry="${backdrop.radius}" fill="${backdrop.color}" fill-opacity="${backdrop.opacity}" />`;
+    }
+  }
+
+  // Prompt 20 (Fase 28) -- ctaStyle UNDERLINE: um traço sob a última
+  // linha de texto, nunca junto de um backdrop (mutuamente exclusivos
+  // em render-plan.ts).
+  const underlineEl = layer.underline
+    ? (() => {
+        const lastLineY = padY + fit.fontSize * 0.85 + (fit.lines.length - 1) * fit.lineHeight;
+        const underlineY = lastLineY + fit.fontSize * 0.18;
+        const x1 = layer.align === "center" ? width / 2 - availableWidth / 2 : layer.align === "right" ? padX : padX;
+        const x2 = layer.align === "center" ? width / 2 + availableWidth / 2 : width - padX;
+        return `<line x1="${x1}" y1="${underlineY}" x2="${x2}" y2="${underlineY}" stroke="${layer.underline.color}" stroke-width="${layer.underline.thickness}" />`;
+      })()
     : "";
 
-  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${backdropRect}${tspans}</svg>`;
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${defs}${backdropRect}${tspans}${underlineEl}</svg>`;
   const resvg = new Resvg(svg, {
     font: { fontFiles, loadSystemFonts: false, defaultFontFamily: layer.fontFamily },
     background: "rgba(0,0,0,0)",

@@ -2,6 +2,9 @@
  * Executar com: node .tmp/run-ts-test.cjs src/lib/rec-os/studio/image/__tests__/background-guard.structural.test.ts
  * Prompt 13 (REC OS Core Experience) — Fase 26/27/28: applyBackgroundGuardPolicy
  * é pura, sem I/O.
+ * Prompt 20 (Studio Visual Quality) — Background Guard V2: reforço
+ * anti-colagem, incidente real de Production (peça única saiu como
+ * mosaico de 6 fotos).
  */
 import { applyBackgroundGuardPolicy, BACKGROUND_GUARD_STATUS } from "../background-guard";
 
@@ -17,6 +20,17 @@ async function main() {
     assert(/NUNCA inclua logotipos, marcas d'água/i.test(result), "proíbe logo/marca d'água explicitamente");
     assert(/interface \(botões, menus, ícones/i.test(result), "proíbe UI falsa explicitamente");
     assert(/branding decorativo/i.test(result), "proíbe branding decorativo explicitamente");
+  }
+
+  console.log("[test] [TEST 01/PROMPT 20] anti-colagem -- proíbe explicitamente grid/colagem/mosaico/contact sheet/split-screen, mesmo em série/feed");
+  {
+    const result = applyBackgroundGuardPolicy("Cenário de café ensolarado, tons quentes.");
+    assert(/colagem, grid interno, contact sheet, moodboard, storyboard/i.test(result), "proíbe colagem/grid/contact sheet/moodboard/storyboard explicitamente");
+    assert(/mosaico de várias fotos/i.test(result), "proíbe mosaico de várias fotos explicitamente (incidente real: 6 fotos numa peça só)");
+    assert(/grid 2x2\/2x3\/3x3/i.test(result), "proíbe grids numéricos explícitos");
+    assert(/split-screen/i.test(result), "proíbe split-screen explicitamente");
+    assert(/grid de instagram/i.test(result), "proíbe grid de Instagram/mockup de rede social explicitamente");
+    assert(/mesmo que o contexto seja uma série ou um feed/i.test(result), "deixa explícito que Série/Feed NUNCA autorizam colagem -- cada peça continua sendo uma única composição");
   }
 
   console.log("[test] prompt vazio -- ainda devolve a política, nunca string vazia");
