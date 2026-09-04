@@ -126,10 +126,12 @@ export interface SaveManualFeedDnaInput {
   patternType: FeedDnaPatternType;
   notes?: string;
   dominantPalette?: string[];
+  secondaryPalette?: string[];
+  compositionRhythm?: string;
   updatedBy: string;
 }
 
-export type SaveFeedDnaResult = { ok: true } | { ok: false; error: string; code: "FEED_DNA_STORAGE_NOT_CONFIGURED" | "FEED_DNA_SAVE_FAILED" };
+export type SaveFeedDnaResult = { ok: true; profile: FeedDnaProfile } | { ok: false; error: string; code: "FEED_DNA_STORAGE_NOT_CONFIGURED" | "FEED_DNA_SAVE_FAILED" };
 
 /**
  * Grava override manual (Fase 43: social manager pode editar sem IA).
@@ -138,12 +140,14 @@ export type SaveFeedDnaResult = { ok: true } | { ok: false; error: string; code:
  */
 export async function saveManualFeedDna(db: SupabaseClient, input: SaveManualFeedDnaInput): Promise<SaveFeedDnaResult> {
   try {
-    const { error } = await db.from("feed_dna_profiles").upsert(
+    const { data, error } = await db.from("feed_dna_profiles").upsert(
       {
         client_id: input.companyId,
         pattern_type: input.patternType,
         pattern_config: input.notes ? { notes: input.notes } : null,
         dominant_palette: input.dominantPalette ?? [],
+        secondary_palette: input.secondaryPalette ?? [],
+        composition_rhythm: input.compositionRhythm ?? null,
         source: "manual",
         user_override: true,
         confidence: null,
@@ -151,14 +155,14 @@ export async function saveManualFeedDna(db: SupabaseClient, input: SaveManualFee
         updated_at: new Date().toISOString(),
       },
       { onConflict: "client_id" },
-    );
+    ).select("*").single();
     if (error) {
       if (error.code === TABLE_MISSING_CODE) {
         return { ok: false, code: "FEED_DNA_STORAGE_NOT_CONFIGURED", error: "O armazenamento de Feed DNA ainda não foi configurado neste ambiente. Peça a um admin para executar a migration pendente." };
       }
       return { ok: false, code: "FEED_DNA_SAVE_FAILED", error: "Não foi possível salvar o Feed DNA agora." };
     }
-    return { ok: true };
+    return { ok: true, profile: rowToProfile(data as FeedDnaRow) };
   } catch {
     return { ok: false, code: "FEED_DNA_SAVE_FAILED", error: "Não foi possível salvar o Feed DNA agora." };
   }

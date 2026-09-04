@@ -18,9 +18,21 @@ function fakeSelectDb(row: unknown, error: { code?: string } | null = null) {
   return { from: (_t: string) => builder } as unknown as SupabaseClient;
 }
 
-function fakeUpsertDb(error: { code?: string } | null = null) {
+function fakeUpsertDb(error: { code?: string } | null = null, savedRow?: Record<string, unknown>) {
   const calls: unknown[] = [];
-  const builder = { upsert: async (payload: unknown, _opts: unknown) => { calls.push(payload); return { error }; } };
+  const builder = {
+    upsert: (payload: unknown, _opts: unknown) => {
+      calls.push(payload);
+      return {
+        select: (_cols: string) => ({
+          single: async () => ({
+            data: error ? null : (savedRow ?? { ...(payload as Record<string, unknown>), id: "fdna-1", created_at: "2026-01-01T00:00:00Z" }),
+            error,
+          }),
+        }),
+      };
+    },
+  };
   return { db: { from: (_t: string) => builder } as unknown as SupabaseClient, calls };
 }
 
@@ -75,6 +87,22 @@ async function main() {
     assert(payload.source === "manual", "source sempre manual neste caminho");
     assert(payload.user_override === true, "user_override sempre true neste caminho -- manual > IA (Fase 32)");
     assert(payload.confidence === null, "confidence nula em override manual -- não é uma inferência");
+  }
+
+  console.log("[test] saveManualFeedDna -- secondaryPalette/compositionRhythm persistidos, e o profile salvo é devolvido pra UI (Prompt 16, refresh-proof sem round-trip extra)");
+  {
+    const { db, calls } = fakeUpsertDb(null);
+    const result = await saveManualFeedDna(db, {
+      companyId: "company-1", patternType: "COLUMN_RHYTHM", updatedBy: "user-1",
+      dominantPalette: ["#111", "#222"], secondaryPalette: ["#eee"], compositionRhythm: "3 colunas fixas",
+    });
+    assert(result.ok === true, "save bem-sucedido");
+    const payload = calls[0] as Record<string, unknown>;
+    assert(JSON.stringify(payload.secondary_palette) === JSON.stringify(["#eee"]), "secondary_palette gravado");
+    assert(payload.composition_rhythm === "3 colunas fixas", "composition_rhythm gravado");
+    if (result.ok) {
+      assert(result.profile.patternType === "COLUMN_RHYTHM", "profile devolvido reflete o patternType salvo, sem precisar de um segundo fetch");
+    }
   }
 
   console.log("[test] saveManualFeedDna -- tabela ausente devolve erro específico, nunca genérico/silencioso");

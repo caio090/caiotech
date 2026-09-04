@@ -7,8 +7,10 @@ import { StudioExecutionForm } from "./_studio-execution-form";
 import { parseStudioLaunchContext } from "@/lib/rec-os/studio/launch-context";
 import { resolveSocialProfileContext } from "@/lib/rec-os/social-profile/resolve";
 import { resolveFeedDnaProfile } from "@/lib/rec-os/social-profile/feed-dna";
-import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+import { resolveCompanyContext } from "@/lib/company-context/resolve";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { FirstRunNote, HelpLauncher, EmptyStateGuide } from "@/components/guided-experience/guided-experience";
+import { FeedDnaSection } from "./_feed-dna-section";
 
 /**
  * Sprint REC OS Studio Foundation V0.1/V0.2 — reaproveita
@@ -34,12 +36,17 @@ export default async function StudioPage({
   const skills = getStudioSkills();
   const launchContext = parseStudioLaunchContext(params);
 
-  // Fase 19/50/51 -- Social Profile First View + Studio Top Bar (Company Mode
-  // apenas; Free Mode nunca resolve contexto social, ver resolveSocialProfileContext).
-  let db;
-  try { db = createSupabaseAdminClient(); } catch { db = await createServerSupabaseClient(); }
-  const socialProfile = clientId ? await resolveSocialProfileContext(db, clientId) : null;
-  const feedDna = clientId ? await resolveFeedDnaProfile(db, clientId) : null;
+  // Fase 06/19/50/51/53 (Prompt 16) -- Social Profile First View + Studio Top
+  // Bar (Company Mode apenas). Autoriza a Company ANTES de ler qualquer dado
+  // Company-scoped (Fase 06: "resolver Company autorizada... só depois
+  // acessar feed_dna_profiles") e usa sempre o client Supabase da SESSÃO
+  // (nunca o admin/service role) pra respeitar RLS de verdade como segunda
+  // camada (Fase 53) -- gap corrigido nesta sprint: a versão do Prompt 13
+  // lia com o client admin sem checar resolveCompanyContext antes.
+  const db = await createServerSupabaseClient();
+  const companyAuthorized = clientId ? (await resolveCompanyContext(clientId)).valid : false;
+  const socialProfile = clientId && companyAuthorized ? await resolveSocialProfileContext(db, clientId) : null;
+  const feedDna = clientId && companyAuthorized ? await resolveFeedDnaProfile(db, clientId) : null;
 
   return (
     <>
@@ -70,9 +77,9 @@ export default async function StudioPage({
         {clientId && socialProfile?.status === "not_connected" && (
           <EmptyStateGuide featureId="studio" stateId="instagram_not_connected" />
         )}
-        {clientId && feedDna?.status === "unset" && (
-          <EmptyStateGuide featureId="studio" stateId="feed_dna_unset" />
-        )}
+
+        {/* Fase 10-17/46 (Prompt 16) -- fecha o P1-A: editor real de Feed DNA (não mais só um empty state estático). */}
+        {clientId && companyAuthorized && <FeedDnaSection clientId={clientId} initial={feedDna} />}
 
         {/* Nova criação visual */}
         <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} launchContext={launchContext} />
