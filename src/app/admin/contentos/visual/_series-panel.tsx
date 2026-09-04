@@ -1,22 +1,29 @@
 "use client";
 
 /**
- * Prompt 13 (REC OS Core Experience) — Fase 20-24: Série Visual (UI).
+ * Prompt 13/16 (REC OS Core Experience / Persistence Completion) —
+ * Fase 20-24 (Série Visual) + Fase 18-30/39-42 (persistência real).
  *
  * REGRA ABSOLUTA: cada item é um request independente a
- * /api/studio/images/generate (o MESMO endpoint da peça única, nunca um
- * endpoint novo de "gerar N imagens") -- a orquestração sequencial
- * (concorrência 1) vive em series-orchestrator.ts, pura e testada ali.
- * Este componente só liga essa lógica ao fetch real e renderiza os
- * cards -- nunca reimplementa a fila aqui.
+ * /api/studio/images/generate (o MESMO endpoint da peça única) --
+ * a orquestração sequencial (concorrência 1) vive em
+ * series-orchestrator.ts, pura e testada ali, NUNCA reaberta aqui.
+ *
+ * Prompt 16 fecha o P1-B do QA do Prompt 13 (série só existia em React
+ * state): a série e cada item agora são criados/atualizados de verdade
+ * via /api/rec-os/series (creative_series/creative_series_items, RLS
+ * real) -- um refresh de página reidrata a partir do Supabase, nunca
+ * de sessionStorage/localStorage (Fase "PERSISTENCE DEFINITION": React
+ * state != persistência).
  */
-import { useState } from "react";
-import { Loader2, RefreshCw, XCircle, Sparkles, AlertTriangle, Grid3x3 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, RefreshCw, XCircle, Sparkles, AlertTriangle, Grid3x3, RotateCcw } from "lucide-react";
 import type { DesignFormat } from "@/lib/providers/shared/types";
 import {
-  buildInitialSeriesItems, runSeriesGeneration, markItemForRegeneration, cancelPendingItems,
+  runSeriesGeneration, markItemForRegeneration, cancelPendingItems,
 } from "@/lib/rec-os/studio/series/series-orchestrator";
 import type { CreativeSeriesItem, CreativeSeriesSize } from "@/lib/rec-os/studio/series/types";
+import type { CreativeSeriesWithItems } from "@/lib/rec-os/studio/series/repository";
 import { FeedPreview } from "@/components/rec-os/feed-preview";
 import { resolveFeedTemporalContext } from "@/lib/rec-os/social-profile/feed-timeline";
 import type { FeedTimelineItem } from "@/lib/rec-os/social-profile/feed-timeline";
@@ -55,6 +62,17 @@ async function generateOneItem(input: {
   }
 }
 
+async function patchSeriesItem(seriesId: string, itemId: string, body: { status: string; imageDataUrl?: string; errorMessage?: string }): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/rec-os/series/${seriesId}/items/${itemId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 const SIZES: CreativeSeriesSize[] = [1, 3, 6, 9];
 
 export function SeriesQuantityPicker({ value, onChange }: { value: CreativeSeriesSize; onChange: (v: CreativeSeriesSize) => void }) {
@@ -74,28 +92,74 @@ export function SeriesQuantityPicker({ value, onChange }: { value: CreativeSerie
 }
 
 export function SeriesPanel({
-  skillId, clientId, format, freeformBrief, references, protectedAssets, quantity,
+  skillId, clientId, contentId, format, freeformBrief, references, protectedAssets, quantity,
 }: {
-  skillId: string; clientId: string | null; format: DesignFormat; freeformBrief: string;
+  skillId: string; clientId: string | null; contentId: string | null; format: DesignFormat; freeformBrief: string;
   references: { label: string; url: string }[]; protectedAssets: { label: string; url: string }[];
   quantity: CreativeSeriesSize;
 }) {
+  const [seriesId, setSeriesId] = useState<string | null>(null);
   const [items, setItems] = useState<CreativeSeriesItem[] | null>(null);
   const [running, setRunning] = useState(false);
   const [showFeedPreview, setShowFeedPreview] = useState(false);
+  const [recent, setRecent] = useState<CreativeSeriesWithItems | null>(null);
   const canceledIds = useState(() => new Set<string>())[0];
+
+  // Fase 25 -- não inicia uma série nova automaticamente a cada mount;
+  // só verifica se existe uma recente pra oferecer "continuar".
+  useEffect(() => {
+    if (seriesId) return;
+    const params = new URLSearchParams();
+    if (clientId) params.set("client_id", clientId);
+    if (contentId) params.set("content_id", contentId);
+    fetch(`/api/rec-os/series?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data) => { if (data?.ok && data.series) setRecent(data.series as CreativeSeriesWithItems); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, contentId]);
 
   function applyUpdate(next: CreativeSeriesItem) {
     setItems((prev) => (prev ? prev.map((i) => (i.id === next.id ? next : i)) : prev));
   }
 
+  function persistItemUpdate(sid: string, item: CreativeSeriesItem) {
+    // Fase 27/28/29 -- persiste a transição real (nunca aguarda o PATCH
+    // pra seguir pro próximo item -- a sequência de geração não depende
+    // da confirmação de escrita, só a sobrevivência ao refresh depende).
+    void patchSeriesItem(sid, item.id, {
+      status: item.status,
+      imageDataUrl: item.status === "ready" && item.image ? item.image.url : undefined,
+      errorMessage: item.status === "error" && item.error ? item.error : undefined,
+    });
+  }
+
+  async function continueRecent() {
+    if (!recent) return;
+    setSeriesId(recent.series.id);
+    setItems(recent.items);
+    setRecent(null);
+  }
+
   async function start() {
-    const initial = buildInitialSeriesItems(freeformBrief.trim(), quantity);
-    setItems(initial);
     setRunning(true);
+    const created = await fetch("/api/rec-os/series", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId: clientId ?? undefined, contentId: contentId ?? undefined, format, freeformBrief: freeformBrief.trim(), count: quantity }),
+    }).then((r) => r.json()).catch(() => null);
+
+    if (!created?.ok) {
+      setRunning(false);
+      return;
+    }
+    const sid = created.series.series.id as string;
+    const initial = created.series.items as CreativeSeriesItem[];
+    setSeriesId(sid);
+    setItems(initial);
+
     const finalItems = await runSeriesGeneration(initial, {
       generate: (item) => generateOneItem({ skillId, clientId, format, item, references, protectedAssets }),
-      onItemUpdate: applyUpdate,
+      onItemUpdate: (item) => { applyUpdate(item); persistItemUpdate(sid, item); },
       isCanceled: (id) => canceledIds.has(id),
     });
     setItems(finalItems);
@@ -103,13 +167,14 @@ export function SeriesPanel({
   }
 
   async function regenerate(itemId: string) {
-    if (!items) return;
+    if (!items || !seriesId) return;
     const marked = markItemForRegeneration(items, itemId);
     setItems(marked);
+    await patchSeriesItem(seriesId, itemId, { status: "planned" });
     setRunning(true);
     const finalItems = await runSeriesGeneration(marked, {
       generate: (item) => generateOneItem({ skillId, clientId, format, item, references, protectedAssets }),
-      onItemUpdate: applyUpdate,
+      onItemUpdate: (item) => { applyUpdate(item); persistItemUpdate(seriesId, item); },
       isCanceled: (id) => canceledIds.has(id),
     });
     setItems(finalItems);
@@ -117,10 +182,16 @@ export function SeriesPanel({
   }
 
   function cancelNotStarted() {
-    if (!items) return;
+    if (!items || !seriesId) return;
     const pendingIds = new Set(items.filter((i) => i.status === "planned").map((i) => i.id));
     pendingIds.forEach((id) => canceledIds.add(id));
     setItems((prev) => (prev ? cancelPendingItems(prev, pendingIds) : prev));
+    // Fase 48 -- otimista; se a persistência falhar, reverte só aquele item.
+    pendingIds.forEach((id) => {
+      void patchSeriesItem(seriesId, id, { status: "canceled" }).then((ok) => {
+        if (!ok) setItems((prev) => (prev ? prev.map((i) => (i.id === id ? { ...i, status: "planned" as const } : i)) : prev));
+      });
+    });
   }
 
   const inCreation: FeedTimelineItem[] = (items ?? [])
@@ -131,14 +202,27 @@ export function SeriesPanel({
 
   if (!items) {
     return (
-      <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-purple-700">
-          {quantity === 1 ? "Vai gerar 1 imagem." : `Esta série vai gerar ${quantity} imagens independentes.`}
-        </p>
-        <button type="button" onClick={() => void start()} disabled={!freeformBrief.trim()}
-          className="text-xs font-bold bg-purple-600 text-white px-4 py-2 rounded-xl disabled:bg-gray-200 disabled:text-gray-400 flex items-center gap-1.5 shrink-0">
-          <Sparkles className="w-3.5 h-3.5" /> Criar {quantity === 1 ? "arte" : "série"}
-        </button>
+      <div className="space-y-2">
+        {recent && recent.items.length > 0 && (
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-600">
+              Série recente: {recent.items.filter((i) => i.status === "ready").length}/{recent.items.length} prontas
+            </p>
+            <button type="button" onClick={() => void continueRecent()} className="text-xs font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 shrink-0">
+              <RotateCcw className="w-3 h-3" /> Continuar
+            </button>
+          </div>
+        )}
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-purple-700">
+            {quantity === 1 ? "Vai gerar 1 imagem." : `Esta série vai gerar ${quantity} imagens independentes.`}
+          </p>
+          <button type="button" onClick={() => void start()} disabled={!freeformBrief.trim() || running}
+            className="text-xs font-bold bg-purple-600 text-white px-4 py-2 rounded-xl disabled:bg-gray-200 disabled:text-gray-400 flex items-center gap-1.5 shrink-0">
+            {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            Criar {quantity === 1 ? "arte" : "série"}
+          </button>
+        </div>
       </div>
     );
   }
@@ -168,7 +252,7 @@ export function SeriesPanel({
           <div key={item.id} className="rounded-xl border border-gray-100 overflow-hidden bg-gray-50">
             <div className="aspect-square flex items-center justify-center relative">
               {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // eslint-disable-next-line @next/next/no-img-element -- data: URL ou signed URL dinâmica
                 <img src={item.image.url} alt={item.role} className="w-full h-full object-cover" />
               ) : item.status === "generating" ? (
                 <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />

@@ -407,7 +407,7 @@ export function StudioExecutionForm({
       ) : (
         // Fase 20-24 -- Série Visual: N requests independentes ao MESMO endpoint, nunca 1 imagem com N layouts.
         <SeriesPanel
-          skillId={skillId} clientId={mode === "company" ? clientId : null} format={format} freeformBrief={freeformBrief}
+          skillId={skillId} clientId={mode === "company" ? clientId : null} contentId={launchContext.contentId} format={format} freeformBrief={freeformBrief}
           references={references.map((a) => ({ label: a.label, url: a.url }))}
           protectedAssets={protectedAssets.map((a) => ({ label: a.label, url: a.url }))}
           quantity={quantity}

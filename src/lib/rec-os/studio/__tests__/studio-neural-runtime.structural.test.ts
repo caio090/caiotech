@@ -84,11 +84,20 @@ test("[14] nenhum write no Supabase em execute.ts/route.ts/neural-executor.ts", 
   }
 });
 
-test("[15] nenhuma tabela/SQL nova criada nesta sprint", () => {
+test("[15] nenhuma tabela/SQL nova criada NESTA sprint (Studio Neural Runtime, text-only)", () => {
+  // Prompt 16 (REC OS Persistence Completion) adicionou de propósito
+  // persistência real ao Studio -- SQL 92/93 são deliberados e
+  // documentados naquele prompt, nunca "nesta sprint" (Studio Neural
+  // Runtime, texto apenas). Allowlist explícito em vez de "zero
+  // arquivos", pra continuar pegando SQL novo e NÃO documentado.
+  const KNOWN_STUDIO_SQL = new Set([
+    "93-studio-visual-assets-storage.sql", "93-studio-visual-assets-storage-rollback.sql",
+  ]);
   const supabaseDir = path.join(root, "docs/supabase");
   const entries = fs.readdirSync(supabaseDir);
   const studioSql = entries.filter((f) => /studio/i.test(f) && f.endsWith(".sql"));
-  assert.deepEqual(studioSql, [], "nenhum arquivo docs/supabase/*studio*.sql -- nenhuma tabela nova nesta sprint");
+  const unexpected = studioSql.filter((f) => !KNOWN_STUDIO_SQL.has(f));
+  assert.deepEqual(unexpected, [], "nenhum arquivo SQL de Studio NÃO documentado além dos já conhecidos (SQL 93)");
 });
 
 test("[16] EditorOS continua intocado", () => {

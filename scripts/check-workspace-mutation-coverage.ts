@@ -77,6 +77,9 @@ const ALLOWLIST: Record<string, { classification: Classification; note: string }
   "jarvis/speech/route.ts": { classification: "protected", note: "Chamada externa — Sprint MVP Experience Completion V0.1 (Jarvis)" },
   "studio/skills/execute/route.ts": { classification: "protected", note: "Chamada externa (OpenAI) — Sprint REC OS Studio Foundation V0.2" },
   "studio/images/generate/route.ts": { classification: "protected", note: "Chamada externa (provider de imagem) — Sprint REC OS Studio Image Generation MVP V0.3" },
+  "rec-os/feed-dna/route.ts": { classification: "protected", note: "PUT — grava Feed DNA manual (feed_dna_profiles) — Prompt 16 REC OS Persistence Completion" },
+  "rec-os/series/route.ts": { classification: "protected", note: "POST — cria Série Visual + items (creative_series/creative_series_items) — Prompt 16 REC OS Persistence Completion" },
+  "rec-os/series/[seriesId]/items/[itemId]/route.ts": { classification: "protected", note: "PATCH — transição de status de um item da série — Prompt 16 REC OS Persistence Completion" },
 
   "admin/workspaces/preview/route.ts": { classification: "excluded_with_reason", note: "É o próprio ponto de entrada/saída do preview" },
   "admin/workspaces/preview/exit/route.ts": { classification: "excluded_with_reason", note: "Hotfix 1.0.10 — saída atômica do preview (Set-Cookie + 303 na mesma resposta); mesma natureza de admin/workspaces/preview/route.ts, não uma mutação de dado de negócio. ATENÇÃO: esta classificação é só análise estática — não exime a rota do guard EM RUNTIME do proxy (src/proxy.ts). O hotfix 1.0.11 encontrou exatamente essa lacuna (classificada aqui, mas ainda bloqueada em produção); a allowlist real é isWorkspacePreviewControlMutation() em src/lib/workspaces/mutation-guard-runtime.ts — ver a tabela dedicada em docs/workspace-mutation-inventory.md." },

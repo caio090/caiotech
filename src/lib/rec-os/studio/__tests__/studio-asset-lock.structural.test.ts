@@ -89,11 +89,23 @@ console.log("[test] 12/13/16 — skill continua sem provider hardcoded; nenhum i
   assert(/responses\.create/.test(executorContent), "neural-executor.ts continua chamando só responses.create (texto estruturado)");
 }
 
-console.log("[test] 14/17 — nenhuma persistência/SQL criada por esta patch");
+console.log("[test] 14/17 — nenhuma persistência/SQL criada por ESTA patch (Asset Lock, text runtime only)");
 {
+  // Prompt 16 (REC OS Persistence Completion) adicionou de propósito
+  // persistência real ao Studio (Feed DNA/Série Visual/assets gerados)
+  // -- SQL 92/93 são deliberados, revisados, documentados no relatório
+  // daquele prompt, nunca "esta patch" (Asset Lock, sprint anterior,
+  // text-runtime-only). Este teste continua útil como guarda-corpo
+  // contra SQL NOVO e não documentado aparecendo sem querer -- por
+  // isso vira um allowlist explícito em vez de "zero arquivos".
   const supabaseDir = path.join(root, "docs/supabase");
+  const KNOWN_STUDIO_SQL = new Set([
+    "92-feed-dna-and-creative-series.sql", "92-feed-dna-and-creative-series-rollback.sql",
+    "93-studio-visual-assets-storage.sql", "93-studio-visual-assets-storage-rollback.sql",
+  ]);
   const studioSql = fs.readdirSync(supabaseDir).filter((f) => /studio/i.test(f) && f.endsWith(".sql"));
-  assert(studioSql.length === 0, "nenhum arquivo docs/supabase/*studio*.sql -- nenhuma persistência/tabela nova");
+  const unexpected = studioSql.filter((f) => !KNOWN_STUDIO_SQL.has(f));
+  assert(unexpected.length === 0, `nenhum arquivo SQL de Studio NÃO documentado -- encontrado: ${unexpected.join(", ")}`);
 }
 
 console.log("[test] 15 — endpoint permanece único (nenhuma rota nova)");
