@@ -42,11 +42,25 @@ const nextConfig: NextConfig = {
   // node_modules/next/dist/docs/.../output.md). Escopado só à rota que
   // realmente importa sharp (render/compositor.ts, via
   // create-studio-visual.ts) -- nunca o pacote inteiro em todas as rotas.
+  //
+  // x64 E arm64: nem `vercel project inspect`/`vercel inspect` nem o
+  // log de build real do deployment quebrado (dpl_B33TSicgKsQLwApedn9uV6wPKGeH,
+  // consultado via `vercel inspect --logs`) expõem a arquitetura de CPU
+  // da Function em texto -- e um `vercel build` local produziu
+  // `.vc-config.json` com `"architecture":"arm64"` mesmo vindo de um
+  // Mac Apple Silicon, o que sugere que isso reflete um default do
+  // projeto na Vercel, não o host que builda. Sem uma forma confiável
+  // de confirmar qual arquitetura a Function do Studio roda de fato,
+  // inclui as duas variantes glibc (x64 e arm64, os dois únicos
+  // suportados por Function do Node.js na Vercel -- nunca musl) em vez
+  // de arriscar deixar a errada de fora outra vez.
   outputFileTracingIncludes: {
     "/api/studio/images/generate": [
       "./node_modules/sharp/**/*",
       "./node_modules/@img/sharp-linux-x64/**/*",
       "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-arm64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-arm64/**/*",
     ],
   },
 };
