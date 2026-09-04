@@ -32,7 +32,8 @@
  *   persistido) -- por isso regenerate de um item "ready" não passa
  *   pela máquina de status planned/generating antes do resultado.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Loader2, RefreshCw, XCircle, Sparkles, AlertTriangle, Grid3x3, RotateCcw, Wand2 } from "lucide-react";
 import type { DesignFormat } from "@/lib/providers/shared/types";
 import { runSeriesGeneration, cancelPendingItems } from "@/lib/rec-os/studio/series/series-orchestrator";
@@ -129,9 +130,56 @@ export function SeriesPanel({
   const [showFeedPreview, setShowFeedPreview] = useState(false);
   const [recent, setRecent] = useState<CreativeSeriesWithItems | null>(null);
   const canceledIds = useState(() => new Set<string>())[0];
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlSeriesId = searchParams.get("series_id");
+  /** Fase 07 -- Company da série já carregada, pra invalidar se o clientId do contexto mudar depois. */
+  const loadedSeriesClientIdRef = useRef<string | null | undefined>(undefined);
 
+  /** Fase 04/05 -- series_id é a fonte de verdade explícita na URL (nunca dados sensíveis: só o UUID). Preserva os demais params. */
+  function setSeriesIdInUrl(nextSeriesId: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextSeriesId) params.set("series_id", nextSeriesId); else params.delete("series_id");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  function resetSeries() {
+    setSeriesId(null);
+    setItems(null);
+    loadedSeriesClientIdRef.current = undefined;
+    setSeriesIdInUrl(null);
+  }
+
+  /**
+   * Fase 04/05/06 -- series_id explícito na URL SEMPRE vence a heurística
+   * de "série recente" (Prompt 19 P1: depender só de "recente" é frágil
+   * -- some no refresh quando outra série mais nova existir pro mesmo
+   * contexto, ou quando a ordenação muda). Sem series_id na URL, cai
+   * pro fallback "recente" (Fase 06).
+   */
   useEffect(() => {
     if (seriesId) return;
+    if (urlSeriesId) {
+      fetch(`/api/rec-os/series/${urlSeriesId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.ok && data.series) {
+            const loaded = data.series as CreativeSeriesWithItems;
+            // Fase 07/08 -- série de outra Company/Free Mode nunca reaparece fora do seu contexto real.
+            if (loaded.series.clientId !== clientId) { setSeriesIdInUrl(null); return; }
+            loadedSeriesClientIdRef.current = loaded.series.clientId;
+            setSeriesId(loaded.series.id);
+            setItems(loaded.items);
+          } else {
+            // id inválido/inacessível (série apagada, ou de outra Company) -- nunca deixa um id morto na URL.
+            setSeriesIdInUrl(null);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
     const params = new URLSearchParams();
     if (clientId) params.set("client_id", clientId);
     if (contentId) params.set("content_id", contentId);
@@ -140,7 +188,14 @@ export function SeriesPanel({
       .then((data) => { if (data?.ok && data.series) setRecent(data.series as CreativeSeriesWithItems); })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, contentId]);
+  }, [clientId, contentId, urlSeriesId]);
+
+  /** Fase 07 -- se o Company do contexto mudar DEPOIS de uma série já carregada, nunca continuar mostrando a série da Company anterior. */
+  useEffect(() => {
+    if (loadedSeriesClientIdRef.current === undefined) return; // ainda não carregou nenhuma série nesta instância.
+    if (loadedSeriesClientIdRef.current !== clientId) resetSeries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
 
   function applyUpdate(next: CreativeSeriesItem) {
     setItems((prev) => (prev ? prev.map((i) => (i.id === next.id ? next : i)) : prev));
@@ -190,9 +245,11 @@ export function SeriesPanel({
 
   async function continueRecent() {
     if (!recent) return;
+    loadedSeriesClientIdRef.current = recent.series.clientId;
     setSeriesId(recent.series.id);
     setItems(recent.items);
     setRecent(null);
+    setSeriesIdInUrl(recent.series.id);
   }
 
   /** Fase "CRIAR SÉRIE" -- só cria a estrutura. Nenhum request ao provider aqui. */
@@ -204,6 +261,8 @@ export function SeriesPanel({
     }).then((r) => r.json()).catch(() => null);
     setCreating(false);
     if (!created?.ok) return;
+    loadedSeriesClientIdRef.current = clientId;
+    setSeriesIdInUrl(created.series.series.id as string);
     setSeriesId(created.series.series.id as string);
     setItems(created.series.items as CreativeSeriesItem[]);
   }

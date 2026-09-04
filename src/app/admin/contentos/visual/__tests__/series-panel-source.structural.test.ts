@@ -94,6 +94,28 @@ async function main() {
     assert(/status: "ready", imageDataUrl: providerResult\.url/.test(body), "branch de SUCESSO sempre persiste 'ready' (com o vínculo real de asset) antes de retornar");
   }
 
+  console.log("[test] [PROMPT 20 P1] series_id explícito na URL é a fonte de verdade, SEMPRE checado antes da heurística 'recente'");
+  {
+    assert(/const urlSeriesId = searchParams\.get\("series_id"\)/.test(source), "lê series_id da URL (fonte canônica, Fase 04/05)");
+    assert(/if \(urlSeriesId\) \{/.test(source), "prioriza series_id explícito sobre a busca de 'recente'");
+    assert(/fetch\(`\/api\/rec-os\/series\/\$\{urlSeriesId\}`\)/.test(source), "hidrata pelo endpoint de série exata (autorizado por RLS), nunca confia no id sem checar o servidor");
+    assert(/loaded\.series\.clientId !== clientId/.test(source), "Fase 07/08 -- nunca aceita uma série carregada que não pertence ao clientId do contexto atual");
+    assert(/setSeriesIdInUrl\(null\)/.test(source), "limpa o id da URL quando a série é inválida/não pertence ao contexto -- nunca deixa um id morto lá");
+  }
+
+  console.log("[test] [PROMPT 20 P1] criar/continuar série sempre grava o series_id real na URL (nunca só em React state)");
+  {
+    const createBody = extractFunctionBody(source, "async function createSeries()");
+    assert(/setSeriesIdInUrl\(created\.series\.series\.id/.test(createBody), "createSeries() grava o id real na URL assim que a série é criada");
+    const continueBody = extractFunctionBody(source, "async function continueRecent()");
+    assert(/setSeriesIdInUrl\(recent\.series\.id\)/.test(continueBody), "continueRecent() também grava o id na URL");
+  }
+
+  console.log("[test] [PROMPT 20 Fase 07] troca de Company invalida série de contexto anterior, nunca continua mostrando");
+  {
+    assert(/loadedSeriesClientIdRef\.current !== clientId\) resetSeries\(\)/.test(source), "effect dedicado reseta a série quando o clientId do contexto muda depois de já ter carregado uma série de outro dono");
+  }
+
   console.log(`\n[result] ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }
