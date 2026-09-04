@@ -21,7 +21,15 @@ import { buildVidigalSystemInstructions } from "./instructions";
 import type { VidigalPngOutputContract } from "./output";
 
 const VIDIGAL_TEXT_MODEL = process.env.STUDIO_VIDIGAL_TEXT_MODEL?.trim() || "gpt-4o-mini";
-const VIDIGAL_TEXT_TIMEOUT_MS = 20_000;
+/**
+ * Prompt 11 -- reduzido de 20s pra 15s pra abrir espaço real, dentro do
+ * teto de 60s (maxDuration, route.ts), pro timeout de imagem ter subido
+ * de 35s pra 42s (openai-images.ts) na migração pro GPT Image 2 --
+ * orçamento do cenário principal de smoke (Free Mode, sem referência):
+ * texto(15s) + imagem(42s) + compositor(~1s) = 58s. Nunca alterado o
+ * texto real produzido, só o teto de espera.
+ */
+const VIDIGAL_TEXT_TIMEOUT_MS = 15_000;
 const MAX_FREEFORM_BRIEF_CHARS = 4000;
 
 /** Fase 19 -- só presença, nunca o valor (mesmo princípio de isJarvisConfigured()). */

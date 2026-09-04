@@ -24,25 +24,31 @@ Clientes compram créditos internos — não têm acesso às chaves de API.
 - Cobrança Google: por imagem / resolução (verificar pricing atual)
 - Capacidade futura: referência de estilo, pessoa (via edição de imagem)
 
-### OpenAI Images (GPT Image e DALL-E)
+### OpenAI Images (GPT Image)
 
 - Arquivos: `src/lib/ai/image-providers/openai-images.ts` (provider, usa o
   SDK oficial `openai`), `openai-image-compat.ts` (resolve a família do
   modelo e monta o request só com os parâmetros válidos pra ela) e
   `openai-image-response.ts` (normaliza a resposta e os erros).
 - Variável: `OPENAI_API_KEY`
-- Modelo padrão: `dall-e-3` (via `OPENAI_IMAGE_MODEL`) — mas o adapter
-  reconhece qualquer modelo do union `ImageModel` do SDK instalado
-  (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
-  `gpt-image-2-*`, `chatgpt-image-latest`, `dall-e-2`, `dall-e-3`) e
-  monta o request certo pra cada família — nunca trata todos os
-  modelos como se aceitassem os mesmos parâmetros (Prompt 09).
-- `response_format` **nunca** é enviado, pra nenhuma família — a API
-  real de Production rejeitou esse parâmetro mesmo pro modelo default
-  (`dall-e-3`), então o normalizador aceita tanto `b64_json` quanto
-  `url` na resposta, o que vier.
+- Modelo padrão: `gpt-image-2` (via `OPENAI_IMAGE_MODEL`, constante
+  `DEFAULT_OPENAI_IMAGE_MODEL` em `openai-image-compat.ts`) — o adapter
+  reconhece qualquer modelo GPT Image do union `ImageModel` do SDK
+  instalado (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`,
+  `gpt-image-2`, `gpt-image-2-*`, `chatgpt-image-latest`) e monta o
+  request certo pra família — nunca trata todos os modelos como se
+  aceitassem os mesmos parâmetros (Prompt 09).
+- **`dall-e-2`/`dall-e-3` foram removidos da API real da OpenAI**
+  (incidente de Production, Prompt 11 — GPT-Image-2 Production
+  Migration). Se `OPENAI_IMAGE_MODEL` estiver configurada pra um dos
+  dois, o adapter falha fechado (nunca chama o SDK, nunca faz fallback
+  silencioso pra outro modelo) com uma mensagem sanitizada ao cliente.
+- `response_format` **nunca** é enviado — a API real de Production
+  rejeitou esse parâmetro mesmo pro modelo default de então, então o
+  normalizador aceita tanto `b64_json` quanto `url` na resposta, o que
+  vier.
 - Suporte a: size/quality por família real (ver `openai-image-compat.ts`
-  pra matriz completa), n (1 pra dall-e-3, até 10 pra gpt-image-*/dall-e-2).
+  pra matriz completa), n (até 10, dentro do limite de cada request).
 - Cobrança OpenAI: por imagem / tamanho / qualidade
 
 ---
@@ -54,7 +60,7 @@ Variável: `AI_IMAGE_PROVIDER`
 | Valor | Provedor |
 |---|---|
 | `google` ou `google-gemini` | Google Imagen |
-| `openai` ou `openai-images` | OpenAI DALL-E |
+| `openai` ou `openai-images` | OpenAI GPT Image |
 | (não definida) | Auto-detect: primeiro disponível |
 
 ---
@@ -71,7 +77,7 @@ GOOGLE_IMAGE_MODEL=imagen-3.0-generate-001
 # ou OpenAI:
 AI_IMAGE_PROVIDER=openai
 OPENAI_API_KEY=sk-...
-OPENAI_IMAGE_MODEL=dall-e-3
+OPENAI_IMAGE_MODEL=gpt-image-2
 ```
 
 ---

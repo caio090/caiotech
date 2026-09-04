@@ -7,6 +7,15 @@
  * normalizada. process.env.OPENAI_IMAGE_MODEL é lido em module-load
  * time pelo provider -- por isso cada teste reimporta o módulo depois
  * de ajustar a env var, com um query string único pra forçar reload.
+ *
+ * Prompt 11 (GPT-Image-2 Production Migration) — segundo incidente
+ * real de Production (`dpl_EHFbxtcH6Czf2xFfmmDrb9UzmTtC`): o default
+ * sem `OPENAI_IMAGE_MODEL` configurada era `"dall-e-3"`, removido da
+ * API real. Os testes que afirmavam esse default e o suporte real a
+ * dall-e-2 foram reescritos: o default agora precisa resolver pra
+ * gpt-image-2 (nunca dall-e-3, obrigatório -- foi exatamente a causa
+ * do incidente), e dall-e-2/dall-e-3 configurados explicitamente agora
+ * precisam falhar fechado (SDK nunca chamado), nunca funcionar.
  */
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
@@ -76,24 +85,50 @@ test("[PRODUCTION_INCIDENT_OPENAI_RESPONSE_FORMAT] modelo GPT Image real -- requ
   assert.ok(result.images?.[0]?.url.startsWith("data:image/png;base64,"), "b64_json normalizado corretamente pra data: URL");
 });
 
-test("modelo dall-e-3 (default sem OPENAI_IMAGE_MODEL configurada, exatamente o cenário do incidente real) -- também nunca envia response_format", async (t) => {
-  const { provider, getCapturedParams } = await loadProviderWith(t, { apiKey: "sk-test-fake-never-real" }); // sem model -> usa o default "dall-e-3"
+test("[PRODUCTION_INCIDENT_MODEL_REMOVED] default sem OPENAI_IMAGE_MODEL configurada -- resolve gpt-image-2, NUNCA dall-e-3 (causa raiz exata do incidente real)", async (t) => {
+  const { provider, getCapturedParams } = await loadProviderWith(t, { apiKey: "sk-test-fake-never-real" }); // sem model -> usa o novo default
   const result = await provider.generate({ prompt: "x", aspectRatio: "16:9" });
   assert.equal(result.success, true);
   const params = getCapturedParams() as Record<string, unknown>;
-  assert.equal(params.model, "dall-e-3", "confirma que o default real (sem env var) é dall-e-3 -- o modelo que realmente estava ativo no incidente de Production");
-  assert.equal("response_format" in params, false, "dall-e-3 também nunca recebe response_format (decisão pós-incidente, ver openai-image-compat.ts)");
-  assert.equal(params.n, 1, "n sempre 1 pro dall-e-3");
+  assert.equal(params.model, "gpt-image-2", "o default real (sem env var) precisa ser gpt-image-2 -- dall-e-3 foi removido da API e causou o incidente de Production");
+  assert.notEqual(params.model, "dall-e-3", "nunca mais dall-e-3 como default silencioso");
+  assert.equal("response_format" in params, false, "gpt-image-2 também nunca recebe response_format");
 });
 
-test("modelo dall-e-2 -- request legítimo continua funcionando (regressão: não perder suporte a DALL-E)", async (t) => {
+test("[PRODUCTION_INCIDENT_MODEL_REMOVED] modelo dall-e-3 configurado explicitamente -- nunca chama o SDK, erro sanitizado (modelo removido da API real)", async (t) => {
+  const { provider, getCapturedParams } = await loadProviderWith(t, { model: "dall-e-3", apiKey: "sk-test-fake-never-real" });
+  const result = await provider.generate({ prompt: "x", aspectRatio: "1:1" });
+  assert.equal(result.success, false, "falha fechada, nunca um fallback silencioso pra outro modelo");
+  assert.equal(getCapturedParams(), null, "SDK nunca é chamado pra um modelo removido da API");
+  assert.equal(result.error, "O modelo de geração de imagem configurado não está disponível.", "mensagem sanitizada exata, nunca detalhe técnico");
+});
+
+test("[PRODUCTION_INCIDENT_MODEL_REMOVED] modelo dall-e-2 configurado explicitamente -- nunca chama o SDK, erro sanitizado (modelo removido da API real)", async (t) => {
   const { provider, getCapturedParams } = await loadProviderWith(t, { model: "dall-e-2", apiKey: "sk-test-fake-never-real" });
+  const result = await provider.generate({ prompt: "x", aspectRatio: "1:1" });
+  assert.equal(result.success, false, "falha fechada, nunca um fallback silencioso pra outro modelo");
+  assert.equal(getCapturedParams(), null, "SDK nunca é chamado pra um modelo removido da API");
+  assert.equal(result.error, "O modelo de geração de imagem configurado não está disponível.", "mensagem sanitizada exata, nunca detalhe técnico");
+});
+
+test("modelo gpt-image-2 configurado explicitamente -- request válido, sem response_format, quality/size corretos", async (t) => {
+  const { provider, getCapturedParams } = await loadProviderWith(t, { model: "gpt-image-2", apiKey: "sk-test-fake-never-real" });
+  const result = await provider.generate({ prompt: "x", aspectRatio: "9:16", highRes: true });
+  assert.equal(result.success, true);
+  const params = getCapturedParams() as Record<string, unknown>;
+  assert.equal(params.model, "gpt-image-2");
+  assert.equal(params.size, "1024x1536");
+  assert.equal(params.quality, "high");
+  assert.equal("response_format" in params, false, "gpt-image-2 nunca recebe response_format");
+});
+
+test("modelo gpt-image-2-2026-04-21 configurado explicitamente -- resolve gpt_image, request válido", async (t) => {
+  const { provider, getCapturedParams } = await loadProviderWith(t, { model: "gpt-image-2-2026-04-21", apiKey: "sk-test-fake-never-real" });
   const result = await provider.generate({ prompt: "x", aspectRatio: "1:1" });
   assert.equal(result.success, true);
   const params = getCapturedParams() as Record<string, unknown>;
-  assert.equal(params.model, "dall-e-2");
-  assert.equal(params.size, "1024x1024");
-  assert.equal(params.quality, "standard");
+  assert.equal(params.model, "gpt-image-2-2026-04-21");
+  assert.equal("response_format" in params, false, "gpt-image-2-2026-04-21 nunca recebe response_format");
 });
 
 test("sem OPENAI_API_KEY -- indisponível explicitamente, nunca tenta chamar o SDK", async (t) => {
