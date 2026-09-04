@@ -79,7 +79,14 @@ test("[15/17] protected assets nunca chegam ao provider.generate() -- só o prom
 
   assert.equal(JSON.stringify(capturedInput).includes("logo-1"), false, "id do asset protegido nunca aparece no input enviado ao provider");
   assert.equal(JSON.stringify(capturedInput).includes("ref-1"), false, "id do asset de referência nunca aparece no input enviado ao provider");
-  assert.equal((capturedInput as { prompt: string }).prompt, "cenário de teste", "só o generationPrompt (texto) é enviado ao provider");
+  // Prompt 13 -- Background Guard (background-guard.ts) anexa uma
+  // política fixa "sem texto/logo" ao final do prompt real enviado ao
+  // provider; o generationPrompt original continua sendo a base
+  // (nunca reordenado), então o teste passa a checar prefixo em vez de
+  // igualdade exata (o texto do generationPrompt do usuário nunca é
+  // alterado, só a política é anexada).
+  assert.equal((capturedInput as { prompt: string }).prompt.startsWith("cenário de teste\n\n"), true, "generationPrompt original preservado no início do prompt real enviado ao provider");
+  assert.match((capturedInput as { prompt: string }).prompt, /NUNCA inclua texto/i, "Background Guard sempre anexado (Fase 26-28)");
   assert.equal(result.warnings.some((w: string) => w.includes("protegido")), true, "warning explícito sobre o(s) asset(s) protegido(s) -- nunca alterado em silêncio");
   assert.equal(result.warnings.some((w: string) => w.toLowerCase().includes("referência")), true, "warning explícito sobre a(s) referência(s) não influenciar(em) a geração");
 });

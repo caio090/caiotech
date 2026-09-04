@@ -1,9 +1,14 @@
-import { Palette, Sparkles, ExternalLink } from "lucide-react";
+import { Palette, Sparkles, ExternalLink, AtSign } from "lucide-react";
 import Link from "next/link";
 import { ContentosSubNavServer } from "../_contentos-subnav-server";
 import { getStudioSkills, isStudioSkillContractAvailable, isStudioSkillRuntimeAvailable } from "@/lib/rec-os/studio";
 import { VIDIGAL_PNG_DELIVERY_STEPS } from "@/lib/rec-os/studio/skills/vidigal-png/instructions";
 import { StudioExecutionForm } from "./_studio-execution-form";
+import { parseStudioLaunchContext } from "@/lib/rec-os/studio/launch-context";
+import { resolveSocialProfileContext } from "@/lib/rec-os/social-profile/resolve";
+import { resolveFeedDnaProfile } from "@/lib/rec-os/social-profile/feed-dna";
+import { createServerSupabaseClient, createSupabaseAdminClient } from "@/lib/supabase/server";
+import { FirstRunNote, HelpLauncher, EmptyStateGuide } from "@/components/guided-experience/guided-experience";
 
 /**
  * Sprint REC OS Studio Foundation V0.1/V0.2 — reaproveita
@@ -22,28 +27,55 @@ import { StudioExecutionForm } from "./_studio-execution-form";
 export default async function StudioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string }>;
+  searchParams: Promise<{ client?: string; content_id?: string; campaign_id?: string; social_profile_id?: string; source_format?: string; return_to?: string }>;
 }) {
-  const { client } = await searchParams;
-  const clientId = client ?? null;
+  const params = await searchParams;
+  const clientId = params.client ?? null;
   const skills = getStudioSkills();
+  const launchContext = parseStudioLaunchContext(params);
+
+  // Fase 19/50/51 -- Social Profile First View + Studio Top Bar (Company Mode
+  // apenas; Free Mode nunca resolve contexto social, ver resolveSocialProfileContext).
+  let db;
+  try { db = createSupabaseAdminClient(); } catch { db = await createServerSupabaseClient(); }
+  const socialProfile = clientId ? await resolveSocialProfileContext(db, clientId) : null;
+  const feedDna = clientId ? await resolveFeedDnaProfile(db, clientId) : null;
 
   return (
     <>
       <ContentosSubNavServer initialClientId={clientId ?? undefined} />
 
       <div className="space-y-4">
-        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5">
-          <p className="text-xs font-bold text-purple-800 mb-1 flex items-center gap-1.5">
-            <Palette className="w-3.5 h-3.5" /> STUDIO
-          </p>
-          <p className="text-xs text-purple-600">
-            Direção criativa e produção visual do REC OS.
-          </p>
+        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-purple-800 mb-1 flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5" /> STUDIO
+            </p>
+            <p className="text-xs text-purple-600">
+              Direção criativa e produção visual do REC OS.
+            </p>
+            {/* Fase 50 -- Studio Top Bar: Company/Social Profile visíveis quando existentes, Free Mode continua simples. */}
+            {clientId && socialProfile?.status === "connected" && (
+              <p className="text-[11px] text-purple-500 mt-1 flex items-center gap-1">
+                <AtSign className="w-3 h-3" /> {socialProfile.handle ?? socialProfile.displayName ?? "conectado"}
+              </p>
+            )}
+          </div>
+          <HelpLauncher featureId="studio" />
         </div>
 
+        <FirstRunNote featureId="studio" />
+
+        {/* Fase 09/35 -- empty states discretos, nunca bloqueiam o Studio. */}
+        {clientId && socialProfile?.status === "not_connected" && (
+          <EmptyStateGuide featureId="studio" stateId="instagram_not_connected" />
+        )}
+        {clientId && feedDna?.status === "unset" && (
+          <EmptyStateGuide featureId="studio" stateId="feed_dna_unset" />
+        )}
+
         {/* Nova criação visual */}
-        <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} />
+        <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} launchContext={launchContext} />
 
         {/* Skills disponíveis */}
         <div>

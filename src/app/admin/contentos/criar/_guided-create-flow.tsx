@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList,
   Copy, FileCheck2, FolderOpen, ImageIcon, Layers, Loader2, PenLine, Send, Upload, Wand2,
@@ -11,6 +12,7 @@ import type { RadarOpportunity } from "@/lib/rec-os-workflow/radar-opportunities
 import {
   buildEditorAssetHandoff, validateEditorAssetHandoff, serializeEditorAssetHandoff,
 } from "@/lib/rec-os-workflow/editor-handoff";
+import { buildStudioLaunchUrl } from "@/lib/rec-os/studio/launch-context";
 
 type StepId = "brief" | "content" | "review" | "destination" | "visual";
 type BriefMode = "manual" | "ai";
@@ -872,15 +874,27 @@ export function GuidedCreateFlow({
             <p className="text-sm text-gray-500">Último passo criativo. Use upload manual, EditorOS ou aguarde provider de imagem aprovado.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-4">
-            {/* IA */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <ImageIcon className="h-6 w-6 text-gray-500" />
-              <p className="mt-3 text-sm font-bold text-gray-900">Gerar com IA</p>
-              <p className="mt-1 text-xs text-gray-500">A geração de imagem ainda não está disponível neste ambiente.</p>
-              <button type="button" disabled
-                className="mt-4 w-full cursor-not-allowed rounded-xl bg-gray-200 px-3 py-2 text-xs font-bold text-gray-400">
-                Geração indisponível
-              </button>
+            {/* Studio (Prompt 13 -- Fase 03/04: Produção Visual dentro de Criar
+                abre o Studio, nunca reimplementa o formulário inteiro aqui). */}
+            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
+              <ImageIcon className="h-6 w-6 text-purple-600" />
+              <p className="mt-3 text-sm font-bold text-gray-900">Gerar com Studio</p>
+              <p className="mt-1 text-xs text-gray-500">Abre o Studio (produção visual com IA) já com este conteúdo em contexto.</p>
+              <Link
+                href={buildStudioLaunchUrl("/admin/contentos/visual", {
+                  clientId, contentId: contentId ?? null, campaignId: null, socialProfileId: null,
+                  format: brief.format || null,
+                  returnRoute: `/admin/contentos/criar?client=${clientId}${contentId ? `&content_id=${contentId}` : ""}&step=visual`,
+                })}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700"
+              >
+                Abrir Studio <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              {visualHasSession && (
+                <p className="mt-2 text-[10px] text-purple-600">
+                  Uma peça gerada no Studio já está pronta para uso neste conteúdo.
+                </p>
+              )}
             </div>
 
             {/* Biblioteca de ativos (Fase 17) — sem fonte real hoje, nunca simulada */}

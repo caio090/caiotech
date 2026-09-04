@@ -26,6 +26,7 @@ const BASE_LINKS: NavLink[] = [
   { href: "/admin/contentos",            label: "Visão Geral", acceptsClient: true },
   { href: "/admin/contentos/radar",      label: "Radar",       acceptsClient: true },
   { href: "/admin/contentos/criar",      label: "✦ Criar",     acceptsClient: true },
+  { href: "/admin/contentos/visual",     label: "Studio",      acceptsClient: true },
   { href: "/admin/contentos/producao",   label: "Produção",    acceptsClient: true },
   { href: "/admin/contentos/aprovacoes", label: "Aprovações",  acceptsClient: true },
   { href: "/admin/contentos/roadmap",    label: "Roadmap",     acceptsClient: true },

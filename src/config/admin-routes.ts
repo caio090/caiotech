@@ -38,6 +38,12 @@ export const ADMIN_ROUTES: AdminRouteDef[] = [
   { id: "rec_os_hub",        label: "REC OS",              href: "/admin/contentos",                     module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported", statusAreaId: "rec_os_global_hub" },
   { id: "rec_os_radar",      label: "Radar",                href: "/admin/contentos/radar",                module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
   { id: "rec_os_criar",      label: "Criar conteúdo",       href: "/admin/contentos/criar",                module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "client_required" },
+  // Prompt 13 (REC OS Core Experience) — Studio (produção visual) passa a
+  // aparecer na navegação oficial (antes só acessível por URL direta,
+  // confirmado por auditoria). Funciona com ou sem `?client=` (Company
+  // Mode / Free Creation Mode, já implementado desde o Studio Foundation),
+  // nunca redireciona sem client -- global_supported.
+  { id: "rec_os_studio",     label: "Studio",                href: "/admin/contentos/visual",               module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported" },
   { id: "rec_os_producao",   label: "Produção",              href: "/admin/contentos/producao",             module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported", statusAreaId: "rec_os_global_production" },
   { id: "rec_os_aprovacoes", label: "Aprovações",            href: "/admin/contentos/aprovacoes",           module: "rec_os",      preserveClient: true,  visibility: "primary",   contextMode: "global_supported", statusAreaId: "rec_os_global_approvals" },
   // REC OS Context Foundation V1 corrigiu isto: /admin/contentos/calendario
