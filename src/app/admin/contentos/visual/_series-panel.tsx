@@ -31,6 +31,21 @@
  *   caso de falha, o item "ready" antigo NUNCA é tocado (nem local nem
  *   persistido) -- por isso regenerate de um item "ready" não passa
  *   pela máquina de status planned/generating antes do resultado.
+ *
+ * Prompt 22 (Series Server-Authoritative Hydration Repair) -- P1 real
+ * de Production: mesmo com series_id salvo corretamente na URL (Prompt
+ * 20), a série ainda podia desaparecer da UI quando o Company Context
+ * terminava de hidratar. Root cause: a série vivia inteiramente de um
+ * fetch client-side, e um efeito separado (disparado só por mudanças
+ * no prop `clientId`, sem saber SE essa mudança era uma hidratação
+ * inicial legítima ou uma troca real de Company) podia resetar a série
+ * já carregada. Corrigido removendo essa race da arquitetura: a página
+ * (Server Component) agora resolve `series_id` + o Company efetivo NA
+ * MESMA passada síncrona, sob RLS real (ver scope-resolution.ts), e
+ * entrega `initialSeries` já pronto -- o client nunca mais "adivinha"
+ * nem reconcilia dois valores que podem divergir. O efeito abaixo
+ * reage à IDENTIDADE do prop `initialSeries` (o que o servidor decidiu
+ * numa passada nova), nunca a mudanças soltas de `clientId`.
  */
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -114,14 +129,16 @@ export function SeriesQuantityPicker({ value, onChange }: { value: CreativeSerie
 }
 
 export function SeriesPanel({
-  skillId, clientId, contentId, format, freeformBrief, references, protectedAssets, quantity,
+  skillId, clientId, contentId, format, freeformBrief, references, protectedAssets, quantity, initialSeries,
 }: {
   skillId: string; clientId: string | null; contentId: string | null; format: DesignFormat; freeformBrief: string;
   references: { label: string; url: string }[]; protectedAssets: { label: string; url: string }[];
   quantity: CreativeSeriesSize;
+  /** Prompt 22 -- já resolvido pelo Server Component (page.tsx) sob RLS real, na MESMA passada que decidiu o `clientId` efetivo. Autoridade real: o client nunca precisa buscar isto sozinho no caminho comum. */
+  initialSeries: CreativeSeriesWithItems | null;
 }) {
-  const [seriesId, setSeriesId] = useState<string | null>(null);
-  const [items, setItems] = useState<CreativeSeriesItem[] | null>(null);
+  const [seriesId, setSeriesId] = useState<string | null>(initialSeries?.series.id ?? null);
+  const [items, setItems] = useState<CreativeSeriesItem[] | null>(initialSeries?.items ?? null);
   const [creating, setCreating] = useState(false);
   const [queueRunning, setQueueRunning] = useState(false);
   const [confirmingGenerateAll, setConfirmingGenerateAll] = useState(false);
@@ -134,8 +151,10 @@ export function SeriesPanel({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlSeriesId = searchParams.get("series_id");
-  /** Fase 07 -- Company da série já carregada, pra invalidar se o clientId do contexto mudar depois. */
-  const loadedSeriesClientIdRef = useRef<string | null | undefined>(undefined);
+  /** Fase 07 -- Company da série carregada (via prop OU fallback client-side), pra decidir o vínculo real. */
+  const loadedSeriesClientIdRef = useRef<string | null | undefined>(initialSeries ? initialSeries.series.clientId : undefined);
+  /** Prompt 22 -- identidade do que o SERVIDOR resolveu por último; só reage quando isso muda de verdade (nova navegação/passada do servidor), nunca a um valor de clientId "passando" no meio de uma hidratação client-side. */
+  const lastServerSeriesIdRef = useRef<string | null>(initialSeries?.series.id ?? null);
 
   /** Fase 04/05 -- series_id é a fonte de verdade explícita na URL (nunca dados sensíveis: só o UUID). Preserva os demais params. */
   function setSeriesIdInUrl(nextSeriesId: string | null) {
@@ -145,29 +164,73 @@ export function SeriesPanel({
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
-  function resetSeries() {
-    setSeriesId(null);
-    setItems(null);
-    loadedSeriesClientIdRef.current = undefined;
-    setSeriesIdInUrl(null);
+  /**
+   * Prompt 22 -- ÚNICA fonte de reconciliação entre o que o servidor
+   * decidiu (initialSeries, resolvido sob RLS na MESMA passada que o
+   * `clientId` efetivo) e o estado local. Reage à IDENTIDADE do prop
+   * (o id da série que o servidor está afirmando agora), nunca a
+   * mudanças soltas de `clientId` -- é exatamente essa distinção que
+   * elimina a race do Prompt 20/21 (Company Context "terminando de
+   * hidratar" não é mais um evento client-side ambíguo; é só uma nova
+   * passada do servidor, que já vem com série+scope AUTOCONSISTENTES).
+   *
+   * Ajustado DURANTE o render (padrão oficial "Adjusting state when a
+   * prop changes", react.dev/learn/you-might-not-need-an-effect) --
+   * nunca dentro de um useEffect: evitar setState direto no corpo de um
+   * efeito evita uma renderização em cascata desnecessária e é o que o
+   * eslint-plugin-react-hooks (react-hooks/set-state-in-effect) exige.
+   * A limpeza de URL (navegação, efeito colateral externo de verdade)
+   * continua isolada num efeito próprio logo abaixo.
+   */
+  const incomingServerSeriesId = initialSeries?.series.id ?? null;
+  if (incomingServerSeriesId !== lastServerSeriesIdRef.current) {
+    lastServerSeriesIdRef.current = incomingServerSeriesId; // mesma decisão do servidor -- nada mudou de verdade, nunca sobrescreve estado local em progresso (ex.: regenerando).
+    if (initialSeries) {
+      setSeriesId(initialSeries.series.id);
+      setItems(initialSeries.items);
+    } else {
+      // Servidor não encontra/autoriza mais nenhuma série pra este
+      // contexto (Fase 09/17: troca real de Company, ou series_id
+      // ficou inválido) -- reseta, nunca deixa a série anterior visível.
+      setSeriesId(null);
+      setItems(null);
+    }
   }
 
   /**
-   * Fase 04/05/06 -- series_id explícito na URL SEMPRE vence a heurística
-   * de "série recente" (Prompt 19 P1: depender só de "recente" é frágil
-   * -- some no refresh quando outra série mais nova existir pro mesmo
-   * contexto, ou quando a ordenação muda). Sem series_id na URL, cai
-   * pro fallback "recente" (Fase 06).
+   * Prompt 22 -- efeitos colaterais de verdade emparelhados com a
+   * mesma decisão do servidor (nunca estado React, por isso vivem num
+   * efeito e não no bloco de render acima): sincroniza a ref de Company
+   * "carregada" (usada só pelo fallback client-side abaixo) e limpa um
+   * series_id morto da URL quando o servidor já confirmou que não há
+   * mais série pra este contexto.
    */
   useEffect(() => {
-    if (seriesId) return;
+    if (initialSeries) {
+      loadedSeriesClientIdRef.current = initialSeries.series.clientId;
+    } else {
+      loadedSeriesClientIdRef.current = undefined;
+      if (searchParams.get("series_id")) setSeriesIdInUrl(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSeries]);
+
+  /**
+   * Fallback client-side (Fase 06/23): só roda quando o servidor NÃO
+   * entregou nada (initialSeries null) mas a URL ainda afirma um
+   * series_id -- ou quando não há series_id nenhum, caso em que cai na
+   * heurística "recente". Nunca disputa com um initialSeries já
+   * presente (Fase 08: series_id explícito > recent, nunca some por
+   * causa disso).
+   */
+  useEffect(() => {
+    if (seriesId || initialSeries) return;
     if (urlSeriesId) {
       fetch(`/api/rec-os/series/${urlSeriesId}`)
         .then((r) => r.json())
         .then((data) => {
           if (data?.ok && data.series) {
             const loaded = data.series as CreativeSeriesWithItems;
-            // Fase 07/08 -- série de outra Company/Free Mode nunca reaparece fora do seu contexto real.
             if (loaded.series.clientId !== clientId) { setSeriesIdInUrl(null); return; }
             loadedSeriesClientIdRef.current = loaded.series.clientId;
             setSeriesId(loaded.series.id);
@@ -188,14 +251,7 @@ export function SeriesPanel({
       .then((data) => { if (data?.ok && data.series) setRecent(data.series as CreativeSeriesWithItems); })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, contentId, urlSeriesId]);
-
-  /** Fase 07 -- se o Company do contexto mudar DEPOIS de uma série já carregada, nunca continuar mostrando a série da Company anterior. */
-  useEffect(() => {
-    if (loadedSeriesClientIdRef.current === undefined) return; // ainda não carregou nenhuma série nesta instância.
-    if (loadedSeriesClientIdRef.current !== clientId) resetSeries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [clientId, contentId, urlSeriesId, initialSeries]);
 
   function applyUpdate(next: CreativeSeriesItem) {
     setItems((prev) => (prev ? prev.map((i) => (i.id === next.id ? next : i)) : prev));
@@ -246,6 +302,7 @@ export function SeriesPanel({
   async function continueRecent() {
     if (!recent) return;
     loadedSeriesClientIdRef.current = recent.series.clientId;
+    lastServerSeriesIdRef.current = recent.series.id; // Prompt 22 -- marca como já reconciliado, pra quando o server round-trip do router.replace chegar não sobrescrever progresso local.
     setSeriesId(recent.series.id);
     setItems(recent.items);
     setRecent(null);
@@ -261,9 +318,11 @@ export function SeriesPanel({
     }).then((r) => r.json()).catch(() => null);
     setCreating(false);
     if (!created?.ok) return;
+    const newSeriesId = created.series.series.id as string;
     loadedSeriesClientIdRef.current = clientId;
-    setSeriesIdInUrl(created.series.series.id as string);
-    setSeriesId(created.series.series.id as string);
+    lastServerSeriesIdRef.current = newSeriesId; // Prompt 22 -- idem: evita que o round-trip do router.replace sobrescreva estado local já em progresso (ex.: usuário já clicou "Gerar" antes do servidor responder).
+    setSeriesIdInUrl(newSeriesId);
+    setSeriesId(newSeriesId);
     setItems(created.series.items as CreativeSeriesItem[]);
   }
 

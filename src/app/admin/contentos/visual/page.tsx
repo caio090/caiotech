@@ -11,6 +11,7 @@ import { resolveCompanyContext } from "@/lib/company-context/resolve";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { FirstRunNote, HelpLauncher, EmptyStateGuide } from "@/components/guided-experience/guided-experience";
 import { FeedDnaSection } from "./_feed-dna-section";
+import { resolveStudioPageBootstrap } from "./page-bootstrap";
 
 /**
  * Sprint REC OS Studio Foundation V0.1/V0.2 — reaproveita
@@ -29,12 +30,21 @@ import { FeedDnaSection } from "./_feed-dna-section";
 export default async function StudioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; content_id?: string; campaign_id?: string; social_profile_id?: string; source_format?: string; return_to?: string }>;
+  searchParams: Promise<{ client?: string; content_id?: string; campaign_id?: string; social_profile_id?: string; source_format?: string; return_to?: string; series_id?: string }>;
 }) {
   const params = await searchParams;
-  const clientId = params.client ?? null;
   const skills = getStudioSkills();
   const launchContext = parseStudioLaunchContext(params);
+
+  // Prompt 22 (Series Server-Authoritative Hydration Repair) -- P1 real
+  // de Production: uma série corretamente persistida desaparecia da UI
+  // quando o Company Context terminava de hidratar no CLIENTE. Root
+  // cause: a série era resolvida só no cliente, em dois momentos que
+  // podiam divergir. Corrigido resolvendo series_id + Company efetivo
+  // NA MESMA passada server-side, sob a sessão real (RLS) -- nunca o
+  // client precisa "adivinhar" ou reconciliar dois valores depois.
+  const db = await createServerSupabaseClient();
+  const { clientId, resolvedSeries } = await resolveStudioPageBootstrap(db, params);
 
   // Fase 06/19/50/51/53 (Prompt 16) -- Social Profile First View + Studio Top
   // Bar (Company Mode apenas). Autoriza a Company ANTES de ler qualquer dado
@@ -43,7 +53,6 @@ export default async function StudioPage({
   // (nunca o admin/service role) pra respeitar RLS de verdade como segunda
   // camada (Fase 53) -- gap corrigido nesta sprint: a versão do Prompt 13
   // lia com o client admin sem checar resolveCompanyContext antes.
-  const db = await createServerSupabaseClient();
   const companyAuthorized = clientId ? (await resolveCompanyContext(clientId)).valid : false;
   const socialProfile = clientId && companyAuthorized ? await resolveSocialProfileContext(db, clientId) : null;
   const feedDna = clientId && companyAuthorized ? await resolveFeedDnaProfile(db, clientId) : null;
@@ -82,7 +91,7 @@ export default async function StudioPage({
         {clientId && companyAuthorized && <FeedDnaSection clientId={clientId} initial={feedDna} />}
 
         {/* Nova criação visual */}
-        <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} launchContext={launchContext} />
+        <StudioExecutionForm skills={skills.map((s) => ({ id: s.id, name: s.name }))} clientId={clientId} launchContext={launchContext} initialSeries={resolvedSeries} />
 
         {/* Skills disponíveis */}
         <div>

@@ -15,6 +15,7 @@ import { writeVisualImportSession } from "@/lib/rec-os-workflow/visual-import-se
 import { buildEditorAssetHandoff, validateEditorAssetHandoff, serializeEditorAssetHandoff } from "@/lib/rec-os-workflow/editor-handoff";
 import { SeriesQuantityPicker, SeriesPanel } from "./_series-panel";
 import type { CreativeSeriesSize } from "@/lib/rec-os/studio/series/types";
+import type { CreativeSeriesWithItems } from "@/lib/rec-os/studio/series/repository";
 import { FeedPreview } from "@/components/rec-os/feed-preview";
 import { resolveFeedTemporalContext } from "@/lib/rec-os/social-profile/feed-timeline";
 
@@ -92,8 +93,8 @@ const PREVIEW_ASPECT: Record<DesignFormat, { ratio: string; maxWidth: number }> 
 type PreviewMode = "piece" | "feed" | "fullscreen";
 
 export function StudioExecutionForm({
-  skills, clientId, launchContext,
-}: { skills: { id: string; name: string }[]; clientId: string | null; launchContext: StudioLaunchContext }) {
+  skills, clientId, launchContext, initialSeries,
+}: { skills: { id: string; name: string }[]; clientId: string | null; launchContext: StudioLaunchContext; initialSeries: CreativeSeriesWithItems | null }) {
   const router = useRouter();
   const [mode, setMode] = useState<CreationMode>(clientId ? "company" : "free");
   const [freeformBrief, setFreeformBrief] = useState("");
@@ -411,6 +412,7 @@ export function StudioExecutionForm({
           references={references.map((a) => ({ label: a.label, url: a.url }))}
           protectedAssets={protectedAssets.map((a) => ({ label: a.label, url: a.url }))}
           quantity={quantity}
+          initialSeries={initialSeries}
         />
       )}
 

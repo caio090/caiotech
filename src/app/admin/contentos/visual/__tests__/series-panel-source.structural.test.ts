@@ -106,14 +106,43 @@ async function main() {
   console.log("[test] [PROMPT 20 P1] criar/continuar série sempre grava o series_id real na URL (nunca só em React state)");
   {
     const createBody = extractFunctionBody(source, "async function createSeries()");
-    assert(/setSeriesIdInUrl\(created\.series\.series\.id/.test(createBody), "createSeries() grava o id real na URL assim que a série é criada");
+    assert(/setSeriesIdInUrl\(newSeriesId\)/.test(createBody), "createSeries() grava o id real na URL assim que a série é criada");
     const continueBody = extractFunctionBody(source, "async function continueRecent()");
     assert(/setSeriesIdInUrl\(recent\.series\.id\)/.test(continueBody), "continueRecent() também grava o id na URL");
   }
 
-  console.log("[test] [PROMPT 20 Fase 07] troca de Company invalida série de contexto anterior, nunca continua mostrando");
+  console.log("[test] [PROMPT 22] série SEMPRE inicializada a partir de initialSeries (resolvido pelo servidor), nunca começa vazia pra depois tentar reconstruir o que o servidor já sabe");
   {
-    assert(/loadedSeriesClientIdRef\.current !== clientId\) resetSeries\(\)/.test(source), "effect dedicado reseta a série quando o clientId do contexto muda depois de já ter carregado uma série de outro dono");
+    assert(/useState<string \| null>\(initialSeries\?\.series\.id \?\? null\)/.test(source), "seriesId inicializado direto do prop initialSeries");
+    assert(/useState<CreativeSeriesItem\[\] \| null>\(initialSeries\?\.items \?\? null\)/.test(source), "items inicializados direto do prop initialSeries");
+  }
+
+  console.log("[test] [PROMPT 22 -- root cause real] reconciliação reage à IDENTIDADE do que o SERVIDOR decidiu (initialSeries), nunca a mudanças soltas de clientId (essa era a race exata do incidente)");
+  {
+    assert(/const incomingServerSeriesId = initialSeries\?\.series\.id \?\? null/.test(source), "compara pela identidade (id) do que o servidor está afirmando agora");
+    assert(/if \(incomingServerSeriesId !== lastServerSeriesIdRef\.current\) \{/.test(source), "só reage quando a decisão do servidor muda de verdade -- nunca reprocessa/reseta à toa");
+    assert(!/\}, \[clientId\]\);/.test(source), "nenhum effect reage a mudanças soltas de clientId sozinho -- a causa raiz exata do P1 foi removida da arquitetura, não 'consertada' com mais lógica no mesmo padrão");
+    assert(/\}, \[initialSeries\]\);/.test(source), "o effect pareado (limpeza de ref/URL) reage ao prop initialSeries (decisão do servidor), nunca a um valor solto do cliente");
+    // Prompt 22 -- ajuste de estado (setSeriesId/setItems) acontece DURANTE o
+    // render (padrão React "adjusting state"), nunca de forma síncrona dentro
+    // do corpo de um useEffect (react-hooks/set-state-in-effect, já validado
+    // por ESLint) -- o effect emparelhado logo abaixo só toca refs/URL.
+    const pairedEffectBody = source.split("Prompt 22 -- efeitos colaterais de verdade emparelhados")[1]?.split("Fallback client-side")[0] ?? "";
+    assert(pairedEffectBody.length > 0, "achou o effect emparelhado (ref/URL) pra inspecionar isoladamente");
+    assert(!/setSeriesId\(/.test(pairedEffectBody) && !/setItems\(/.test(pairedEffectBody), "o effect emparelhado nunca chama setSeriesId/setItems diretamente -- ajuste de estado sempre no corpo do render, nunca num efeito");
+  }
+
+  console.log("[test] [PROMPT 22] fallback client-side nunca disputa com initialSeries já presente (Fase 08)");
+  {
+    assert(/if \(seriesId \|\| initialSeries\) return;/.test(source), "fallback de busca (série exata ou 'recente') nunca roda quando já existe seriesId local OU initialSeries do servidor");
+  }
+
+  console.log("[test] [PROMPT 22] createSeries()/continueRecent() marcam lastServerSeriesIdRef, pra um round-trip de router.replace nunca sobrescrever progresso local recém-criado");
+  {
+    const createBody = extractFunctionBody(source, "async function createSeries()");
+    const continueBody = extractFunctionBody(source, "async function continueRecent()");
+    assert(/lastServerSeriesIdRef\.current = newSeriesId/.test(createBody), "createSeries() sincroniza a ref ANTES do round-trip do servidor chegar");
+    assert(/lastServerSeriesIdRef\.current = recent\.series\.id/.test(continueBody), "continueRecent() também sincroniza a ref");
   }
 
   console.log(`\n[result] ${passed} passed, ${failed} failed`);
